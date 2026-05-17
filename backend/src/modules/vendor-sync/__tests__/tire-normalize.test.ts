@@ -1,5 +1,5 @@
 import { parseTireSize } from '../utils/tire-parse-helpers'
-import { normalizeTireRow } from '../adapters/teraflex-tires/normalize'
+import { normalizeTireRow } from '../adapters/wheelpros-tires/normalize'
 import { ParsedRow } from '../adapters/types'
 
 describe('parseTireSize', () => {

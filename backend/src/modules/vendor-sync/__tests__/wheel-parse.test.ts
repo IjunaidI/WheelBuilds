@@ -1,6 +1,6 @@
 import * as path from 'path'
-import { parseWheelCsv, detectWarehouseColumns } from '../adapters/teraflex-wheels/parse'
-import { normalizeWheelRow } from '../adapters/teraflex-wheels/normalize'
+import { parseWheelCsv, detectWarehouseColumns } from '../adapters/wheelpros-wheels/parse'
+import { normalizeWheelRow } from '../adapters/wheelpros-wheels/normalize'
 
 const FIXTURE_PATH = path.resolve(__dirname, '../__fixtures__/wheels-small.csv')
 

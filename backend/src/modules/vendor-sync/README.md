@@ -9,10 +9,10 @@ Automated inventory sync pipeline that pulls wheel and tire CSV feeds from vendo
 Add to `backend/.env`:
 
 ```
-VENDOR_TERAFLEX_WHEELS_ENABLED=true
-VENDOR_TERAFLEX_WHEEL_FEED_PATH=./wheelInvPriceData.csv
-VENDOR_TERAFLEX_TIRES_ENABLED=true
-VENDOR_TERAFLEX_TIRE_FEED_PATH=./tireInvPriceData.csv
+VENDOR_WHEELPROS_WHEELS_ENABLED=true
+VENDOR_WHEELPROS_WHEEL_FEED_PATH=./wheelInvPriceData.csv
+VENDOR_WHEELPROS_TIRES_ENABLED=true
+VENDOR_WHEELPROS_TIRE_FEED_PATH=./tireInvPriceData.csv
 ```
 
 These env vars cause `medusa-config.js` to register the vendor-sync module with the appropriate vendor configs. If neither vendor is enabled, the module is not loaded at all.
@@ -20,8 +20,8 @@ These env vars cause `medusa-config.js` to register the vendor-sync module with 
 ### 2. Run a dry-run
 
 ```bash
-pnpm vendor-sync:dry-run teraflex-wheels
-pnpm vendor-sync:dry-run teraflex-tires
+pnpm vendor-sync:dry-run wheelpros-wheels
+pnpm vendor-sync:dry-run wheelpros-tires
 ```
 
 A dry-run executes the full pipeline (fetch, parse, normalize, stage, diff) but stops before applying changes to Medusa products. It creates a run record you can inspect.
@@ -52,7 +52,7 @@ Or trigger a full (non-dry-run) sync via the API:
 curl -X POST \
   -H "Authorization: Bearer <token>" \
   -H "Content-Type: application/json" \
-  -d '{"vendor_code": "teraflex-wheels"}' \
+  -d '{"vendor_code": "wheelpros-wheels"}' \
   http://localhost:9000/admin/vendor-sync/runs
 ```
 
@@ -106,10 +106,10 @@ All configuration flows through `medusa-config.js` module options, which read fr
 
 | Env Var | Default | Description |
 |---------|---------|-------------|
-| `VENDOR_TERAFLEX_WHEELS_ENABLED` | `false` | Enable the teraflex-wheels adapter |
-| `VENDOR_TERAFLEX_WHEEL_FEED_PATH` | `./wheelInvPriceData.csv` | Path to wheel CSV feed |
-| `VENDOR_TERAFLEX_TIRES_ENABLED` | `false` | Enable the teraflex-tires adapter |
-| `VENDOR_TERAFLEX_TIRE_FEED_PATH` | `./tireInvPriceData.csv` | Path to tire CSV feed |
+| `VENDOR_WHEELPROS_WHEELS_ENABLED` | `false` | Enable the wheelpros-wheels adapter |
+| `VENDOR_WHEELPROS_WHEEL_FEED_PATH` | `./wheelInvPriceData.csv` | Path to wheel CSV feed |
+| `VENDOR_WHEELPROS_TIRES_ENABLED` | `false` | Enable the wheelpros-tires adapter |
+| `VENDOR_WHEELPROS_TIRE_FEED_PATH` | `./tireInvPriceData.csv` | Path to tire CSV feed |
 | `VENDOR_SYNC_DISCONTINUE_THRESHOLD` | `0.05` | Max ratio of discontinued/active before requiring approval |
 | `VENDOR_SYNC_APPLY_CONCURRENCY` | `8` | Concurrency limit for apply operations |
 | `VENDOR_SYNC_FEED_ARCHIVE_BUCKET` | `vendor-feeds` | Archive bucket name (reserved for future MinIO use) |
@@ -131,7 +131,7 @@ Returns `{ runs, limit, offset }`.
 
 ```
 POST /admin/vendor-sync/runs
-Body: { "vendor_code": "teraflex-wheels", "dry_run": false }
+Body: { "vendor_code": "wheelpros-wheels", "dry_run": false }
 ```
 
 Returns `{ run_id }` (HTTP 201). Returns HTTP 409 if a run is already in progress.
@@ -172,7 +172,7 @@ Re-diffs and re-applies all SKUs from a completed or failed run's existing stagi
 
 ```
 POST /admin/vendor-sync/skus/:partNumber/replay
-Body: { "vendor_code": "teraflex-wheels" }
+Body: { "vendor_code": "wheelpros-wheels" }
 ```
 
 Finds the most recent staging row for the given vendor + part number and applies it.

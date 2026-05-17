@@ -5,7 +5,7 @@ function makeWheelRecord(overrides: Partial<WheelNormalizedRecord> = {}): WheelN
   return {
     productType: 'wheel',
     partNumber: '000000000001058059',
-    vendorCode: 'teraflex-wheels',
+    vendorCode: 'wheelpros-wheels',
     title: 'NOMAD SPLIT 17X8.5 5X5 71 -12 MTL-BLK',
     brand: 'Teraflex',
     imageUrl: 'https://cdn.example.com/wheels/058-blk.jpg',
@@ -34,7 +34,7 @@ function makeTireRecord(): TireNormalizedRecord {
   return {
     productType: 'tire',
     partNumber: '000000000001058059',
-    vendorCode: 'teraflex-wheels',
+    vendorCode: 'wheelpros-wheels',
     title: 'NOMAD SPLIT 17X8.5 5X5 71 -12 MTL-BLK',
     brand: 'Teraflex',
     imageUrl: 'https://cdn.example.com/wheels/058-blk.jpg',

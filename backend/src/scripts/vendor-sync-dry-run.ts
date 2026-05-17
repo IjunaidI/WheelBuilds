@@ -9,7 +9,7 @@ export default async function vendorSyncDryRun({ container }: ExecArgs) {
   const vendorCode = process.argv[process.argv.length - 1]
   if (!vendorCode || vendorCode.endsWith('.ts') || vendorCode.endsWith('.js')) {
     logger.error('Usage: medusa exec ./src/scripts/vendor-sync-dry-run.ts <vendor-code>')
-    logger.error('Example: medusa exec ./src/scripts/vendor-sync-dry-run.ts teraflex-wheels')
+    logger.error('Example: medusa exec ./src/scripts/vendor-sync-dry-run.ts wheelpros-wheels')
     return
   }
 

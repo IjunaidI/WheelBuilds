@@ -1,13 +1,13 @@
 import { VendorAdapter } from './types'
-import { TeraflexWheelAdapter } from './teraflex-wheels'
-import { TeraflexTireAdapter } from './teraflex-tires'
+import { WheelProsWheelAdapter } from './wheelpros-wheels'
+import { WheelProsTireAdapter } from './wheelpros-tires'
 
 export function resolveAdapter(vendorCode: string, deps?: any): VendorAdapter {
   switch (vendorCode) {
-    case 'teraflex-wheels':
-      return new TeraflexWheelAdapter(deps)
-    case 'teraflex-tires':
-      return new TeraflexTireAdapter(deps)
+    case 'wheelpros-wheels':
+      return new WheelProsWheelAdapter(deps)
+    case 'wheelpros-tires':
+      return new WheelProsTireAdapter(deps)
     default:
       throw new Error(`Unknown vendor adapter: ${vendorCode}`)
   }

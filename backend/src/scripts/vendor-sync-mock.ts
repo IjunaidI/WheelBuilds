@@ -10,10 +10,10 @@
  *   npx tsx src/scripts/vendor-sync-mock.ts ../wheelInvPriceData.csv wheel
  */
 import path from 'path'
-import { parseWheelCsv } from '../modules/vendor-sync/adapters/teraflex-wheels/parse'
-import { normalizeWheelRow } from '../modules/vendor-sync/adapters/teraflex-wheels/normalize'
-import { parseTireCsv } from '../modules/vendor-sync/adapters/teraflex-tires/parse'
-import { normalizeTireRow } from '../modules/vendor-sync/adapters/teraflex-tires/normalize'
+import { parseWheelCsv } from '../modules/vendor-sync/adapters/wheelpros-wheels/parse'
+import { normalizeWheelRow } from '../modules/vendor-sync/adapters/wheelpros-wheels/normalize'
+import { parseTireCsv } from '../modules/vendor-sync/adapters/wheelpros-tires/parse'
+import { normalizeTireRow } from '../modules/vendor-sync/adapters/wheelpros-tires/normalize'
 import { computeContentHash } from '../modules/vendor-sync/utils/hash'
 import type { NormalizedRecord } from '../modules/vendor-sync/adapters/types'
 

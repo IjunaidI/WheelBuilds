@@ -10,7 +10,7 @@ import { parseWheelCsv } from './parse'
 import { normalizeWheelRow } from './normalize'
 import { archiveFeed } from '../../utils/archive'
 
-const VENDOR_CODE = 'teraflex-wheels'
+const VENDOR_CODE = 'wheelpros-wheels'
 
 /**
  * Default CSV path: the wheelInvPriceData.csv at the repository root.
@@ -18,7 +18,7 @@ const VENDOR_CODE = 'teraflex-wheels'
  */
 const DEFAULT_CSV_PATH = path.resolve(__dirname, '../../../../../../wheelInvPriceData.csv')
 
-export class TeraflexWheelAdapter implements VendorAdapter {
+export class WheelProsWheelAdapter implements VendorAdapter {
   readonly vendorCode = VENDOR_CODE
   private csvPath: string
 
@@ -51,6 +51,6 @@ export class TeraflexWheelAdapter implements VendorAdapter {
   }
 
   async submitPurchaseOrder(_input: unknown): Promise<never> {
-    throw new Error('submitPurchaseOrder is not yet implemented for teraflex-wheels')
+    throw new Error('submitPurchaseOrder is not yet implemented for wheelpros-wheels')
   }
 }

@@ -8,7 +8,7 @@ import {
 } from '../../utils/parse-helpers'
 import { wheelRawRowSchema } from './schema'
 
-const VENDOR_CODE = 'teraflex-wheels'
+const VENDOR_CODE = 'wheelpros-wheels'
 
 /**
  * Normalize a parsed CSV row into a WheelNormalizedRecord.

@@ -7,7 +7,7 @@ function makeWheelRecord(
   return {
     productType: "wheel",
     partNumber: "000000000001058059",
-    vendorCode: "teraflex-wheels",
+    vendorCode: "wheelpros-wheels",
     title: "NOMAD SPLIT 17X8.5 5X5 71 -12 MTL-BLK",
     brand: "Teraflex",
     imageUrl: "https://cdn.example.com/wheels/058-blk.jpg",
@@ -38,7 +38,7 @@ function makeTireRecord(
   return {
     productType: "tire",
     partNumber: "000000000001100200",
-    vendorCode: "teraflex-tires",
+    vendorCode: "wheelpros-tires",
     title: "FALKEN WILDPEAK AT3W 285/70R17 116T",
     brand: "Falken",
     imageUrl: "https://cdn.example.com/tires/at3w.jpg",
@@ -65,7 +65,7 @@ function makeTireRecord(
 describe("buildProductMetadata", () => {
   it("includes common base fields for wheel records", () => {
     const meta = buildProductMetadata(makeWheelRecord())
-    expect(meta.vendor_code).toBe("teraflex-wheels")
+    expect(meta.vendor_code).toBe("wheelpros-wheels")
     expect(meta.vendor_part_number).toBe("000000000001058059")
     expect(meta.vendor_map_usd).toBe(369.99)
     expect(meta.vendor_inv_order_type).toBe("ST")
@@ -74,7 +74,7 @@ describe("buildProductMetadata", () => {
 
   it("includes common base fields for tire records", () => {
     const meta = buildProductMetadata(makeTireRecord())
-    expect(meta.vendor_code).toBe("teraflex-tires")
+    expect(meta.vendor_code).toBe("wheelpros-tires")
     expect(meta.vendor_part_number).toBe("000000000001100200")
     expect(meta.vendor_map_usd).toBe(229.99)
     expect(meta.vendor_inv_order_type).toBe("ST")

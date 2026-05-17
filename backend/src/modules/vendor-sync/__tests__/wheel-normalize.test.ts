@@ -5,7 +5,7 @@ import {
   parseVendorDate,
   parseOptionalNumber,
 } from '../utils/parse-helpers'
-import { normalizeWheelRow } from '../adapters/teraflex-wheels/normalize'
+import { normalizeWheelRow } from '../adapters/wheelpros-wheels/normalize'
 import { ParsedRow } from '../adapters/types'
 
 describe('parseSize', () => {

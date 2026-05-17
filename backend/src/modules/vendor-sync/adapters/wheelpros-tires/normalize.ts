@@ -3,7 +3,7 @@ import { parseVendorDate, parsePrice } from '../../utils/parse-helpers'
 import { parseTireSize } from '../../utils/tire-parse-helpers'
 import { tireRawRowSchema } from './schema'
 
-const VENDOR_CODE = 'teraflex-tires'
+const VENDOR_CODE = 'wheelpros-tires'
 
 /**
  * Normalize a parsed CSV row into a TireNormalizedRecord.

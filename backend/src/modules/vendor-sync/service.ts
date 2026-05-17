@@ -264,6 +264,182 @@ class VendorSyncService extends MedusaService({
       return { runId }
     }
   }
+
+  /**
+   * Approve a paused run (awaiting_approval) and apply its diff.
+   * Re-computes the diff from existing staging data, then applies.
+   */
+  async approveAndApply(runId: string, actorId?: string): Promise<void> {
+    // Record who approved and when
+    await (this as any).updateVendorFeedRuns(
+      { id: runId },
+      {
+        status: "applying",
+        approved_by: actorId ?? "admin",
+        approved_at: new Date(),
+      }
+    )
+
+    try {
+      const [run] = await (this as any).listVendorFeedRuns({ id: runId })
+      const vendorCode = run.vendor_code
+
+      // Re-compute diff from existing staging data
+      const diff = await computeDiff(this, runId, vendorCode)
+
+      this.logger_.info(
+        `[vendor-sync] [${runId}] Approved. Applying: ${diff.newPartNumbers.length} new, ` +
+          `${diff.changedPartNumbers.length} changed, ${diff.discontinuedPartNumbers.length} discontinued`
+      )
+
+      const result = await applyChanges(
+        this.container_,
+        this,
+        runId,
+        vendorCode,
+        diff,
+        this.logger_
+      )
+
+      this.logger_.info(
+        `[vendor-sync] [${runId}] Apply complete: ${result.processedCount} processed, ${result.errorCount} errors`
+      )
+
+      await (this as any).updateVendorFeedRuns(
+        { id: runId },
+        { status: "completed", finished_at: new Date() }
+      )
+    } catch (err: any) {
+      this.logger_.error(
+        `[vendor-sync] [${runId}] Apply after approval failed: ${err.message}`
+      )
+      await (this as any).updateVendorFeedRuns(
+        { id: runId },
+        {
+          status: "failed",
+          error_message: err.message?.slice(0, 2000),
+          finished_at: new Date(),
+        }
+      ).catch(() => {})
+      throw err
+    }
+  }
+
+  /**
+   * Replay a completed or failed run: re-diff from existing staging data
+   * and re-apply all changes.
+   */
+  async replayRun(runId: string): Promise<void> {
+    const [run] = await (this as any).listVendorFeedRuns({ id: runId })
+    if (!run) throw new Error(`Run ${runId} not found`)
+
+    const vendorCode = run.vendor_code
+
+    await (this as any).updateVendorFeedRuns(
+      { id: runId },
+      { status: "applying", finished_at: null }
+    )
+
+    try {
+      const diff = await computeDiff(this, runId, vendorCode)
+
+      this.logger_.info(
+        `[vendor-sync] [${runId}] Replaying: ${diff.newPartNumbers.length} new, ` +
+          `${diff.changedPartNumbers.length} changed, ${diff.discontinuedPartNumbers.length} discontinued`
+      )
+
+      const result = await applyChanges(
+        this.container_,
+        this,
+        runId,
+        vendorCode,
+        diff,
+        this.logger_
+      )
+
+      this.logger_.info(
+        `[vendor-sync] [${runId}] Replay complete: ${result.processedCount} processed, ${result.errorCount} errors`
+      )
+
+      await (this as any).updateVendorFeedRuns(
+        { id: runId },
+        { status: "completed", finished_at: new Date() }
+      )
+    } catch (err: any) {
+      this.logger_.error(
+        `[vendor-sync] [${runId}] Replay failed: ${err.message}`
+      )
+      await (this as any).updateVendorFeedRuns(
+        { id: runId },
+        {
+          status: "failed",
+          error_message: err.message?.slice(0, 2000),
+          finished_at: new Date(),
+        }
+      ).catch(() => {})
+      throw err
+    }
+  }
+
+  /**
+   * Replay a single SKU: find the most recent staging row, classify it
+   * against the current state, and apply the appropriate action.
+   */
+  async replaySku(vendorCode: string, partNumber: string): Promise<void> {
+    // Find the most recent staging row for this vendor + part number
+    const [stagingRow] = await (this as any).listVendorFeedStagings(
+      { vendor_code: vendorCode, part_number: partNumber },
+      { order: { created_at: "DESC" }, take: 1 }
+    )
+
+    if (!stagingRow) {
+      throw new Error(
+        `No staging data found for vendor=${vendorCode}, part_number=${partNumber}`
+      )
+    }
+
+    const runId = stagingRow.run_id
+
+    // Get current row for this part number
+    const [currentRow] = await (this as any).listVendorProductCurrents(
+      { vendor_code: vendorCode, part_number: partNumber },
+      { take: 1 }
+    )
+
+    // Classify: if no current row -> new, if hash differs -> changed
+    const isNew = !currentRow || currentRow.discontinued_at !== null
+    const isChanged =
+      currentRow &&
+      currentRow.discontinued_at === null &&
+      currentRow.content_hash !== stagingRow.content_hash
+
+    if (!isNew && !isChanged) {
+      this.logger_.info(
+        `[vendor-sync] SKU ${partNumber} is unchanged, nothing to replay`
+      )
+      return
+    }
+
+    // Build a minimal diff and apply
+    const diff = {
+      newPartNumbers: isNew ? [partNumber] : [],
+      changedPartNumbers: isChanged ? [partNumber] : [],
+      discontinuedPartNumbers: [],
+    }
+
+    this.logger_.info(
+      `[vendor-sync] Replaying SKU ${partNumber} (${isNew ? "new" : "changed"}) from run ${runId}`
+    )
+
+    await applyChanges(
+      this.container_,
+      this,
+      runId,
+      vendorCode,
+      diff,
+      this.logger_
+    )
+  }
 }
 
 export default VendorSyncService

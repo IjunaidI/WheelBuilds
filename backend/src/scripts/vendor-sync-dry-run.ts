@@ -1,9 +1,6 @@
 import { ExecArgs } from "@medusajs/framework/types"
 import { ContainerRegistrationKeys } from "@medusajs/framework/utils"
 import { VENDOR_SYNC_MODULE } from '../modules/vendor-sync'
-import { resolveAdapter } from '../modules/vendor-sync/adapters/registry'
-import { fetchFeed } from '../modules/vendor-sync/pipeline/fetch'
-import { stageFeed } from '../modules/vendor-sync/pipeline/stage'
 
 export default async function vendorSyncDryRun({ container }: ExecArgs) {
   const logger = container.resolve(ContainerRegistrationKeys.LOGGER)
@@ -17,52 +14,33 @@ export default async function vendorSyncDryRun({ container }: ExecArgs) {
   }
 
   logger.info(`[dry-run] Starting vendor sync for: ${vendorCode}`)
+  const startTime = Date.now()
 
-  // Resolve adapter
-  const adapter = resolveAdapter(vendorCode)
+  // Run the full pipeline in dry-run mode
+  const { runId } = await (vendorSyncService as any).run(vendorCode, {
+    dryRun: true,
+  })
 
-  // Fetch feed
-  logger.info('[dry-run] Fetching feed...')
-  const descriptor = await fetchFeed(adapter)
-  logger.info(
-    `[dry-run] Feed fetched: ${descriptor.sourceFilename} (${descriptor.byteLength} bytes)`
+  const elapsed = ((Date.now() - startTime) / 1000).toFixed(1)
+
+  // Fetch the completed run row for the summary
+  const [run] = await (vendorSyncService as any).listVendorFeedRuns(
+    { id: runId },
+    { take: 1 }
   )
 
-  // Create run row
-  const [run] = await (vendorSyncService as any).createVendorFeedRuns({
-    vendor_code: vendorCode,
-    source_filename: descriptor.sourceFilename,
-    source_archive_key: descriptor.archiveKey,
-    status: 'dry-run',
-    started_at: new Date(),
-    row_count: 0,
-    skipped_no_image_count: 0,
-    hash_match_count: 0,
-    new_count: 0,
-    changed_count: 0,
-    discontinued_count: 0,
-  })
-
-  logger.info(`[dry-run] Created run: ${run.id}`)
-
-  // Stage feed (populates staging tables only, no Medusa product changes)
-  const result = await stageFeed(adapter, descriptor, vendorSyncService, run.id, logger)
-
-  // Update run status
-  await (vendorSyncService as any).updateVendorFeedRuns({
-    id: run.id,
-    status: 'dry-run-complete',
-    finished_at: new Date(),
-  })
-
   // Print summary
-  logger.info('--- Dry Run Summary ---')
+  logger.info('')
+  logger.info('Vendor Sync Dry Run Summary')
+  logger.info('===========================')
   logger.info(`Vendor:              ${vendorCode}`)
-  logger.info(`Run ID:              ${run.id}`)
-  logger.info(`Source file:         ${descriptor.sourceFilename}`)
-  logger.info(`File size:           ${descriptor.byteLength} bytes`)
-  logger.info(`Total rows parsed:   ${result.rowCount}`)
-  logger.info(`Rows staged:         ${result.stagedCount}`)
-  logger.info(`Skipped (no image):  ${result.skippedNoImageCount}`)
-  logger.info('-----------------------')
+  logger.info(`Run ID:              ${runId}`)
+  logger.info(`Status:              ${run.status}`)
+  logger.info(`Rows parsed:         ${run.row_count}`)
+  logger.info(`Skipped (no image):  ${run.skipped_no_image_count}`)
+  logger.info(`New:                 ${run.new_count}`)
+  logger.info(`Changed:             ${run.changed_count}`)
+  logger.info(`Discontinued:        ${run.discontinued_count}`)
+  logger.info(`Duration:            ${elapsed}s`)
+  logger.info('===========================')
 }

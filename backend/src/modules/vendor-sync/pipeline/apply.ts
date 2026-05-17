@@ -15,6 +15,7 @@ import {
   ensureShippingProfile,
 } from "./bootstrap"
 import { applyStockLevels } from "./apply-stock"
+import { applyDiscontinuations } from "./apply-discontinue"
 import VendorSyncService from "../service"
 
 interface Logger {
@@ -279,6 +280,26 @@ export async function applyChanges(
     )
     logger.info(
       `[vendor-sync] [${runId}] Stock levels applied: ${stockResult.updatedCount} updated, ${stockResult.errorCount} errors`
+    )
+  }
+
+  // 5. Apply discontinuations
+  if (diffResult.discontinuedPartNumbers.length > 0) {
+    const discResult = await applyDiscontinuations(
+      container,
+      service,
+      vendorCode,
+      diffResult.discontinuedPartNumbers,
+      logger
+    )
+    logger.info(
+      `[vendor-sync] [${runId}] Discontinuations applied: ${discResult.discontinuedCount} discontinued, ${discResult.errorCount} errors`
+    )
+    errors.push(
+      ...Array.from({ length: discResult.errorCount }, (_, i) => ({
+        partNumber: diffResult.discontinuedPartNumbers[i] ?? "unknown",
+        error: "discontinuation failed",
+      }))
     )
   }
 

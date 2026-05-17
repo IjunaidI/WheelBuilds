@@ -22,6 +22,7 @@ export function buildProductMetadata(
       wheel_width_in: normalized.widthIn,
       bolt_count: normalized.boltCount,
       bolt_circle_in: normalized.boltCircleIn,
+      bolt_pattern_raw: normalized.boltPatternRaw,
       offset_mm: normalized.offsetMm,
       center_bore_mm: normalized.centerBoreMm,
       load_rating_lb: normalized.loadRatingLb,

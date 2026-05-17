@@ -20,7 +20,7 @@ export function normalizeWheelRow(row: ParsedRow): WheelNormalizedRecord {
   wheelRawRowSchema.parse(raw)
 
   const { diameterIn, widthIn } = parseSize(raw['Size'])
-  const { boltCount, boltCircleIn } = parseBoltPattern(raw['BoltPattern'])
+  const boltResult = parseBoltPattern(raw['BoltPattern'])
 
   const stockByWarehouse: Record<string, number> = {}
   let warehouseSum = 0
@@ -50,7 +50,7 @@ export function normalizeWheelRow(row: ParsedRow): WheelNormalizedRecord {
     title: raw['PartDescription'],
     brand: raw['Brand'],
     imageUrl,
-    invOrderType: raw['InvOrderType'] as 'ST' | 'N2' | 'SO',
+    invOrderType: raw['InvOrderType'],
     totalQoh: warehouseSum > 0 ? warehouseSum : totalQoh,
     msrpUsd: parsePrice(raw['MSRP_USD']),
     mapUsd: parsePrice(raw['MAP_USD']),
@@ -60,8 +60,9 @@ export function normalizeWheelRow(row: ParsedRow): WheelNormalizedRecord {
     finish: raw['Finish']?.trim() || null,
     diameterIn,
     widthIn,
-    boltCount,
-    boltCircleIn,
+    boltCount: boltResult?.boltCount ?? null,
+    boltCircleIn: boltResult?.boltCircleIn ?? null,
+    boltPatternRaw: raw['BoltPattern'],
     offsetMm: parseFloat(raw['Offset']) || 0,
     centerBoreMm: parseOptionalNumber(raw['CenterBore'] || ''),
     loadRatingLb: parseOptionalNumber(raw['LoadRating'] || ''),

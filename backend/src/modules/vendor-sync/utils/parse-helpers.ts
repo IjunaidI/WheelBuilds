@@ -15,19 +15,40 @@ export function parseSize(str: string): { diameterIn: number; widthIn: number } 
 }
 
 /**
- * Parse a bolt pattern string like "5X5.0" into bolt count and bolt circle diameter.
+ * Parse a bolt pattern string into bolt count and bolt circle diameter.
+ *
+ * Handles these real-world formats:
+ *   "5X5.0"      -> { boltCount: 5, boltCircleIn: 5.0 }
+ *   "5X120"      -> { boltCount: 5, boltCircleIn: 4.724 }  (mm -> in)
+ *   "5X5.0/5.5"  -> { boltCount: 5, boltCircleIn: 5.0 }   (dual pattern, use first)
+ *   "6X135/5.5"  -> { boltCount: 6, boltCircleIn: 5.315 }  (dual, use first which is mm)
+ *   "BLANK"      -> null  (no bolt pattern, custom/forged)
+ *
+ * Bolt circle values > 20 are treated as millimeters and converted to inches.
  */
-export function parseBoltPattern(str: string): { boltCount: number; boltCircleIn: number } {
-  const parts = str.toUpperCase().split('X')
+export function parseBoltPattern(str: string): { boltCount: number; boltCircleIn: number } | null {
+  const upper = str.toUpperCase().trim()
+  if (upper === 'BLANK' || upper === '' || upper === 'CALL') {
+    return null
+  }
+
+  // Handle dual bolt patterns like "5X5.0/5.5" or "6X135/5.5" — take the first pattern
+  const primaryPattern = upper.split('/')[0]
+
+  const parts = primaryPattern.split('X')
   if (parts.length !== 2) {
-    throw new Error(`Invalid bolt pattern format: "${str}"`)
+    return null
   }
   const boltCount = parseInt(parts[0], 10)
-  const boltCircleIn = parseFloat(parts[1])
-  if (isNaN(boltCount) || isNaN(boltCircleIn)) {
-    throw new Error(`Invalid bolt pattern values: "${str}"`)
+  let boltCircle = parseFloat(parts[1])
+  if (isNaN(boltCount) || isNaN(boltCircle)) {
+    return null
   }
-  return { boltCount, boltCircleIn }
+  // Values > 20 are millimeters (e.g. 112mm, 120mm, 135mm, 156mm); convert to inches
+  if (boltCircle > 20) {
+    boltCircle = Math.round((boltCircle / 25.4) * 1000) / 1000
+  }
+  return { boltCount, boltCircleIn: boltCircle }
 }
 
 /**

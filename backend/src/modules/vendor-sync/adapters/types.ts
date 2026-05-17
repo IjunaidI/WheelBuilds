@@ -18,7 +18,7 @@ export interface NormalizedRecordBase {
   title: string
   brand: string
   imageUrl: string | null
-  invOrderType: 'ST' | 'N2' | 'SO'
+  invOrderType: string
   totalQoh: number
   msrpUsd: number
   mapUsd: number
@@ -32,8 +32,9 @@ export interface WheelNormalizedRecord extends NormalizedRecordBase {
   finish: string | null
   diameterIn: number
   widthIn: number
-  boltCount: number
-  boltCircleIn: number
+  boltCount: number | null
+  boltCircleIn: number | null
+  boltPatternRaw: string
   offsetMm: number
   centerBoreMm: number | null
   loadRatingLb: number | null

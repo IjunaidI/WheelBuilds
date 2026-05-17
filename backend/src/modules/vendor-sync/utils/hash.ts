@@ -29,6 +29,7 @@ export function computeContentHash(record: NormalizedRecord): string {
     base.widthIn = record.widthIn
     base.boltCount = record.boltCount
     base.boltCircleIn = record.boltCircleIn
+    base.boltPatternRaw = record.boltPatternRaw
     base.offsetMm = record.offsetMm
     base.centerBoreMm = record.centerBoreMm
     base.loadRatingLb = record.loadRatingLb

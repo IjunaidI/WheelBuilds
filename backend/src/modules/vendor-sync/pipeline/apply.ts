@@ -14,6 +14,7 @@ import {
   ensureBrandCollection,
   ensureShippingProfile,
 } from "./bootstrap"
+import { applyStockLevels } from "./apply-stock"
 import VendorSyncService from "../service"
 
 interface Logger {
@@ -259,6 +260,26 @@ export async function applyChanges(
       )
       errors.push({ partNumber, error: err.message })
     }
+  }
+
+  // 4. Apply stock levels for all new and changed products
+  const stockPartNumbers = [
+    ...diffResult.newPartNumbers,
+    ...diffResult.changedPartNumbers,
+  ]
+  if (stockPartNumbers.length > 0) {
+    const stockResult = await applyStockLevels(
+      container,
+      service,
+      runId,
+      vendorCode,
+      stockPartNumbers,
+      salesChannelId,
+      logger
+    )
+    logger.info(
+      `[vendor-sync] [${runId}] Stock levels applied: ${stockResult.updatedCount} updated, ${stockResult.errorCount} errors`
+    )
   }
 
   logger.info(

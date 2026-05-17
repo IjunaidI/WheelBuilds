@@ -5,6 +5,8 @@ import {
   createSalesChannelsWorkflow,
   createProductCategoriesWorkflow,
   createShippingProfilesWorkflow,
+  createStockLocationsWorkflow,
+  linkSalesChannelsToStockLocationWorkflow,
 } from "@medusajs/medusa/core-flows"
 
 /**
@@ -159,4 +161,53 @@ export async function ensureShippingProfile(
     },
   })
   return result[0].id
+}
+
+/**
+ * Ensures a stock location exists for the given warehouse code.
+ * Creates "Warehouse <code>" with metadata.vendor_warehouse_code = code.
+ * Links to the default sales channel.
+ * Returns stock_location_id.
+ * Caches results in-memory for the run (same warehouse code = same location).
+ */
+export async function ensureStockLocation(
+  container: MedusaContainer,
+  warehouseCode: string,
+  salesChannelId: string,
+  cache: Map<string, string>
+): Promise<string> {
+  const cached = cache.get(warehouseCode)
+  if (cached) return cached
+
+  const stockLocationService = container.resolve(Modules.STOCK_LOCATION)
+  const existing = await stockLocationService.listStockLocations({
+    metadata: { vendor_warehouse_code: warehouseCode },
+  })
+
+  if (existing.length > 0) {
+    cache.set(warehouseCode, existing[0].id)
+    return existing[0].id
+  }
+
+  const { result } = await createStockLocationsWorkflow(container).run({
+    input: {
+      locations: [
+        {
+          name: `Warehouse ${warehouseCode}`,
+          metadata: { vendor_warehouse_code: warehouseCode },
+        },
+      ],
+    },
+  })
+  const locationId = result[0].id
+
+  await linkSalesChannelsToStockLocationWorkflow(container).run({
+    input: {
+      id: locationId,
+      add: [salesChannelId],
+    },
+  })
+
+  cache.set(warehouseCode, locationId)
+  return locationId
 }

@@ -21,7 +21,15 @@ import {
   MINIO_SECRET_KEY,
   MINIO_BUCKET,
   MEILISEARCH_HOST,
-  MEILISEARCH_ADMIN_KEY
+  MEILISEARCH_ADMIN_KEY,
+  VENDOR_TERAFLEX_WHEELS_ENABLED,
+  VENDOR_TERAFLEX_TIRES_ENABLED,
+  VENDOR_TERAFLEX_WHEEL_FEED_PATH,
+  VENDOR_TERAFLEX_TIRE_FEED_PATH,
+  VENDOR_SYNC_FEED_ARCHIVE_BUCKET,
+  VENDOR_SYNC_DISCONTINUE_THRESHOLD,
+  VENDOR_SYNC_APPLY_CONCURRENCY,
+  VENDOR_SYNC_DRY_RUN,
 } from 'lib/constants';
 
 loadEnv(process.env.NODE_ENV, process.cwd());
@@ -132,7 +140,26 @@ const medusaConfig = {
           },
         ],
       },
-    }] : [])
+    }] : []),
+    ...((VENDOR_TERAFLEX_WHEELS_ENABLED === 'true' || VENDOR_TERAFLEX_TIRES_ENABLED === 'true') ? [{
+      resolve: './src/modules/vendor-sync',
+      options: {
+        discontinueThreshold: parseFloat(VENDOR_SYNC_DISCONTINUE_THRESHOLD ?? '0.05'),
+        applyConcurrency: parseInt(VENDOR_SYNC_APPLY_CONCURRENCY ?? '8', 10),
+        archiveBucket: VENDOR_SYNC_FEED_ARCHIVE_BUCKET ?? 'vendor-feeds',
+        dryRun: VENDOR_SYNC_DRY_RUN === 'true',
+        vendors: {
+          'teraflex-wheels': {
+            enabled: VENDOR_TERAFLEX_WHEELS_ENABLED === 'true',
+            feedPath: VENDOR_TERAFLEX_WHEEL_FEED_PATH,
+          },
+          'teraflex-tires': {
+            enabled: VENDOR_TERAFLEX_TIRES_ENABLED === 'true',
+            feedPath: VENDOR_TERAFLEX_TIRE_FEED_PATH,
+          },
+        },
+      },
+    }] : []),
   ],
   plugins: [
   ...(MEILISEARCH_HOST && MEILISEARCH_ADMIN_KEY ? [{

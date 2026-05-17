@@ -8,7 +8,7 @@ import {
 } from '../types'
 import { parseTireCsv } from './parse'
 import { normalizeTireRow } from './normalize'
-import { uploadFeedToMinio } from '../../utils/archive'
+import { archiveFeed } from '../../utils/archive'
 
 const VENDOR_CODE = 'teraflex-tires'
 
@@ -30,7 +30,7 @@ export class TeraflexTireAdapter implements VendorAdapter {
     const stat = fs.statSync(this.csvPath)
     const filename = path.basename(this.csvPath)
 
-    const archiveKey = await uploadFeedToMinio(this.csvPath, VENDOR_CODE, filename)
+    const archiveKey = await archiveFeed(VENDOR_CODE, this.csvPath)
 
     return {
       vendorCode: VENDOR_CODE,
@@ -42,8 +42,8 @@ export class TeraflexTireAdapter implements VendorAdapter {
   }
 
   async *parse(descriptor: VendorFeedDescriptor): AsyncIterable<ParsedRow> {
-    const filePath = descriptor.archiveKey
-    yield* parseTireCsv(filePath)
+    // archiveKey is a local file path (either the archive copy or the original)
+    yield* parseTireCsv(descriptor.archiveKey)
   }
 
   normalize(row: ParsedRow): NormalizedRecord {

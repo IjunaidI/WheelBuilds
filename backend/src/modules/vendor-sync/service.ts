@@ -97,13 +97,20 @@ class VendorSyncService extends MedusaService({
     })
     const runId = run.id
 
+    const startTime = Date.now()
+
     try {
       // 3. Resolve adapter
       const adapter = resolveAdapter(vendorCode)
 
       // 4. Fetch
-      this.logger_.info(`[vendor-sync] [${runId}] Fetching feed for ${vendorCode}...`)
+      this.logger_.info(
+        `[vendor-sync] [${runId}] stage=fetching vendor=${vendorCode}`
+      )
       const descriptor = await fetchFeed(adapter)
+      this.logger_.info(
+        `[vendor-sync] [${runId}] stage=fetched vendor=${vendorCode} file=${descriptor.sourceFilename} bytes=${descriptor.byteLength} archiveKey=${descriptor.archiveKey}`
+      )
       await (this as any).updateVendorFeedRuns(
         { id: runId },
         {
@@ -137,8 +144,9 @@ class VendorSyncService extends MedusaService({
           new Date(lastCompleted.run_date_vendor).getTime() ===
             new Date(runDateVendor).getTime()
         ) {
+          const durationMs = Date.now() - startTime
           this.logger_.info(
-            `[vendor-sync] [${runId}] Feed date ${runDateVendor.toISOString()} matches last completed run. Short-circuiting.`
+            `[vendor-sync] [${runId}] stage=short-circuited vendor=${vendorCode} feedDate=${runDateVendor.toISOString()} durationMs=${durationMs}`
           )
           await (this as any).updateVendorFeedRuns(
             { id: runId },
@@ -159,7 +167,9 @@ class VendorSyncService extends MedusaService({
       )
 
       // 6. Stage
-      this.logger_.info(`[vendor-sync] [${runId}] Staging feed...`)
+      this.logger_.info(
+        `[vendor-sync] [${runId}] stage=staging vendor=${vendorCode}`
+      )
       await stageFeed(adapter, descriptor, this, runId, this.logger_)
 
       // Transition to diffing
@@ -169,7 +179,9 @@ class VendorSyncService extends MedusaService({
       )
 
       // 7. Diff
-      this.logger_.info(`[vendor-sync] [${runId}] Computing diff...`)
+      this.logger_.info(
+        `[vendor-sync] [${runId}] stage=diffing vendor=${vendorCode}`
+      )
       const diff = await computeDiff(this, runId, vendorCode)
       await (this as any).updateVendorFeedRuns(
         { id: runId },
@@ -181,9 +193,7 @@ class VendorSyncService extends MedusaService({
       )
 
       this.logger_.info(
-        `[vendor-sync] [${runId}] Diff: ${diff.newPartNumbers.length} new, ` +
-          `${diff.changedPartNumbers.length} changed, ` +
-          `${diff.discontinuedPartNumbers.length} discontinued`
+        `[vendor-sync] [${runId}] stage=diffed vendor=${vendorCode} new=${diff.newPartNumbers.length} changed=${diff.changedPartNumbers.length} discontinued=${diff.discontinuedPartNumbers.length}`
       )
 
       // 8. Threshold check
@@ -212,6 +222,10 @@ class VendorSyncService extends MedusaService({
 
       // 9. Dry run: mark completed and return
       if (isDryRun) {
+        const durationMs = Date.now() - startTime
+        this.logger_.info(
+          `[vendor-sync] [${runId}] stage=completed vendor=${vendorCode} dryRun=true durationMs=${durationMs}`
+        )
         await (this as any).updateVendorFeedRuns(
           { id: runId },
           { status: "completed", finished_at: new Date() }
@@ -225,7 +239,9 @@ class VendorSyncService extends MedusaService({
         { status: "applying" }
       )
 
-      this.logger_.info(`[vendor-sync] [${runId}] Applying changes...`)
+      this.logger_.info(
+        `[vendor-sync] [${runId}] stage=applying vendor=${vendorCode}`
+      )
       const applyResult = await applyChanges(
         this.container_,
         this,
@@ -235,8 +251,9 @@ class VendorSyncService extends MedusaService({
         this.logger_
       )
 
+      const durationMs = Date.now() - startTime
       this.logger_.info(
-        `[vendor-sync] [${runId}] Apply result: ${applyResult.processedCount} processed, ${applyResult.errorCount} errors`
+        `[vendor-sync] [${runId}] stage=completed vendor=${vendorCode} processed=${applyResult.processedCount} errors=${applyResult.errorCount} durationMs=${durationMs}`
       )
 
       await (this as any).updateVendorFeedRuns(
@@ -246,8 +263,9 @@ class VendorSyncService extends MedusaService({
 
       return { runId }
     } catch (err: any) {
+      const durationMs = Date.now() - startTime
       this.logger_.error(
-        `[vendor-sync] [${runId}] Run failed: ${err.message}`
+        `[vendor-sync] [${runId}] stage=failed vendor=${vendorCode} error="${err.message}" durationMs=${durationMs}`
       )
       await (this as any).updateVendorFeedRuns(
         { id: runId },

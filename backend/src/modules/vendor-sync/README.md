@@ -1,5 +1,227 @@
 # Vendor Sync Module
 
-Vendor inventory sync pipeline -- see VENDOR_SYNC_PLAN.md for architecture.
+Automated inventory sync pipeline that pulls wheel and tire CSV feeds from vendor sources, diffs against the current catalog state, and applies changes to Medusa products, variants, and inventory levels.
 
-This is Phase 1: schema, data models, and module shell with CRUD only.
+## Quick Start
+
+### 1. Configure environment
+
+Add to `backend/.env`:
+
+```
+VENDOR_TERAFLEX_WHEELS_ENABLED=true
+VENDOR_TERAFLEX_WHEEL_FEED_PATH=./wheelInvPriceData.csv
+VENDOR_TERAFLEX_TIRES_ENABLED=true
+VENDOR_TERAFLEX_TIRE_FEED_PATH=./tireInvPriceData.csv
+```
+
+These env vars cause `medusa-config.js` to register the vendor-sync module with the appropriate vendor configs. If neither vendor is enabled, the module is not loaded at all.
+
+### 2. Run a dry-run
+
+```bash
+pnpm vendor-sync:dry-run teraflex-wheels
+pnpm vendor-sync:dry-run teraflex-tires
+```
+
+A dry-run executes the full pipeline (fetch, parse, normalize, stage, diff) but stops before applying changes to Medusa products. It creates a run record you can inspect.
+
+### 3. Review the diff
+
+Use the admin API to list runs and inspect results:
+
+```bash
+# List recent runs
+curl -H "Authorization: Bearer <token>" \
+  http://localhost:9000/admin/vendor-sync/runs
+
+# Get a specific run
+curl -H "Authorization: Bearer <token>" \
+  http://localhost:9000/admin/vendor-sync/runs/<run-id>
+```
+
+### 4. Apply changes
+
+```bash
+pnpm vendor-sync:apply <run-id>
+```
+
+Or trigger a full (non-dry-run) sync via the API:
+
+```bash
+curl -X POST \
+  -H "Authorization: Bearer <token>" \
+  -H "Content-Type: application/json" \
+  -d '{"vendor_code": "teraflex-wheels"}' \
+  http://localhost:9000/admin/vendor-sync/runs
+```
+
+### 5. Automated scheduling
+
+The scheduled job at `src/jobs/vendor-sync-tick.ts` runs every 12 hours automatically. It iterates over all enabled vendors and calls `service.run()` for each. No manual intervention is needed once the environment is configured.
+
+## Architecture
+
+The pipeline has six stages, each tracked by the run's `status` field:
+
+```
+fetch -> stage -> diff -> [threshold check] -> apply -> completed
+```
+
+### Fetch
+
+The adapter reads the CSV file from the configured path and archives a copy to `static/vendor-feeds/<vendor>/<timestamp>.csv`. The feed descriptor (filename, byte size, archive key) is recorded on the run.
+
+### Parse
+
+A streaming CSV parser yields one `ParsedRow` per data row. Each row carries the raw column values and a list of warehouse column names (used for per-warehouse stock extraction).
+
+### Normalize
+
+Each parsed row is normalized into a typed `NormalizedRecord` with consistent field names, parsed numeric values, computed `totalQoh`, and a content hash for change detection.
+
+### Stage
+
+Normalized records are bulk-inserted into the `vendor_feed_staging` table, keyed to the run ID. Rows without an image URL are counted but still staged. Stock-by-warehouse data goes into `vendor_stock_staging`.
+
+### Diff
+
+The diff compares staging rows against `vendor_product_current` (the last-known state). It classifies each part number as **new**, **changed** (content hash differs), or **discontinued** (present in current but absent from the feed).
+
+### Threshold check
+
+If the ratio of discontinued parts to current active parts exceeds the configured threshold (default 5%), the run is paused with status `awaiting_approval`. An admin must explicitly approve it before changes are applied.
+
+### Apply
+
+For each new/changed/discontinued part number, the apply stage:
+- Creates or updates Medusa products and variants (new/changed)
+- Updates inventory levels at each warehouse location (stock sync)
+- Marks discontinued products as unavailable
+- Updates `vendor_product_current` to reflect the new state
+
+## Configuration
+
+All configuration flows through `medusa-config.js` module options, which read from environment variables:
+
+| Env Var | Default | Description |
+|---------|---------|-------------|
+| `VENDOR_TERAFLEX_WHEELS_ENABLED` | `false` | Enable the teraflex-wheels adapter |
+| `VENDOR_TERAFLEX_WHEEL_FEED_PATH` | `./wheelInvPriceData.csv` | Path to wheel CSV feed |
+| `VENDOR_TERAFLEX_TIRES_ENABLED` | `false` | Enable the teraflex-tires adapter |
+| `VENDOR_TERAFLEX_TIRE_FEED_PATH` | `./tireInvPriceData.csv` | Path to tire CSV feed |
+| `VENDOR_SYNC_DISCONTINUE_THRESHOLD` | `0.05` | Max ratio of discontinued/active before requiring approval |
+| `VENDOR_SYNC_APPLY_CONCURRENCY` | `8` | Concurrency limit for apply operations |
+| `VENDOR_SYNC_FEED_ARCHIVE_BUCKET` | `vendor-feeds` | Archive bucket name (reserved for future MinIO use) |
+| `VENDOR_SYNC_DRY_RUN` | `false` | If `true`, all runs are dry-runs by default |
+
+## Admin API
+
+All endpoints require admin authentication (`Authorization: Bearer <token>`).
+
+### List runs
+
+```
+GET /admin/vendor-sync/runs?vendor=<code>&status=<status>&limit=20&offset=0
+```
+
+Returns `{ runs, limit, offset }`.
+
+### Trigger a run
+
+```
+POST /admin/vendor-sync/runs
+Body: { "vendor_code": "teraflex-wheels", "dry_run": false }
+```
+
+Returns `{ run_id }` (HTTP 201). Returns HTTP 409 if a run is already in progress.
+
+### Get run detail
+
+```
+GET /admin/vendor-sync/runs/:id
+```
+
+Returns `{ run }` with all fields including counts, timestamps, and error info.
+
+### Approve a paused run
+
+```
+POST /admin/vendor-sync/runs/:id/approve
+```
+
+Only valid when the run status is `awaiting_approval`. Re-computes the diff and applies changes.
+
+### Cancel a run
+
+```
+POST /admin/vendor-sync/runs/:id/cancel
+```
+
+Valid for any in-progress or awaiting-approval run.
+
+### Replay a run
+
+```
+POST /admin/vendor-sync/runs/:id/replay
+```
+
+Re-diffs and re-applies all SKUs from a completed or failed run's existing staging data.
+
+### Replay a single SKU
+
+```
+POST /admin/vendor-sync/skus/:partNumber/replay
+Body: { "vendor_code": "teraflex-wheels" }
+```
+
+Finds the most recent staging row for the given vendor + part number and applies it.
+
+## Data Models
+
+The module defines four MikroORM models:
+
+- **`VendorFeedRun`** -- One row per sync execution. Tracks status, counts, timestamps, and error messages.
+- **`VendorFeedStaging`** -- Normalized feed rows keyed to a run. Used for diffing and as the source of truth during apply.
+- **`VendorStockStaging`** -- Per-warehouse stock levels for each staging row.
+- **`VendorProductCurrent`** -- The last-applied state for each vendor + part number. Used for diff computation.
+
+## Feed Archive
+
+Each fetch archives the CSV to `static/vendor-feeds/<vendor>/<YYYY-MM-DD-HHmm>.csv`. This is a local filesystem copy for debugging and audit purposes. If the archive write fails (e.g., permissions), the pipeline continues using the original file path.
+
+Future enhancement: upload archives to MinIO for durable storage.
+
+## Adding a New Vendor
+
+1. Create a new adapter directory under `src/modules/vendor-sync/adapters/<vendor-name>/`
+2. Implement the `VendorAdapter` interface (see `adapters/types.ts`):
+   - `fetch()` -- read the CSV and return a `VendorFeedDescriptor`
+   - `parse(descriptor)` -- async generator yielding `ParsedRow` objects
+   - `normalize(row)` -- convert raw columns to a `NormalizedRecord`
+3. Register the adapter in `adapters/registry.ts`
+4. Add env vars and module options in `medusa-config.js`
+5. Add the vendor to the `vendors` config block
+
+## Testing
+
+```bash
+pnpm test:sync
+```
+
+This runs all unit tests in `src/modules/vendor-sync/__tests__/`. Tests cover:
+- CSV parsing (wheels and tires)
+- Normalization logic and edge cases
+- Content hash computation
+- Diff algorithm
+- Metadata building
+- Stock application
+
+## Troubleshooting
+
+- **Module not loading**: Check that at least one `VENDOR_*_ENABLED=true` env var is set. The module is conditionally registered in `medusa-config.js`.
+- **Stale config in `.medusa/server`**: Run `rm -rf .medusa/server` before restarting after config changes.
+- **Feed archive location**: `static/vendor-feeds/<vendor>/` in the backend directory.
+- **Run stuck in progress**: Use the cancel endpoint to reset, then trigger a new run.
+- **Threshold block**: If too many products would be discontinued, the run pauses at `awaiting_approval`. Review the diff and approve via the admin API.
+- **Missing products after sync**: Check the run's `error_message` field and logs. Individual SKU failures are logged but do not abort the run.

@@ -7,6 +7,7 @@ import { resolveAdapter } from "./adapters/registry"
 import { fetchFeed } from "./pipeline/fetch"
 import { stageFeed } from "./pipeline/stage"
 import { computeDiff } from "./pipeline/diff"
+import { applyChanges } from "./pipeline/apply"
 
 interface Logger {
   info(message: string, ...args: any[]): void
@@ -33,11 +34,13 @@ class VendorSyncService extends MedusaService({
   VendorStockStaging,
   VendorProductCurrent,
 }) {
+  private container_: any
   private logger_: Logger
   private options_: VendorSyncModuleOptions
 
   constructor(container: any, options: any) {
     super(...arguments)
+    this.container_ = container
     this.logger_ = container.logger ?? {
       info: console.log,
       warn: console.warn,
@@ -216,13 +219,26 @@ class VendorSyncService extends MedusaService({
         return { runId }
       }
 
-      // 10. Transition to applying (apply logic is PR 4+)
+      // 10. Transition to applying
       await (this as any).updateVendorFeedRuns(
         { id: runId },
         { status: "applying" }
       )
 
-      // Apply step placeholder -- will be implemented in PR 4
+      this.logger_.info(`[vendor-sync] [${runId}] Applying changes...`)
+      const applyResult = await applyChanges(
+        this.container_,
+        this,
+        runId,
+        vendorCode,
+        diff,
+        this.logger_
+      )
+
+      this.logger_.info(
+        `[vendor-sync] [${runId}] Apply result: ${applyResult.processedCount} processed, ${applyResult.errorCount} errors`
+      )
+
       await (this as any).updateVendorFeedRuns(
         { id: runId },
         { status: "completed", finished_at: new Date() }

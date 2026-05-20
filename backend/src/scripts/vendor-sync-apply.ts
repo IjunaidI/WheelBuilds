@@ -45,10 +45,10 @@ export default async function vendorSyncApply({ container }: ExecArgs) {
 
   try {
     // Transition to applying
-    await vendorSyncService.updateVendorFeedRuns(
-      { id: runId },
-      { status: "applying" }
-    )
+    await vendorSyncService.updateVendorFeedRuns({
+      id: runId,
+      status: "applying",
+    })
 
     // Re-compute diff against current state
     logger.info(`[apply] Re-computing diff...`)
@@ -71,10 +71,11 @@ export default async function vendorSyncApply({ container }: ExecArgs) {
     )
 
     // Mark run as completed
-    await vendorSyncService.updateVendorFeedRuns(
-      { id: runId },
-      { status: "completed", finished_at: new Date() }
-    )
+    await vendorSyncService.updateVendorFeedRuns({
+      id: runId,
+      status: "completed",
+      finished_at: new Date(),
+    })
 
     const elapsed = ((Date.now() - startTime) / 1000).toFixed(1)
 
@@ -100,14 +101,12 @@ export default async function vendorSyncApply({ container }: ExecArgs) {
   } catch (err: any) {
     logger.error(`[apply] Run failed: ${err.message}`)
     await vendorSyncService
-      .updateVendorFeedRuns(
-        { id: runId },
-        {
-          status: "failed",
-          error_message: err.message?.slice(0, 2000),
-          finished_at: new Date(),
-        }
-      )
+      .updateVendorFeedRuns({
+        id: runId,
+        status: "failed",
+        error_message: err.message?.slice(0, 2000),
+        finished_at: new Date(),
+      })
       .catch((updateErr: any) => {
         logger.error(
           `[apply] Failed to update run status: ${updateErr.message}`

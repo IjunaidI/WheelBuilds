@@ -31,10 +31,11 @@ export async function POST(req: MedusaRequest, res: MedusaResponse) {
     return
   }
 
-  await service.updateVendorFeedRuns(
-    { id },
-    { status: "cancelled", finished_at: new Date() }
-  )
+  await service.updateVendorFeedRuns({
+    id,
+    status: "cancelled",
+    finished_at: new Date(),
+  })
 
   res.json({ run: { ...run, status: "cancelled", finished_at: new Date() } })
 }

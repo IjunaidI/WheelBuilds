@@ -83,7 +83,7 @@ class VendorSyncService extends MedusaService({
     }
 
     // 2. Create run row
-    const [run] = await (this as any).createVendorFeedRuns({
+    const run = await (this as any).createVendorFeedRuns({
       vendor_code: vendorCode,
       source_filename: "",
       status: "fetching",
@@ -111,13 +111,11 @@ class VendorSyncService extends MedusaService({
       this.logger_.info(
         `[vendor-sync] [${runId}] stage=fetched vendor=${vendorCode} file=${descriptor.sourceFilename} bytes=${descriptor.byteLength} archiveKey=${descriptor.archiveKey}`
       )
-      await (this as any).updateVendorFeedRuns(
-        { id: runId },
-        {
-          source_filename: descriptor.sourceFilename,
-          source_archive_key: descriptor.archiveKey,
-        }
-      )
+      await (this as any).updateVendorFeedRuns({
+        id: runId,
+        source_filename: descriptor.sourceFilename,
+        source_archive_key: descriptor.archiveKey,
+      })
 
       // 5. RunDate short-circuit
       // Parse runDateVendor from a sample row (first parsed row)
@@ -148,23 +146,22 @@ class VendorSyncService extends MedusaService({
           this.logger_.info(
             `[vendor-sync] [${runId}] stage=short-circuited vendor=${vendorCode} feedDate=${runDateVendor.toISOString()} durationMs=${durationMs}`
           )
-          await (this as any).updateVendorFeedRuns(
-            { id: runId },
-            {
-              status: "completed",
-              run_date_vendor: runDateVendor,
-              finished_at: new Date(),
-            }
-          )
+          await (this as any).updateVendorFeedRuns({
+            id: runId,
+            status: "completed",
+            run_date_vendor: runDateVendor,
+            finished_at: new Date(),
+          })
           return { runId }
         }
       }
 
       // Transition to staging
-      await (this as any).updateVendorFeedRuns(
-        { id: runId },
-        { status: "staging", run_date_vendor: runDateVendor }
-      )
+      await (this as any).updateVendorFeedRuns({
+        id: runId,
+        status: "staging",
+        run_date_vendor: runDateVendor,
+      })
 
       // 6. Stage
       this.logger_.info(
@@ -173,24 +170,22 @@ class VendorSyncService extends MedusaService({
       await stageFeed(adapter, descriptor, this, runId, this.logger_)
 
       // Transition to diffing
-      await (this as any).updateVendorFeedRuns(
-        { id: runId },
-        { status: "diffing" }
-      )
+      await (this as any).updateVendorFeedRuns({
+        id: runId,
+        status: "diffing",
+      })
 
       // 7. Diff
       this.logger_.info(
         `[vendor-sync] [${runId}] stage=diffing vendor=${vendorCode}`
       )
       const diff = await computeDiff(this, runId, vendorCode)
-      await (this as any).updateVendorFeedRuns(
-        { id: runId },
-        {
-          new_count: diff.newPartNumbers.length,
-          changed_count: diff.changedPartNumbers.length,
-          discontinued_count: diff.discontinuedPartNumbers.length,
-        }
-      )
+      await (this as any).updateVendorFeedRuns({
+        id: runId,
+        new_count: diff.newPartNumbers.length,
+        changed_count: diff.changedPartNumbers.length,
+        discontinued_count: diff.discontinuedPartNumbers.length,
+      })
 
       this.logger_.info(
         `[vendor-sync] [${runId}] stage=diffed vendor=${vendorCode} new=${diff.newPartNumbers.length} changed=${diff.changedPartNumbers.length} discontinued=${diff.discontinuedPartNumbers.length}`
@@ -213,10 +208,10 @@ class VendorSyncService extends MedusaService({
             `${diff.discontinuedPartNumbers.length}/${currentCount} ` +
             `exceeds threshold ${threshold}. Awaiting approval.`
         )
-        await (this as any).updateVendorFeedRuns(
-          { id: runId },
-          { status: "awaiting_approval" }
-        )
+        await (this as any).updateVendorFeedRuns({
+          id: runId,
+          status: "awaiting_approval",
+        })
         return { runId }
       }
 
@@ -226,18 +221,19 @@ class VendorSyncService extends MedusaService({
         this.logger_.info(
           `[vendor-sync] [${runId}] stage=completed vendor=${vendorCode} dryRun=true durationMs=${durationMs}`
         )
-        await (this as any).updateVendorFeedRuns(
-          { id: runId },
-          { status: "completed", finished_at: new Date() }
-        )
+        await (this as any).updateVendorFeedRuns({
+          id: runId,
+          status: "completed",
+          finished_at: new Date(),
+        })
         return { runId }
       }
 
       // 10. Transition to applying
-      await (this as any).updateVendorFeedRuns(
-        { id: runId },
-        { status: "applying" }
-      )
+      await (this as any).updateVendorFeedRuns({
+        id: runId,
+        status: "applying",
+      })
 
       this.logger_.info(
         `[vendor-sync] [${runId}] stage=applying vendor=${vendorCode}`
@@ -256,10 +252,11 @@ class VendorSyncService extends MedusaService({
         `[vendor-sync] [${runId}] stage=completed vendor=${vendorCode} processed=${applyResult.processedCount} errors=${applyResult.errorCount} durationMs=${durationMs}`
       )
 
-      await (this as any).updateVendorFeedRuns(
-        { id: runId },
-        { status: "completed", finished_at: new Date() }
-      )
+      await (this as any).updateVendorFeedRuns({
+        id: runId,
+        status: "completed",
+        finished_at: new Date(),
+      })
 
       return { runId }
     } catch (err: any) {
@@ -267,14 +264,12 @@ class VendorSyncService extends MedusaService({
       this.logger_.error(
         `[vendor-sync] [${runId}] stage=failed vendor=${vendorCode} error="${err.message}" durationMs=${durationMs}`
       )
-      await (this as any).updateVendorFeedRuns(
-        { id: runId },
-        {
-          status: "failed",
-          error_message: err.message?.slice(0, 2000),
-          finished_at: new Date(),
-        }
-      ).catch((updateErr: any) => {
+      await (this as any).updateVendorFeedRuns({
+        id: runId,
+        status: "failed",
+        error_message: err.message?.slice(0, 2000),
+        finished_at: new Date(),
+      }).catch((updateErr: any) => {
         this.logger_.error(
           `[vendor-sync] [${runId}] Failed to update run status: ${updateErr.message}`
         )
@@ -289,14 +284,12 @@ class VendorSyncService extends MedusaService({
    */
   async approveAndApply(runId: string, actorId?: string): Promise<void> {
     // Record who approved and when
-    await (this as any).updateVendorFeedRuns(
-      { id: runId },
-      {
-        status: "applying",
-        approved_by: actorId ?? "admin",
-        approved_at: new Date(),
-      }
-    )
+    await (this as any).updateVendorFeedRuns({
+      id: runId,
+      status: "applying",
+      approved_by: actorId ?? "admin",
+      approved_at: new Date(),
+    })
 
     try {
       const [run] = await (this as any).listVendorFeedRuns({ id: runId })
@@ -323,22 +316,21 @@ class VendorSyncService extends MedusaService({
         `[vendor-sync] [${runId}] Apply complete: ${result.processedCount} processed, ${result.errorCount} errors`
       )
 
-      await (this as any).updateVendorFeedRuns(
-        { id: runId },
-        { status: "completed", finished_at: new Date() }
-      )
+      await (this as any).updateVendorFeedRuns({
+        id: runId,
+        status: "completed",
+        finished_at: new Date(),
+      })
     } catch (err: any) {
       this.logger_.error(
         `[vendor-sync] [${runId}] Apply after approval failed: ${err.message}`
       )
-      await (this as any).updateVendorFeedRuns(
-        { id: runId },
-        {
-          status: "failed",
-          error_message: err.message?.slice(0, 2000),
-          finished_at: new Date(),
-        }
-      ).catch(() => {})
+      await (this as any).updateVendorFeedRuns({
+        id: runId,
+        status: "failed",
+        error_message: err.message?.slice(0, 2000),
+        finished_at: new Date(),
+      }).catch(() => {})
       throw err
     }
   }
@@ -353,10 +345,11 @@ class VendorSyncService extends MedusaService({
 
     const vendorCode = run.vendor_code
 
-    await (this as any).updateVendorFeedRuns(
-      { id: runId },
-      { status: "applying", finished_at: null }
-    )
+    await (this as any).updateVendorFeedRuns({
+      id: runId,
+      status: "applying",
+      finished_at: null,
+    })
 
     try {
       const diff = await computeDiff(this, runId, vendorCode)
@@ -379,22 +372,21 @@ class VendorSyncService extends MedusaService({
         `[vendor-sync] [${runId}] Replay complete: ${result.processedCount} processed, ${result.errorCount} errors`
       )
 
-      await (this as any).updateVendorFeedRuns(
-        { id: runId },
-        { status: "completed", finished_at: new Date() }
-      )
+      await (this as any).updateVendorFeedRuns({
+        id: runId,
+        status: "completed",
+        finished_at: new Date(),
+      })
     } catch (err: any) {
       this.logger_.error(
         `[vendor-sync] [${runId}] Replay failed: ${err.message}`
       )
-      await (this as any).updateVendorFeedRuns(
-        { id: runId },
-        {
-          status: "failed",
-          error_message: err.message?.slice(0, 2000),
-          finished_at: new Date(),
-        }
-      ).catch(() => {})
+      await (this as any).updateVendorFeedRuns({
+        id: runId,
+        status: "failed",
+        error_message: err.message?.slice(0, 2000),
+        finished_at: new Date(),
+      }).catch(() => {})
       throw err
     }
   }

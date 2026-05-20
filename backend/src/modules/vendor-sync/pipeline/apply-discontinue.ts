@@ -59,10 +59,10 @@ export async function applyDiscontinuations(
       })
 
       // 3. Set discontinued_at on vendor_product_current
-      await (service as any).updateVendorProductCurrents(
-        { id: currentRow.id },
-        { discontinued_at: new Date() }
-      )
+      await (service as any).updateVendorProductCurrents({
+        id: currentRow.id,
+        discontinued_at: new Date(),
+      })
 
       discontinuedCount++
       logger.info(

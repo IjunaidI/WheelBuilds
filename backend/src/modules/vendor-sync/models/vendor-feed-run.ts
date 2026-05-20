@@ -16,6 +16,7 @@ const VendorFeedRun = model.define("vendor_feed_run", {
   approved_by: model.text().nullable(),
   approved_at: model.dateTime().nullable(),
   error_message: model.text().nullable(),
+  failed_part_numbers: model.json().nullable(),
   started_at: model.dateTime(),
   finished_at: model.dateTime().nullable(),
 }).indexes([

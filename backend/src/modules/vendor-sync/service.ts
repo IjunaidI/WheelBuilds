@@ -256,6 +256,8 @@ class VendorSyncService extends MedusaService({
         id: runId,
         status: "completed",
         finished_at: new Date(),
+        failed_part_numbers:
+          applyResult.errors.length > 0 ? applyResult.errors : null,
       })
 
       return { runId }
@@ -320,6 +322,7 @@ class VendorSyncService extends MedusaService({
         id: runId,
         status: "completed",
         finished_at: new Date(),
+        failed_part_numbers: result.errors.length > 0 ? result.errors : null,
       })
     } catch (err: any) {
       this.logger_.error(
@@ -376,6 +379,7 @@ class VendorSyncService extends MedusaService({
         id: runId,
         status: "completed",
         finished_at: new Date(),
+        failed_part_numbers: result.errors.length > 0 ? result.errors : null,
       })
     } catch (err: any) {
       this.logger_.error(

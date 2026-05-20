@@ -31,6 +31,11 @@ export interface ApplyResult {
   processedCount: number
   errorCount: number
   errors: Array<{ partNumber: string; error: string }>
+  /**
+   * True when the run was cancelled mid-apply. Callers should NOT
+   * overwrite the run status to "completed" when this is true.
+   */
+  cancelled: boolean
 }
 
 /**
@@ -60,6 +65,18 @@ export async function applyChanges(
 ): Promise<ApplyResult> {
   const errors: Array<{ partNumber: string; error: string }> = []
   let processedCount = 0
+  let cancelled = false
+
+  const checkCancelled = (): boolean => {
+    if (service.isCancelled(runId)) {
+      cancelled = true
+      logger.warn(
+        `[vendor-sync] [${runId}] cancel requested; stopping apply loop`
+      )
+      return true
+    }
+    return false
+  }
 
   // 1. Bootstrap required Medusa entities
   logger.info(`[vendor-sync] [${runId}] Bootstrapping Medusa entities...`)
@@ -93,6 +110,7 @@ export async function applyChanges(
     `[vendor-sync] [${runId}] Creating ${diffResult.newPartNumbers.length} new products...`
   )
   for (const partNumber of diffResult.newPartNumbers) {
+    if (checkCancelled()) break
     try {
       // Read the normalized record from staging
       const [stagingRow] = await (service as any).listVendorFeedStagings(
@@ -200,10 +218,13 @@ export async function applyChanges(
   }
 
   // 3. Process changed products
-  logger.info(
-    `[vendor-sync] [${runId}] Updating ${diffResult.changedPartNumbers.length} changed products...`
-  )
+  if (!cancelled) {
+    logger.info(
+      `[vendor-sync] [${runId}] Updating ${diffResult.changedPartNumbers.length} changed products...`
+    )
+  }
   for (const partNumber of diffResult.changedPartNumbers) {
+    if (cancelled || checkCancelled()) break
     try {
       // Read the normalized record from staging
       const [stagingRow] = await (service as any).listVendorFeedStagings(
@@ -286,7 +307,7 @@ export async function applyChanges(
     ...diffResult.newPartNumbers,
     ...diffResult.changedPartNumbers,
   ]
-  if (stockPartNumbers.length > 0) {
+  if (!cancelled && stockPartNumbers.length > 0) {
     const stockResult = await applyStockLevels(
       container,
       service,
@@ -299,10 +320,14 @@ export async function applyChanges(
     logger.info(
       `[vendor-sync] [${runId}] Stock levels applied: ${stockResult.updatedCount} updated, ${stockResult.errorCount} errors`
     )
+    if (checkCancelled()) {
+      // applyStockLevels does not poll cancel today; absorb a cancel
+      // requested during the stock pass before moving on.
+    }
   }
 
   // 5. Apply discontinuations
-  if (diffResult.discontinuedPartNumbers.length > 0) {
+  if (!cancelled && diffResult.discontinuedPartNumbers.length > 0) {
     const discResult = await applyDiscontinuations(
       container,
       service,
@@ -322,12 +347,13 @@ export async function applyChanges(
   }
 
   logger.info(
-    `[vendor-sync] [${runId}] Apply complete: ${processedCount} processed, ${errors.length} errors`
+    `[vendor-sync] [${runId}] Apply complete: ${processedCount} processed, ${errors.length} errors${cancelled ? ", cancelled" : ""}`
   )
 
   return {
     processedCount,
     errorCount: errors.length,
     errors,
+    cancelled,
   }
 }

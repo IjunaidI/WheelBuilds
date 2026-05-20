@@ -31,6 +31,11 @@ export async function POST(req: MedusaRequest, res: MedusaResponse) {
     return
   }
 
+  // Set the in-memory cancel flag first so an in-flight apply loop
+  // sees it on its next iteration and stops before we (and it) try to
+  // overwrite the run status.
+  service.markCancelled(id)
+
   await service.updateVendorFeedRuns({
     id,
     status: "cancelled",

@@ -37,6 +37,13 @@ class VendorSyncService extends MedusaService({
   private container_: any
   private logger_: Logger
   private options_: VendorSyncModuleOptions
+  /**
+   * In-memory set of run ids that have been requested to cancel. Lives
+   * for the lifetime of this service instance (i.e. this process). The
+   * apply loop checks this between part_numbers so cancel-while-applying
+   * stops cleanly instead of running to completion.
+   */
+  private cancelledRuns_: Set<string> = new Set()
 
   constructor(container: any, options: any) {
     super(...arguments)
@@ -57,6 +64,32 @@ class VendorSyncService extends MedusaService({
     return Object.entries(vendors)
       .filter(([, cfg]) => cfg.enabled)
       .map(([code]) => code)
+  }
+
+  /**
+   * Mark a run as cancelled so the apply loop sees it on its next
+   * iteration. The cancel endpoint calls this before flipping the DB
+   * status. Idempotent.
+   */
+  markCancelled(runId: string): void {
+    this.cancelledRuns_.add(runId)
+  }
+
+  /**
+   * True if markCancelled was called for this runId. The apply loop
+   * polls this between part_numbers.
+   */
+  isCancelled(runId: string): boolean {
+    return this.cancelledRuns_.has(runId)
+  }
+
+  /**
+   * Forget the cancel flag for a runId. Called from the run terminator
+   * after the run row reaches a terminal status so the set doesn't grow
+   * indefinitely.
+   */
+  private clearCancelled_(runId: string): void {
+    this.cancelledRuns_.delete(runId)
   }
 
   /**
@@ -249,17 +282,29 @@ class VendorSyncService extends MedusaService({
 
       const durationMs = Date.now() - startTime
       this.logger_.info(
-        `[vendor-sync] [${runId}] stage=completed vendor=${vendorCode} processed=${applyResult.processedCount} errors=${applyResult.errorCount} durationMs=${durationMs}`
+        `[vendor-sync] [${runId}] stage=${applyResult.cancelled ? "cancelled" : "completed"} vendor=${vendorCode} processed=${applyResult.processedCount} errors=${applyResult.errorCount} durationMs=${durationMs}`
       )
 
-      await (this as any).updateVendorFeedRuns({
-        id: runId,
-        status: "completed",
-        finished_at: new Date(),
-        failed_part_numbers:
-          applyResult.errors.length > 0 ? applyResult.errors : null,
-      })
+      if (applyResult.cancelled) {
+        // The cancel route already set status=cancelled and finished_at.
+        // Only enrich with the partial-progress failed_part_numbers.
+        if (applyResult.errors.length > 0) {
+          await (this as any).updateVendorFeedRuns({
+            id: runId,
+            failed_part_numbers: applyResult.errors,
+          })
+        }
+      } else {
+        await (this as any).updateVendorFeedRuns({
+          id: runId,
+          status: "completed",
+          finished_at: new Date(),
+          failed_part_numbers:
+            applyResult.errors.length > 0 ? applyResult.errors : null,
+        })
+      }
 
+      this.clearCancelled_(runId)
       return { runId }
     } catch (err: any) {
       const durationMs = Date.now() - startTime
@@ -276,6 +321,7 @@ class VendorSyncService extends MedusaService({
           `[vendor-sync] [${runId}] Failed to update run status: ${updateErr.message}`
         )
       })
+      this.clearCancelled_(runId)
       return { runId }
     }
   }
@@ -315,15 +361,25 @@ class VendorSyncService extends MedusaService({
       )
 
       this.logger_.info(
-        `[vendor-sync] [${runId}] Apply complete: ${result.processedCount} processed, ${result.errorCount} errors`
+        `[vendor-sync] [${runId}] Apply ${result.cancelled ? "cancelled" : "complete"}: ${result.processedCount} processed, ${result.errorCount} errors`
       )
 
-      await (this as any).updateVendorFeedRuns({
-        id: runId,
-        status: "completed",
-        finished_at: new Date(),
-        failed_part_numbers: result.errors.length > 0 ? result.errors : null,
-      })
+      if (result.cancelled) {
+        if (result.errors.length > 0) {
+          await (this as any).updateVendorFeedRuns({
+            id: runId,
+            failed_part_numbers: result.errors,
+          })
+        }
+      } else {
+        await (this as any).updateVendorFeedRuns({
+          id: runId,
+          status: "completed",
+          finished_at: new Date(),
+          failed_part_numbers: result.errors.length > 0 ? result.errors : null,
+        })
+      }
+      this.clearCancelled_(runId)
     } catch (err: any) {
       this.logger_.error(
         `[vendor-sync] [${runId}] Apply after approval failed: ${err.message}`
@@ -334,6 +390,7 @@ class VendorSyncService extends MedusaService({
         error_message: err.message?.slice(0, 2000),
         finished_at: new Date(),
       }).catch(() => {})
+      this.clearCancelled_(runId)
       throw err
     }
   }
@@ -372,15 +429,25 @@ class VendorSyncService extends MedusaService({
       )
 
       this.logger_.info(
-        `[vendor-sync] [${runId}] Replay complete: ${result.processedCount} processed, ${result.errorCount} errors`
+        `[vendor-sync] [${runId}] Replay ${result.cancelled ? "cancelled" : "complete"}: ${result.processedCount} processed, ${result.errorCount} errors`
       )
 
-      await (this as any).updateVendorFeedRuns({
-        id: runId,
-        status: "completed",
-        finished_at: new Date(),
-        failed_part_numbers: result.errors.length > 0 ? result.errors : null,
-      })
+      if (result.cancelled) {
+        if (result.errors.length > 0) {
+          await (this as any).updateVendorFeedRuns({
+            id: runId,
+            failed_part_numbers: result.errors,
+          })
+        }
+      } else {
+        await (this as any).updateVendorFeedRuns({
+          id: runId,
+          status: "completed",
+          finished_at: new Date(),
+          failed_part_numbers: result.errors.length > 0 ? result.errors : null,
+        })
+      }
+      this.clearCancelled_(runId)
     } catch (err: any) {
       this.logger_.error(
         `[vendor-sync] [${runId}] Replay failed: ${err.message}`
@@ -391,6 +458,7 @@ class VendorSyncService extends MedusaService({
         error_message: err.message?.slice(0, 2000),
         finished_at: new Date(),
       }).catch(() => {})
+      this.clearCancelled_(runId)
       throw err
     }
   }

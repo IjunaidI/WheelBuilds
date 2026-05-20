@@ -1,4 +1,5 @@
 import { MedusaContainer } from "@medusajs/framework/types"
+import { ContainerRegistrationKeys } from "@medusajs/framework/utils"
 import { updateProductsWorkflow } from "@medusajs/medusa/core-flows"
 import VendorSyncService from "../service"
 
@@ -21,13 +22,14 @@ export async function applyDiscontinuations(
   vendorCode: string,
   discontinuedPartNumbers: string[],
   logger: Logger
-): Promise<{ discontinuedCount: number; errorCount: number }> {
+): Promise<{ discontinuedCount: number; errorCount: number; skippedCount: number }> {
   let discontinuedCount = 0
   let errorCount = 0
+  let skippedCount = 0
+  const query = container.resolve(ContainerRegistrationKeys.QUERY)
 
   for (const partNumber of discontinuedPartNumbers) {
     try {
-      // 1. Look up vendor_product_current for (vendorCode, partNumber)
       const [currentRow] = await (service as any).listVendorProductCurrents(
         { vendor_code: vendorCode, part_number: partNumber },
         { take: 1 }
@@ -40,9 +42,28 @@ export async function applyDiscontinuations(
         continue
       }
 
-      // 2. Merge existing metadata and add discontinued_at
+      // Idempotency: already discontinued -> no-op. Replay/approve paths
+      // can re-enter this loop for the same SKU, and we don't want to
+      // re-emit product.updated (which triggers another Meilisearch
+      // indexing pass) for no reason.
+      if (currentRow.discontinued_at) {
+        skippedCount++
+        logger.info(
+          `[vendor-sync] discontinue: already discontinued, skipping ${vendorCode}/${partNumber}`
+        )
+        continue
+      }
+
+      // Read the existing Medusa product metadata so admin-added keys
+      // are preserved. The previous implementation read from
+      // currentRow.normalized.metadata which is always undefined.
+      const { data: products } = await query.graph({
+        entity: "product",
+        fields: ["id", "metadata"],
+        filters: { id: [currentRow.medusa_product_id] },
+      })
       const existingMetadata =
-        (currentRow.normalized as any)?.metadata || {}
+        ((products?.[0] as any)?.metadata as Record<string, unknown>) ?? {}
       const discontinuedAt = new Date().toISOString()
 
       await updateProductsWorkflow(container).run({
@@ -58,7 +79,6 @@ export async function applyDiscontinuations(
         },
       })
 
-      // 3. Set discontinued_at on vendor_product_current
       await (service as any).updateVendorProductCurrents({
         id: currentRow.id,
         discontinued_at: new Date(),
@@ -76,5 +96,5 @@ export async function applyDiscontinuations(
     }
   }
 
-  return { discontinuedCount, errorCount }
+  return { discontinuedCount, errorCount, skippedCount }
 }

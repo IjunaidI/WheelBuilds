@@ -311,7 +311,7 @@ export async function applyChanges(
       logger
     )
     logger.info(
-      `[vendor-sync] [${runId}] Discontinuations applied: ${discResult.discontinuedCount} discontinued, ${discResult.errorCount} errors`
+      `[vendor-sync] [${runId}] Discontinuations applied: ${discResult.discontinuedCount} discontinued, ${discResult.skippedCount} skipped, ${discResult.errorCount} errors`
     )
     errors.push(
       ...Array.from({ length: discResult.errorCount }, (_, i) => ({

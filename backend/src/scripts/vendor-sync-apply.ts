@@ -4,22 +4,39 @@ import { VENDOR_SYNC_MODULE } from "../modules/vendor-sync"
 import { computeDiff } from "../modules/vendor-sync/pipeline/diff"
 import { applyChanges } from "../modules/vendor-sync/pipeline/apply"
 
+const ALLOWED_STATUSES = ["completed", "diffing", "failed"]
+
+function printUsage(logger: any): void {
+  logger.error(
+    "Usage: medusa exec ./src/scripts/vendor-sync-apply.ts <run-id>"
+  )
+  logger.error("")
+  logger.error(
+    "  <run-id>   The run id printed by vendor-sync-dry-run, e.g. 01KS3PW3MZQ8RP0K28QEAHTYZP."
+  )
+  logger.error("")
+  logger.error(
+    `The run must be in one of these statuses: ${ALLOWED_STATUSES.join(", ")}.`
+  )
+}
+
+function looksLikeRunId(arg: string | undefined): boolean {
+  if (!arg) return false
+  if (arg.endsWith(".ts") || arg.endsWith(".js")) return false
+  if (arg.startsWith("-")) return false
+  return /^[0-9A-Za-z]{20,32}$/.test(arg)
+}
+
 export default async function vendorSyncApply({ container }: ExecArgs) {
   const logger = container.resolve(ContainerRegistrationKeys.LOGGER)
   const vendorSyncService = container.resolve(VENDOR_SYNC_MODULE) as any
 
   const runId = process.argv[process.argv.length - 1]
-  if (!runId || runId.endsWith(".ts") || runId.endsWith(".js")) {
-    logger.error(
-      "Usage: medusa exec ./src/scripts/vendor-sync-apply.ts <run-id>"
-    )
-    logger.error(
-      "The run-id is returned by vendor-sync-dry-run. The run must be in a completed (dry-run) or diffing status."
-    )
+  if (!looksLikeRunId(runId)) {
+    printUsage(logger)
     return
   }
 
-  // Look up the run row
   const [run] = await vendorSyncService.listVendorFeedRuns(
     { id: runId },
     { take: 1 }
@@ -29,29 +46,40 @@ export default async function vendorSyncApply({ container }: ExecArgs) {
     return
   }
 
-  // Only allow re-apply from certain statuses
-  const allowedStatuses = ["completed", "diffing", "failed"]
-  if (!allowedStatuses.includes(run.status)) {
+  if (!ALLOWED_STATUSES.includes(run.status)) {
     logger.error(
       `[apply] Run ${runId} is in status "${run.status}". ` +
-        `Expected one of: ${allowedStatuses.join(", ")}`
+        `Expected one of: ${ALLOWED_STATUSES.join(", ")}.`
     )
     return
   }
 
   const vendorCode = run.vendor_code
-  logger.info(`[apply] Starting apply for run ${runId} (vendor: ${vendorCode})`)
+  logger.info("")
+  logger.info("Vendor Sync Apply")
+  logger.info("=================")
+  logger.info(`Vendor:        ${vendorCode}`)
+  logger.info(`Run ID:        ${runId}`)
+  logger.info(`Source file:   ${run.source_filename}`)
+  logger.info(`Run date:      ${run.run_date_vendor ?? "(unknown)"}`)
+  logger.info(
+    `Staged counts: ${run.new_count} new, ${run.changed_count} changed, ${run.discontinued_count} discontinued`
+  )
+  logger.info(
+    `Skipped:       ${run.skipped_no_image_count} (no image)`
+  )
+  logger.info("=================")
+  logger.info("")
+
   const startTime = Date.now()
 
   try {
-    // Transition to applying
     await vendorSyncService.updateVendorFeedRuns({
       id: runId,
       status: "applying",
     })
 
-    // Re-compute diff against current state
-    logger.info(`[apply] Re-computing diff...`)
+    logger.info(`[apply] Re-computing diff against current state...`)
     const diff = await computeDiff(vendorSyncService, runId, vendorCode)
 
     logger.info(
@@ -60,7 +88,6 @@ export default async function vendorSyncApply({ container }: ExecArgs) {
         `${diff.discontinuedPartNumbers.length} discontinued`
     )
 
-    // Apply changes
     const result = await applyChanges(
       container,
       vendorSyncService,
@@ -70,31 +97,55 @@ export default async function vendorSyncApply({ container }: ExecArgs) {
       logger
     )
 
-    // Mark run as completed
-    await vendorSyncService.updateVendorFeedRuns({
-      id: runId,
-      status: "completed",
-      finished_at: new Date(),
-    })
+    if (result.cancelled) {
+      // The cancel route already wrote status=cancelled and finished_at.
+      // Only enrich with the partial-progress failed_part_numbers.
+      if (result.errors.length > 0) {
+        await vendorSyncService.updateVendorFeedRuns({
+          id: runId,
+          failed_part_numbers: result.errors,
+        })
+      }
+    } else {
+      await vendorSyncService.updateVendorFeedRuns({
+        id: runId,
+        status: "completed",
+        finished_at: new Date(),
+        failed_part_numbers:
+          result.errors.length > 0 ? result.errors : null,
+      })
+    }
 
     const elapsed = ((Date.now() - startTime) / 1000).toFixed(1)
 
-    // Print summary
     logger.info("")
     logger.info("Vendor Sync Apply Summary")
     logger.info("=========================")
     logger.info(`Vendor:              ${vendorCode}`)
     logger.info(`Run ID:              ${runId}`)
+    logger.info(`Final status:        ${result.cancelled ? "cancelled" : "completed"}`)
     logger.info(`Processed:           ${result.processedCount}`)
     logger.info(`Errors:              ${result.errorCount}`)
     logger.info(`Duration:            ${elapsed}s`)
     if (result.errors.length > 0) {
-      logger.info("Errors:")
-      for (const err of result.errors.slice(0, 20)) {
-        logger.info(`  ${err.partNumber}: ${err.error}`)
+      const grouped = new Map<string, string[]>()
+      for (const err of result.errors) {
+        const list = grouped.get(err.error) ?? []
+        list.push(err.partNumber)
+        grouped.set(err.error, list)
       }
-      if (result.errors.length > 20) {
-        logger.info(`  ... and ${result.errors.length - 20} more`)
+      logger.info("Errors by message:")
+      const sortedGroups = Array.from(grouped.entries()).sort(
+        (a, b) => b[1].length - a[1].length
+      )
+      for (const [message, partNumbers] of sortedGroups) {
+        logger.info(`  [${partNumbers.length}x] ${message}`)
+        for (const pn of partNumbers.slice(0, 3)) {
+          logger.info(`     - ${pn}`)
+        }
+        if (partNumbers.length > 3) {
+          logger.info(`     - ...and ${partNumbers.length - 3} more`)
+        }
       }
     }
     logger.info("=========================")

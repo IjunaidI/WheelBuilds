@@ -38,7 +38,6 @@
     "@rokmohar/medusa-plugin-meilisearch": "1.3.5",
     "medusajs-launch-utils": "0.0.18",
     "minio": "^8.0.6",
-    "bullmq": "^5.0.0",
     "papaparse": "^5.4.0",
     "resend": "4.0.1",
     "ulid": "^2.4.0",

@@ -1,6 +1,1 @@
 .idea/
-
-# Auto-generated MikroORM full-DB schema snapshot. Captures the entire
-# Medusa schema (huge) and changes whenever any migration runs. Module-
-# scoped snapshots (.snapshot-<module-name>-module.json) are kept.
-backend/src/modules/*/migrations/.snapshot-railway.json

@@ -1,5 +1,8 @@
 import { MedusaContainer } from "@medusajs/framework/types"
-import { ProductStatus } from "@medusajs/framework/utils"
+import {
+  ContainerRegistrationKeys,
+  ProductStatus,
+} from "@medusajs/framework/utils"
 import {
   createProductsWorkflow,
   updateProductsWorkflow,
@@ -150,11 +153,28 @@ export async function applyChanges(
         },
       })
 
-      // Extract ids from the result
+      // Extract ids from the result. createProductsWorkflow returns the
+      // variant but does NOT eagerly populate the inventory_items link, so
+      // we re-query via the graph to get inventory_item_id.
       const product = result[0]
       const variant = product.variants?.[0]
-      const inventoryItemId =
-        (variant as any)?.inventory_items?.[0]?.inventory_item_id ?? null
+      let inventoryItemId: string | null = null
+      if (variant?.id) {
+        const query = container.resolve(ContainerRegistrationKeys.QUERY)
+        const { data: variantsWithInv } = await query.graph({
+          entity: "variant",
+          fields: ["id", "inventory_items.inventory_item_id"],
+          filters: { id: [variant.id] },
+        })
+        inventoryItemId =
+          (variantsWithInv?.[0] as any)?.inventory_items?.[0]
+            ?.inventory_item_id ?? null
+        if (!inventoryItemId) {
+          logger.warn(
+            `[vendor-sync] [${runId}] inventory_item_id missing after create for ${partNumber} (variant=${variant.id})`
+          )
+        }
+      }
 
       // Create vendor_product_current row
       await (service as any).createVendorProductCurrents({
@@ -244,15 +264,13 @@ export async function applyChanges(
       })
 
       // Update vendor_product_current
-      await (service as any).updateVendorProductCurrents(
-        { id: currentRow.id },
-        {
-          content_hash: stagingRow.content_hash,
-          normalized: normalized,
-          last_seen_run_id: runId,
-          applied_at: new Date(),
-        }
-      )
+      await (service as any).updateVendorProductCurrents({
+        id: currentRow.id,
+        content_hash: stagingRow.content_hash,
+        normalized: normalized,
+        last_seen_run_id: runId,
+        applied_at: new Date(),
+      })
 
       processedCount++
     } catch (err: any) {

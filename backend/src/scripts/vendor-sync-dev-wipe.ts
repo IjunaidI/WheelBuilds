@@ -26,8 +26,9 @@ import { VENDOR_SYNC_MODULE } from "../modules/vendor-sync"
  *      (prints the target host + instructions; refuses to act)
  *
  *   pnpm exec medusa exec ./src/scripts/vendor-sync-dev-wipe.ts \
- *      --confirm-host=<the host printed above>
- *      (actually wipes)
+ *      -- --confirm-host=<the host printed above>
+ *      (actually wipes; note the `--` separator -- medusa exec uses
+ *       yargs and would otherwise reject the flag as unknown)
  */
 
 const VENDORS = ["wheelpros-wheels", "wheelpros-tires"]
@@ -95,7 +96,10 @@ export default async function vendorSyncDevWipe({ container }: ExecArgs) {
   const confirmHost = extractFlag("--confirm-host")
   if (!confirmHost) {
     logger.info("To proceed, re-run with:")
-    logger.info(`  --confirm-host=${parsed.host}`)
+    logger.info(
+      `  pnpm exec medusa exec ./src/scripts/vendor-sync-dev-wipe.ts -- --confirm-host=${parsed.host}`
+    )
+    logger.info("(the `--` separator is required so medusa exec ignores the flag)")
     logger.info("")
     return
   }

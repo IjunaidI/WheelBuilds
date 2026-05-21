@@ -13,6 +13,11 @@ coverage
 
 !src/**
 
+# Auto-generated MikroORM full-DB schema snapshot. Captures the entire
+# Medusa schema (huge) and changes whenever any migration runs. Module-
+# scoped snapshots (.snapshot-<module-name>-module.json) are kept.
+src/modules/*/migrations/.snapshot-railway.json
+
 ./tsconfig.tsbuildinfo
 # package-lock.json
 yarn.lock

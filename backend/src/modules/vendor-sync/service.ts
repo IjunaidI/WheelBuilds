@@ -1,0 +1,527 @@
+import { MedusaService } from "@medusajs/framework/utils"
+import VendorFeedRun from "./models/vendor-feed-run"
+import VendorFeedStaging from "./models/vendor-feed-staging"
+import VendorStockStaging from "./models/vendor-stock-staging"
+import VendorProductCurrent from "./models/vendor-product-current"
+import { resolveAdapter } from "./adapters/registry"
+import { fetchFeed } from "./pipeline/fetch"
+import { stageFeed } from "./pipeline/stage"
+import { computeDiff } from "./pipeline/diff"
+import { applyChanges } from "./pipeline/apply"
+
+interface Logger {
+  info(message: string, ...args: any[]): void
+  warn(message: string, ...args: any[]): void
+  error(message: string, ...args: any[]): void
+}
+
+export interface VendorSyncModuleOptions {
+  discontinueThreshold?: number
+  applyConcurrency?: number
+  archiveBucket?: string
+  dryRun?: boolean
+  vendors?: Record<
+    string,
+    { enabled?: boolean; feedPath?: string }
+  >
+}
+
+const IN_PROGRESS_STATUSES = ["fetching", "staging", "diffing", "applying"]
+
+class VendorSyncService extends MedusaService({
+  VendorFeedRun,
+  VendorFeedStaging,
+  VendorStockStaging,
+  VendorProductCurrent,
+}) {
+  private container_: any
+  private logger_: Logger
+  private options_: VendorSyncModuleOptions
+  /**
+   * In-memory set of run ids that have been requested to cancel. Lives
+   * for the lifetime of this service instance (i.e. this process). The
+   * apply loop checks this between part_numbers so cancel-while-applying
+   * stops cleanly instead of running to completion.
+   */
+  private cancelledRuns_: Set<string> = new Set()
+
+  constructor(container: any, options: any) {
+    super(...arguments)
+    this.container_ = container
+    this.logger_ = container.logger ?? {
+      info: console.log,
+      warn: console.warn,
+      error: console.error,
+    }
+    this.options_ = (options ?? {}) as VendorSyncModuleOptions
+  }
+
+  /**
+   * Return vendor codes where enabled is true in module options.
+   */
+  listEnabledVendors(): string[] {
+    const vendors = this.options_.vendors ?? {}
+    return Object.entries(vendors)
+      .filter(([, cfg]) => cfg.enabled)
+      .map(([code]) => code)
+  }
+
+  /**
+   * Mark a run as cancelled so the apply loop sees it on its next
+   * iteration. The cancel endpoint calls this before flipping the DB
+   * status. Idempotent.
+   */
+  markCancelled(runId: string): void {
+    this.cancelledRuns_.add(runId)
+  }
+
+  /**
+   * True if markCancelled was called for this runId. The apply loop
+   * polls this between part_numbers.
+   */
+  isCancelled(runId: string): boolean {
+    return this.cancelledRuns_.has(runId)
+  }
+
+  /**
+   * Forget the cancel flag for a runId. Called from the run terminator
+   * after the run row reaches a terminal status so the set doesn't grow
+   * indefinitely.
+   */
+  private clearCancelled_(runId: string): void {
+    this.cancelledRuns_.delete(runId)
+  }
+
+  /**
+   * Orchestrate a full vendor sync run: fetch -> stage -> diff.
+   * Transitions the run through status states and handles errors.
+   */
+  async run(
+    vendorCode: string,
+    options?: { dryRun?: boolean }
+  ): Promise<{ runId: string }> {
+    const isDryRun = options?.dryRun ?? this.options_.dryRun ?? false
+    const threshold = this.options_.discontinueThreshold ?? 0.05
+
+    // 1. In-progress guard
+    const inProgress = await (this as any).listVendorFeedRuns(
+      { vendor_code: vendorCode, status: IN_PROGRESS_STATUSES },
+      { take: 1 }
+    )
+    if (inProgress.length > 0) {
+      this.logger_.warn(
+        `[vendor-sync] Run already in progress for ${vendorCode} (run ${inProgress[0].id}, status ${inProgress[0].status}). Skipping.`
+      )
+      return { runId: inProgress[0].id }
+    }
+
+    // 2. Create run row
+    const run = await (this as any).createVendorFeedRuns({
+      vendor_code: vendorCode,
+      source_filename: "",
+      status: "fetching",
+      started_at: new Date(),
+      row_count: 0,
+      skipped_no_image_count: 0,
+      hash_match_count: 0,
+      new_count: 0,
+      changed_count: 0,
+      discontinued_count: 0,
+    })
+    const runId = run.id
+
+    const startTime = Date.now()
+
+    try {
+      // 3. Resolve adapter
+      const adapter = resolveAdapter(vendorCode)
+
+      // 4. Fetch
+      this.logger_.info(
+        `[vendor-sync] [${runId}] stage=fetching vendor=${vendorCode}`
+      )
+      const descriptor = await fetchFeed(adapter)
+      this.logger_.info(
+        `[vendor-sync] [${runId}] stage=fetched vendor=${vendorCode} file=${descriptor.sourceFilename} bytes=${descriptor.byteLength} archiveKey=${descriptor.archiveKey}`
+      )
+      await (this as any).updateVendorFeedRuns({
+        id: runId,
+        source_filename: descriptor.sourceFilename,
+        source_archive_key: descriptor.archiveKey,
+      })
+
+      // 5. RunDate short-circuit
+      // Parse runDateVendor from a sample row (first parsed row)
+      let runDateVendor: Date | null = null
+      for await (const parsedRow of adapter.parse(descriptor)) {
+        try {
+          const normalized = adapter.normalize(parsedRow)
+          runDateVendor = normalized.runDateVendor
+        } catch {
+          // skip un-normalizable rows, keep looking
+          continue
+        }
+        break
+      }
+
+      if (runDateVendor) {
+        // Check the most recent completed run for this vendor
+        const [lastCompleted] = await (this as any).listVendorFeedRuns(
+          { vendor_code: vendorCode, status: "completed" },
+          { order: { started_at: "DESC" }, take: 1 }
+        )
+        if (
+          lastCompleted?.run_date_vendor &&
+          new Date(lastCompleted.run_date_vendor).getTime() ===
+            new Date(runDateVendor).getTime()
+        ) {
+          const durationMs = Date.now() - startTime
+          this.logger_.info(
+            `[vendor-sync] [${runId}] stage=short-circuited vendor=${vendorCode} feedDate=${runDateVendor.toISOString()} durationMs=${durationMs}`
+          )
+          await (this as any).updateVendorFeedRuns({
+            id: runId,
+            status: "completed",
+            run_date_vendor: runDateVendor,
+            finished_at: new Date(),
+          })
+          return { runId }
+        }
+      }
+
+      // Transition to staging
+      await (this as any).updateVendorFeedRuns({
+        id: runId,
+        status: "staging",
+        run_date_vendor: runDateVendor,
+      })
+
+      // 6. Stage
+      this.logger_.info(
+        `[vendor-sync] [${runId}] stage=staging vendor=${vendorCode}`
+      )
+      await stageFeed(adapter, descriptor, this, runId, this.logger_)
+
+      // Transition to diffing
+      await (this as any).updateVendorFeedRuns({
+        id: runId,
+        status: "diffing",
+      })
+
+      // 7. Diff
+      this.logger_.info(
+        `[vendor-sync] [${runId}] stage=diffing vendor=${vendorCode}`
+      )
+      const diff = await computeDiff(this, runId, vendorCode)
+      await (this as any).updateVendorFeedRuns({
+        id: runId,
+        new_count: diff.newPartNumbers.length,
+        changed_count: diff.changedPartNumbers.length,
+        discontinued_count: diff.discontinuedPartNumbers.length,
+      })
+
+      this.logger_.info(
+        `[vendor-sync] [${runId}] stage=diffed vendor=${vendorCode} new=${diff.newPartNumbers.length} changed=${diff.changedPartNumbers.length} discontinued=${diff.discontinuedPartNumbers.length}`
+      )
+
+      // 8. Threshold check
+      // Count active current rows for this vendor
+      const currentRows = await (this as any).listVendorProductCurrents(
+        { vendor_code: vendorCode, discontinued_at: null },
+        { select: ["id"], take: null }
+      )
+      const currentCount = currentRows.length
+
+      if (
+        currentCount > 0 &&
+        diff.discontinuedPartNumbers.length / currentCount > threshold
+      ) {
+        this.logger_.warn(
+          `[vendor-sync] [${runId}] Discontinue ratio ` +
+            `${diff.discontinuedPartNumbers.length}/${currentCount} ` +
+            `exceeds threshold ${threshold}. Awaiting approval.`
+        )
+        await (this as any).updateVendorFeedRuns({
+          id: runId,
+          status: "awaiting_approval",
+        })
+        return { runId }
+      }
+
+      // 9. Dry run: mark completed and return
+      if (isDryRun) {
+        const durationMs = Date.now() - startTime
+        this.logger_.info(
+          `[vendor-sync] [${runId}] stage=completed vendor=${vendorCode} dryRun=true durationMs=${durationMs}`
+        )
+        await (this as any).updateVendorFeedRuns({
+          id: runId,
+          status: "completed",
+          finished_at: new Date(),
+        })
+        return { runId }
+      }
+
+      // 10. Transition to applying
+      await (this as any).updateVendorFeedRuns({
+        id: runId,
+        status: "applying",
+      })
+
+      this.logger_.info(
+        `[vendor-sync] [${runId}] stage=applying vendor=${vendorCode}`
+      )
+      const applyResult = await applyChanges(
+        this.container_,
+        this,
+        runId,
+        vendorCode,
+        diff,
+        this.logger_
+      )
+
+      const durationMs = Date.now() - startTime
+      this.logger_.info(
+        `[vendor-sync] [${runId}] stage=${applyResult.cancelled ? "cancelled" : "completed"} vendor=${vendorCode} processed=${applyResult.processedCount} errors=${applyResult.errorCount} durationMs=${durationMs}`
+      )
+
+      if (applyResult.cancelled) {
+        // The cancel route already set status=cancelled and finished_at.
+        // Only enrich with the partial-progress failed_part_numbers.
+        if (applyResult.errors.length > 0) {
+          await (this as any).updateVendorFeedRuns({
+            id: runId,
+            failed_part_numbers: applyResult.errors,
+          })
+        }
+      } else {
+        await (this as any).updateVendorFeedRuns({
+          id: runId,
+          status: "completed",
+          finished_at: new Date(),
+          failed_part_numbers:
+            applyResult.errors.length > 0 ? applyResult.errors : null,
+        })
+      }
+
+      this.clearCancelled_(runId)
+      return { runId }
+    } catch (err: any) {
+      const durationMs = Date.now() - startTime
+      this.logger_.error(
+        `[vendor-sync] [${runId}] stage=failed vendor=${vendorCode} error="${err.message}" durationMs=${durationMs}`
+      )
+      await (this as any).updateVendorFeedRuns({
+        id: runId,
+        status: "failed",
+        error_message: err.message?.slice(0, 2000),
+        finished_at: new Date(),
+      }).catch((updateErr: any) => {
+        this.logger_.error(
+          `[vendor-sync] [${runId}] Failed to update run status: ${updateErr.message}`
+        )
+      })
+      this.clearCancelled_(runId)
+      return { runId }
+    }
+  }
+
+  /**
+   * Approve a paused run (awaiting_approval) and apply its diff.
+   * Re-computes the diff from existing staging data, then applies.
+   */
+  async approveAndApply(runId: string, actorId?: string): Promise<void> {
+    // Record who approved and when
+    await (this as any).updateVendorFeedRuns({
+      id: runId,
+      status: "applying",
+      approved_by: actorId ?? "admin",
+      approved_at: new Date(),
+    })
+
+    try {
+      const [run] = await (this as any).listVendorFeedRuns({ id: runId })
+      const vendorCode = run.vendor_code
+
+      // Re-compute diff from existing staging data
+      const diff = await computeDiff(this, runId, vendorCode)
+
+      this.logger_.info(
+        `[vendor-sync] [${runId}] Approved. Applying: ${diff.newPartNumbers.length} new, ` +
+          `${diff.changedPartNumbers.length} changed, ${diff.discontinuedPartNumbers.length} discontinued`
+      )
+
+      const result = await applyChanges(
+        this.container_,
+        this,
+        runId,
+        vendorCode,
+        diff,
+        this.logger_
+      )
+
+      this.logger_.info(
+        `[vendor-sync] [${runId}] Apply ${result.cancelled ? "cancelled" : "complete"}: ${result.processedCount} processed, ${result.errorCount} errors`
+      )
+
+      if (result.cancelled) {
+        if (result.errors.length > 0) {
+          await (this as any).updateVendorFeedRuns({
+            id: runId,
+            failed_part_numbers: result.errors,
+          })
+        }
+      } else {
+        await (this as any).updateVendorFeedRuns({
+          id: runId,
+          status: "completed",
+          finished_at: new Date(),
+          failed_part_numbers: result.errors.length > 0 ? result.errors : null,
+        })
+      }
+      this.clearCancelled_(runId)
+    } catch (err: any) {
+      this.logger_.error(
+        `[vendor-sync] [${runId}] Apply after approval failed: ${err.message}`
+      )
+      await (this as any).updateVendorFeedRuns({
+        id: runId,
+        status: "failed",
+        error_message: err.message?.slice(0, 2000),
+        finished_at: new Date(),
+      }).catch(() => {})
+      this.clearCancelled_(runId)
+      throw err
+    }
+  }
+
+  /**
+   * Replay a completed or failed run: re-diff from existing staging data
+   * and re-apply all changes.
+   */
+  async replayRun(runId: string): Promise<void> {
+    const [run] = await (this as any).listVendorFeedRuns({ id: runId })
+    if (!run) throw new Error(`Run ${runId} not found`)
+
+    const vendorCode = run.vendor_code
+
+    await (this as any).updateVendorFeedRuns({
+      id: runId,
+      status: "applying",
+      finished_at: null,
+    })
+
+    try {
+      const diff = await computeDiff(this, runId, vendorCode)
+
+      this.logger_.info(
+        `[vendor-sync] [${runId}] Replaying: ${diff.newPartNumbers.length} new, ` +
+          `${diff.changedPartNumbers.length} changed, ${diff.discontinuedPartNumbers.length} discontinued`
+      )
+
+      const result = await applyChanges(
+        this.container_,
+        this,
+        runId,
+        vendorCode,
+        diff,
+        this.logger_
+      )
+
+      this.logger_.info(
+        `[vendor-sync] [${runId}] Replay ${result.cancelled ? "cancelled" : "complete"}: ${result.processedCount} processed, ${result.errorCount} errors`
+      )
+
+      if (result.cancelled) {
+        if (result.errors.length > 0) {
+          await (this as any).updateVendorFeedRuns({
+            id: runId,
+            failed_part_numbers: result.errors,
+          })
+        }
+      } else {
+        await (this as any).updateVendorFeedRuns({
+          id: runId,
+          status: "completed",
+          finished_at: new Date(),
+          failed_part_numbers: result.errors.length > 0 ? result.errors : null,
+        })
+      }
+      this.clearCancelled_(runId)
+    } catch (err: any) {
+      this.logger_.error(
+        `[vendor-sync] [${runId}] Replay failed: ${err.message}`
+      )
+      await (this as any).updateVendorFeedRuns({
+        id: runId,
+        status: "failed",
+        error_message: err.message?.slice(0, 2000),
+        finished_at: new Date(),
+      }).catch(() => {})
+      this.clearCancelled_(runId)
+      throw err
+    }
+  }
+
+  /**
+   * Replay a single SKU: find the most recent staging row, classify it
+   * against the current state, and apply the appropriate action.
+   */
+  async replaySku(vendorCode: string, partNumber: string): Promise<void> {
+    // Find the most recent staging row for this vendor + part number
+    const [stagingRow] = await (this as any).listVendorFeedStagings(
+      { vendor_code: vendorCode, part_number: partNumber },
+      { order: { created_at: "DESC" }, take: 1 }
+    )
+
+    if (!stagingRow) {
+      throw new Error(
+        `No staging data found for vendor=${vendorCode}, part_number=${partNumber}`
+      )
+    }
+
+    const runId = stagingRow.run_id
+
+    // Get current row for this part number
+    const [currentRow] = await (this as any).listVendorProductCurrents(
+      { vendor_code: vendorCode, part_number: partNumber },
+      { take: 1 }
+    )
+
+    // Classify: if no current row -> new, if hash differs -> changed
+    const isNew = !currentRow || currentRow.discontinued_at !== null
+    const isChanged =
+      currentRow &&
+      currentRow.discontinued_at === null &&
+      currentRow.content_hash !== stagingRow.content_hash
+
+    if (!isNew && !isChanged) {
+      this.logger_.info(
+        `[vendor-sync] SKU ${partNumber} is unchanged, nothing to replay`
+      )
+      return
+    }
+
+    // Build a minimal diff and apply
+    const diff = {
+      newPartNumbers: isNew ? [partNumber] : [],
+      changedPartNumbers: isChanged ? [partNumber] : [],
+      discontinuedPartNumbers: [],
+    }
+
+    this.logger_.info(
+      `[vendor-sync] Replaying SKU ${partNumber} (${isNew ? "new" : "changed"}) from run ${runId}`
+    )
+
+    await applyChanges(
+      this.container_,
+      this,
+      runId,
+      vendorCode,
+      diff,
+      this.logger_
+    )
+  }
+}
+
+export default VendorSyncService

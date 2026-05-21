@@ -1,4 +1,7 @@
-import { buildProductMetadata } from "../pipeline/build-metadata"
+import {
+  buildProductMetadata,
+  buildVariantMetadata,
+} from "../pipeline/build-metadata"
 import { WheelNormalizedRecord, TireNormalizedRecord } from "../adapters/types"
 
 function makeWheelRecord(
@@ -24,6 +27,7 @@ function makeWheelRecord(
     widthIn: 8.5,
     boltCount: 5,
     boltCircleIn: 5.0,
+    boltPatternRaw: "5X5.0",
     offsetMm: -12,
     centerBoreMm: 71.5,
     loadRatingLb: 2250,
@@ -64,43 +68,102 @@ function makeTireRecord(
   }
 }
 
-describe("buildProductMetadata", () => {
-  it("includes common base fields for wheel records", () => {
+describe("buildProductMetadata (group-level fields)", () => {
+  it("includes the shared identifiers for wheel records", () => {
     const meta = buildProductMetadata(makeWheelRecord())
     expect(meta.vendor_code).toBe("wheelpros-wheels")
+    expect(meta.product_type).toBe("wheel")
+    expect(meta.group_key).toBe("Teraflex|058|Matte Black")
+    expect(meta.brand).toBe("Teraflex")
+  })
+
+  it("includes the shared identifiers for tire records", () => {
+    const meta = buildProductMetadata(makeTireRecord())
+    expect(meta.vendor_code).toBe("wheelpros-tires")
+    expect(meta.product_type).toBe("tire")
+    expect(meta.group_key).toBe("sku:000000000001100200")
+    expect(meta.brand).toBe("Falken")
+  })
+
+  it("includes wheel-only product-level fields", () => {
+    const meta = buildProductMetadata(makeWheelRecord())
+    expect(meta.display_style_no).toBe("058")
+    expect(meta.finish).toBe("Matte Black")
+    expect(meta.style).toBe("NOMAD")
+  })
+
+  it("includes tire-only product-level fields", () => {
+    const meta = buildProductMetadata(makeTireRecord())
+    expect(meta.vendor_division).toBe("Falken")
+    expect(meta.tire_prefix).toBe("P")
+  })
+
+  it("does NOT include per-variant dimension or price fields", () => {
+    const meta = buildProductMetadata(makeWheelRecord())
+    expect(meta).not.toHaveProperty("wheel_diameter_in")
+    expect(meta).not.toHaveProperty("wheel_width_in")
+    expect(meta).not.toHaveProperty("bolt_count")
+    expect(meta).not.toHaveProperty("offset_mm")
+    expect(meta).not.toHaveProperty("center_bore_mm")
+    expect(meta).not.toHaveProperty("load_rating_lb")
+    expect(meta).not.toHaveProperty("vendor_part_number")
+    expect(meta).not.toHaveProperty("vendor_map_usd")
+  })
+
+  it("does NOT leak tire fields into wheel metadata", () => {
+    const meta = buildProductMetadata(makeWheelRecord())
+    expect(meta).not.toHaveProperty("tire_width_mm")
+    expect(meta).not.toHaveProperty("vendor_division")
+  })
+
+  it("does NOT leak wheel fields into tire metadata", () => {
+    const meta = buildProductMetadata(makeTireRecord())
+    expect(meta).not.toHaveProperty("finish")
+    expect(meta).not.toHaveProperty("style")
+    expect(meta).not.toHaveProperty("display_style_no")
+  })
+
+  it("handles nullable wheel group-level fields", () => {
+    const meta = buildProductMetadata(
+      makeWheelRecord({ finish: null, style: null, displayStyleNo: null })
+    )
+    expect(meta.finish).toBeNull()
+    expect(meta.style).toBeNull()
+    expect(meta.display_style_no).toBeNull()
+  })
+
+  it("handles nullable tire group-level fields", () => {
+    const meta = buildProductMetadata(
+      makeTireRecord({ division: null, tirePrefix: null })
+    )
+    expect(meta.vendor_division).toBeNull()
+    expect(meta.tire_prefix).toBeNull()
+  })
+})
+
+describe("buildVariantMetadata (per-row fields)", () => {
+  it("includes vendor identifiers on the variant", () => {
+    const meta = buildVariantMetadata(makeWheelRecord())
     expect(meta.vendor_part_number).toBe("000000000001058059")
     expect(meta.vendor_map_usd).toBe(369.99)
     expect(meta.vendor_inv_order_type).toBe("ST")
-    expect(meta.product_type).toBe("wheel")
   })
 
-  it("includes common base fields for tire records", () => {
-    const meta = buildProductMetadata(makeTireRecord())
-    expect(meta.vendor_code).toBe("wheelpros-tires")
-    expect(meta.vendor_part_number).toBe("000000000001100200")
-    expect(meta.vendor_map_usd).toBe(229.99)
-    expect(meta.vendor_inv_order_type).toBe("ST")
-    expect(meta.product_type).toBe("tire")
-  })
-
-  it("produces wheel-specific metadata fields", () => {
-    const meta = buildProductMetadata(makeWheelRecord())
+  it("captures wheel dimensional and geometry fields per variant", () => {
+    const meta = buildVariantMetadata(makeWheelRecord())
     expect(meta.wheel_diameter_in).toBe(17)
     expect(meta.wheel_width_in).toBe(8.5)
     expect(meta.bolt_count).toBe(5)
     expect(meta.bolt_circle_in).toBe(5.0)
+    expect(meta.bolt_pattern_raw).toBe("5X5.0")
     expect(meta.offset_mm).toBe(-12)
     expect(meta.center_bore_mm).toBe(71.5)
     expect(meta.load_rating_lb).toBe(2250)
-    expect(meta.finish).toBe("Matte Black")
-    expect(meta.style).toBe("NOMAD")
-    expect(meta.display_style_no).toBe("058")
   })
 
-  it("produces tire-specific metadata fields", () => {
-    const meta = buildProductMetadata(makeTireRecord())
+  it("captures tire-specific fields per variant", () => {
+    const meta = buildVariantMetadata(makeTireRecord())
     expect(meta.manufacturer_part_number).toBe("28065517")
-    expect(meta.vendor_division).toBe("Falken")
     expect(meta.tire_width_mm).toBe(285)
     expect(meta.aspect_ratio).toBe(70)
     expect(meta.construction_type).toBe("R")
@@ -108,47 +171,28 @@ describe("buildProductMetadata", () => {
     expect(meta.load_index).toBe(116)
     expect(meta.speed_rating).toBe("T")
     expect(meta.ply_rating).toBeNull()
-    expect(meta.tire_prefix).toBe("P")
   })
 
-  it("does not include tire fields in wheel metadata", () => {
-    const meta = buildProductMetadata(makeWheelRecord())
-    expect(meta).not.toHaveProperty("manufacturer_part_number")
-    expect(meta).not.toHaveProperty("tire_width_mm")
-    expect(meta).not.toHaveProperty("aspect_ratio")
-    expect(meta).not.toHaveProperty("rim_diameter_in")
-  })
-
-  it("does not include wheel fields in tire metadata", () => {
-    const meta = buildProductMetadata(makeTireRecord())
-    expect(meta).not.toHaveProperty("wheel_diameter_in")
-    expect(meta).not.toHaveProperty("wheel_width_in")
-    expect(meta).not.toHaveProperty("bolt_count")
+  it("does NOT include group-level fields", () => {
+    const meta = buildVariantMetadata(makeWheelRecord())
+    expect(meta).not.toHaveProperty("brand")
+    expect(meta).not.toHaveProperty("group_key")
     expect(meta).not.toHaveProperty("finish")
+    expect(meta).not.toHaveProperty("display_style_no")
   })
 
-  it("handles nullable wheel fields", () => {
-    const meta = buildProductMetadata(
-      makeWheelRecord({
-        centerBoreMm: null,
-        loadRatingLb: null,
-        finish: null,
-        style: null,
-        displayStyleNo: null,
-      })
+  it("handles nullable wheel variant-level fields", () => {
+    const meta = buildVariantMetadata(
+      makeWheelRecord({ centerBoreMm: null, loadRatingLb: null })
     )
     expect(meta.center_bore_mm).toBeNull()
     expect(meta.load_rating_lb).toBeNull()
-    expect(meta.finish).toBeNull()
-    expect(meta.style).toBeNull()
-    expect(meta.display_style_no).toBeNull()
   })
 
-  it("handles nullable tire fields", () => {
-    const meta = buildProductMetadata(
+  it("handles nullable tire variant-level fields", () => {
+    const meta = buildVariantMetadata(
       makeTireRecord({
         manufacturerPartNumber: null,
-        division: null,
         tireWidthMm: null,
         aspectRatio: null,
         constructionType: null,
@@ -156,11 +200,9 @@ describe("buildProductMetadata", () => {
         loadIndex: null,
         speedRating: null,
         plyRating: null,
-        tirePrefix: null,
       })
     )
     expect(meta.manufacturer_part_number).toBeNull()
-    expect(meta.vendor_division).toBeNull()
     expect(meta.tire_width_mm).toBeNull()
     expect(meta.aspect_ratio).toBeNull()
     expect(meta.construction_type).toBeNull()
@@ -168,6 +210,5 @@ describe("buildProductMetadata", () => {
     expect(meta.load_index).toBeNull()
     expect(meta.speed_rating).toBeNull()
     expect(meta.ply_rating).toBeNull()
-    expect(meta.tire_prefix).toBeNull()
   })
 })

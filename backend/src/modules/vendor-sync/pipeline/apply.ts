@@ -198,6 +198,7 @@ export async function applyChanges(
       await (service as any).createVendorProductCurrents({
         vendor_code: vendorCode,
         part_number: partNumber,
+        group_key: normalized.groupKey,
         content_hash: stagingRow.content_hash,
         medusa_product_id: product.id,
         medusa_variant_id: variant?.id ?? null,

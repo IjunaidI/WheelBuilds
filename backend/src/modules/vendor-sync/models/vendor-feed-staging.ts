@@ -5,6 +5,7 @@ const VendorFeedStaging = model.define("vendor_feed_staging", {
   run_id: model.text(),
   vendor_code: model.text(),
   part_number: model.text(),
+  group_key: model.text(),
   row_json: model.json(),
   normalized: model.json(),
   content_hash: model.text(),
@@ -12,6 +13,7 @@ const VendorFeedStaging = model.define("vendor_feed_staging", {
   { on: ["run_id", "part_number"], unique: true },
   { on: ["vendor_code", "part_number"] },
   { on: ["run_id", "content_hash"] },
+  { on: ["vendor_code", "run_id", "group_key"] },
 ])
 
 export default VendorFeedStaging

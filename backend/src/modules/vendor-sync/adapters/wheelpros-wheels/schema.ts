@@ -40,6 +40,7 @@ export const wheelNormalizedSchema = z.object({
   mapUsd: z.number().min(0),
   runDateVendor: z.date(),
   stockByWarehouse: z.record(z.string(), z.number().int().min(0)),
+  groupKey: z.string().min(1),
   displayStyleNo: z.string().nullable(),
   finish: z.string().nullable(),
   diameterIn: z.number().positive(),

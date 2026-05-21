@@ -173,4 +173,9 @@ describe('normalizeTireRow', () => {
     expect(result.productType).toBe('tire')
     warnSpy.mockRestore()
   })
+
+  it('emits per-SKU groupKey (no tire grouping rule yet)', () => {
+    const result = normalizeTireRow(makeRow())
+    expect(result.groupKey).toBe('sku:F28840215')
+  })
 })

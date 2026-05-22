@@ -37,7 +37,7 @@ Sizes are rough: S (≤ 1 day), M (2-5 days), L (1-2 weeks), XL (>2 weeks).
 
 | # | Gap | Detail | Dependency | Size |
 |---|---|---|---|---|
-| 2.1 | Fitment data | YMM-Submodel ↔ SKU mapping. Vehicle taxonomy is year × make × model × submodel × drive ≈ 10-50k vehicles. WheelPros ships a `FitmentData` feed (format and license terms not yet confirmed). New schema, new ingestion pipeline parallel to vendor-sync. **This is the elephant in Phase 2.** | — | XL |
+| 2.1 | Fitment data | Vehicle-to-SKU compatibility mapping. Vehicle taxonomy is year × make × model × (submodel/drive depending on data source). **WheelPros does NOT ship fitment data.** Candidate external source: [wheel-size.com REST API](https://developer.wheel-size.com/) — covers `usdm` (US domestic market) region with bolt pattern, PCD, offset, OE + aftermarket tire sizes, rim dimensions. Different from vendor-sync architecturally: either runtime API with caching, or bulk import (Enterprise tier only). **This is the elephant in Phase 2.** | — | XL |
 | 2.2 | Vehicle garage | Customer saves vehicle(s); storefront filters and recommends from them. New `customer_vehicle` table linked to Medusa customers. | 2.1 | M |
 | 2.3 | Search facets | Meilisearch indexes only `title/desc/sku/handle` today. Real wheel/tire search needs `filterableAttributes` for Bolt Pattern, Diameter, Width, Offset, Brand, Finish, Tire Size, Construction. Same plugin, larger index config. | — | S backend + frontend work |
 | 2.4 | Set-of-4 quick add | Most wheel orders are 4. PDP default qty = 4, "Buy as set" button, optional lug-kit upsell. Backend already supports quantity; this is mostly storefront. | — | S backend + M frontend |
@@ -106,7 +106,7 @@ These are not technical questions; they need information from outside the codeba
 
 | Gap | Open question |
 |---|---|
-| 2.1 Fitment | What does the WheelPros FitmentData feed actually contain? Format (CSV/XML/JSON), update cadence, license terms for redistribution? Third-party alternatives (PFYC, Ride Match) viable? |
+| 2.1 Fitment | wheel-size.com is the candidate data source. Three decisions outstanding: (a) **pricing tier** — runtime API integration ($450-$1,570/yr, capped at 5k-40k hits/day) vs Enterprise (custom quote, the only tier with explicit commercial-use language and bulk-database option); (b) **schema granularity** — confirm whether `search/by_model` returns trim/submodel/drivetrain or only make+model+year (their headline example uses only year/make/model, which would be coarser than typical US dealer practice); (c) **commercial-use terms** at `/api-tos` — confirm we can use the data to power a B2C storefront, and whether attribution is required. |
 | 2.6 MAP enforcement | What does the dealer agreement with WheelPros actually require? "MAP" by itself is ambiguous; the legal answer dictates the technical policy. |
 | 3.1-3.5 Drop-ship | What channel does WheelPros use for PO submission and status (SFTP folder structure, sFTP file naming, real API endpoint)? Cadence of status files? |
 | 1.3 Sales tax | Are you committing to TaxJar/Avalara monthly cost, or building per-state rates manually? Wholesale dealer license sometimes complicates this. |

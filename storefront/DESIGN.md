@@ -80,25 +80,29 @@ If a component might be reused outside `.frame` (e.g. mounted in a portal), add 
 
 All classes are scoped under `.frame .foo` selectors, so the names are short. Use them by class string on the relevant element.
 
+> **Heads-up on the typography / button / tag classes below.** Most of these are now wrapped by React primitives (§5) that bake in the right defaults — reach for `<Display>` / `<Label>` / `<Button>` / `<Chip>` first. The raw classes are still here because (a) the primitives use them internally for the bespoke parts (e.g. `<Display>` adds `className="display"`), (b) legacy Medusa-style modules outside `.frame` (cart, checkout, account) still target them directly, and (c) they're a reliable fallback when you genuinely need the visual treatment without React state.
+
 ### Typography
 
-- **`display`** — Antonio 900, uppercase, tight letter-spacing. Use for headlines, section titles, big numbers.
-- **`label`** — Mono 600, uppercase, 11px, orange. Use for section eyebrows and emphasized small caps.
-- **`label-muted`** — Same as `label` but `--ink-soft` color. Use for column headings in the footer, secondary tags.
+- **`display`** — Antonio 900, uppercase, tight letter-spacing. Use for headlines, section titles, big numbers. *Wrapped by [`<Display>`](src/modules/common/components/display/index.tsx).*
+- **`label`** — Mono 600, uppercase, 11px, orange. Use for section eyebrows and emphasized small caps. *Wrapped by [`<Label>`](src/modules/common/components/label/index.tsx).*
+- **`label-muted`** — Same as `label` but `--ink-soft` color. Use for column headings in the footer, secondary tags. *Wrapped by [`<Label tone="muted">`](src/modules/common/components/label/index.tsx).*
 
 ### Buttons & CTAs
 
-- **`btn`** — Base button shape: 48px tall, 22px horizontal padding, 4px radius. Adds `btn-primary` or `btn-outline` for fill.
-- **`btn-primary`** — Orange fill, white text, drop shadow with orange glow, uppercase, 0.06em tracking.
-- **`btn-outline`** — Transparent fill, ink border, inverts on hover.
+The `.btn` / `.btn-primary` / `.btn-outline` classes ship in `wheel-builds.css` for backwards compatibility but **new design code should use [`<Button>`](src/components/ui/button.tsx) from `@/components/ui/button`**. It carries 6 variants (`default`, `outline`, `secondary`, `ghost`, `link`, `destructive`) × 4 sizes (`default`, `sm`, `lg`, `icon`) and gives you focus-ring + disabled handling for free.
 
-Sizing variants: override `height` + `padding` inline. Hero CTA is 64px tall; newsletter is 56px; in-card CTAs stick to 48px.
+- **`btn`** *(legacy)* — Base button shape: 48px tall, 22px horizontal padding, 4px radius.
+- **`btn-primary`** *(legacy)* — Orange fill, white text, drop shadow with orange glow, uppercase. Maps to `<Button variant="default">`.
+- **`btn-outline`** *(legacy)* — Transparent fill, ink border. Maps to `<Button variant="outline">`.
 
 ### Tags & badges
 
-- **`tag-new`** — Orange pill, uppercase white text, 26px tall. Use for "NEW" markers on product cards.
-- **`fits-chip`** — Solid orange chip with white text, "FITS YOUR F-150" style. Use anywhere a vehicle-OK signal needs to live.
-- **`build-chip`** — White rounded pill (12px radius) for overlay tags on dark imagery (build gallery, etc.).
+The `.tag-new` / `.fits-chip` / `.build-chip` classes are similarly wrapped by [`<Chip>`](src/modules/common/components/chip/index.tsx) — use the component first.
+
+- **`tag-new`** *(legacy)* — Maps to `<Chip variant="accent" size="sm">NEW</Chip>`.
+- **`fits-chip`** *(legacy)* — Maps to `<Chip variant="accent" dot>FITS YOUR F-150</Chip>`.
+- **`build-chip`** *(legacy)* — White rounded pill for dark-imagery overlays. Maps to `<Chip variant="outline">`.
 
 ### Surfaces
 
@@ -207,13 +211,24 @@ These are the section archetypes used on the home. Future Discovery and Product 
 
 ### Section header
 
+Use the [`<SectionHeader>`](src/modules/common/components/section-header/index.tsx) primitive. It produces this layout:
+
 ```
-[ display title 40 ]                          [ "View all 08 →" link in orange ]
-[ optional eyebrow label · orange, mono ]
-[ optional subhead 13 in --graphite ]
+[ counter 88 orange ]  [ display title 40 ]              [ action (right-aligned) ]
+                       [ optional eyebrow ]
+                       [ optional description 13 graphite ]
 ```
 
-Examples: New This Week, Trusted Brands, Build Gallery.
+```tsx
+<SectionHeader
+  counter="08"
+  title="New This Week"
+  description="Fresh fitments from Blackline, Vanguard, Meridian and more."
+  action={<MicroLink href="/collections">View all 08</MicroLink>}
+/>
+```
+
+Examples in the home: New This Week, Trusted Brands, Build Gallery. Don't reinvent this layout with inline flex/grid — every duplication risks drift.
 
 ### Editorial block
 
@@ -231,22 +246,31 @@ Mega button, 132px min height, big Antonio value (current selection) above an or
 
 480px wide, slides in from the right, 24px header padding, 24px body padding, scrollable body. Apply `.frame` on the root so CSS variables work even when mounted via portal.
 
-## 7. Iconography / motion baseline
+## 7. Motion baseline
 
-What's shipped today is mostly static — hover lifts on cards, color transitions on buttons. We have not yet:
+What's wired today:
 
-- Animated the drawer slide-in (it appears instantly)
-- Used scroll-linked reveals on the home sections
-- Added a focus-ring style for the orange CTA
-- Built skeleton loaders for the catalog / search results
+- **Search drawer** uses [Vaul](https://github.com/emilkowalski/vaul) (`direction="right"`) — JS-driven slide with drag-to-dismiss, momentum easing, and graceful exit. Underlying primitive: [`<Drawer>`](src/components/ui/drawer.tsx).
+- **Dialog / Sheet / DropdownMenu / Tooltip / Popover** use [tailwindcss-animate](https://github.com/jamiebuilds/tailwindcss-animate) keyframes — `data-[state=open]:animate-in`, `slide-in-from-*`, `fade-in-0`, `zoom-in-95`. All driven by data-attributes on the open/close state, so animations stay in sync with the primitives' own state machines.
+- **Sonner toasts** are wired via [`<Toaster position="bottom-right">`](src/app/[countryCode]/(main)/layout.tsx) — call `toast.success(...)` / `toast.error(...)` from any client component.
+- **Button focus rings** come for free from `<Button>`'s `focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2`. The orange `--ring` token makes them WB-orange.
+- **Hover lifts / color transitions** on cards and CTAs are CSS-only — `transition` on `transform`, `opacity`, `border-color`.
 
-Those land in the polish pass. For now: don't introduce JS-driven animation libraries (framer-motion, etc.). Stick to CSS transitions on `transform`, `opacity`, and `border-color`. If you need slide-in, do it with `transform: translateX` and a 200–280ms ease curve.
+Still on the polish list:
+
+- Scroll-linked reveals on home sections (consider [Motion](https://motion.dev) — successor to framer-motion — if/when needed)
+- Skeleton loaders for the catalog / search results / PDP
+- Mobile breakpoints (the home is desktop-only today)
+- Hero entry stagger
+
+Rule of thumb: **use the primitives' built-in motion before adding any of your own**. If you need custom motion that isn't one of `transform` / `opacity` / `border-color` on a CSS transition, reach for Vaul/tailwindcss-animate utilities; only escalate to a JS animation lib (Motion) when scroll/gesture/spring physics genuinely matter.
 
 ## 8. Anti-patterns (don't do these)
 
 - **Inline hex colors.** Use `var(--orange)` etc. The exception is the watermark wheel's internal gradients in `wheel-builds.css`, which are hard-coded by necessity.
 - **`wb-` / `WB` prefixes.** See [CLAUDE.md → Naming convention](CLAUDE.md#naming-convention--no-wb--prefix) and `feedback_no_wb_prefix.md`.
-- **Tailwind classes inside `.frame`.** Mixing the two is fine in legacy modules (cart, checkout, account), but new design-system markup should use the scoped CSS classes plus inline styles for layout-specific values. The reason: design tokens live as CSS variables, not as Tailwind theme entries.
+- **Hand-rolled section headers, eyebrow labels, display headlines, pills, or YMM tiles.** These are all composed primitives (§5) — use `<SectionHeader>` / `<Label>` / `<Display>` / `<Chip>` / `<VehicleTile>`. Duplicating the inline styling is how the system drifts.
+- **Tailwind utility classes on raw `div`s inside `.frame` when a primitive exists.** Tailwind inside primitives is fine (Button, Chip, Sheet, Drawer, etc. all use it because shadcn does). Tailwind on top-level page markup that should be using `<Display>` / `<SectionHeader>` / etc. is duplication. Inline `style={...}` is OK for genuinely one-off layout values (specific `gap`, `maxWidth`, `gridTemplateColumns`).
 - **A second `.frame` wrapper.** Once per page tree, mounted in the layout. Nested wrappers redeclare variables for nothing.
 - **Big multi-line comments in components.** One short line max — the design's *what* should be obvious from the markup; the *why* belongs in this file or in PR descriptions.
 - **Generic class names that leak.** `.btn` is fine because it only matches `.frame .btn`. Don't write `.card`, `.title`, `.row` etc. without scoping under `.frame`.
@@ -257,22 +281,32 @@ Those land in the polish pass. For now: don't introduce JS-driven animation libr
 
 ## 9. Adding a new component to the design
 
-1. **Pick the right home.** Shared primitives → `src/modules/common/components/<name>/`. Section components → `src/modules/<feature>/components/<name>/`. Drawer-internal pieces → nested inside the drawer.
-2. **Use the existing primitives** (`Wheel`, `Icon`, `Logo`, `ImgPlaceholder`) before inventing new ones.
-3. **Use the existing classes** (`display`, `label`, `btn`, `tag-new`, …) before adding new ones.
-4. **If you have to add a class**: add it to `wheel-builds.css` under a `.frame .my-class { ... }` selector. Use a descriptive role-based name. Document it in the Class catalog (§4) of this file.
-5. **If you have to add a CSS variable**: add it to the `.frame { ... }` block at the top of `wheel-builds.css`. Document it in Tokens (§2).
+The three-tier rule: shadcn for **behavior**, WB composed primitives for **visual patterns**, feature/section files for **page-specific composition**.
+
+1. **Pick the right home.**
+   - Pure interactive primitive someone else built (dialog, popover, command palette, accordion, …) → `npx shadcn@2.1.8 add <name>` lands it in `src/components/ui/<name>.tsx`. **Don't hand-edit afterward.**
+   - A visual pattern that repeats in 2+ places → `src/modules/common/components/<name>/index.tsx`. Build it on top of shadcn + the WB tokens. Document it in §5.
+   - A composition that only one page section uses → `src/modules/<feature>/components/<name>/`.
+2. **Use the existing primitives** (`<Display>`, `<Label>`, `<SectionHeader>`, `<MicroLink>`, `<Chip>`, `<VehicleTile>`, `<Wheel>`, `<Icon>`, `<Logo>`, `<ImgPlaceholder>`, plus the shadcn primitives) before inventing new ones.
+3. **Use the existing tokens** (`var(--orange)`, `var(--ink)`, `var(--ink-soft)`, `var(--hairline)`, `var(--soft)`, `var(--surface)`, `var(--display)`, `var(--mono)`, …) and the shadcn token aliases (`bg-primary`, `text-foreground`, `border-border`, …) before adding new ones.
+4. **If you have to add a new CSS class**: add it to `wheel-builds.css` under `.frame .my-class { ... }`. Role-based name. Document it in §4.
+5. **If you have to add a new CSS variable**: add it to the `.frame { ... }` block in `wheel-builds.css`. Document it in §2. **Grep `globals.css` for collisions first** — shadcn owns names like `--muted`, `--background`, `--foreground`, `--primary`, `--secondary`, `--accent`, `--destructive`, `--border`, `--input`, `--ring`, `--radius`. We've already had to rename WB's `--muted` to `--ink-soft` for this reason.
 6. **If you have to add a new font weight**: load it via `next/font/google` in `app/layout.tsx`. Don't add a separate `<link>` tag.
-7. **No emojis in the design.** All icons go through `Icon`.
+7. **No emojis in the design.** All icons go through [`<Icon>`](src/modules/common/components/icon/index.tsx).
+8. **If the new component is portaled** (drawer, dialog, popover, dropdown, tooltip, toast — anything that ends up at body root): its content className must include `frame ` so WB tokens resolve.
 
 ## 10. Open questions for future work
 
 These don't change the design contract above, but they're tracked so the next iteration knows the gaps.
 
-- **Mobile.** The home is desktop-only today. The original design canvas had a mobile home + filter bottom sheet; that's still to be ported.
+- **Consistency sweep.** Hero, NewDropsRow, ShopByStyle are on the new primitives. `featured-blocks`, `shop-by-brand`, `build-gallery`, `trust-strip`, `newsletter`, the footer, the GaragePill, and the search drawer internals (`header`, `popular-searches`, `recent-searches`, `find-by-vehicle/*`) still hand-roll their headers, labels, and chips. Same primitives, no new shapes — straight find/replace pass.
+- **Cart dropdown.** Still HeadlessUI Popover. Migrate to shadcn `<DropdownMenu>` — it's already wired and themed.
+- **Form primitives.** `<Field>` / `<Input>` / `<Select>` for the newsletter input, drawer search box, YMM selects. Right now each of those is a one-off inline-styled input.
+- **Toasts.** `<Toaster>` is mounted but unused. Cart-add, cart-remove, fitment-saved, copy-to-clipboard, form-error are the obvious first callers.
+- **Mobile.** The home is desktop-only (fixed 80px paddings, `repeat(6, 1fr)` grids). The original design canvas had a mobile home + filter bottom sheet; that's still to be ported. Vaul's `direction="bottom"` is the natural fit for the mobile filter sheet.
 - **Discovery (catalog) page.** Designed but not built. Filter rail + 4-up product grid + active-filter chips.
 - **Product Detail.** Designed but not built. Fitment matrix, offset diagrams, stance previews — the most complex screen.
 - **Mood/Accent/Display tweaks.** Three orthogonal axes were designed; only one combination ships. Adding the other modes is a separate, fully scoped piece of work (Tweaks panel + state plumbing + CSS variants).
 - **Imagery.** Every photographic element is currently an `ImgPlaceholder`. When real photography lands, swap to `next/image`, set explicit aspect ratios, and decide on a CDN strategy.
-- **Skeleton loading.** No skeletons yet. The Discovery/Product Detail pages will need them.
-- **Motion.** Drawer slide-in, hero entry stagger, scroll-linked reveals. The polish pass owns this.
+- **Skeleton loading.** No skeletons yet. The Discovery/Product Detail pages will need them. `shadcn add skeleton` is the next add when we get there.
+- **Motion polish.** Hero entry stagger, scroll-linked reveals, fine-grained hover micro-interactions. Drawer slide-in is now handled by Vaul — strike from the list.

@@ -13,29 +13,32 @@ A MedusaJS 2.x Next.js 15 (App Router, React 19) storefront for **Wheel Builds**
 ```
 storefront/src/
 ├── app/[countryCode]/
-│   ├── (main)/           # everything except checkout — Nav, Footer, SearchMount wrap the children
-│   │   ├── layout.tsx    # the single .frame wrapper lives here
+│   ├── (main)/           # everything except checkout — Nav, Footer, SearchMount, TooltipProvider, Toaster wrap children
+│   │   ├── layout.tsx    # the single .frame wrapper + global providers live here
 │   │   ├── page.tsx      # Home — composes the design's home sections
 │   │   ├── store/        # catalog
 │   │   ├── products/[handle]/
 │   │   ├── categories/, collections/, cart/, account/, order/
 │   │   └── results/[query]/  # search results route
 │   └── (checkout)/       # separate layout for the checkout flow
+├── components/ui/        # shadcn primitives (drawer, sheet, dialog, dropdown-menu, tooltip, sonner, command, button)
 ├── lib/
 │   ├── garage/           # vehicle garage abstraction (swap-ready for Phase 2.2)
 │   ├── stores/           # tiny client-side stores (search-open, recent-searches)
 │   ├── data/             # Medusa API calls (cart, customer, orders, regions, products…)
 │   ├── search-client.ts  # Meilisearch wrapper
-│   └── util/
+│   ├── utils.ts          # cn() helper for shadcn / WB primitives
+│   └── util/             # legacy util/ dir — env, money, etc.
 ├── modules/
-│   ├── common/components/    # design primitives (wheel, icon, logo, img-placeholder, …)
+│   ├── common/components/    # WB composed primitives: Label, Display, SectionHeader, MicroLink, Chip, VehicleTile,
+│   │                         # Wheel, Icon, Logo, ImgPlaceholder, LocalizedClientLink
 │   ├── home/components/      # home page sections
 │   ├── layout/               # nav, footer, cart-button, cart-dropdown, garage-pill, side-menu (orphaned)
 │   ├── search/               # search-drawer, search-mount, search-trigger, actions, results template
 │   ├── products/, cart/, checkout/, account/, order/, categories/, collections/, store/
 │   └── skeletons/
 └── styles/
-    ├── globals.css
+    ├── globals.css       # tailwind layer + shadcn token overrides (mapped to WB palette)
     └── wheel-builds.css  # design tokens + scoped utility classes (see DESIGN.md)
 ```
 
@@ -89,7 +92,7 @@ Same pattern (module-level state + emitter set + `useSyncExternalStore`). If you
 
 ## Search
 
-- The drawer is mounted once in `(main)/layout.tsx` via [`<SearchMount />`](src/modules/search/components/search-mount/index.tsx). It owns `Cmd/Ctrl+K`, `Esc`, body scroll lock, and the scrim.
+- The drawer is mounted once in `(main)/layout.tsx` via [`<SearchMount />`](src/modules/search/components/search-mount/index.tsx). It wraps a [Vaul `<Drawer direction="right">`](src/components/ui/drawer.tsx) which owns Esc/overlay-click/drag-to-dismiss/scroll-lock/focus-trap/slide-animation. The only custom behavior left in SearchMount is the global `Cmd/Ctrl+K` opener.
 - Triggers: the nav search icon ([`SearchTrigger`](src/modules/search/components/search-trigger/index.tsx)), the [`GaragePill`](src/modules/layout/components/garage-pill/index.tsx) in the nav, and the hero's vehicle tiles + "USE MY GARAGE" button.
 - Submit → `/<countryCode>/results/<encoded query>` via the existing [`search()`](src/modules/search/actions.ts) Server Action and [`SearchResultsTemplate`](src/modules/search/templates/search-results-template/).
 - The Year/Make/Model pane writes the new vehicle to the garage, sets it active, then routes to `/store`. Once Phase 2.1 lands, the destination becomes a fitment-filtered URL — change that one route in [`ymm-pane.tsx`](src/modules/search/components/search-drawer/find-by-vehicle/ymm-pane.tsx) and [`garage-pane.tsx`](src/modules/search/components/search-drawer/find-by-vehicle/garage-pane.tsx).
@@ -117,9 +120,17 @@ Loaded via `next/font/google` in [`app/layout.tsx`](src/app/layout.tsx): Antonio
 
 ## Tailwind
 
-The project still has Tailwind set up (via `@medusajs/ui-preset`), and existing modules (cart, checkout, account, products, side-menu, etc.) use it. The new design layer uses **scoped CSS classes** in `wheel-builds.css` instead — see DESIGN.md for the rationale.
+Three flavors of styling coexist now; pick by where you are:
 
-When extending an existing Medusa-style module, use Tailwind (consistent with the surrounding code). When building inside `.frame` (home, drawer, nav, footer, future Discovery / Product Detail), use the design-system classes.
+- **Legacy Medusa modules** (cart, checkout, account, products, side-menu) use Tailwind utilities exclusively. Keep using them when extending those files — don't mix in WB classes.
+- **shadcn primitives** in [src/components/ui/](src/components/ui) use Tailwind utilities that resolve to the WB palette via the shadcn token aliases in `tailwind.config.js` (`bg-primary`, `text-foreground`, `border-border`, …). Don't hand-edit these files.
+- **WB composed primitives** ([src/modules/common/components/](src/modules/common/components/)) and **page sections** inside `.frame` should reach for:
+  1. A WB composed primitive first (`<Display>`, `<Label>`, `<SectionHeader>`, `<MicroLink>`, `<Chip>`, `<VehicleTile>`).
+  2. A shadcn primitive for behavior (`<Button>`, `<Drawer>`, `<Dialog>`, `<DropdownMenu>`, `<Tooltip>`, …).
+  3. The scoped CSS classes in [wheel-builds.css](src/styles/wheel-builds.css) (`.frame .display`, `.frame .vehicle-tile`, `.frame .product-card`, …) for design tokens already named there.
+  4. Inline `style={...}` or Tailwind utilities for genuinely one-off layout values (specific `gap`/`padding`/`maxWidth`).
+
+The general direction: as the codebase converges on the primitives, inline-styled sections shrink and `wheel-builds.css` becomes the foundation rather than the surface. DESIGN.md owns the visual contract that these layers all implement.
 
 ## shadcn/ui primitives
 
@@ -155,7 +166,7 @@ The pattern when extending: if a section needs interactive behavior (drawer, dro
 ## Gotchas
 
 - **`SideMenu`** ([modules/layout/components/side-menu](src/modules/layout/components/side-menu/index.tsx)) is orphaned — the new nav doesn't import it. It still references `/search` which no longer exists. Harmless dead code. Don't extend it; either delete it or replace it with a new wheel-builds-styled mobile menu.
-- **Cart dropdown's popover** uses Headless UI inline-portal (not React Portal), so its contents stay inside `.frame` and the design CSS variables resolve. If you move it into a true portal, prefix orange-colored elements with the `--orange` fallback (`var(--orange, #FF6A00)`).
+- **Cart dropdown's popover** still uses Headless UI inline-portal (not React Portal), so its contents stay inside `.frame` and the design CSS variables resolve. Replacement path when it's time: swap it for shadcn [`<DropdownMenu>`](src/components/ui/dropdown-menu.tsx) — that primitive's content className already includes `frame ` so it works inside a true portal. The HeadlessUI dropdown is still here only because no one has touched it yet.
 - **Featured-products module** ([modules/home/components/featured-products](src/modules/home/components/featured-products)) is dead code (no longer imported by the home page). Delete it during a cleanup pass, not as part of feature work.
 - **`(main)` layout's `.frame` applies to every page in the group**, including `/store`, `/cart`, `/products/[handle]`, etc. Those pages don't use the design classes, but they inherit `.frame`'s background (faint grid pattern on `#FAFAF8`) and base font size. If a future page needs a different chrome (e.g. a fully bleached PDP), wrap that page in a counter-class or move `.frame` to a per-page wrapper.
 - **No mobile breakpoints on the home page yet** — sections use fixed pixel paddings (`80px 80px`) and grid template columns like `repeat(6, 1fr)`. The home is desktop-only until the next polish pass adds responsive rules.
@@ -165,19 +176,32 @@ The pattern when extending: if a section needs interactive behavior (drawer, dro
 For a new home section:
 
 1. Create `src/modules/home/components/<section-name>/index.tsx`.
-2. Use the design tokens / classes from `DESIGN.md`. Prefer the existing primitives (`Wheel`, `Icon`, `Logo`, `ImgPlaceholder`) over hand-rolled markup.
-3. Server component by default. Promote to `"use client"` only if the section is interactive.
+2. Start with `<SectionHeader>` for the top row, then `<Display>` / `<Label>` / `<MicroLink>` / `<Chip>` for the inside. Reach for [`Wheel`](src/modules/common/components/wheel/index.tsx) / [`Icon`](src/modules/common/components/icon/index.tsx) / [`ImgPlaceholder`](src/modules/common/components/img-placeholder/index.tsx) for visuals.
+3. Server component by default. Promote to `"use client"` only if the section reads from a client store (`useGarage`, `useSearchOpen`, …) or attaches event handlers.
 4. Import it into [`app/[countryCode]/(main)/page.tsx`](src/app/[countryCode]/(main)/page.tsx) in the right order.
 
 For a new top-level route inside the design:
 
 1. Add the file under `src/app/[countryCode]/(main)/<route>/page.tsx`.
 2. Server component; fetch from `lib/data/...`.
-3. Render design-system markup from `src/modules/<feature>/components/...`.
+3. Render design-system markup from `src/modules/<feature>/components/...`, built from the primitives in `modules/common/components/`.
 4. Section padding follows `DESIGN.md` conventions.
 
-For a new design-time class:
+For a new interactive primitive (dialog / dropdown / popover / toast / etc.):
 
-1. Add it to `wheel-builds.css` under a `.frame .my-class { ... }` selector — never global.
-2. Document it in DESIGN.md (Class catalog section).
-3. Use a name that describes the role, not the look. `style-tile` ✓, `big-orange-box` ✗.
+1. Check [`src/components/ui/`](src/components/ui) first — if shadcn already ships it, pull via `npx shadcn@2.1.8 add <name>` (or write the file directly using the canonical shadcn 2.x source if `pnpm` isn't on PATH).
+2. The tokens map already gives you the WB palette for free. Don't theme the primitive in place; if you need WB-specific defaults, wrap it in `modules/common/components/<name>/`.
+3. If the primitive renders into a portal, ensure its content className includes `frame ` so WB tokens resolve.
+
+For a new visual pattern that appears in 2+ places:
+
+1. Build it in `src/modules/common/components/<name>/`. Use the existing primitives as building blocks.
+2. Embed sane WB defaults (font family, spacing, color) so callers stay terse.
+3. Document it in DESIGN.md §5 (Primitives) with a usage example.
+
+For a new design-time CSS class:
+
+1. Only add a class if the pattern truly belongs in `wheel-builds.css` rather than a React component (rare now).
+2. Scope it under a `.frame .my-class { ... }` selector — never global.
+3. Document it in DESIGN.md §4 (Class catalog).
+4. Use a name that describes the role, not the look. `style-tile` ✓, `big-orange-box` ✗.

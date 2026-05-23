@@ -1,4 +1,4 @@
-"use client"
+﻿"use client"
 
 import { useParams, useRouter } from "next/navigation"
 import Icon from "@modules/common/components/icon"
@@ -45,7 +45,7 @@ const RecentSearches = ({ onClose }: RecentSearchesProps) => {
             padding: 0,
             cursor: "pointer",
             fontSize: 11,
-            color: "var(--muted)",
+            color: "var(--ink-soft)",
             fontFamily: "inherit",
           }}
         >

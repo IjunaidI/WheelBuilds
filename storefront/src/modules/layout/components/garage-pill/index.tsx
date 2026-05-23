@@ -1,4 +1,4 @@
-"use client"
+﻿"use client"
 
 import { useGarage } from "@lib/garage/use-garage"
 import { openSearch } from "@lib/stores/search-store"
@@ -7,8 +7,8 @@ const GaragePill = () => {
   const { active } = useGarage()
 
   const label = active
-    ? `Garage · ${active.year} ${active.make} ${active.model}${active.trim ? ` ${active.trim}` : ""}`
-    : "Garage · Select a vehicle"
+    ? `Garage Â· ${active.year} ${active.make} ${active.model}${active.trim ? ` ${active.trim}` : ""}`
+    : "Garage Â· Select a vehicle"
 
   return (
     <button
@@ -40,7 +40,7 @@ const GaragePill = () => {
           width: 6,
           height: 6,
           borderRadius: 3,
-          background: active ? "var(--orange)" : "var(--muted)",
+          background: active ? "var(--orange)" : "var(--ink-soft)",
           flexShrink: 0,
         }}
       />

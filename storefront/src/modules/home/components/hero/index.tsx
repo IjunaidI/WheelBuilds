@@ -1,4 +1,4 @@
-"use client"
+﻿"use client"
 
 import LocalizedClientLink from "@modules/common/components/localized-client-link"
 import Icon from "@modules/common/components/icon"
@@ -33,10 +33,10 @@ const VehicleTile = ({ idx, label, value, onClick }: VehicleTileProps) => {
             fontFamily: "var(--mono)",
             fontSize: 10,
             letterSpacing: "0.1em",
-            color: "var(--muted)",
+            color: "var(--ink-soft)",
           }}
         >
-          STEP 0{idx} · {label.toUpperCase()}
+          STEP 0{idx} Â· {label.toUpperCase()}
         </span>
         <Icon
           name="chevron-down"
@@ -52,7 +52,7 @@ const VehicleTile = ({ idx, label, value, onClick }: VehicleTileProps) => {
             fontSize: hasValue ? 36 : 22,
             letterSpacing: "-0.01em",
             textTransform: "uppercase",
-            color: hasValue ? "var(--ink)" : "var(--muted)",
+            color: hasValue ? "var(--ink)" : "var(--ink-soft)",
             lineHeight: 1,
           }}
         >
@@ -76,7 +76,7 @@ const VehicleTile = ({ idx, label, value, onClick }: VehicleTileProps) => {
 const TRUST_POINTS = [
   { l: "Fitment guaranteed", s: "Or your money back" },
   { l: "Free returns", s: "30 days, unmounted" },
-  { l: "Free ship $199+", s: "2–3 day delivery" },
+  { l: "Free ship $199+", s: "2â€“3 day delivery" },
   { l: "Authorized dealer", s: "42 brands" },
 ]
 
@@ -91,8 +91,8 @@ const Hero = () => {
         : `USE MY GARAGE (${vehicles.length} SAVED)`
 
   const primaryCtaText = active
-    ? `Find My Fit · See wheels for your ${active.make}`
-    : "Find My Fit · Start with your vehicle"
+    ? `Find My Fit Â· See wheels for your ${active.make}`
+    : "Find My Fit Â· Start with your vehicle"
 
   return (
     <section
@@ -102,7 +102,7 @@ const Hero = () => {
         overflow: "hidden",
       }}
     >
-      {/* Watermark wheel — sits behind, on the right */}
+      {/* Watermark wheel â€” sits behind, on the right */}
       <div
         style={{
           position: "absolute",
@@ -133,7 +133,7 @@ const Hero = () => {
           <span
             style={{ width: 32, height: 1, background: "var(--orange)" }}
           />
-          FITMENT FIRST · STEP 01 OF 02
+          FITMENT FIRST Â· STEP 01 OF 02
         </div>
         <h1
           className="display"
@@ -159,11 +159,11 @@ const Hero = () => {
           }}
         >
           Tell us once. We&apos;ll show you only the wheels confirmed to fit,
-          ship them in 2–3 days, and back every fitment with our money-back
+          ship them in 2â€“3 days, and back every fitment with our money-back
           guarantee.
         </p>
 
-        {/* Mega vehicle selector — 4 huge tiles. All open the search drawer. */}
+        {/* Mega vehicle selector â€” 4 huge tiles. All open the search drawer. */}
         <div style={{ display: "flex", gap: 8, marginBottom: 20 }}>
           <VehicleTile
             idx="1"
@@ -231,7 +231,7 @@ const Hero = () => {
               padding: "0 8px",
             }}
           >
-            Or browse all wheels →
+            Or browse all wheels â†’
           </LocalizedClientLink>
           <span style={{ flex: 1 }} />
           <button
@@ -291,7 +291,7 @@ const Hero = () => {
                 <div
                   style={{
                     fontSize: 11,
-                    color: "var(--muted)",
+                    color: "var(--ink-soft)",
                     marginTop: 1,
                   }}
                 >

@@ -1,4 +1,4 @@
-import Icon from "@modules/common/components/icon"
+﻿import Icon from "@modules/common/components/icon"
 import Wheel, { Finish } from "@modules/common/components/wheel"
 
 export type ProductCardProps = {
@@ -85,7 +85,7 @@ const ProductCard = ({
       <span
         style={{
           fontSize: 10,
-          color: "var(--muted)",
+          color: "var(--ink-soft)",
           marginLeft: 4,
           alignSelf: "center",
           fontFamily: "var(--mono)",

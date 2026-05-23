@@ -121,6 +121,18 @@ The project still has Tailwind set up (via `@medusajs/ui-preset`), and existing 
 
 When extending an existing Medusa-style module, use Tailwind (consistent with the surrounding code). When building inside `.frame` (home, drawer, nav, footer, future Discovery / Product Detail), use the design-system classes.
 
+## shadcn/ui primitives
+
+shadcn is integrated as a **headless behavior layer** — we use Radix-based primitives (Sheet, Dialog, Popover, etc.) for accessibility, focus management, and motion, then skin them with the Wheel Builds palette so they read as part of the same design system.
+
+- **Components dir:** [src/components/ui/](src/components/ui). Pulled in via `npx shadcn@2.1.8 add <component>`. We pin to 2.1.8 because newer shadcn defaults to Tailwind v4 which conflicts with our v3 + `@medusajs/ui-preset` setup.
+- **Aliases:** `@/components`, `@/lib/utils`, `@/components/ui` — declared in [components.json](components.json) and resolved via the `@/*` path in [tsconfig.json](tsconfig.json). Existing `@lib/*` and `@modules/*` aliases are unchanged.
+- **`cn()` helper:** [src/lib/utils.ts](src/lib/utils.ts). Use it from shadcn components only — domain code under `@modules/*` should not import from `@/lib/utils`.
+- **Token mapping:** the shadcn CSS variables (`--background`, `--primary`, `--ring`, …) are redefined in [styles/globals.css](src/styles/globals.css) to use HSL components from the WB palette in DESIGN.md. So `bg-primary` is WB orange, `bg-secondary` is WB `--soft`, `border-border` is WB `--hairline`. Don't change shadcn token names — change the values they map to.
+- **`pnpm` on Windows:** `npx shadcn add <x>` will fail at the "install deps" step because pnpm isn't on PATH. Workaround: run the dep install separately (`npx -y pnpm@9.10.0 add <radix-pkg>`) and either let `shadcn add` finish writing the component file, or write it manually.
+- **`--muted` is shadcn's, `--ink-soft` is ours.** WB originally had a `--muted` token (`#8A8A8E`) but shadcn's tokens own that name. WB's was renamed to `--ink-soft` so both systems coexist inside `.frame`. If you're adding a new WB token, grep `globals.css` first for collisions.
+- **Portals and `.frame`:** shadcn primitives that use Radix Portal (Sheet, Dialog, Popover, …) render at the body root, escaping the single `.frame` wrapper in `(main)/layout.tsx`. **Re-apply `className="frame"` on the portaled content** (e.g. `<SheetContent className="frame …">`) so WB tokens resolve. The search drawer ([modules/search/components/search-mount](src/modules/search/components/search-mount/index.tsx)) is the reference.
+
 ## Gotchas
 
 - **`SideMenu`** ([modules/layout/components/side-menu](src/modules/layout/components/side-menu/index.tsx)) is orphaned — the new nav doesn't import it. It still references `/search` which no longer exists. Harmless dead code. Don't extend it; either delete it or replace it with a new wheel-builds-styled mobile menu.

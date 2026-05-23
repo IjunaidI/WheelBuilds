@@ -1,4 +1,4 @@
-"use client"
+﻿"use client"
 
 import { useState } from "react"
 import Tab from "./tab"
@@ -44,7 +44,7 @@ const FindByVehicle = ({ onClose }: FindByVehicleProps) => {
         <span
           style={{
             fontSize: 11,
-            color: "var(--muted)",
+            color: "var(--ink-soft)",
             fontFamily: "var(--mono)",
             letterSpacing: "0.04em",
           }}

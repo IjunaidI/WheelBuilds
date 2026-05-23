@@ -1,4 +1,4 @@
-"use client"
+﻿"use client"
 
 import { useRouter, useParams } from "next/navigation"
 import Icon from "@modules/common/components/icon"
@@ -21,7 +21,7 @@ const formatSpecs = (v: Vehicle): string => {
   if (v.boltPattern) parts.push(v.boltPattern)
   if (v.hubBore) parts.push(`${v.hubBore} hub`)
   if (v.notes) parts.push(v.notes)
-  return parts.length ? parts.join(" · ") : formatSavedDate(v.savedAt)
+  return parts.length ? parts.join(" Â· ") : formatSavedDate(v.savedAt)
 }
 
 const GaragePane = ({ onClose, onAddNew }: GaragePaneProps) => {
@@ -141,7 +141,7 @@ const GaragePane = ({ onClose, onAddNew }: GaragePaneProps) => {
                 <div
                   style={{
                     fontSize: 11,
-                    color: "var(--muted)",
+                    color: "var(--ink-soft)",
                     fontFamily: "var(--mono)",
                     marginTop: 4,
                   }}
@@ -161,7 +161,7 @@ const GaragePane = ({ onClose, onAddNew }: GaragePaneProps) => {
                 border: "none",
                 padding: 4,
                 cursor: "pointer",
-                color: "var(--muted)",
+                color: "var(--ink-soft)",
                 display: "inline-flex",
                 flexShrink: 0,
               }}

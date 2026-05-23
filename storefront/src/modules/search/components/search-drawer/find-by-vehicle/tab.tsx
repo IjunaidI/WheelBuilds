@@ -1,4 +1,4 @@
-"use client"
+﻿"use client"
 
 type TabProps = {
   id: string
@@ -59,7 +59,7 @@ const Tab = ({ active, label, sub, onClick }: TabProps) => (
     <div
       style={{
         fontSize: 11,
-        color: "var(--muted)",
+        color: "var(--ink-soft)",
         marginTop: 4,
         paddingLeft: 22,
         fontFamily: "var(--mono)",

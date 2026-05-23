@@ -1,11 +1,11 @@
-/* Wheel Builds — Design System (Garage mood · High accent · Wide display) */
+﻿/* Wheel Builds â€” Design System (Garage mood Â· High accent Â· Wide display) */
 
 .frame {
   --orange: #FF6A00;
   --orange-deep: #E55A00;
   --ink: #0F0F10;
   --graphite: #3A3A3D;
-  --muted: #8A8A8E;
+  --ink-soft: #8A8A8E;
   --hairline: #E6E6E8;
   --surface: #FFFFFF;
   --soft: #F7F7F8;
@@ -57,7 +57,7 @@
   text-transform: uppercase;
   letter-spacing: 0.08em;
   font-size: 11px;
-  color: var(--muted);
+  color: var(--ink-soft);
 }
 
 .frame .btn {
@@ -114,7 +114,7 @@
   text-transform: uppercase;
 }
 
-/* Wheel render — concentric circles + spokes via conic-gradient */
+/* Wheel render â€” concentric circles + spokes via conic-gradient */
 .frame .wheel {
   position: relative;
   border-radius: 50%;
@@ -246,7 +246,7 @@
   justify-content: center;
   font-family: var(--mono);
   font-size: 11px;
-  color: var(--muted);
+  color: var(--ink-soft);
   letter-spacing: 0.04em;
   position: relative;
   overflow: hidden;

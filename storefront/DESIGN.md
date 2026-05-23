@@ -26,7 +26,7 @@ All tokens live as CSS variables on `.frame` ([storefront/src/styles/wheel-build
 | `--orange-deep` | `#E55A00` | Hover state of orange CTAs |
 | `--ink` | `#0F0F10` | Body text, display type, primary borders |
 | `--graphite` | `#3A3A3D` | Secondary text, descriptions, link rest state |
-| `--muted` | `#8A8A8E` | Tertiary text, monospace labels, disabled |
+| `--ink-soft` | `#8A8A8E` | Tertiary text, monospace labels, disabled. Renamed from `--muted` because shadcn's design tokens own that name. |
 | `--hairline` | `#E6E6E8` | Borders, dividers |
 | `--surface` | `#FFFFFF` | Card / sheet background |
 | `--soft` | `#F7F7F8` | Chips, brand tiles, inset surfaces |
@@ -84,7 +84,7 @@ All classes are scoped under `.frame .foo` selectors, so the names are short. Us
 
 - **`display`** — Antonio 900, uppercase, tight letter-spacing. Use for headlines, section titles, big numbers.
 - **`label`** — Mono 600, uppercase, 11px, orange. Use for section eyebrows and emphasized small caps.
-- **`label-muted`** — Same as `label` but `--muted` color. Use for column headings in the footer, secondary tags.
+- **`label-muted`** — Same as `label` but `--ink-soft` color. Use for column headings in the footer, secondary tags.
 
 ### Buttons & CTAs
 

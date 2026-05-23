@@ -1,4 +1,4 @@
-import Icon, { IconName } from "@modules/common/components/icon"
+﻿import Icon, { IconName } from "@modules/common/components/icon"
 
 const ITEMS: { icon: IconName; h: string; s: string }[] = [
   { icon: "shipping", h: "Free shipping $199+", s: "Lower 48, ground" },
@@ -33,7 +33,7 @@ const TrustStrip = () => (
           <div style={{ fontSize: 13, fontWeight: 600, color: "var(--ink)" }}>
             {it.h}
           </div>
-          <div style={{ fontSize: 12, color: "var(--muted)", marginTop: 2 }}>
+          <div style={{ fontSize: 12, color: "var(--ink-soft)", marginTop: 2 }}>
             {it.s}
           </div>
         </div>

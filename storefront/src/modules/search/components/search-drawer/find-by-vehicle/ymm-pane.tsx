@@ -1,4 +1,4 @@
-"use client"
+﻿"use client"
 
 import { FormEvent, useMemo, useState } from "react"
 import { useParams, useRouter } from "next/navigation"
@@ -22,7 +22,7 @@ const labelStyle: React.CSSProperties = {
   fontWeight: 600,
   textTransform: "uppercase",
   letterSpacing: "0.08em",
-  color: "var(--muted)",
+  color: "var(--ink-soft)",
 }
 
 const YmmPane = ({ onClose }: YmmPaneProps) => {
@@ -163,7 +163,7 @@ const YmmPane = ({ onClose }: YmmPaneProps) => {
       <div
         style={{
           fontSize: 11,
-          color: "var(--muted)",
+          color: "var(--ink-soft)",
           marginTop: 10,
           textAlign: "center",
           fontFamily: "var(--mono)",
@@ -181,7 +181,7 @@ const YmmPane = ({ onClose }: YmmPaneProps) => {
             cursor: "not-allowed",
           }}
         >
-          SEARCH BY LICENSE PLATE →
+          SEARCH BY LICENSE PLATE â†’
         </span>
       </div>
     </form>

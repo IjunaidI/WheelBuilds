@@ -1,4 +1,4 @@
-"use client"
+﻿"use client"
 
 import { FormEvent, useEffect, useRef, useState } from "react"
 import { useParams, useRouter } from "next/navigation"
@@ -20,7 +20,7 @@ const Header = ({ onClose }: HeaderProps) => {
   const [shortcutLabel, setShortcutLabel] = useState("Ctrl K")
 
   useEffect(() => {
-    setShortcutLabel(isMac() ? "⌘ K" : "Ctrl K")
+    setShortcutLabel(isMac() ? "âŒ˜ K" : "Ctrl K")
     inputRef.current?.focus()
   }, [])
 
@@ -94,7 +94,7 @@ const Header = ({ onClose }: HeaderProps) => {
           ref={inputRef}
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          placeholder="Search wheels, brands, fitments…"
+          placeholder="Search wheels, brands, fitmentsâ€¦"
           type="search"
           autoComplete="off"
           spellCheck={false}
@@ -114,7 +114,7 @@ const Header = ({ onClose }: HeaderProps) => {
           style={{
             fontFamily: "var(--mono)",
             fontSize: 10,
-            color: "var(--muted)",
+            color: "var(--ink-soft)",
             border: "1px solid var(--hairline)",
             padding: "2px 6px",
             borderRadius: 3,

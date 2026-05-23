@@ -1,4 +1,4 @@
-"use client"
+﻿"use client"
 
 const Newsletter = () => (
   <section
@@ -18,7 +18,7 @@ const Newsletter = () => (
     >
       <div>
         <div className="label" style={{ marginBottom: 14 }}>
-          NEWSLETTER · WEEKLY
+          NEWSLETTER Â· WEEKLY
         </div>
         <div
           className="display"
@@ -64,7 +64,7 @@ const Newsletter = () => (
         <div
           style={{
             fontSize: 11,
-            color: "var(--muted)",
+            color: "var(--ink-soft)",
             marginTop: 12,
             fontFamily: "var(--mono)",
             letterSpacing: "0.04em",

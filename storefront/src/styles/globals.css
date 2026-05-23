@@ -1,6 +1,6 @@
-@import "tailwindcss/base";
-@import "tailwindcss/components";
-@import "tailwindcss/utilities";
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
 @import "./wheel-builds.css";
 
 @layer utilities {
@@ -109,5 +109,41 @@
 
   .text-3xl-semi {
     @apply text-[32px] leading-[44px] font-semibold;
+  }
+}
+
+/*
+ * shadcn tokens mapped to the Wheel Builds palette (see DESIGN.md §2).
+ * Values are HSL components so `hsl(var(--token))` in tailwind.config.js
+ * resolves correctly. Adjust both sides if a token mapping changes.
+ */
+@layer base {
+  :root {
+    --background: 60 14% 98%;        /* surface  #FAFAF8 */
+    --foreground: 240 7% 4%;         /* ink      #0B0B0C */
+    --card: 0 0% 100%;               /* white    #FFFFFF */
+    --card-foreground: 240 7% 4%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 240 7% 4%;
+    --primary: 25 100% 50%;          /* orange   #FF6A00 */
+    --primary-foreground: 0 0% 100%;
+    --secondary: 40 17% 93%;         /* soft     #F2EFE9 */
+    --secondary-foreground: 240 7% 4%;
+    --muted: 40 17% 93%;
+    --muted-foreground: 240 2% 55%;  /* muted    #8A8A8E */
+    --accent: 40 17% 93%;
+    --accent-foreground: 240 7% 4%;
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 36 16% 89%;            /* hairline #E8E5DF */
+    --input: 36 16% 89%;
+    --ring: 25 100% 50%;             /* focus ring = orange */
+    --radius: 0.25rem;
+  }
+}
+
+@layer base {
+  body {
+    @apply bg-background text-foreground;
   }
 }

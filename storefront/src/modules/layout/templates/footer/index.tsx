@@ -1,4 +1,4 @@
-import LocalizedClientLink from "@modules/common/components/localized-client-link"
+﻿import LocalizedClientLink from "@modules/common/components/localized-client-link"
 import Icon from "@modules/common/components/icon"
 import Logo from "@modules/common/components/logo"
 
@@ -118,13 +118,13 @@ export default async function Footer() {
         <div
           style={{
             fontSize: 11,
-            color: "var(--muted)",
+            color: "var(--ink-soft)",
             letterSpacing: "0.04em",
             fontFamily: "var(--mono)",
           }}
         >
-          © {new Date().getFullYear()} WHEEL/BUILDS, INC. · ALL RIGHTS
-          RESERVED · TERMS · PRIVACY
+          Â© {new Date().getFullYear()} WHEEL/BUILDS, INC. Â· ALL RIGHTS
+          RESERVED Â· TERMS Â· PRIVACY
         </div>
         <div
           style={{

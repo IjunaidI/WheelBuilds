@@ -7,11 +7,11 @@ import {
   useSearchOpen,
 } from "@lib/stores/search-store"
 import {
-  Sheet,
-  SheetContent,
-  SheetDescription,
-  SheetTitle,
-} from "@/components/ui/sheet"
+  Drawer,
+  DrawerContent,
+  DrawerDescription,
+  DrawerTitle,
+} from "@/components/ui/drawer"
 import SearchDrawer from "../search-drawer"
 
 const isMac = () =>
@@ -20,7 +20,7 @@ const isMac = () =>
 const SearchMount = () => {
   const open = useSearchOpen()
 
-  /** Cmd/Ctrl+K opens from anywhere; Esc/overlay-click/etc are handled by Radix. */
+  /** Cmd/Ctrl+K opens from anywhere; Esc / drag-to-dismiss / overlay-click are handled by Vaul. */
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       const cmdOrCtrl = isMac() ? e.metaKey : e.ctrlKey
@@ -34,20 +34,23 @@ const SearchMount = () => {
   }, [])
 
   return (
-    <Sheet open={open} onOpenChange={(next) => !next && closeSearch()}>
-      <SheetContent
-        side="right"
-        hideCloseButton
+    <Drawer
+      open={open}
+      onOpenChange={(next: boolean) => !next && closeSearch()}
+      direction="right"
+      shouldScaleBackground={false}
+    >
+      <DrawerContent
         aria-label="Search"
-        className="frame w-full sm:max-w-[480px] p-0 border-l border-[var(--hairline)] bg-white flex flex-col"
+        className="frame inset-y-0 right-0 left-auto top-0 mt-0 h-full w-full sm:max-w-[480px] rounded-none border-0 border-l border-[var(--hairline)] bg-white"
       >
-        <SheetTitle className="sr-only">Search</SheetTitle>
-        <SheetDescription className="sr-only">
+        <DrawerTitle className="sr-only">Search</DrawerTitle>
+        <DrawerDescription className="sr-only">
           Find wheels by vehicle, brand, or keyword.
-        </SheetDescription>
+        </DrawerDescription>
         <SearchDrawer onClose={closeSearch} />
-      </SheetContent>
-    </Sheet>
+      </DrawerContent>
+    </Drawer>
   )
 }
 

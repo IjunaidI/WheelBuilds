@@ -123,15 +123,34 @@ When extending an existing Medusa-style module, use Tailwind (consistent with th
 
 ## shadcn/ui primitives
 
-shadcn is integrated as a **headless behavior layer** — we use Radix-based primitives (Sheet, Dialog, Popover, etc.) for accessibility, focus management, and motion, then skin them with the Wheel Builds palette so they read as part of the same design system.
+shadcn is integrated as a **headless behavior layer** — we use Radix/Vaul/cmdk-based primitives (Drawer, Dialog, DropdownMenu, Tooltip, Sonner, Command, Sheet, Button) for accessibility, focus management, and motion, then skin them with the Wheel Builds palette so they read as part of the same design system.
 
 - **Components dir:** [src/components/ui/](src/components/ui). Pulled in via `npx shadcn@2.1.8 add <component>`. We pin to 2.1.8 because newer shadcn defaults to Tailwind v4 which conflicts with our v3 + `@medusajs/ui-preset` setup.
+- **Don't hand-edit `components/ui/*`** — they're meant to stay close to the canonical shadcn source so they can be re-pulled or upgraded. If something needs WB-specific behavior, build a wrapper in [modules/common/components/](src/modules/common/components/) (see next section) rather than editing the primitive in place.
+- **What's wired today** (Jan 2026): Drawer (Vaul, owns the search panel), Sheet, Dialog, DropdownMenu, Tooltip, Sonner, Command, Button. Providers (`TooltipProvider`, `Toaster`) live in [(main)/layout.tsx](src/app/[countryCode]/(main)/layout.tsx).
 - **Aliases:** `@/components`, `@/lib/utils`, `@/components/ui` — declared in [components.json](components.json) and resolved via the `@/*` path in [tsconfig.json](tsconfig.json). Existing `@lib/*` and `@modules/*` aliases are unchanged.
-- **`cn()` helper:** [src/lib/utils.ts](src/lib/utils.ts). Use it from shadcn components only — domain code under `@modules/*` should not import from `@/lib/utils`.
+- **`cn()` helper:** [src/lib/utils.ts](src/lib/utils.ts). Imported freely from both shadcn primitives and WB composed primitives (`modules/common/components/*`).
 - **Token mapping:** the shadcn CSS variables (`--background`, `--primary`, `--ring`, …) are redefined in [styles/globals.css](src/styles/globals.css) to use HSL components from the WB palette in DESIGN.md. So `bg-primary` is WB orange, `bg-secondary` is WB `--soft`, `border-border` is WB `--hairline`. Don't change shadcn token names — change the values they map to.
 - **`pnpm` on Windows:** `npx shadcn add <x>` will fail at the "install deps" step because pnpm isn't on PATH. Workaround: run the dep install separately (`npx -y pnpm@9.10.0 add <radix-pkg>`) and either let `shadcn add` finish writing the component file, or write it manually.
 - **`--muted` is shadcn's, `--ink-soft` is ours.** WB originally had a `--muted` token (`#8A8A8E`) but shadcn's tokens own that name. WB's was renamed to `--ink-soft` so both systems coexist inside `.frame`. If you're adding a new WB token, grep `globals.css` first for collisions.
-- **Portals and `.frame`:** shadcn primitives that use Radix Portal (Sheet, Dialog, Popover, …) render at the body root, escaping the single `.frame` wrapper in `(main)/layout.tsx`. **Re-apply `className="frame"` on the portaled content** (e.g. `<SheetContent className="frame …">`) so WB tokens resolve. The search drawer ([modules/search/components/search-mount](src/modules/search/components/search-mount/index.tsx)) is the reference.
+- **Portals and `.frame`:** shadcn primitives that use a portal (Drawer, Sheet, Dialog, DropdownMenu, Tooltip, …) render at the body root, escaping the single `.frame` wrapper in `(main)/layout.tsx`. Their content classes already include `frame ` so WB tokens resolve. If you author a new portaled primitive in `components/ui/`, **add `frame` to the portal content's className** — DropdownMenu and Tooltip in this repo are the references.
+
+## WB composed primitives
+
+Sitting one layer above shadcn — and one layer below the page sections — are the WB-specific primitives in [src/modules/common/components/](src/modules/common/components/). They exist to keep recurring patterns from drifting apart visually, and to keep section files small. **If you find yourself writing the same `style={{ fontFamily: "var(--display)", fontSize: X, ... }}` block twice, the pattern probably belongs here.**
+
+Current set:
+
+- **[`Label`](src/modules/common/components/label/index.tsx)** — mono uppercase eyebrow text. Tones: `accent` (orange, default), `muted`, `ink`. Pass `bar` for an orange leading bar (hero / section eyebrows). Replaces ad-hoc `.label` / `.label-muted` plus inline mono/uppercase styles.
+- **[`Display`](src/modules/common/components/display/index.tsx)** — Antonio display headline with `size` in pixels and tones `ink` / `orange` / `graphite` / `inherit`. Render-as via `as` (`h1`/`h2`/`span`/…). Replaces inline `<span className="display" style={{ fontSize: X, color: Y }}>`.
+- **[`SectionHeader`](src/modules/common/components/section-header/index.tsx)** — the recurring "counter + title + description + action" row at the top of every home section. Pass only the slots you need; omitted ones collapse.
+- **[`MicroLink`](src/modules/common/components/micro-link/index.tsx)** — the orange mono "VIEW ALL 08 →" / "BROWSE BRANDS →" link that ends sections. Country-scoped via `LocalizedClientLink` under the hood.
+- **[`Chip`](src/modules/common/components/chip/index.tsx)** — the small pill used for popular searches, brand chips, build chips, fitment-OK tags. Variants `soft` / `accent` / `outline`. Renders as a button by default; pass `href` to render a country-scoped link instead.
+- **[`VehicleTile`](src/modules/common/components/vehicle-tile/index.tsx)** — the big YMM tile used in the hero and the drawer's YMM pane. Sizes `lg` (hero, 110px tall) and `md` (drawer-inline).
+
+Plus the existing [`Wheel`](src/modules/common/components/wheel/index.tsx), [`Icon`](src/modules/common/components/icon/index.tsx), [`Logo`](src/modules/common/components/logo/index.tsx), [`ImgPlaceholder`](src/modules/common/components/img-placeholder/index.tsx).
+
+The pattern when extending: if a section needs interactive behavior (drawer, dropdown, popover, toast, modal) → reach into `@/components/ui/*`. If a section needs a visual pattern that more than one place uses (eyebrow label, display heading, section header, chip) → reach into `@modules/common/components/*`. Don't bake either layer into page-section code with inline styles unless the pattern is genuinely one-off.
 
 ## Gotchas
 

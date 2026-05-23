@@ -124,7 +124,58 @@ Sizing variants: override `height` + `padding` inline. Hero CTA is 64px tall; ne
 
 ## 5. Primitives (React components)
 
-The four shared primitives all live under `src/modules/common/components/` and are the only sanctioned way to render their respective things. Don't hand-roll wheel SVGs or image placeholders elsewhere.
+WB primitives live under `src/modules/common/components/` and are the only sanctioned way to render their respective things. **Two tiers:**
+
+- **Composed primitives** wrap the raw aesthetic — `<Label>`, `<Display>`, `<SectionHeader>`, `<MicroLink>`, `<Chip>`, `<VehicleTile>`. Reach for these instead of repeating `style={{ fontFamily: "var(--display)", … }}` blocks. They embed WB defaults (Antonio for display, mono for labels, orange accents) so callers stay terse and the look stays consistent.
+- **Asset primitives** wrap the bespoke visuals — `<Wheel>`, `<Icon>`, `<Logo>`, `<ImgPlaceholder>`.
+
+Below `modules/common`, shadcn primitives in `src/components/ui/*` (Drawer, Sheet, Dialog, DropdownMenu, Tooltip, Sonner, Command, Button) handle behavior/accessibility/motion. Their tokens are already mapped to the WB palette so they inherit the look automatically.
+
+Don't hand-roll wheel SVGs, image placeholders, mono labels, or section headers anywhere else.
+
+### `<Label tone? bar? children />`
+
+[`src/modules/common/components/label/index.tsx`](src/modules/common/components/label/index.tsx). Mono uppercase eyebrow, 11px, 0.08em tracking. Tones: `accent` (orange, default), `muted` (`--ink-soft`), `ink`. Pass `bar` for the orange leading dash (hero / section eyebrows).
+
+```tsx
+<Label bar>FITMENT FIRST · STEP 01 OF 02</Label>
+<Label tone="muted">2 saved vehicles</Label>
+```
+
+### `<Display size? tone? as? children />`
+
+[`src/modules/common/components/display/index.tsx`](src/modules/common/components/display/index.tsx). Antonio 900 headline. `size` is pixel count (default 40 — the section-header size). `as` controls the rendered element (`h1` for hero, `h2` for sections, `span` for inline counters). Letter-spacing and line-height auto-tune based on size.
+
+```tsx
+<Display size={132} as="h1">What do you drive?</Display>
+<Display size={88} tone="orange" as="span">08</Display>
+<Display>Shop by Style</Display>
+```
+
+### `<SectionHeader counter? eyebrow? title description? action? />`
+
+[`src/modules/common/components/section-header/index.tsx`](src/modules/common/components/section-header/index.tsx). The recurring section-top row (huge orange counter + display title + description + trailing action). Pass only the slots you need; omitted ones collapse.
+
+```tsx
+<SectionHeader
+  counter="08"
+  title="New This Week"
+  description="Fresh fitments from Blackline, Vanguard, Meridian and more."
+  action={<MicroLink href="/collections">View all 08</MicroLink>}
+/>
+```
+
+### `<MicroLink href arrow? tone? children />`
+
+[`src/modules/common/components/micro-link/index.tsx`](src/modules/common/components/micro-link/index.tsx). The orange mono "VIEW ALL →" / "BROWSE BRANDS →" pattern. Country-scoped via `LocalizedClientLink` under the hood. `tone="ink"` flips it to ink. Don't nest inside another `<a>` — use the inline arrow span variant instead (see `shop-by-style/index.tsx` for an example of nested-link avoidance).
+
+### `<Chip onClick? href? variant? size? dot? children />`
+
+[`src/modules/common/components/chip/index.tsx`](src/modules/common/components/chip/index.tsx). Pill component for popular searches, brand chips, fitment-OK tags, build chips. Variants `soft` (neutral) / `accent` (orange) / `outline`. Renders as a `<button>` by default; pass `href` to render a country-scoped link. Pass `dot` for the orange leading dot used by fitment-confirmed chips.
+
+### `<VehicleTile idx label value? onClick size? />`
+
+[`src/modules/common/components/vehicle-tile/index.tsx`](src/modules/common/components/vehicle-tile/index.tsx). The big YMM tile button. Hero uses `size="lg"` (default, 110px tall); inline/drawer uses `size="md"` (80px). Renders a "Pick {label}" prompt when `value` is undefined and the actual value with an orange underline when set.
 
 ### `<Wheel size={n} finish="black" | "bronze" | "silver" />`
 

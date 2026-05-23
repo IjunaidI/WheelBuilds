@@ -1,5 +1,5 @@
-import LocalizedClientLink from "@modules/common/components/localized-client-link"
-import Icon from "@modules/common/components/icon"
+import SectionHeader from "@modules/common/components/section-header"
+import MicroLink from "@modules/common/components/micro-link"
 import { Finish } from "@modules/common/components/wheel"
 import ProductCard from "./product-card"
 
@@ -19,62 +19,12 @@ const DROPS: {
 
 const NewDropsRow = () => (
   <section style={{ padding: "120px 80px 80px" }}>
-    <div
-      style={{
-        display: "flex",
-        alignItems: "flex-end",
-        justifyContent: "space-between",
-        marginBottom: 48,
-      }}
-    >
-      <div style={{ display: "flex", alignItems: "flex-end", gap: 24 }}>
-        <span
-          className="display"
-          style={{
-            fontSize: 88,
-            color: "var(--orange)",
-            letterSpacing: "-0.02em",
-          }}
-        >
-          08
-        </span>
-        <div style={{ paddingBottom: 12 }}>
-          <div
-            className="display"
-            style={{ fontSize: 40, color: "var(--ink)" }}
-          >
-            New This Week
-          </div>
-          <div
-            style={{
-              fontSize: 13,
-              color: "var(--graphite)",
-              marginTop: 6,
-              maxWidth: 400,
-            }}
-          >
-            Fresh fitments from Blackline, Vanguard, Meridian and more — first
-            to land, first to ship.
-          </div>
-        </div>
-      </div>
-      <LocalizedClientLink
-        href="/collections"
-        style={{
-          fontSize: 13,
-          fontWeight: 600,
-          color: "var(--orange)",
-          textTransform: "uppercase",
-          letterSpacing: "0.06em",
-          textDecoration: "none",
-          display: "inline-flex",
-          gap: 6,
-          alignItems: "center",
-        }}
-      >
-        View all 08 <Icon name="arrow-right" size={14} color="#FF6A00" />
-      </LocalizedClientLink>
-    </div>
+    <SectionHeader
+      counter="08"
+      title="New This Week"
+      description="Fresh fitments from Blackline, Vanguard, Meridian and more — first to land, first to ship."
+      action={<MicroLink href="/collections">View all 08</MicroLink>}
+    />
     <div
       style={{
         display: "grid",

@@ -10,24 +10,15 @@ const BRANDS = [
 
 const ShopByBrand = () => (
   <section
-    style={{
-      padding: "120px 80px",
-      background: "white",
-      borderTop: "1px solid var(--hairline)",
-    }}
+    className="px-5 py-16 xsmall:px-8 small:px-20 small:py-[120px] bg-white"
+    style={{ borderTop: "1px solid var(--hairline)" }}
   >
     <SectionHeader
       eyebrow="42 BRANDS · ALL AUTHORIZED"
       title="Trusted Brands"
       action={<MicroLink href="/collections">View all brands</MicroLink>}
     />
-    <div
-      style={{
-        display: "grid",
-        gridTemplateColumns: "repeat(4, 1fr)",
-        gap: 16,
-      }}
-    >
+    <div className="grid grid-cols-2 xsmall:grid-cols-3 small:grid-cols-4 gap-3 small:gap-4">
       {BRANDS.map((b) => (
         <LocalizedClientLink
           key={b}

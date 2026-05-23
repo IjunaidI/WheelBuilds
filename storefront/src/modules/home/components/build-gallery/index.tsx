@@ -14,47 +14,49 @@ const TILES = [
   { w: 4, h: 3, name: "FORGEHAUS F-1" },
 ]
 
+const Tile = ({ name, w, h }: (typeof TILES)[number]) => (
+  <div
+    className="build-tile relative aspect-square small:aspect-auto"
+    style={{
+      // Spans get media-queried OFF on mobile via .build-tile in
+      // wheel-builds.css so the inline values don't fight the 2-col grid.
+      gridColumn: `span ${w}`,
+      gridRow: `span ${h}`,
+    }}
+  >
+    <ImgPlaceholder
+      label="VEHICLE BUILD"
+      dark
+      radius={6}
+      style={{ width: "100%", height: "100%" }}
+    />
+    <div style={{ position: "absolute", left: 12, bottom: 12 }}>
+      <Chip variant="outline" size="sm" dot>
+        ON {name}
+      </Chip>
+    </div>
+  </div>
+)
+
 const BuildGallery = () => (
   <section
-    style={{
-      padding: "120px 80px",
-      background: "var(--soft)",
-    }}
+    className="px-5 py-16 xsmall:px-8 small:px-20 small:py-[120px]"
+    style={{ background: "var(--soft)" }}
   >
     <SectionHeader
       eyebrow="#WHEELBUILDS · 14.2K POSTS"
       title="Shot by our community."
       action={<MicroLink href="#">Explore the gallery</MicroLink>}
     />
+    {/* Mobile: simple 2-col aspect-square grid. small+: editorial 12-col
+        with mixed spans (the span values on the tiles only take effect
+        because the parent declares grid-template-columns: repeat(12,...)). */}
     <div
-      style={{
-        display: "grid",
-        gridTemplateColumns: "repeat(12, 1fr)",
-        gridAutoRows: "70px",
-        gap: 12,
-      }}
+      className="grid grid-cols-2 small:grid-cols-12 gap-3"
+      style={{ gridAutoRows: "70px" }}
     >
-      {TILES.map((t, i) => (
-        <div
-          key={i}
-          style={{
-            gridColumn: `span ${t.w}`,
-            gridRow: `span ${t.h}`,
-            position: "relative",
-          }}
-        >
-          <ImgPlaceholder
-            label="VEHICLE BUILD"
-            dark
-            radius={6}
-            style={{ width: "100%", height: "100%" }}
-          />
-          <div style={{ position: "absolute", left: 12, bottom: 12 }}>
-            <Chip variant="outline" size="sm" dot>
-              ON {t.name}
-            </Chip>
-          </div>
-        </div>
+      {TILES.map((t) => (
+        <Tile key={t.name} {...t} />
       ))}
     </div>
   </section>

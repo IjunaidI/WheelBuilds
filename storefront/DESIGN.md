@@ -70,6 +70,19 @@ The home and drawer use raw pixel paddings — there's no spacing scale yet. Com
 
 If you find yourself reaching for a tenth value, stop and reuse one of these.
 
+### Responsive scale
+
+Two breakpoints govern the design:
+
+- **mobile** (default, < 1024px) — single-column or 2-col grids, horizontal padding `px-5` / `xsmall:px-8`
+- **small+** (`small:` prefix, ≥ 1024px) — the original desktop layout, horizontal padding `px-20`
+
+The Tailwind breakpoints baked into [tailwind.config.js](tailwind.config.js) are: `2xsmall: 320px`, `xsmall: 512px`, `small: 1024px`, `medium: 1280px`, `large: 1440px`, `xlarge: 1680px`, `2xlarge: 1920px`. Use `small:` as the desktop/mobile divider; reserve `xsmall:` for tablet tweaks (e.g. footer goes 2-col at 512px+ before going 5-col at 1024px+).
+
+Vertical paddings collapse on mobile too: a `small:py-30` section drops to `py-16` on mobile, `small:py-20` drops to `py-12` or `py-16` depending on prominence.
+
+Display sizes scale too — use the `<Display>` primitive's responsive override pattern: `<Display size={36} className="small:!text-[56px]">` keeps the JSX terse while the typography breathes on desktop.
+
 ## 3. The `.frame` wrapper
 
 Every component that uses design-system classes MUST be a descendant of `.frame`. Today that's done once in [`(main)/layout.tsx`](src/app/[countryCode]/(main)/layout.tsx). Don't add a second `.frame` inside it — nested wrappers redeclare the CSS variables for no benefit.
@@ -285,7 +298,7 @@ Still on the polish list:
 
 - Scroll-linked reveals on home sections (consider [Motion](https://motion.dev) — successor to framer-motion — if/when needed)
 - Skeleton loaders for the catalog / search results / PDP
-- Mobile breakpoints (the home is desktop-only today)
+- ~~Mobile breakpoints~~ Done — see §2 Responsive scale
 - Hero entry stagger
 
 Rule of thumb: **use the primitives' built-in motion before adding any of your own**. If you need custom motion that isn't one of `transform` / `opacity` / `border-color` on a CSS transition, reach for Vaul/tailwindcss-animate utilities; only escalate to a JS animation lib (Motion) when scroll/gesture/spring physics genuinely matter.
@@ -328,7 +341,7 @@ These don't change the design contract above, but they're tracked so the next it
 - **Cart dropdown.** Still HeadlessUI Popover. Migrate to shadcn `<DropdownMenu>` — it's already wired and themed.
 - **Form primitives.** `<Field>` / `<Input>` / `<Select>` for the newsletter input, drawer search box, YMM selects. Right now each of those is a one-off inline-styled input.
 - **Toasts.** `<Toaster>` is mounted but unused. Cart-add, cart-remove, fitment-saved, copy-to-clipboard, form-error are the obvious first callers.
-- **Mobile.** The home is desktop-only (fixed 80px paddings, `repeat(6, 1fr)` grids). The original design canvas had a mobile home + filter bottom sheet; that's still to be ported. Vaul's `direction="bottom"` is the natural fit for the mobile filter sheet.
+- ~~**Mobile.**~~ Done — every section has a responsive variant. Home grids collapse 6→2 cols, Discovery rail becomes a bottom Vaul drawer, PDP hero stacks, nav gets a hamburger left Vaul drawer. See §2 Responsive scale + the [MobileMenu](src/modules/layout/components/mobile-menu/index.tsx) and [MobileFilterTrigger](src/modules/discovery/components/filter-rail/mobile-trigger.tsx) components.
 - **Discovery (catalog) page.** Designed but not built. Filter rail + 4-up product grid + active-filter chips.
 - **Product Detail.** Designed but not built. Fitment matrix, offset diagrams, stance previews — the most complex screen.
 - **Mood/Accent/Display tweaks.** Three orthogonal axes were designed; only one combination ships. Adding the other modes is a separate, fully scoped piece of work (Tweaks panel + state plumbing + CSS variants).

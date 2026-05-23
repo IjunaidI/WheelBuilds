@@ -456,3 +456,75 @@
   letter-spacing: 0.08em;
   text-transform: uppercase;
 }
+
+/* -------------------------------------------------------------------------
+ * Mobile / responsive helpers
+ *
+ * Most responsive work happens via Tailwind classes (`small:px-20` etc.) on
+ * the section components. These CSS-side helpers exist for cases where
+ * Tailwind can't reach — namely the build-gallery's mixed-span grid tiles
+ * (inline `style={{ gridColumn: span N }}` can't be media-queried out from
+ * the call site).
+ * ------------------------------------------------------------------------- */
+
+/* BuildGallery tile: spans set via inline style apply only on small+ —
+ * below that, the tile sits in a simple 2-col aspect-square grid. */
+@media (max-width: 1023px) {
+  .frame .build-tile {
+    grid-column: auto !important;
+    grid-row: auto !important;
+  }
+}
+
+/* Frame background grid is heavy on mobile; lighten the lines so phones
+ * don't render moiré on the 80px squares. */
+@media (max-width: 511px) {
+  .frame {
+    background-size: 40px 100%, 100% 40px, auto;
+  }
+}
+
+/* PDP Specs grid. 2-col mobile, 4-col small+. Per-cell right+bottom hairlines
+ * draw via the cell, and the (n)-th-child rules below kill the trailing
+ * borders at the right edge and bottom row so the section frames itself. */
+.frame .spec-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+.frame .spec-cell {
+  border-right: 1px solid var(--hairline);
+  border-bottom: 1px solid var(--hairline);
+}
+/* Mobile: 2-col. Right border off on every even (last column) cell.
+ * Bottom border off on the last two cells (final row, assumes even count). */
+.frame .spec-cell:nth-child(2n) {
+  border-right: none;
+}
+.frame .spec-cell:nth-last-child(-n + 2):nth-child(2n + 1),
+.frame .spec-cell:nth-last-child(-n + 1) {
+  border-bottom: none;
+}
+@media (min-width: 1024px) {
+  .frame .spec-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+  /* Reset mobile-only overrides */
+  .frame .spec-cell {
+    border-right: 1px solid var(--hairline);
+    border-bottom: 1px solid var(--hairline);
+  }
+  .frame .spec-cell:nth-child(2n) {
+    border-right: 1px solid var(--hairline);
+  }
+  .frame .spec-cell:nth-last-child(-n + 2):nth-child(2n + 1),
+  .frame .spec-cell:nth-last-child(-n + 1) {
+    border-bottom: 1px solid var(--hairline);
+  }
+  /* Then apply 4-col rules */
+  .frame .spec-cell:nth-child(4n) {
+    border-right: none;
+  }
+  .frame .spec-cell:nth-last-child(-n + 4) {
+    border-bottom: none;
+  }
+}

@@ -27,46 +27,32 @@ const Newsletter = () => {
 
   return (
     <section
+      className="px-5 py-16 xsmall:px-8 small:px-20 small:py-24"
       style={{
         background: "var(--soft)",
-        padding: "96px 80px",
         borderTop: "1px solid var(--hairline)",
       }}
     >
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "1fr 1fr",
-          alignItems: "center",
-          gap: 64,
-        }}
-      >
+      <div className="grid grid-cols-1 small:grid-cols-2 items-center gap-10 small:gap-16">
         <div>
           <Label style={{ marginBottom: 14, display: "block" }}>
             NEWSLETTER · WEEKLY
           </Label>
-          <Display size={56}>
+          <Display size={40} className="small:!text-[56px]">
             Get the
             <br />
             drops first.
           </Display>
-          <div
-            style={{
-              fontSize: 14,
-              color: "var(--graphite)",
-              marginTop: 16,
-              maxWidth: 380,
-            }}
-          >
+          <div className="text-[14px] text-[var(--graphite)] mt-4 max-w-[380px]">
             Restock alerts, new fitments, and the occasional unannounced sale.
             No spam, unsub anytime.
           </div>
         </div>
         <form
           onSubmit={submit}
-          style={{ display: "flex", flexDirection: "column" }}
+          className="flex flex-col"
         >
-          <div style={{ display: "flex", gap: 8 }}>
+          <div className="flex flex-col xsmall:flex-row gap-2">
             <TextInput
               type="email"
               required
@@ -82,6 +68,7 @@ const Newsletter = () => {
               type="submit"
               disabled={submitting}
               style={{ height: 56, padding: "0 28px" }}
+              className="w-full xsmall:w-auto"
             >
               {submitting ? "..." : "Subscribe"}
             </Button>

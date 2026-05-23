@@ -27,21 +27,24 @@ const DiscoveryHeader = ({ totalCount }: DiscoveryHeaderProps) => {
 
   return (
     <header className="flex flex-col gap-4 pb-6 border-b border-[var(--hairline)] mb-6">
-      <div className="flex items-end justify-between gap-4 flex-wrap">
-        <div>
+      <div className="flex flex-col small:flex-row small:items-end small:justify-between gap-4">
+        <div className="min-w-0">
           <Label tone="muted" style={{ display: "block", marginBottom: 6 }}>
             CATALOG ·{" "}
             {totalCount.toLocaleString()} {totalCount === 1 ? "RESULT" : "RESULTS"}
           </Label>
-          <Display size={48} as="h1">
+          <Display size={32} as="h1" className="small:!text-[48px]">
             All wheels
           </Display>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2 small:gap-3 flex-wrap">
           {/* Garage indicator — appears when an active vehicle is set */}
           {active ? (
             <Chip variant="accent" dot onClick={openSearch}>
-              FITS YOUR {active.make.toUpperCase()} {active.model.toUpperCase()}
+              <span className="truncate max-w-[180px] small:max-w-none">
+                FITS YOUR {active.make.toUpperCase()}{" "}
+                <span className="hidden xsmall:inline">{active.model.toUpperCase()}</span>
+              </span>
             </Chip>
           ) : (
             <Chip variant="outline" onClick={openSearch}>
@@ -53,7 +56,8 @@ const DiscoveryHeader = ({ totalCount }: DiscoveryHeaderProps) => {
             <DropdownMenuTrigger asChild>
               <Button variant="outline" size="sm">
                 <Icon name="sort" size={14} strokeWidth={1.6} />
-                Sort · {SORT_LABELS[sort]}
+                <span className="hidden xsmall:inline">Sort · {SORT_LABELS[sort]}</span>
+                <span className="xsmall:hidden">Sort</span>
                 <Icon name="chevron-down" size={12} color="#8A8A8E" />
               </Button>
             </DropdownMenuTrigger>

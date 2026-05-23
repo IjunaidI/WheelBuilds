@@ -15,10 +15,7 @@ const Related = ({ products }: RelatedProps) => {
   if (products.length === 0) return null
 
   return (
-    <section
-      className="border-t border-[var(--hairline)]"
-      style={{ padding: "80px 0" }}
-    >
+    <section className="border-t border-[var(--hairline)] py-16 small:py-20">
       <SectionHeader
         eyebrow="ALSO IN YOUR LANE"
         title="Similar wheels"

@@ -57,7 +57,7 @@ const PurchasePanel = ({
       <Label style={{ display: "block", marginBottom: 12 }}>
         {product.brand}
       </Label>
-      <Display size={56} as="h1">
+      <Display size={36} as="h1" className="small:!text-[56px]">
         {product.name}
       </Display>
 

@@ -15,6 +15,10 @@ type HeroProps = {
  * The PDP hero. Owns the variant-selection state (finish / size / bolt
  * pattern) and threads it down to Gallery and PurchasePanel. Kept client so
  * the picks are interactive without page reloads.
+ *
+ * Layout:
+ *   small+: 2-col split — Gallery left, purchase+picker right
+ *   mobile: stacked — Gallery first, then purchase+picker
  */
 const Hero = ({ product }: HeroProps) => {
   const [activeFinish, setActiveFinish] = useState<Finish>(
@@ -38,14 +42,7 @@ const Hero = ({ product }: HeroProps) => {
     selectedSize.priceCentsOverride ?? product.priceCents
 
   return (
-    <section
-      style={{
-        display: "grid",
-        gridTemplateColumns: "minmax(0, 1fr) minmax(0, 1fr)",
-        gap: 64,
-        alignItems: "start",
-      }}
-    >
+    <section className="grid grid-cols-1 small:grid-cols-2 gap-10 small:gap-16 items-start">
       <Gallery
         finishes={product.finishOptions}
         activeFinish={activeFinish}

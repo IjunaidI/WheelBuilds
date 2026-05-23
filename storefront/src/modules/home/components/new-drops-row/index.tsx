@@ -18,20 +18,14 @@ const DROPS: {
 ]
 
 const NewDropsRow = () => (
-  <section style={{ padding: "120px 80px 80px" }}>
+  <section className="px-5 pt-16 pb-12 xsmall:px-8 small:px-20 small:pt-[120px] small:pb-20">
     <SectionHeader
       counter="08"
       title="New This Week"
       description="Fresh fitments from Blackline, Vanguard, Meridian and more — first to land, first to ship."
       action={<MicroLink href="/collections">View all 08</MicroLink>}
     />
-    <div
-      style={{
-        display: "grid",
-        gridTemplateColumns: "repeat(6, 1fr)",
-        gap: 16,
-      }}
-    >
+    <div className="grid grid-cols-2 small:grid-cols-3 medium:grid-cols-6 gap-4">
       {DROPS.map((d) => (
         <ProductCard key={d.name} {...d} isNew compact />
       ))}

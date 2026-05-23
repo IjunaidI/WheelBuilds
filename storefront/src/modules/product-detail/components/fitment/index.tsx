@@ -36,7 +36,7 @@ const Fitment = ({ product }: FitmentProps) => {
     : null
 
   return (
-    <section className="border-t border-[var(--hairline)]" style={{ padding: "80px 0" }}>
+    <section className="border-t border-[var(--hairline)] py-16 small:py-20">
       <SectionHeader
         eyebrow={`FITMENT · ${product.fitment.length} CONFIRMED MODELS`}
         title="Will it fit your build?"
@@ -119,8 +119,10 @@ const Fitment = ({ product }: FitmentProps) => {
         )}
       </div>
 
-      {/* Fitment list — split into two columns for scan-ability */}
-      <div className="grid grid-cols-2 gap-x-8 gap-y-0 border-y border-[var(--hairline)]">
+      {/* Fitment list — single column on mobile, two columns on small+. Each
+          row draws its own bottom hairline; the section uses border-top only
+          so the final row doubles as the section's bottom frame. */}
+      <div className="grid grid-cols-1 small:grid-cols-2 gap-x-8 gap-y-0 border-t border-[var(--hairline)]">
         {product.fitment.map((f, i) => {
           const isActive =
             active &&
@@ -131,7 +133,6 @@ const Fitment = ({ product }: FitmentProps) => {
               key={`${f.make}-${f.model}-${i}`}
               entry={f}
               highlight={Boolean(isActive)}
-              isLast={i >= product.fitment.length - 2}
             />
           )
         })}
@@ -154,16 +155,13 @@ const Fitment = ({ product }: FitmentProps) => {
 const FitmentRow = ({
   entry,
   highlight,
-  isLast,
 }: {
   entry: FitmentEntry
   highlight: boolean
-  isLast: boolean
 }) => (
   <div
-    className="flex items-center gap-4 py-4"
+    className="flex items-center gap-4 py-4 border-b border-[var(--hairline)]"
     style={{
-      borderBottom: isLast ? "none" : "1px solid var(--hairline)",
       background: highlight ? "rgba(255,106,0,0.04)" : "transparent",
       paddingLeft: highlight ? 12 : 0,
       paddingRight: highlight ? 12 : 0,

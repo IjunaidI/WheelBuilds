@@ -7,30 +7,20 @@ import { Skeleton } from "@/components/ui/skeleton"
  */
 const ProductDetailSkeleton = () => (
   <section
-    style={{
-      padding: "32px 80px 80px",
-      maxWidth: 1600,
-      margin: "0 auto",
-    }}
+    className="px-5 pt-6 pb-16 xsmall:px-8 small:px-20 small:pt-8 small:pb-20"
+    style={{ maxWidth: 1600, margin: "0 auto" }}
   >
     {/* Breadcrumb */}
-    <div className="flex items-center gap-2 mb-8">
+    <div className="flex items-center gap-2 mb-6 small:mb-8">
       <Skeleton className="h-3 w-16" />
       <Skeleton className="h-3 w-3 rounded-full" />
       <Skeleton className="h-3 w-28" />
-      <Skeleton className="h-3 w-3 rounded-full" />
-      <Skeleton className="h-3 w-36" />
+      <Skeleton className="h-3 w-3 rounded-full hidden xsmall:block" />
+      <Skeleton className="h-3 w-36 hidden xsmall:block" />
     </div>
 
-    {/* Hero split */}
-    <div
-      style={{
-        display: "grid",
-        gridTemplateColumns: "minmax(0, 1fr) minmax(0, 1fr)",
-        gap: 64,
-        alignItems: "start",
-      }}
-    >
+    {/* Hero split — stacks on mobile */}
+    <div className="grid grid-cols-1 small:grid-cols-2 gap-10 small:gap-16 items-start">
       {/* Gallery */}
       <div className="flex flex-col gap-4">
         <Skeleton className="aspect-square rounded-[var(--radius)]" />
@@ -81,19 +71,13 @@ const ProductDetailSkeleton = () => (
     </div>
 
     {/* Specs */}
-    <div className="border-t border-[var(--hairline)] mt-20 pt-20">
+    <div className="border-t border-[var(--hairline)] mt-16 pt-16 small:mt-20 small:pt-20">
       <Skeleton className="h-3 w-32 mb-4" />
-      <Skeleton className="h-10 w-96 mb-2" />
+      <Skeleton className="h-10 w-2/3 max-w-96 mb-2" />
       <Skeleton className="h-4 w-2/3 mb-8" />
-      <div className="grid grid-cols-4 border-y border-[var(--hairline)]">
+      <div className="spec-grid border-y border-[var(--hairline)]">
         {Array.from({ length: 8 }).map((_, i) => (
-          <div
-            key={i}
-            className="border-r border-[var(--hairline)] last:border-r-0 p-6"
-            style={{
-              borderBottom: i < 4 ? "1px solid var(--hairline)" : "none",
-            }}
-          >
+          <div key={i} className="spec-cell px-5 py-5 small:px-7 small:py-6">
             <Skeleton className="h-2.5 w-20 mb-3" />
             <Skeleton className="h-6 w-24" />
           </div>
@@ -102,18 +86,15 @@ const ProductDetailSkeleton = () => (
     </div>
 
     {/* Fitment */}
-    <div className="border-t border-[var(--hairline)] mt-20 pt-20">
+    <div className="border-t border-[var(--hairline)] mt-16 pt-16 small:mt-20 small:pt-20">
       <Skeleton className="h-3 w-48 mb-4" />
-      <Skeleton className="h-10 w-80 mb-8" />
+      <Skeleton className="h-10 w-2/3 max-w-80 mb-8" />
       <Skeleton className="h-20 w-full rounded-[var(--radius)] mb-8" />
-      <div className="grid grid-cols-2 gap-x-8">
+      <div className="grid grid-cols-1 small:grid-cols-2 gap-x-8 border-t border-[var(--hairline)]">
         {Array.from({ length: 8 }).map((_, i) => (
           <div
             key={i}
-            className="flex items-center gap-4 py-4"
-            style={{
-              borderBottom: i < 6 ? "1px solid var(--hairline)" : "none",
-            }}
+            className="flex items-center gap-4 py-4 border-b border-[var(--hairline)]"
           >
             <div className="flex-1 flex flex-col gap-1.5">
               <Skeleton className="h-3.5 w-3/4" />
@@ -126,9 +107,9 @@ const ProductDetailSkeleton = () => (
     </div>
 
     {/* Related */}
-    <div className="border-t border-[var(--hairline)] mt-20 pt-20">
+    <div className="border-t border-[var(--hairline)] mt-16 pt-16 small:mt-20 small:pt-20">
       <Skeleton className="h-3 w-32 mb-4" />
-      <Skeleton className="h-10 w-64 mb-8" />
+      <Skeleton className="h-10 w-2/3 max-w-64 mb-8" />
       <ul className="grid grid-cols-2 small:grid-cols-3 medium:grid-cols-4 gap-x-4 gap-y-8 list-none p-0 m-0">
         {Array.from({ length: 4 }).map((_, i) => (
           <li key={i}>

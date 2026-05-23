@@ -32,21 +32,16 @@ const Hero = () => {
     : "Find My Fit · Start with your vehicle"
 
   return (
-    <section
-      style={{
-        padding: "80px 80px 96px",
-        position: "relative",
-        overflow: "hidden",
-      }}
-    >
-      {/* Watermark wheel — sits behind, on the right */}
+    <section className="relative overflow-hidden px-5 pt-12 pb-16 xsmall:px-8 small:px-20 small:pt-20 small:pb-24">
+      {/* Watermark wheel — only on small+ (would crowd the mobile layout) */}
       <div
+        aria-hidden
+        className="hidden small:block pointer-events-none"
         style={{
           position: "absolute",
           right: -120,
           top: 60,
           opacity: 0.55,
-          pointerEvents: "none",
           zIndex: 0,
         }}
       >
@@ -61,31 +56,27 @@ const Hero = () => {
         />
       </div>
 
-      <div style={{ position: "relative", zIndex: 1, maxWidth: 1280 }}>
-        <Label bar style={{ marginBottom: 28 }}>
+      <div className="relative z-10 max-w-[1280px]">
+        <Label bar className="mb-5 small:mb-7">
           FITMENT FIRST · STEP 01 OF 02
         </Label>
-        <Display size={132} as="h1">
+        <Display
+          size={64}
+          as="h1"
+          className="small:!text-[132px]"
+        >
           What do
           <br />
           you drive?
         </Display>
-        <p
-          style={{
-            fontSize: 18,
-            color: "var(--graphite)",
-            maxWidth: 580,
-            margin: "28px 0 40px",
-            lineHeight: 1.5,
-          }}
-        >
+        <p className="text-[16px] small:text-[18px] text-[var(--graphite)] max-w-[580px] mt-5 mb-8 small:mt-7 small:mb-10 leading-[1.5]">
           Tell us once. We&apos;ll show you only the wheels confirmed to fit,
           ship them in 2–3 days, and back every fitment with our money-back
           guarantee.
         </p>
 
-        {/* Mega vehicle selector — 4 huge tiles. All open the search drawer. */}
-        <div style={{ display: "flex", gap: 8, marginBottom: 20 }}>
+        {/* Mega vehicle selector — 2×2 on mobile, 4-in-a-row on small+ */}
+        <div className="grid grid-cols-2 small:grid-cols-4 gap-2 mb-5">
           <VehicleTile
             idx="1"
             label="Year"
@@ -113,23 +104,20 @@ const Hero = () => {
         </div>
 
         {/* CTA row */}
-        <div
-          style={{
-            display: "flex",
-            gap: 14,
-            alignItems: "center",
-            flexWrap: "wrap",
-          }}
-        >
+        <div className="flex gap-3 small:gap-3.5 items-stretch small:items-center flex-wrap">
           {active ? (
-            <Button asChild size="lg">
+            <Button asChild size="lg" className="w-full small:w-auto">
               <LocalizedClientLink href="/store">
                 {primaryCtaText}
                 <Icon name="arrow-right" size={18} color="white" />
               </LocalizedClientLink>
             </Button>
           ) : (
-            <Button size="lg" onClick={openSearch}>
+            <Button
+              size="lg"
+              onClick={openSearch}
+              className="w-full small:w-auto"
+            >
               {primaryCtaText}
               <Icon name="arrow-right" size={18} color="white" />
             </Button>
@@ -139,7 +127,7 @@ const Hero = () => {
               Or browse all wheels →
             </LocalizedClientLink>
           </Button>
-          <span style={{ flex: 1 }} />
+          <span className="hidden small:block flex-1" />
           <Button
             variant="outline"
             size="sm"
@@ -152,41 +140,15 @@ const Hero = () => {
         </div>
 
         {/* Trust line */}
-        <div
-          style={{
-            marginTop: 48,
-            paddingTop: 24,
-            borderTop: "1px solid var(--hairline)",
-            display: "flex",
-            gap: 40,
-            alignItems: "center",
-            flexWrap: "wrap",
-            maxWidth: 880,
-          }}
-        >
+        <div className="grid grid-cols-2 small:flex small:flex-wrap gap-x-6 gap-y-4 small:gap-x-10 mt-10 pt-6 border-t border-[var(--hairline)] max-w-[880px]">
           {TRUST_POINTS.map((t) => (
-            <div
-              key={t.l}
-              style={{ display: "flex", alignItems: "center", gap: 10 }}
-            >
+            <div key={t.l} className="flex items-center gap-2.5">
               <Icon name="check" size={16} color="#FF6A00" strokeWidth={2.5} />
               <div>
-                <div
-                  style={{
-                    fontSize: 13,
-                    fontWeight: 600,
-                    color: "var(--ink)",
-                  }}
-                >
+                <div className="text-[13px] font-semibold text-[var(--ink)]">
                   {t.l}
                 </div>
-                <div
-                  style={{
-                    fontSize: 11,
-                    color: "var(--ink-soft)",
-                    marginTop: 1,
-                  }}
-                >
+                <div className="text-[11px] text-[var(--ink-soft)] mt-px">
                   {t.s}
                 </div>
               </div>

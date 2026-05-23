@@ -61,16 +61,11 @@ const STATS_FOR = (price: string): Stat[] => [
 
 const EditorialBlock = ({ idx, name, brand, blurb, price, flip }: Block) => (
   <div
-    style={{
-      display: "grid",
-      gridTemplateColumns: "1fr 1fr",
-      gap: 64,
-      alignItems: "center",
-      padding: "80px 80px",
-      direction: flip ? "rtl" : "ltr",
-    }}
+    className={`grid grid-cols-1 small:grid-cols-2 gap-10 small:gap-16 items-center px-5 py-12 xsmall:px-8 small:px-20 small:py-20 ${
+      flip ? "small:[direction:rtl]" : ""
+    }`}
   >
-    <div style={{ direction: "ltr", position: "relative" }}>
+    <div className="relative" style={{ direction: "ltr" }}>
       <ImgPlaceholder
         label="VEHICLE PHOTO · 3/4 ANGLE"
         dark
@@ -88,42 +83,25 @@ const EditorialBlock = ({ idx, name, brand, blurb, price, flip }: Block) => (
       <Label style={{ marginBottom: 14, display: "block" }}>
         FEATURED · {brand}
       </Label>
-      <Display size={56} as="h3">
+      <Display size={36} as="h3" className="small:!text-[56px]">
         {name}
       </Display>
-      <p
-        style={{
-          fontSize: 16,
-          color: "var(--graphite)",
-          margin: "20px 0 28px",
-          maxWidth: 480,
-          lineHeight: 1.55,
-        }}
-      >
+      <p className="text-[15px] small:text-[16px] text-[var(--graphite)] mt-5 mb-7 max-w-[480px] leading-[1.55]">
         {blurb}
       </p>
-      <div
-        style={{
-          display: "flex",
-          gap: 20,
-          marginBottom: 28,
-          borderTop: "1px solid var(--hairline)",
-          borderBottom: "1px solid var(--hairline)",
-          padding: "20px 0",
-        }}
-      >
+      <div className="grid grid-cols-2 small:grid-cols-4 gap-5 mb-7 border-y border-[var(--hairline)] py-5">
         {STATS_FOR(price).map((s) => (
-          <div key={s.l} style={{ flex: 1 }}>
+          <div key={s.l}>
             <Label tone="muted" style={{ fontSize: 10, display: "block" }}>
               {s.l}
             </Label>
-            <Display size={22} as="div" style={{ marginTop: 4 }}>
+            <Display size={20} as="div" className="small:!text-[22px]" style={{ marginTop: 4 }}>
               {s.v}
             </Display>
           </div>
         ))}
       </div>
-      <Button asChild>
+      <Button asChild className="w-full small:w-auto">
         <LocalizedClientLink href="/store">
           Shop This Wheel <Icon name="arrow-right" size={16} color="white" />
         </LocalizedClientLink>

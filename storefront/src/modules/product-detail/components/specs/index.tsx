@@ -8,8 +8,9 @@ type SpecsProps = {
 }
 
 /**
- * Spec grid. Two-row 4-up table of engineering numbers + optional spotlight
- * paragraph on the right.
+ * Spec grid. 4-up on small+, 2-up on mobile. Cells draw their own right +
+ * bottom hairlines via a CSS class (`spec-cell`) defined in wheel-builds.css
+ * — see the @media override there for the column-count switch.
  */
 const Specs = ({ product }: SpecsProps) => {
   const rows: { label: string; value: string }[] = [
@@ -26,34 +27,26 @@ const Specs = ({ product }: SpecsProps) => {
   ]
 
   return (
-    <section className="border-t border-[var(--hairline)]" style={{ padding: "80px 0" }}>
+    <section className="border-t border-[var(--hairline)] py-16 small:py-20">
       <SectionHeader
         eyebrow="ENGINEERING"
         title="Built to spec, tested in pairs."
         description={product.spotlight}
         marginBottom={32}
       />
-      <div
-        className="grid border-y border-[var(--hairline)]"
-        style={{
-          gridTemplateColumns: "repeat(4, 1fr)",
-        }}
-      >
-        {rows.map((row, i) => (
-          <div
-            key={row.label}
-            className="border-r border-[var(--hairline)] last:border-r-0"
-            style={{
-              padding: "24px 28px",
-              // Add a bottom border to the first row to separate from the second
-              borderBottom:
-                i < rows.length - 4 ? "1px solid var(--hairline)" : "none",
-            }}
-          >
+      {/* spec-grid handles the responsive column count + cell borders. */}
+      <div className="spec-grid border-y border-[var(--hairline)]">
+        {rows.map((row) => (
+          <div key={row.label} className="spec-cell px-5 py-5 small:px-7 small:py-6">
             <Label tone="muted" style={{ fontSize: 10, display: "block" }}>
               {row.label}
             </Label>
-            <Display size={22} as="div" style={{ marginTop: 6 }}>
+            <Display
+              size={20}
+              as="div"
+              className="small:!text-[22px]"
+              style={{ marginTop: 6 }}
+            >
               {row.value}
             </Display>
           </div>

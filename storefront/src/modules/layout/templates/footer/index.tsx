@@ -57,36 +57,23 @@ const SOCIALS: { name: "instagram" | "youtube" | "tiktok" | "facebook"; label: s
 export default async function Footer() {
   return (
     <footer
-      style={{
-        borderTop: "1px solid var(--hairline)",
-        padding: "64px 80px 32px",
-        background: "white",
-      }}
+      className="px-5 pt-12 pb-8 xsmall:px-8 small:px-20 small:pt-16 bg-white"
+      style={{ borderTop: "1px solid var(--hairline)" }}
     >
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "1.6fr 1fr 1fr 1fr 1fr",
-          gap: 40,
-          marginBottom: 56,
-        }}
-      >
-        <div>
+      {/*
+        Mobile  : 1-col stack — brand block, then each link column full-width.
+        xsmall+ : 2-col grid of link columns; brand block above spans both.
+        small+  : 5-col original layout (1.6fr 1fr 1fr 1fr 1fr).
+      */}
+      <div className="grid grid-cols-1 xsmall:grid-cols-2 small:grid-cols-[1.6fr_1fr_1fr_1fr_1fr] gap-x-8 gap-y-10 mb-12 small:mb-14">
+        <div className="xsmall:col-span-2 small:col-span-1">
           <LocalizedClientLink
             href="/"
             style={{ textDecoration: "none", display: "inline-flex" }}
           >
             <Logo size={20} />
           </LocalizedClientLink>
-          <div
-            style={{
-              fontSize: 13,
-              color: "var(--graphite)",
-              marginTop: 16,
-              maxWidth: 260,
-              lineHeight: 1.6,
-            }}
-          >
+          <div className="text-[13px] text-[var(--graphite)] mt-4 max-w-[260px] leading-[1.6]">
             Authorized dealer for 40+ premium aftermarket wheel brands. Built
             in Long Beach.
           </div>
@@ -115,26 +102,18 @@ export default async function Footer() {
         ))}
       </div>
       <div
-        style={{
-          borderTop: "1px solid var(--hairline)",
-          paddingTop: 20,
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-        }}
+        className="pt-5 flex flex-col xsmall:flex-row gap-4 xsmall:gap-0 xsmall:justify-between xsmall:items-center"
+        style={{ borderTop: "1px solid var(--hairline)" }}
       >
-        <Label tone="muted" style={{ letterSpacing: "0.04em" }}>
+        <Label
+          tone="muted"
+          style={{ letterSpacing: "0.04em" }}
+          className="leading-relaxed"
+        >
           © {new Date().getFullYear()} WHEEL/BUILDS, INC. · ALL RIGHTS
           RESERVED · TERMS · PRIVACY
         </Label>
-        <div
-          style={{
-            display: "flex",
-            gap: 14,
-            color: "var(--ink)",
-            alignItems: "center",
-          }}
-        >
+        <div className="flex gap-3.5 items-center text-[var(--ink)]">
           {SOCIALS.map((s) => (
             <a
               key={s.name}

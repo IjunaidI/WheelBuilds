@@ -21,13 +21,10 @@ const ProductDetailTemplate = ({
   related,
 }: ProductDetailTemplateProps) => (
   <section
-    style={{
-      padding: "32px 80px 80px",
-      maxWidth: 1600,
-      margin: "0 auto",
-    }}
+    className="px-5 pt-6 pb-16 xsmall:px-8 small:px-20 small:pt-8 small:pb-20"
+    style={{ maxWidth: 1600, margin: "0 auto" }}
   >
-    <div style={{ marginBottom: 32 }}>
+    <div className="mb-6 small:mb-8">
       <Breadcrumb brand={product.brand} name={product.name} />
     </div>
     <Hero product={product} />

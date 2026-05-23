@@ -14,18 +14,11 @@ const STYLE_TILES: { label: string; count: string; finish: Finish }[] = [
 ]
 
 const ShopByStyle = () => (
-  <section style={{ padding: "0 80px 120px" }}>
-    <Display size={40} style={{ marginBottom: 32 }}>
+  <section className="px-5 pb-16 xsmall:px-8 small:px-20 small:pb-[120px]">
+    <Display size={32} className="mb-6 small:!text-[40px] small:mb-8">
       Shop by Style
     </Display>
-    <div
-      style={{
-        display: "grid",
-        gridTemplateColumns: "repeat(3, 1fr)",
-        gridTemplateRows: "repeat(2, 1fr)",
-        gap: 16,
-      }}
-    >
+    <div className="grid grid-cols-2 small:grid-cols-3 gap-4">
       {STYLE_TILES.map((t) => (
         <LocalizedClientLink
           key={t.label}
@@ -34,13 +27,19 @@ const ShopByStyle = () => (
           style={{ textDecoration: "none", color: "inherit" }}
         >
           <div>
-            <Display size={28}>{t.label}</Display>
+            <Display size={22} className="small:!text-[28px]">
+              {t.label}
+            </Display>
             <Label tone="muted" style={{ marginTop: 8, display: "block" }}>
               {t.count}
             </Label>
             <span
               className="inline-flex items-center gap-1.5 text-[12px] font-semibold uppercase tracking-[0.06em]"
-              style={{ marginTop: 32, display: "inline-flex", color: "var(--orange)" }}
+              style={{
+                marginTop: 32,
+                display: "inline-flex",
+                color: "var(--orange)",
+              }}
             >
               Explore
               <Icon name="arrow-right" size={14} color="#FF6A00" strokeWidth={2} />

@@ -5,7 +5,7 @@ import { Skeleton } from "@/components/ui/skeleton"
  * Vehicle band, matching the closed state of the real rail.
  */
 const FilterRailSkeleton = () => (
-  <aside className="w-[260px] shrink-0 sticky top-4 self-start">
+  <aside className="hidden small:block w-[260px] shrink-0 sticky top-4 self-start">
     {/* Vehicle band */}
     <div className="rounded-[var(--radius)] border border-[var(--hairline)] bg-white p-4 mb-4 flex flex-col gap-2">
       <Skeleton className="h-2.5 w-16" />

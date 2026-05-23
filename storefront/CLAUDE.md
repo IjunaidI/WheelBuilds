@@ -1,0 +1,152 @@
+# CLAUDE.md — Storefront
+
+Storefront-scoped guide. The repo-wide CLAUDE.md at the root covers backend, vendor-sync, env, and Railway specifics — read it for anything outside `storefront/`.
+
+For visual / design rules, the canonical reference is [`DESIGN.md`](DESIGN.md). Read it before touching JSX, CSS, or any component that renders inside the design system.
+
+## What this storefront is
+
+A MedusaJS 2.x Next.js 15 (App Router, React 19) storefront for **Wheel Builds** — a wheels + tires e-commerce site. The current visual layer is a custom design (garage / blueprint aesthetic, surgical orange #FF6A00, Antonio display type) ported from a Claude Design handoff. The Medusa data layer underneath is unchanged from the boilerplate.
+
+## Layout
+
+```
+storefront/src/
+├── app/[countryCode]/
+│   ├── (main)/           # everything except checkout — Nav, Footer, SearchMount wrap the children
+│   │   ├── layout.tsx    # the single .frame wrapper lives here
+│   │   ├── page.tsx      # Home — composes the design's home sections
+│   │   ├── store/        # catalog
+│   │   ├── products/[handle]/
+│   │   ├── categories/, collections/, cart/, account/, order/
+│   │   └── results/[query]/  # search results route
+│   └── (checkout)/       # separate layout for the checkout flow
+├── lib/
+│   ├── garage/           # vehicle garage abstraction (swap-ready for Phase 2.2)
+│   ├── stores/           # tiny client-side stores (search-open, recent-searches)
+│   ├── data/             # Medusa API calls (cart, customer, orders, regions, products…)
+│   ├── search-client.ts  # Meilisearch wrapper
+│   └── util/
+├── modules/
+│   ├── common/components/    # design primitives (wheel, icon, logo, img-placeholder, …)
+│   ├── home/components/      # home page sections
+│   ├── layout/               # nav, footer, cart-button, cart-dropdown, garage-pill, side-menu (orphaned)
+│   ├── search/               # search-drawer, search-mount, search-trigger, actions, results template
+│   ├── products/, cart/, checkout/, account/, order/, categories/, collections/, store/
+│   └── skeletons/
+└── styles/
+    ├── globals.css
+    └── wheel-builds.css  # design tokens + scoped utility classes (see DESIGN.md)
+```
+
+## The `.frame` wrapper rule
+
+The new design uses a single root class `.frame` that scopes its CSS variables (`--orange`, `--ink`, `--hairline`, …) and class selectors (`.display`, `.label`, `.btn`, `.wheel`, …). It's applied **once** at [`app/[countryCode]/(main)/layout.tsx`](src/app/[countryCode]/(main)/layout.tsx). Do not re-apply `.frame` on children — they're already inside it.
+
+`(checkout)` routes are intentionally outside `.frame`. If you ever need design tokens in checkout, either wrap that layout in `.frame` too, or hoist `.frame` to the top-level `app/layout.tsx`.
+
+## Naming convention — no `wb-` prefix
+
+The project name (Wheel Builds) is implied. **Never** use `wb-`, `WB`, or `wheelbuilds-` prefixes on component dirs, files, exports, or CSS classes. If a new identifier would collide with a generic name elsewhere (e.g. an existing `icon`), pick a more specific name (`inline-icon`, `product-icon`) — don't reintroduce the prefix.
+
+Detail and examples: [memory/feedback_no_wb_prefix.md](../.claude/projects/e--medusajs-2-0-for-railway-boilerplate/memory/feedback_no_wb_prefix.md).
+
+## Server vs client components
+
+Default to **server components** for layouts, page templates, and anything that fetches Medusa data. Promote to `"use client"` only when you need:
+
+- Local UI state (`useState`, `useReducer`, `useEffect`)
+- Browser APIs (localStorage, window, document)
+- Event handlers attached to DOM (`onClick`, `onChange`, …) on intrinsic elements
+- A subscription to one of the client stores (`useGarage`, `useSearchOpen`, `useRecentSearches`)
+
+Patterns established by this work:
+
+- Server components compose pages and inject client "islands" where interaction is needed (e.g. [`Nav`](src/modules/layout/templates/nav/index.tsx) is a server component, but it includes [`<GaragePill />`](src/modules/layout/components/garage-pill/index.tsx) and [`<SearchTrigger />`](src/modules/search/components/search-trigger/index.tsx) which are client components).
+- The home [`Hero`](src/modules/home/components/hero/index.tsx) is a client component because the vehicle tiles read from `useGarage()`; the other home sections are server components.
+- Don't pass server data into a client component by serializing it through props if you can avoid it — fetch in the server parent and pass primitives.
+
+## Data fetching
+
+All Medusa API calls go through `lib/data/*`. Server components call those directly (they're async). Client components call them through Server Actions in `modules/<feature>/actions.ts`. Don't import the Medusa SDK directly from a component.
+
+## Garage abstraction
+
+`lib/garage/` defines a `GarageProvider` interface ([provider.ts](src/lib/garage/provider.ts)) and exports a singleton `garage` ([index.ts](src/lib/garage/index.ts)). Today the singleton is a `LocalStorageGarage` ([local-storage-garage.ts](src/lib/garage/local-storage-garage.ts)); when Phase 2.2 (customer-vehicle backend) lands, swap that one line to a `MedusaGarage` implementation. The `Vehicle` type already carries optional fitment fields so the type doesn't shift on swap.
+
+Components read via the `useGarage()` hook ([use-garage.ts](src/lib/garage/use-garage.ts)). Don't read `localStorage` directly anywhere else.
+
+The static Year/Make/Model lookup data is at [`vehicle-data.ts`](src/lib/garage/vehicle-data.ts) and gets replaced by the wheel-size.com dataset when Phase 2.1 lands.
+
+## Client stores
+
+Two tiny `useSyncExternalStore`-based stores live at `lib/stores/`:
+
+- [`search-store.ts`](src/lib/stores/search-store.ts) — drawer open/closed. `openSearch()`, `closeSearch()`, `toggleSearch()`, `useSearchOpen()`.
+- [`recent-searches.ts`](src/lib/stores/recent-searches.ts) — most-recent text queries (cap 10). `addRecentSearch(q)`, `clearRecentSearches()`, `useRecentSearches()`.
+
+Same pattern (module-level state + emitter set + `useSyncExternalStore`). If you add another global piece of client UI state, follow this pattern rather than reaching for Context or Zustand — it stays zero-dependency.
+
+## Search
+
+- The drawer is mounted once in `(main)/layout.tsx` via [`<SearchMount />`](src/modules/search/components/search-mount/index.tsx). It owns `Cmd/Ctrl+K`, `Esc`, body scroll lock, and the scrim.
+- Triggers: the nav search icon ([`SearchTrigger`](src/modules/search/components/search-trigger/index.tsx)), the [`GaragePill`](src/modules/layout/components/garage-pill/index.tsx) in the nav, and the hero's vehicle tiles + "USE MY GARAGE" button.
+- Submit → `/<countryCode>/results/<encoded query>` via the existing [`search()`](src/modules/search/actions.ts) Server Action and [`SearchResultsTemplate`](src/modules/search/templates/search-results-template/).
+- The Year/Make/Model pane writes the new vehicle to the garage, sets it active, then routes to `/store`. Once Phase 2.1 lands, the destination becomes a fitment-filtered URL — change that one route in [`ymm-pane.tsx`](src/modules/search/components/search-drawer/find-by-vehicle/ymm-pane.tsx) and [`garage-pane.tsx`](src/modules/search/components/search-drawer/find-by-vehicle/garage-pane.tsx).
+
+## Fonts
+
+Loaded via `next/font/google` in [`app/layout.tsx`](src/app/layout.tsx): Antonio (display), JetBrains Mono (technical labels), Inter (body). Each one exposes a CSS variable (`--font-antonio`, `--font-mono`, `--font-inter`) consumed by `wheel-builds.css`. Don't reach for raw Google Fonts `<link>` tags — go through `next/font` to avoid layout shift and to keep them self-hosted in build output.
+
+## Routing — `[countryCode]` is mandatory
+
+`src/middleware.ts` enforces a country code on every URL. Resolution order: Vercel IP header → `NEXT_PUBLIC_DEFAULT_REGION` → first region returned by the backend. In components:
+
+- Server: get it from `params` (`{ params: Promise<{ countryCode: string }> }` in Next 15).
+- Client: `const { countryCode } = useParams() as { countryCode: string }`.
+- For links, use [`LocalizedClientLink`](src/modules/common/components/localized-client-link/index.tsx) — it prepends the country code automatically.
+- For imperative `router.push(...)`, prepend it yourself: `router.push(`/${countryCode}/results/${encodeURIComponent(q)}`)`.
+
+## Build + verification
+
+- `next.config.js` has `eslint.ignoreDuringBuilds: true` and `typescript.ignoreBuildErrors: true`. Type and lint errors will **not** fail the build.
+- Run `pnpm lint` and `npx tsc --noEmit` separately to catch them.
+- Pre-existing TS errors live in `lib/data/customer.ts`, `lib/data/collections.ts`, `lib/data/onboarding.ts`, `lib/data/orders.ts`, `modules/order/templates/order-completed-template.tsx`, `modules/products/components/product-onboarding-cta/index.tsx`, `modules/products/components/related-products/index.tsx`. They're Medusa SDK type drift — don't try to "fix" them as part of unrelated work.
+- A pre-existing eslint warning lives in `modules/checkout/components/shipping-address/index.tsx`. Same advice.
+- Backend must be running for `pnpm dev` to unblock (the `await-backend` shim polls port 9000). For storefront-only iteration, use `pnpm build:next` to skip the wait.
+
+## Tailwind
+
+The project still has Tailwind set up (via `@medusajs/ui-preset`), and existing modules (cart, checkout, account, products, side-menu, etc.) use it. The new design layer uses **scoped CSS classes** in `wheel-builds.css` instead — see DESIGN.md for the rationale.
+
+When extending an existing Medusa-style module, use Tailwind (consistent with the surrounding code). When building inside `.frame` (home, drawer, nav, footer, future Discovery / Product Detail), use the design-system classes.
+
+## Gotchas
+
+- **`SideMenu`** ([modules/layout/components/side-menu](src/modules/layout/components/side-menu/index.tsx)) is orphaned — the new nav doesn't import it. It still references `/search` which no longer exists. Harmless dead code. Don't extend it; either delete it or replace it with a new wheel-builds-styled mobile menu.
+- **Cart dropdown's popover** uses Headless UI inline-portal (not React Portal), so its contents stay inside `.frame` and the design CSS variables resolve. If you move it into a true portal, prefix orange-colored elements with the `--orange` fallback (`var(--orange, #FF6A00)`).
+- **Featured-products module** ([modules/home/components/featured-products](src/modules/home/components/featured-products)) is dead code (no longer imported by the home page). Delete it during a cleanup pass, not as part of feature work.
+- **`(main)` layout's `.frame` applies to every page in the group**, including `/store`, `/cart`, `/products/[handle]`, etc. Those pages don't use the design classes, but they inherit `.frame`'s background (faint grid pattern on `#FAFAF8`) and base font size. If a future page needs a different chrome (e.g. a fully bleached PDP), wrap that page in a counter-class or move `.frame` to a per-page wrapper.
+- **No mobile breakpoints on the home page yet** — sections use fixed pixel paddings (`80px 80px`) and grid template columns like `repeat(6, 1fr)`. The home is desktop-only until the next polish pass adds responsive rules.
+
+## Adding new pages or sections
+
+For a new home section:
+
+1. Create `src/modules/home/components/<section-name>/index.tsx`.
+2. Use the design tokens / classes from `DESIGN.md`. Prefer the existing primitives (`Wheel`, `Icon`, `Logo`, `ImgPlaceholder`) over hand-rolled markup.
+3. Server component by default. Promote to `"use client"` only if the section is interactive.
+4. Import it into [`app/[countryCode]/(main)/page.tsx`](src/app/[countryCode]/(main)/page.tsx) in the right order.
+
+For a new top-level route inside the design:
+
+1. Add the file under `src/app/[countryCode]/(main)/<route>/page.tsx`.
+2. Server component; fetch from `lib/data/...`.
+3. Render design-system markup from `src/modules/<feature>/components/...`.
+4. Section padding follows `DESIGN.md` conventions.
+
+For a new design-time class:
+
+1. Add it to `wheel-builds.css` under a `.frame .my-class { ... }` selector — never global.
+2. Document it in DESIGN.md (Class catalog section).
+3. Use a name that describes the role, not the look. `style-tile` ✓, `big-orange-box` ✗.

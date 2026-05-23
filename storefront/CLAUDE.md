@@ -138,7 +138,7 @@ shadcn is integrated as a **headless behavior layer** — we use Radix/Vaul/cmdk
 
 - **Components dir:** [src/components/ui/](src/components/ui). Pulled in via `npx shadcn@2.1.8 add <component>`. We pin to 2.1.8 because newer shadcn defaults to Tailwind v4 which conflicts with our v3 + `@medusajs/ui-preset` setup.
 - **Don't hand-edit `components/ui/*`** — they're meant to stay close to the canonical shadcn source so they can be re-pulled or upgraded. If something needs WB-specific behavior, build a wrapper in [modules/common/components/](src/modules/common/components/) (see next section) rather than editing the primitive in place.
-- **What's wired today** (Jan 2026): Drawer (Vaul, owns the search panel), Sheet, Dialog, DropdownMenu, Tooltip, Sonner, Command, Button. Providers (`TooltipProvider`, `Toaster`) live in [(main)/layout.tsx](src/app/[countryCode]/(main)/layout.tsx).
+- **What's wired today** (Jan 2026): Drawer (Vaul, owns the search panel), Sheet, Dialog, Popover (cart dropdown), DropdownMenu, Tooltip, Sonner, Command, Button, Accordion / Checkbox / Separator (Discovery filter rail). Providers (`TooltipProvider`, `Toaster`) live in [(main)/layout.tsx](src/app/[countryCode]/(main)/layout.tsx).
 - **Aliases:** `@/components`, `@/lib/utils`, `@/components/ui` — declared in [components.json](components.json) and resolved via the `@/*` path in [tsconfig.json](tsconfig.json). Existing `@lib/*` and `@modules/*` aliases are unchanged.
 - **`cn()` helper:** [src/lib/utils.ts](src/lib/utils.ts). Imported freely from both shadcn primitives and WB composed primitives (`modules/common/components/*`).
 - **Token mapping:** the shadcn CSS variables (`--background`, `--primary`, `--ring`, …) are redefined in [styles/globals.css](src/styles/globals.css) to use HSL components from the WB palette in DESIGN.md. So `bg-primary` is WB orange, `bg-secondary` is WB `--soft`, `border-border` is WB `--hairline`. Don't change shadcn token names — change the values they map to.
@@ -175,6 +175,48 @@ Current set:
 - [`Wheel`](src/modules/common/components/wheel/index.tsx), [`Icon`](src/modules/common/components/icon/index.tsx), [`Logo`](src/modules/common/components/logo/index.tsx), [`ImgPlaceholder`](src/modules/common/components/img-placeholder/index.tsx).
 
 The pattern when extending: if a section needs interactive behavior (drawer, dropdown, popover, toast, modal) → reach into `@/components/ui/*`. If a section needs a visual pattern that more than one place uses (eyebrow label, display heading, section header, chip) → reach into `@modules/common/components/*`. Don't bake either layer into page-section code with inline styles unless the pattern is genuinely one-off.
+
+## Discovery (catalog) page
+
+The `/store` route is the catalog / discovery page. It lives at [`modules/discovery/`](src/modules/discovery/) and is composed from the WB primitives + shadcn primitives + a small mock data layer. **As of Jan 2026 the data is mocked — only the chrome is wired.** The mock catalog and facets ship deterministic results so SSR/CSR match.
+
+Layout:
+
+```
+src/modules/discovery/
+├── data/
+│   ├── types.ts                 — DiscoveryProduct, DiscoveryFilters, FacetCounts, SortOption
+│   ├── mock-products.ts         — 60-row deterministic catalog
+│   ├── mock-facets.ts           — facet count computation from mock catalog
+│   ├── get-products.ts          — adapter: parses URL params, filters/sorts/paginates,
+│   │                              returns DiscoveryResult. The integration seam.
+│   └── use-discovery-query.ts   — client hook: reads filters from search params,
+│                                   provides toggleArrayFilter/setSort/setPage/clearAll
+├── components/
+│   ├── header/                  — title + result count + sort dropdown + garage chip
+│   ├── filter-rail/             — left sidebar: Vehicle band + Accordion(category,
+│   │                              brand, diameter, bolt-pattern, finish, price)
+│   ├── active-chips/            — removable filter chip strip
+│   ├── grid/                    — 4-up product grid (incl. discovery-specific product card)
+│   ├── pagination/              — numeric pager with prev/next
+│   └── empty-state/             — no-results message
+└── templates/
+    └── index.tsx                — composes everything; server component
+```
+
+**Source of truth for filter state is URL search params** (`?categories=street&brands=BLACKLINE+FORGED&diameters=22&sort=price-asc&page=2`). The server component re-runs whenever any param changes; client components write back via `useDiscoveryQuery` (which delegates to `router.push`).
+
+**Integration seam (when real data wiring lands):**
+
+1. Replace the body of `getDiscoveryProducts(query)` in [data/get-products.ts](src/modules/discovery/data/get-products.ts) with a Meilisearch query. Meilisearch is already wired in `backend/medusa-config.js`; index attributes (brand, finish, diameter, bolt_pattern, categories, price) need to be added to the plugin block.
+2. Map Meilisearch hits → `DiscoveryProduct`. Shape stays stable; no consumer changes.
+3. Pull `facets` from the same response's `facetDistribution`. Drop `mock-facets.ts`.
+4. Region-scoped Medusa price lookups happen in the adapter too (see `modules/store/templates/paginated-products.tsx` for the existing region resolution).
+5. `useDiscoveryQuery` does **not** change — it only manipulates URL params.
+
+The legacy [`modules/store/`](src/modules/store/) ships alongside as the reference for real Medusa wiring (it has working `getProductsListWithSort` / `getRegion` calls). Nothing imports it anymore — delete it once the discovery adapter is real.
+
+`TODO(integration)` comments in the rail mark places that need follow-up: the Vehicle band's "only show wheels that fit" toggle (depends on Phase 2.1 fitment data) and the Price section's TextInputs (should become a `<Slider>` once a real min/max range is available from Meilisearch).
 
 ## Gotchas
 

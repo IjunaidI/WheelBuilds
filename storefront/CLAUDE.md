@@ -152,14 +152,27 @@ Sitting one layer above shadcn — and one layer below the page sections — are
 
 Current set:
 
+**Typography & section structure**
+
 - **[`Label`](src/modules/common/components/label/index.tsx)** — mono uppercase eyebrow text. Tones: `accent` (orange, default), `muted`, `ink`. Pass `bar` for an orange leading bar (hero / section eyebrows). Replaces ad-hoc `.label` / `.label-muted` plus inline mono/uppercase styles.
 - **[`Display`](src/modules/common/components/display/index.tsx)** — Antonio display headline with `size` in pixels and tones `ink` / `orange` / `graphite` / `inherit`. Render-as via `as` (`h1`/`h2`/`span`/…). Replaces inline `<span className="display" style={{ fontSize: X, color: Y }}>`.
 - **[`SectionHeader`](src/modules/common/components/section-header/index.tsx)** — the recurring "counter + title + description + action" row at the top of every home section. Pass only the slots you need; omitted ones collapse.
 - **[`MicroLink`](src/modules/common/components/micro-link/index.tsx)** — the orange mono "VIEW ALL 08 →" / "BROWSE BRANDS →" link that ends sections. Country-scoped via `LocalizedClientLink` under the hood.
-- **[`Chip`](src/modules/common/components/chip/index.tsx)** — the small pill used for popular searches, brand chips, build chips, fitment-OK tags. Variants `soft` / `accent` / `outline`. Renders as a button by default; pass `href` to render a country-scoped link instead.
+
+**Interactive bits**
+
+- **[`Chip`](src/modules/common/components/chip/index.tsx)** — the small pill used for popular searches, brand chips, build chips, fitment-OK tags. Variants `soft` / `accent` / `outline`. Renders as a button when `onClick` is set, a link when `href` is set, a span when neither is set (decorative chips).
 - **[`VehicleTile`](src/modules/common/components/vehicle-tile/index.tsx)** — the big YMM tile used in the hero and the drawer's YMM pane. Sizes `lg` (hero, 110px tall) and `md` (drawer-inline).
 
-Plus the existing [`Wheel`](src/modules/common/components/wheel/index.tsx), [`Icon`](src/modules/common/components/icon/index.tsx), [`Logo`](src/modules/common/components/logo/index.tsx), [`ImgPlaceholder`](src/modules/common/components/img-placeholder/index.tsx).
+**Form primitives** (Jan 2026)
+
+- **[`Field`](src/modules/common/components/field/index.tsx)** — label-above-control wrapper with optional helper/error text. Pass a string label to auto-wrap in `<Label tone="muted">`, or a node for full control. The label is the only required prop.
+- **[`TextInput`](src/modules/common/components/text-input/index.tsx)** — WB-styled `<input>`. Sizes `default` (44px) and `lg` (56px). Distinct from the legacy [`Input`](src/modules/common/components/input/index.tsx) which is a Medusa-checkout floating-label compound — leave that one alone, it powers checkout/account.
+- **[`Select`](src/modules/common/components/select/index.tsx)** — WB-styled native `<select>` with a custom chevron. Native is intentional so mobile gets the platform picker (much better UX than a Radix custom dropdown for long lists like YMM years). For combobox/searchable patterns later, use shadcn `<Command>` instead.
+
+**Assets**
+
+- [`Wheel`](src/modules/common/components/wheel/index.tsx), [`Icon`](src/modules/common/components/icon/index.tsx), [`Logo`](src/modules/common/components/logo/index.tsx), [`ImgPlaceholder`](src/modules/common/components/img-placeholder/index.tsx).
 
 The pattern when extending: if a section needs interactive behavior (drawer, dropdown, popover, toast, modal) → reach into `@/components/ui/*`. If a section needs a visual pattern that more than one place uses (eyebrow label, display heading, section header, chip) → reach into `@modules/common/components/*`. Don't bake either layer into page-section code with inline styles unless the pattern is genuinely one-off.
 

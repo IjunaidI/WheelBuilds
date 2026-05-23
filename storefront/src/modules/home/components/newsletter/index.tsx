@@ -4,6 +4,7 @@ import { FormEvent, useState } from "react"
 import { toast } from "sonner"
 import Display from "@modules/common/components/display"
 import Label from "@modules/common/components/label"
+import TextInput from "@modules/common/components/text-input"
 import { Button } from "@/components/ui/button"
 
 const Newsletter = () => {
@@ -65,17 +66,17 @@ const Newsletter = () => {
           onSubmit={submit}
           style={{ display: "flex", flexDirection: "column" }}
         >
-          <div style={{ display: "flex", gap: 8, height: 56 }}>
-            <input
+          <div style={{ display: "flex", gap: 8 }}>
+            <TextInput
               type="email"
               required
               placeholder="you@domain.com"
               aria-label="Email address"
-              className="field input"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               disabled={submitting}
-              style={{ flex: 1, height: 56, fontSize: 15 }}
+              inputSize="lg"
+              className="flex-1"
             />
             <Button
               type="submit"

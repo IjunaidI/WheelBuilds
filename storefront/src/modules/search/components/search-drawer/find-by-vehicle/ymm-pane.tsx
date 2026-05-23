@@ -5,6 +5,8 @@ import { useParams, useRouter } from "next/navigation"
 import { toast } from "sonner"
 import Icon from "@modules/common/components/icon"
 import Label from "@modules/common/components/label"
+import Field from "@modules/common/components/field"
+import Select from "@modules/common/components/select"
 import { Button } from "@/components/ui/button"
 import { useGarage } from "@lib/garage/use-garage"
 import {
@@ -61,29 +63,9 @@ const YmmPane = ({ onClose }: YmmPaneProps) => {
 
   return (
     <form onSubmit={submit}>
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "1fr 1fr",
-          gap: 8,
-          marginBottom: 8,
-        }}
-      >
-        <div>
-          <Label
-            tone="muted"
-            style={{
-              marginBottom: 6,
-              fontSize: 10,
-              display: "block",
-              letterSpacing: "0.08em",
-            }}
-          >
-            Year
-          </Label>
-          <select
-            className="field"
-            style={{ width: "100%" }}
+      <div className="grid grid-cols-2 gap-2 mb-2">
+        <Field label="Year">
+          <Select
             value={year}
             onChange={(e) => setYear(e.target.value)}
             required
@@ -94,23 +76,10 @@ const YmmPane = ({ onClose }: YmmPaneProps) => {
                 {y}
               </option>
             ))}
-          </select>
-        </div>
-        <div>
-          <Label
-            tone="muted"
-            style={{
-              marginBottom: 6,
-              fontSize: 10,
-              display: "block",
-              letterSpacing: "0.08em",
-            }}
-          >
-            Make
-          </Label>
-          <select
-            className="field"
-            style={{ width: "100%" }}
+          </Select>
+        </Field>
+        <Field label="Make">
+          <Select
             value={make}
             onChange={(e) => {
               setMake(e.target.value)
@@ -125,23 +94,10 @@ const YmmPane = ({ onClose }: YmmPaneProps) => {
                 {m}
               </option>
             ))}
-          </select>
-        </div>
-        <div>
-          <Label
-            tone="muted"
-            style={{
-              marginBottom: 6,
-              fontSize: 10,
-              display: "block",
-              letterSpacing: "0.08em",
-            }}
-          >
-            Model
-          </Label>
-          <select
-            className="field"
-            style={{ width: "100%" }}
+          </Select>
+        </Field>
+        <Field label="Model">
+          <Select
             value={model}
             onChange={(e) => {
               setModel(e.target.value)
@@ -150,47 +106,34 @@ const YmmPane = ({ onClose }: YmmPaneProps) => {
             required
             disabled={!make}
           >
-            <option value="">{make ? "Select model" : "Select make first"}</option>
+            <option value="">
+              {make ? "Select model" : "Select make first"}
+            </option>
             {modelOptions.map((m) => (
               <option key={m} value={m}>
                 {m}
               </option>
             ))}
-          </select>
-        </div>
-        <div>
-          <Label
-            tone="muted"
-            style={{
-              marginBottom: 6,
-              fontSize: 10,
-              display: "block",
-              letterSpacing: "0.08em",
-            }}
-          >
-            Trim
-          </Label>
-          <select
-            className="field"
-            style={{ width: "100%" }}
+          </Select>
+        </Field>
+        <Field label="Trim">
+          <Select
             value={trim}
             onChange={(e) => setTrim(e.target.value)}
             disabled={!model}
           >
-            <option value="">{model ? "Any trim" : "Select model first"}</option>
+            <option value="">
+              {model ? "Any trim" : "Select model first"}
+            </option>
             {trimOptions.map((t) => (
               <option key={t} value={t}>
                 {t}
               </option>
             ))}
-          </select>
-        </div>
+          </Select>
+        </Field>
       </div>
-      <Button
-        type="submit"
-        disabled={!canSubmit}
-        className="w-full mt-2"
-      >
+      <Button type="submit" disabled={!canSubmit} className="w-full mt-2">
         Find My Fit <Icon name="arrow-right" size={16} color="white" />
       </Button>
       <Label

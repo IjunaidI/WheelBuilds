@@ -181,6 +181,31 @@ Don't hand-roll wheel SVGs, image placeholders, mono labels, or section headers 
 
 [`src/modules/common/components/vehicle-tile/index.tsx`](src/modules/common/components/vehicle-tile/index.tsx). The big YMM tile button. Hero uses `size="lg"` (default, 110px tall); inline/drawer uses `size="md"` (80px). Renders a "Pick {label}" prompt when `value` is undefined and the actual value with an orange underline when set.
 
+### `<Field label htmlFor? helperText? error? labelHidden? children />`
+
+[`src/modules/common/components/field/index.tsx`](src/modules/common/components/field/index.tsx). Label-above-control form wrapper with optional helper / error text under the control. String labels are auto-wrapped in `<Label tone="muted">`; pass a node for full control. Pair with `<TextInput>` or `<Select>` (or any other control you slot in).
+
+```tsx
+<Field label="Year">
+  <Select value={year} onChange={(e) => setYear(e.target.value)}>
+    <option value="">Select year</option>
+    ...
+  </Select>
+</Field>
+
+<Field label="Email" helperText="No spam, unsub anytime.">
+  <TextInput type="email" placeholder="you@domain.com" />
+</Field>
+```
+
+### `<TextInput inputSize? ...inputProps />`
+
+[`src/modules/common/components/text-input/index.tsx`](src/modules/common/components/text-input/index.tsx). WB-styled `<input>`. Sizes `default` (44px, matches `.field`) and `lg` (56px, newsletter/hero partners). Forwarded ref + all native input props. **Note:** the legacy [`Input`](src/modules/common/components/input/index.tsx) is a Medusa-checkout floating-label compound — leave it alone, it's used by 11 checkout/account components.
+
+### `<Select ...selectProps />`
+
+[`src/modules/common/components/select/index.tsx`](src/modules/common/components/select/index.tsx). WB-styled native `<select>` with a custom chevron drawn via inline-SVG `background-image` (no extra DOM). Native is deliberate so mobile gets the platform-native picker. For combobox/searchable selects later, reach for shadcn `<Command>` instead.
+
 ### `<Wheel size={n} finish="black" | "bronze" | "silver" />`
 
 [`src/modules/common/components/wheel/index.tsx`](src/modules/common/components/wheel/index.tsx). CSS conic gradient + SVG spoke overlay. Default 320px square. The size scales the SVG viewport; lug nuts and hub stay proportional. Pass `style` for positioning. Comes with a built-in soft shadow — don't add your own shadow stacking.

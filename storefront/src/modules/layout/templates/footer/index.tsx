@@ -1,153 +1,167 @@
-import { getCategoriesList } from "@lib/data/categories"
-import { getCollectionsList } from "@lib/data/collections"
-import { Text, clx } from "@medusajs/ui"
-
 import LocalizedClientLink from "@modules/common/components/localized-client-link"
-import MedusaCTA from "@modules/layout/components/medusa-cta"
+import Icon from "@modules/common/components/icon"
+import Logo from "@modules/common/components/logo"
+
+const FOOTER_COLUMNS: { h: string; items: { label: string; href: string }[] }[] = [
+  {
+    h: "Shop",
+    items: [
+      { label: "All Wheels", href: "/store" },
+      { label: "New Drops", href: "/collections" },
+      { label: "Off-Road", href: "/categories" },
+      { label: "Luxury", href: "/categories" },
+      { label: "Street", href: "/categories" },
+      { label: "Truck & Dually", href: "/categories" },
+    ],
+  },
+  {
+    h: "Brands",
+    items: [
+      { label: "Forgiato Type", href: "/collections" },
+      { label: "Vossen Type", href: "/collections" },
+      { label: "Method Type", href: "/collections" },
+      { label: "Fuel Type", href: "/collections" },
+      { label: "All Brands", href: "/collections" },
+    ],
+  },
+  {
+    h: "Help",
+    items: [
+      { label: "Fitment Guide", href: "#" },
+      { label: "Bolt Pattern", href: "#" },
+      { label: "Returns", href: "#" },
+      { label: "Shipping", href: "#" },
+      { label: "Contact", href: "#" },
+    ],
+  },
+  {
+    h: "Company",
+    items: [
+      { label: "About", href: "#" },
+      { label: "Build Gallery", href: "#" },
+      { label: "Press", href: "#" },
+      { label: "Careers", href: "#" },
+      { label: "Dealers", href: "#" },
+    ],
+  },
+]
 
 export default async function Footer() {
-  const { collections } = await getCollectionsList(0, 6)
-  const { product_categories } = await getCategoriesList(0, 6)
-
   return (
-    <footer className="border-t border-ui-border-base w-full">
-      <div className="content-container flex flex-col w-full">
-        <div className="flex flex-col gap-y-6 xsmall:flex-row items-start justify-between py-40">
-          <div>
-            <LocalizedClientLink
-              href="/"
-              className="txt-compact-xlarge-plus text-ui-fg-subtle hover:text-ui-fg-base uppercase"
-            >
-              Medusa Store
-            </LocalizedClientLink>
-          </div>
-          <div className="text-small-regular gap-10 md:gap-x-16 grid grid-cols-2 sm:grid-cols-3">
-            {product_categories && product_categories?.length > 0 && (
-              <div className="flex flex-col gap-y-2">
-                <span className="txt-small-plus txt-ui-fg-base">
-                  Categories
-                </span>
-                <ul
-                  className="grid grid-cols-1 gap-2"
-                  data-testid="footer-categories"
-                >
-                  {product_categories?.slice(0, 6).map((c) => {
-                    if (c.parent_category) {
-                      return
-                    }
-
-                    const children =
-                      c.category_children?.map((child) => ({
-                        name: child.name,
-                        handle: child.handle,
-                        id: child.id,
-                      })) || null
-
-                    return (
-                      <li
-                        className="flex flex-col gap-2 text-ui-fg-subtle txt-small"
-                        key={c.id}
-                      >
-                        <LocalizedClientLink
-                          className={clx(
-                            "hover:text-ui-fg-base",
-                            children && "txt-small-plus"
-                          )}
-                          href={`/categories/${c.handle}`}
-                          data-testid="category-link"
-                        >
-                          {c.name}
-                        </LocalizedClientLink>
-                        {children && (
-                          <ul className="grid grid-cols-1 ml-3 gap-2">
-                            {children &&
-                              children.map((child) => (
-                                <li key={child.id}>
-                                  <LocalizedClientLink
-                                    className="hover:text-ui-fg-base"
-                                    href={`/categories/${child.handle}`}
-                                    data-testid="category-link"
-                                  >
-                                    {child.name}
-                                  </LocalizedClientLink>
-                                </li>
-                              ))}
-                          </ul>
-                        )}
-                      </li>
-                    )
-                  })}
-                </ul>
-              </div>
-            )}
-            {collections && collections.length > 0 && (
-              <div className="flex flex-col gap-y-2">
-                <span className="txt-small-plus txt-ui-fg-base">
-                  Collections
-                </span>
-                <ul
-                  className={clx(
-                    "grid grid-cols-1 gap-2 text-ui-fg-subtle txt-small",
-                    {
-                      "grid-cols-2": (collections?.length || 0) > 3,
-                    }
-                  )}
-                >
-                  {collections?.slice(0, 6).map((c) => (
-                    <li key={c.id}>
-                      <LocalizedClientLink
-                        className="hover:text-ui-fg-base"
-                        href={`/collections/${c.handle}`}
-                      >
-                        {c.title}
-                      </LocalizedClientLink>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
-            <div className="flex flex-col gap-y-2">
-              <span className="txt-small-plus txt-ui-fg-base">Medusa</span>
-              <ul className="grid grid-cols-1 gap-y-2 text-ui-fg-subtle txt-small">
-                <li>
-                  <a
-                    href="https://github.com/medusajs"
-                    target="_blank"
-                    rel="noreferrer"
-                    className="hover:text-ui-fg-base"
-                  >
-                    GitHub
-                  </a>
-                </li>
-                <li>
-                  <a
-                    href="https://docs.medusajs.com"
-                    target="_blank"
-                    rel="noreferrer"
-                    className="hover:text-ui-fg-base"
-                  >
-                    Documentation
-                  </a>
-                </li>
-                <li>
-                  <a
-                    href="https://github.com/medusajs/nextjs-starter-medusa"
-                    target="_blank"
-                    rel="noreferrer"
-                    className="hover:text-ui-fg-base"
-                  >
-                    Source code
-                  </a>
-                </li>
-              </ul>
-            </div>
+    <footer
+      style={{
+        borderTop: "1px solid var(--hairline)",
+        padding: "64px 80px 32px",
+        background: "white",
+      }}
+    >
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "1.6fr 1fr 1fr 1fr 1fr",
+          gap: 40,
+          marginBottom: 56,
+        }}
+      >
+        <div>
+          <LocalizedClientLink
+            href="/"
+            style={{ textDecoration: "none", display: "inline-flex" }}
+          >
+            <Logo size={20} />
+          </LocalizedClientLink>
+          <div
+            style={{
+              fontSize: 13,
+              color: "var(--graphite)",
+              marginTop: 16,
+              maxWidth: 260,
+              lineHeight: 1.6,
+            }}
+          >
+            Authorized dealer for 40+ premium aftermarket wheel brands. Built
+            in Long Beach.
           </div>
         </div>
-        <div className="flex w-full mb-16 justify-between text-ui-fg-muted">
-          <Text className="txt-compact-small">
-            © {new Date().getFullYear()} Medusa Store. All rights reserved.
-          </Text>
-          <MedusaCTA />
+        {FOOTER_COLUMNS.map((col) => (
+          <div key={col.h}>
+            <div className="label-muted" style={{ marginBottom: 14 }}>
+              {col.h}
+            </div>
+            {col.items.map((it) => (
+              <LocalizedClientLink
+                key={it.label}
+                href={it.href}
+                style={{
+                  display: "block",
+                  fontSize: 13,
+                  color: "var(--graphite)",
+                  marginBottom: 8,
+                  textDecoration: "none",
+                }}
+              >
+                {it.label}
+              </LocalizedClientLink>
+            ))}
+          </div>
+        ))}
+      </div>
+      <div
+        style={{
+          borderTop: "1px solid var(--hairline)",
+          paddingTop: 20,
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+        }}
+      >
+        <div
+          style={{
+            fontSize: 11,
+            color: "var(--muted)",
+            letterSpacing: "0.04em",
+            fontFamily: "var(--mono)",
+          }}
+        >
+          © {new Date().getFullYear()} WHEEL/BUILDS, INC. · ALL RIGHTS
+          RESERVED · TERMS · PRIVACY
+        </div>
+        <div
+          style={{
+            display: "flex",
+            gap: 14,
+            color: "var(--ink)",
+            alignItems: "center",
+          }}
+        >
+          <a
+            href="#"
+            aria-label="Instagram"
+            style={{ color: "inherit", display: "inline-flex" }}
+          >
+            <Icon name="instagram" size={16} />
+          </a>
+          <a
+            href="#"
+            aria-label="YouTube"
+            style={{ color: "inherit", display: "inline-flex" }}
+          >
+            <Icon name="youtube" size={16} />
+          </a>
+          <a
+            href="#"
+            aria-label="TikTok"
+            style={{ color: "inherit", display: "inline-flex" }}
+          >
+            <Icon name="tiktok" size={16} />
+          </a>
+          <a
+            href="#"
+            aria-label="Facebook"
+            style={{ color: "inherit", display: "inline-flex" }}
+          >
+            <Icon name="facebook" size={16} />
+          </a>
         </div>
       </div>
     </footer>

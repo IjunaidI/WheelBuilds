@@ -1,37 +1,31 @@
 import { Metadata } from "next"
 
-import FeaturedProducts from "@modules/home/components/featured-products"
 import Hero from "@modules/home/components/hero"
-import { getCollectionsWithProducts } from "@lib/data/collections"
-import { getRegion } from "@lib/data/regions"
+import NewDropsRow from "@modules/home/components/new-drops-row"
+import ShopByStyle from "@modules/home/components/shop-by-style"
+import FeaturedBlocks from "@modules/home/components/featured-blocks"
+import ShopByBrand from "@modules/home/components/shop-by-brand"
+import BuildGallery from "@modules/home/components/build-gallery"
+import TrustStrip from "@modules/home/components/trust-strip"
+import Newsletter from "@modules/home/components/newsletter"
 
 export const metadata: Metadata = {
-  title: "Medusa Next.js Starter Template",
+  title: "Wheel Builds — Premium Aftermarket Wheels & Fitment",
   description:
-    "A performant frontend ecommerce starter template with Next.js 14 and Medusa.",
+    "Authorized dealer for 40+ premium aftermarket wheel brands. Tell us what you drive — we'll show you only the wheels confirmed to fit.",
 }
 
-export default async function Home({
-  params,
-}: {
-  params: Promise<{ countryCode: string }>
-}) {
-  const { countryCode } = await params
-  const collections = await getCollectionsWithProducts(countryCode)
-  const region = await getRegion(countryCode)
-
-  if (!collections || !region) {
-    return null
-  }
-
+export default async function Home() {
   return (
     <>
       <Hero />
-      <div className="py-12">
-        <ul className="flex flex-col gap-x-6">
-          <FeaturedProducts collections={collections} region={region} />
-        </ul>
-      </div>
+      <NewDropsRow />
+      <ShopByStyle />
+      <FeaturedBlocks />
+      <ShopByBrand />
+      <BuildGallery />
+      <TrustStrip />
+      <Newsletter />
     </>
   )
 }

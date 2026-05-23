@@ -1,6 +1,7 @@
 @import "tailwindcss/base";
 @import "tailwindcss/components";
 @import "tailwindcss/utilities";
+@import "./wheel-builds.css";
 
 @layer utilities {
   /* Chrome, Safari and Opera */

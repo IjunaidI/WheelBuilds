@@ -1,7 +1,9 @@
-﻿"use client"
+"use client"
 
 import { useParams, useRouter } from "next/navigation"
 import Icon from "@modules/common/components/icon"
+import Label from "@modules/common/components/label"
+import { Button } from "@/components/ui/button"
 import {
   clearRecentSearches,
   useRecentSearches,
@@ -33,24 +35,15 @@ const RecentSearches = ({ onClose }: RecentSearchesProps) => {
           marginBottom: 12,
         }}
       >
-        <span className="label" style={{ color: "var(--ink)" }}>
-          Recent
-        </span>
-        <button
-          type="button"
+        <Label tone="ink">Recent</Label>
+        <Button
+          variant="link"
+          size="sm"
           onClick={clearRecentSearches}
-          style={{
-            background: "none",
-            border: "none",
-            padding: 0,
-            cursor: "pointer",
-            fontSize: 11,
-            color: "var(--ink-soft)",
-            fontFamily: "inherit",
-          }}
+          className="h-auto p-0 text-[11px] font-normal text-[var(--ink-soft)] no-underline hover:text-[var(--ink)] hover:no-underline"
         >
           Clear
-        </button>
+        </Button>
       </div>
       <div style={{ display: "flex", flexDirection: "column" }}>
         {recent.map((r, i) => (

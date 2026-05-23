@@ -1,8 +1,11 @@
-﻿"use client"
+"use client"
 
 import { FormEvent, useMemo, useState } from "react"
 import { useParams, useRouter } from "next/navigation"
+import { toast } from "sonner"
 import Icon from "@modules/common/components/icon"
+import Label from "@modules/common/components/label"
+import { Button } from "@/components/ui/button"
 import { useGarage } from "@lib/garage/use-garage"
 import {
   MAKES,
@@ -13,16 +16,6 @@ import {
 
 type YmmPaneProps = {
   onClose: () => void
-}
-
-const labelStyle: React.CSSProperties = {
-  marginBottom: 6,
-  fontSize: 10,
-  fontFamily: "var(--mono)",
-  fontWeight: 600,
-  textTransform: "uppercase",
-  letterSpacing: "0.08em",
-  color: "var(--ink-soft)",
 }
 
 const YmmPane = ({ onClose }: YmmPaneProps) => {
@@ -56,6 +49,12 @@ const YmmPane = ({ onClose }: YmmPaneProps) => {
       trim: trim || undefined,
     })
     setActive(vehicle.id)
+    const label = [vehicle.year, vehicle.make, vehicle.model, vehicle.trim]
+      .filter(Boolean)
+      .join(" ")
+    toast.success("Vehicle saved", {
+      description: `${label} is now your active vehicle.`,
+    })
     onClose()
     router.push(`/${countryCode}/store`)
   }
@@ -71,7 +70,17 @@ const YmmPane = ({ onClose }: YmmPaneProps) => {
         }}
       >
         <div>
-          <div style={labelStyle}>Year</div>
+          <Label
+            tone="muted"
+            style={{
+              marginBottom: 6,
+              fontSize: 10,
+              display: "block",
+              letterSpacing: "0.08em",
+            }}
+          >
+            Year
+          </Label>
           <select
             className="field"
             style={{ width: "100%" }}
@@ -88,7 +97,17 @@ const YmmPane = ({ onClose }: YmmPaneProps) => {
           </select>
         </div>
         <div>
-          <div style={labelStyle}>Make</div>
+          <Label
+            tone="muted"
+            style={{
+              marginBottom: 6,
+              fontSize: 10,
+              display: "block",
+              letterSpacing: "0.08em",
+            }}
+          >
+            Make
+          </Label>
           <select
             className="field"
             style={{ width: "100%" }}
@@ -109,7 +128,17 @@ const YmmPane = ({ onClose }: YmmPaneProps) => {
           </select>
         </div>
         <div>
-          <div style={labelStyle}>Model</div>
+          <Label
+            tone="muted"
+            style={{
+              marginBottom: 6,
+              fontSize: 10,
+              display: "block",
+              letterSpacing: "0.08em",
+            }}
+          >
+            Model
+          </Label>
           <select
             className="field"
             style={{ width: "100%" }}
@@ -130,7 +159,17 @@ const YmmPane = ({ onClose }: YmmPaneProps) => {
           </select>
         </div>
         <div>
-          <div style={labelStyle}>Trim</div>
+          <Label
+            tone="muted"
+            style={{
+              marginBottom: 6,
+              fontSize: 10,
+              display: "block",
+              letterSpacing: "0.08em",
+            }}
+          >
+            Trim
+          </Label>
           <select
             className="field"
             style={{ width: "100%" }}
@@ -147,26 +186,19 @@ const YmmPane = ({ onClose }: YmmPaneProps) => {
           </select>
         </div>
       </div>
-      <button
+      <Button
         type="submit"
-        className="btn btn-primary"
-        style={{
-          width: "100%",
-          marginTop: 8,
-          opacity: canSubmit ? 1 : 0.5,
-          cursor: canSubmit ? "pointer" : "not-allowed",
-        }}
         disabled={!canSubmit}
+        className="w-full mt-2"
       >
         Find My Fit <Icon name="arrow-right" size={16} color="white" />
-      </button>
-      <div
+      </Button>
+      <Label
+        tone="muted"
         style={{
-          fontSize: 11,
-          color: "var(--ink-soft)",
           marginTop: 10,
+          display: "block",
           textAlign: "center",
-          fontFamily: "var(--mono)",
           letterSpacing: "0.06em",
         }}
       >
@@ -181,9 +213,9 @@ const YmmPane = ({ onClose }: YmmPaneProps) => {
             cursor: "not-allowed",
           }}
         >
-          SEARCH BY LICENSE PLATE â†’
+          SEARCH BY LICENSE PLATE →
         </span>
-      </div>
+      </Label>
     </form>
   )
 }

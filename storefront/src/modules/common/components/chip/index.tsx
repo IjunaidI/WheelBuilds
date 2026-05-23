@@ -4,8 +4,9 @@ import LocalizedClientLink from "@modules/common/components/localized-client-lin
 import { cn } from "@/lib/utils"
 
 type ChipProps = {
-  /** Renders a clickable button. Provide `href` to render a link instead. */
+  /** When set, renders a clickable button. */
   onClick?: () => void
+  /** When set, renders a country-scoped link. Takes precedence over `onClick`. */
   href?: string
   /** Visual variant. `soft` is the default neutral pill; `accent` is orange; `outline` is a hairline-bordered pill. */
   variant?: "soft" | "accent" | "outline"
@@ -23,12 +24,15 @@ type ChipProps = {
  * visual variants. Replaces the per-section `style={{...}}` chips that drifted
  * apart visually.
  *
- *   <Chip onClick={...}>22 inch</Chip>
- *   <Chip variant="accent" dot>Fitment OK</Chip>
- *   <Chip variant="outline" size="sm">FORGED</Chip>
+ *   <Chip onClick={...}>22 inch</Chip>                          // button
+ *   <Chip href="/collections">FORGED</Chip>                     // link
+ *   <Chip variant="accent" dot>FITS YOUR F-150</Chip>           // decorative span (no handler)
+ *   <Chip variant="outline" size="sm">NEW</Chip>                // decorative span
  *
- * Renders a link when `href` is provided (uses LocalizedClientLink under the
- * hood — country code is prepended). Otherwise renders a button.
+ * Renders the most appropriate element automatically:
+ *   - `href` set → `LocalizedClientLink` (country-scoped)
+ *   - `onClick` set → `<button>`
+ *   - neither → `<span>` (purely decorative)
  */
 const Chip = ({
   onClick,
@@ -74,11 +78,15 @@ const Chip = ({
     )
   }
 
-  return (
-    <button type="button" onClick={onClick} className={base}>
-      {content}
-    </button>
-  )
+  if (onClick) {
+    return (
+      <button type="button" onClick={onClick} className={base}>
+        {content}
+      </button>
+    )
+  }
+
+  return <span className={base}>{content}</span>
 }
 
 export default Chip

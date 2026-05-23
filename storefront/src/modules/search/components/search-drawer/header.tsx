@@ -1,8 +1,10 @@
-﻿"use client"
+"use client"
 
 import { FormEvent, useEffect, useRef, useState } from "react"
 import { useParams, useRouter } from "next/navigation"
 import Icon from "@modules/common/components/icon"
+import Display from "@modules/common/components/display"
+import { Button } from "@/components/ui/button"
 import { addRecentSearch } from "@lib/stores/recent-searches"
 
 const isMac = () =>
@@ -20,7 +22,7 @@ const Header = ({ onClose }: HeaderProps) => {
   const [shortcutLabel, setShortcutLabel] = useState("Ctrl K")
 
   useEffect(() => {
-    setShortcutLabel(isMac() ? "âŒ˜ K" : "Ctrl K")
+    setShortcutLabel(isMac() ? "⌘ K" : "Ctrl K")
     inputRef.current?.focus()
   }, [])
 
@@ -49,32 +51,18 @@ const Header = ({ onClose }: HeaderProps) => {
           marginBottom: 16,
         }}
       >
-        <span
-          style={{
-            fontFamily: "var(--display)",
-            fontWeight: 900,
-            fontSize: 22,
-            textTransform: "uppercase",
-            letterSpacing: "0.01em",
-          }}
-        >
+        <Display size={22} as="span">
           Search
-        </span>
-        <button
-          type="button"
+        </Display>
+        <Button
+          variant="ghost"
+          size="icon"
           onClick={onClose}
           aria-label="Close search"
-          style={{
-            background: "none",
-            border: "none",
-            cursor: "pointer",
-            padding: 4,
-            color: "var(--ink)",
-            display: "inline-flex",
-          }}
+          className="h-8 w-8"
         >
           <Icon name="x" size={20} />
-        </button>
+        </Button>
       </div>
       <form
         onSubmit={submit}
@@ -94,7 +82,7 @@ const Header = ({ onClose }: HeaderProps) => {
           ref={inputRef}
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          placeholder="Search wheels, brands, fitmentsâ€¦"
+          placeholder="Search wheels, brands, fitments…"
           type="search"
           autoComplete="off"
           spellCheck={false}

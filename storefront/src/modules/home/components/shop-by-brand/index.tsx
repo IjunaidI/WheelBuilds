@@ -1,5 +1,6 @@
 import LocalizedClientLink from "@modules/common/components/localized-client-link"
-import Icon from "@modules/common/components/icon"
+import SectionHeader from "@modules/common/components/section-header"
+import MicroLink from "@modules/common/components/micro-link"
 
 const BRANDS = [
   "BLACKLINE", "VANGUARD", "MERIDIAN", "RONIN",
@@ -15,39 +16,11 @@ const ShopByBrand = () => (
       borderTop: "1px solid var(--hairline)",
     }}
   >
-    <div
-      style={{
-        display: "flex",
-        alignItems: "flex-end",
-        justifyContent: "space-between",
-        marginBottom: 48,
-      }}
-    >
-      <div>
-        <div className="label" style={{ marginBottom: 12 }}>
-          42 BRANDS · ALL AUTHORIZED
-        </div>
-        <div className="display" style={{ fontSize: 40, color: "var(--ink)" }}>
-          Trusted Brands
-        </div>
-      </div>
-      <LocalizedClientLink
-        href="/collections"
-        style={{
-          fontSize: 13,
-          fontWeight: 600,
-          color: "var(--orange)",
-          textTransform: "uppercase",
-          letterSpacing: "0.06em",
-          textDecoration: "none",
-          display: "inline-flex",
-          gap: 6,
-          alignItems: "center",
-        }}
-      >
-        View all brands <Icon name="arrow-right" size={14} color="#FF6A00" />
-      </LocalizedClientLink>
-    </div>
+    <SectionHeader
+      eyebrow="42 BRANDS · ALL AUTHORIZED"
+      title="Trusted Brands"
+      action={<MicroLink href="/collections">View all brands</MicroLink>}
+    />
     <div
       style={{
         display: "grid",

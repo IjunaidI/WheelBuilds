@@ -1,4 +1,4 @@
-﻿"use client"
+"use client"
 
 type TabProps = {
   id: string
@@ -8,6 +8,12 @@ type TabProps = {
   onClick: () => void
 }
 
+/**
+ * Radio-style tab used by the Find-by-Vehicle pane switcher. Two of these
+ * sit side by side inside `<FindByVehicle>`. Kept hand-rolled (rather than
+ * mapping to a shadcn primitive) because the "small radio dot + label + sub"
+ * layout is specific to this one use.
+ */
 const Tab = ({ active, label, sub, onClick }: TabProps) => (
   <button
     type="button"
@@ -28,6 +34,7 @@ const Tab = ({ active, label, sub, onClick }: TabProps) => (
   >
     <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
       <span
+        aria-hidden
         style={{
           width: 14,
           height: 14,

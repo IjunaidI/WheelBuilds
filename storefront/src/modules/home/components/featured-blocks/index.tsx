@@ -1,6 +1,9 @@
 import LocalizedClientLink from "@modules/common/components/localized-client-link"
 import Icon from "@modules/common/components/icon"
 import ImgPlaceholder from "@modules/common/components/img-placeholder"
+import Display from "@modules/common/components/display"
+import Label from "@modules/common/components/label"
+import { Button } from "@/components/ui/button"
 
 type Block = {
   idx: string
@@ -39,6 +42,23 @@ const BLOCKS: Block[] = [
   },
 ]
 
+type Stat = { l: string; v: React.ReactNode }
+
+const STATS_FOR = (price: string): Stat[] => [
+  { l: "DIAMETER", v: "22\"" },
+  { l: "WIDTH", v: "10\"" },
+  { l: "FINISHES", v: "4" },
+  {
+    l: "FROM",
+    v: (
+      <span>
+        <span style={{ color: "var(--orange)" }}>$</span>
+        {price}
+      </span>
+    ),
+  },
+]
+
 const EditorialBlock = ({ idx, name, brand, blurb, price, flip }: Block) => (
   <div
     style={{
@@ -65,15 +85,12 @@ const EditorialBlock = ({ idx, name, brand, blurb, price, flip }: Block) => (
       </div>
     </div>
     <div style={{ direction: "ltr" }}>
-      <div className="label" style={{ marginBottom: 14 }}>
+      <Label style={{ marginBottom: 14, display: "block" }}>
         FEATURED · {brand}
-      </div>
-      <h3
-        className="display"
-        style={{ fontSize: 56, margin: 0, color: "var(--ink)" }}
-      >
+      </Label>
+      <Display size={56} as="h3">
         {name}
-      </h3>
+      </Display>
       <p
         style={{
           fontSize: 16,
@@ -95,40 +112,22 @@ const EditorialBlock = ({ idx, name, brand, blurb, price, flip }: Block) => (
           padding: "20px 0",
         }}
       >
-        {[
-          { l: "DIAMETER", v: "22\"" as React.ReactNode },
-          { l: "WIDTH", v: "10\"" as React.ReactNode },
-          { l: "FINISHES", v: "4" as React.ReactNode },
-          {
-            l: "FROM",
-            v: (
-              <span>
-                <span style={{ color: "var(--orange)" }}>$</span>
-                {price}
-              </span>
-            ),
-          },
-        ].map((s, i) => (
-          <div key={i} style={{ flex: 1 }}>
-            <div className="label-muted" style={{ fontSize: 10 }}>
+        {STATS_FOR(price).map((s) => (
+          <div key={s.l} style={{ flex: 1 }}>
+            <Label tone="muted" style={{ fontSize: 10, display: "block" }}>
               {s.l}
-            </div>
-            <div
-              style={{
-                fontFamily: "var(--display)",
-                fontWeight: 900,
-                fontSize: 22,
-                marginTop: 4,
-              }}
-            >
+            </Label>
+            <Display size={22} as="div" style={{ marginTop: 4 }}>
               {s.v}
-            </div>
+            </Display>
           </div>
         ))}
       </div>
-      <LocalizedClientLink href="/store" className="btn btn-primary">
-        Shop This Wheel <Icon name="arrow-right" size={16} color="white" />
-      </LocalizedClientLink>
+      <Button asChild>
+        <LocalizedClientLink href="/store">
+          Shop This Wheel <Icon name="arrow-right" size={16} color="white" />
+        </LocalizedClientLink>
+      </Button>
     </div>
   </div>
 )

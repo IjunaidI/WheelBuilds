@@ -3,6 +3,9 @@
 import { useParams, useRouter } from "next/navigation"
 import Icon from "@modules/common/components/icon"
 import Wheel, { Finish } from "@modules/common/components/wheel"
+import Display from "@modules/common/components/display"
+import Label from "@modules/common/components/label"
+import { Button } from "@/components/ui/button"
 
 const TRENDING: {
   name: string
@@ -57,30 +60,18 @@ const Trending = ({ onClose }: TrendingProps) => {
           marginBottom: 12,
         }}
       >
-        <span className="label" style={{ color: "var(--ink)" }}>
-          Trending
-        </span>
-        <button
-          type="button"
+        <Label tone="ink">Trending</Label>
+        <Button
+          variant="link"
+          size="sm"
           onClick={() => {
             onClose()
             router.push(`/${countryCode}/store`)
           }}
-          style={{
-            background: "none",
-            border: "none",
-            padding: 0,
-            cursor: "pointer",
-            fontSize: 11,
-            color: "var(--orange)",
-            fontWeight: 600,
-            letterSpacing: "0.04em",
-            textTransform: "uppercase",
-            fontFamily: "inherit",
-          }}
+          className="h-auto p-0 text-[11px] font-semibold uppercase tracking-[0.04em] text-[var(--orange)] no-underline hover:no-underline"
         >
           See all
-        </button>
+        </Button>
       </div>
       <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
         {TRENDING.map((t) => (
@@ -104,32 +95,17 @@ const Trending = ({ onClose }: TrendingProps) => {
           >
             <Wheel size={56} finish={t.finish} />
             <div style={{ flex: 1, minWidth: 0 }}>
-              <div className="label" style={{ fontSize: 9, marginBottom: 2 }}>
+              <Label style={{ fontSize: 9, marginBottom: 2, display: "block" }}>
                 {t.brand}
-              </div>
-              <div
-                style={{
-                  fontFamily: "var(--display)",
-                  fontWeight: 900,
-                  fontSize: 14,
-                  color: "var(--ink)",
-                  textTransform: "uppercase",
-                }}
-              >
+              </Label>
+              <Display size={14} as="div">
                 {t.name}
-              </div>
+              </Display>
             </div>
-            <div
-              style={{
-                fontFamily: "var(--display)",
-                fontWeight: 900,
-                fontSize: 15,
-                color: "var(--ink)",
-              }}
-            >
+            <Display size={15} as="div">
               <span style={{ color: "var(--orange)" }}>$</span>
               {t.price}
-            </div>
+            </Display>
             <Icon name="arrow-right" size={14} color="#8A8A8E" />
           </button>
         ))}

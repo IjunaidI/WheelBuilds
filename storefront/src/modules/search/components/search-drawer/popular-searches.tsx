@@ -1,6 +1,8 @@
 "use client"
 
 import { useParams, useRouter } from "next/navigation"
+import Label from "@modules/common/components/label"
+import Chip from "@modules/common/components/chip"
 import { addRecentSearch } from "@lib/stores/recent-searches"
 
 const POPULAR = [
@@ -29,31 +31,14 @@ const PopularSearches = ({ onClose }: PopularSearchesProps) => {
 
   return (
     <div style={{ marginBottom: 28 }}>
-      <div className="label" style={{ marginBottom: 12, color: "var(--ink)" }}>
+      <Label tone="ink" style={{ marginBottom: 12, display: "block" }}>
         Popular searches
-      </div>
+      </Label>
       <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
         {POPULAR.map((p) => (
-          <button
-            key={p}
-            type="button"
-            onClick={() => submit(p)}
-            style={{
-              display: "inline-flex",
-              alignItems: "center",
-              height: 30,
-              padding: "0 12px",
-              background: "var(--soft)",
-              border: "1px solid var(--hairline)",
-              borderRadius: 15,
-              fontSize: 12,
-              color: "var(--ink)",
-              cursor: "pointer",
-              fontFamily: "inherit",
-            }}
-          >
+          <Chip key={p} variant="outline" size="sm" onClick={() => submit(p)}>
             {p}
-          </button>
+          </Chip>
         ))}
       </div>
     </div>

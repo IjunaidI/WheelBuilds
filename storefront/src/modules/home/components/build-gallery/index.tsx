@@ -1,6 +1,7 @@
-import LocalizedClientLink from "@modules/common/components/localized-client-link"
-import Icon from "@modules/common/components/icon"
 import ImgPlaceholder from "@modules/common/components/img-placeholder"
+import SectionHeader from "@modules/common/components/section-header"
+import MicroLink from "@modules/common/components/micro-link"
+import Chip from "@modules/common/components/chip"
 
 const TILES = [
   { w: 5, h: 4, name: "BLACKLINE BL-7" },
@@ -20,41 +21,11 @@ const BuildGallery = () => (
       background: "var(--soft)",
     }}
   >
-    <div
-      style={{
-        display: "flex",
-        alignItems: "flex-end",
-        justifyContent: "space-between",
-        marginBottom: 48,
-      }}
-    >
-      <div>
-        <div className="label" style={{ marginBottom: 12 }}>
-          #WHEELBUILDS · 14.2K POSTS
-        </div>
-        <div className="display" style={{ fontSize: 40, color: "var(--ink)" }}>
-          Shot by our
-          <br />
-          community.
-        </div>
-      </div>
-      <LocalizedClientLink
-        href="#"
-        style={{
-          fontSize: 13,
-          fontWeight: 600,
-          color: "var(--orange)",
-          textTransform: "uppercase",
-          letterSpacing: "0.06em",
-          textDecoration: "none",
-          display: "inline-flex",
-          gap: 6,
-          alignItems: "center",
-        }}
-      >
-        Explore the gallery <Icon name="arrow-right" size={14} color="#FF6A00" />
-      </LocalizedClientLink>
-    </div>
+    <SectionHeader
+      eyebrow="#WHEELBUILDS · 14.2K POSTS"
+      title="Shot by our community."
+      action={<MicroLink href="#">Explore the gallery</MicroLink>}
+    />
     <div
       style={{
         display: "grid",
@@ -78,19 +49,10 @@ const BuildGallery = () => (
             radius={6}
             style={{ width: "100%", height: "100%" }}
           />
-          <div
-            className="build-chip"
-            style={{ position: "absolute", left: 12, bottom: 12 }}
-          >
-            <span
-              style={{
-                width: 6,
-                height: 6,
-                borderRadius: 3,
-                background: "var(--orange)",
-              }}
-            />
-            ON {t.name}
+          <div style={{ position: "absolute", left: 12, bottom: 12 }}>
+            <Chip variant="outline" size="sm" dot>
+              ON {t.name}
+            </Chip>
           </div>
         </div>
       ))}

@@ -1,9 +1,12 @@
-﻿"use client"
+"use client"
 
 import { useRouter, useParams } from "next/navigation"
+import { toast } from "sonner"
 import Icon from "@modules/common/components/icon"
+import Chip from "@modules/common/components/chip"
+import { Button } from "@/components/ui/button"
 import { useGarage } from "@lib/garage/use-garage"
-import { Vehicle } from "@lib/garage/types"
+import { Vehicle, NewVehicle } from "@lib/garage/types"
 
 type GaragePaneProps = {
   onClose: () => void
@@ -21,18 +24,40 @@ const formatSpecs = (v: Vehicle): string => {
   if (v.boltPattern) parts.push(v.boltPattern)
   if (v.hubBore) parts.push(`${v.hubBore} hub`)
   if (v.notes) parts.push(v.notes)
-  return parts.length ? parts.join(" Â· ") : formatSavedDate(v.savedAt)
+  return parts.length ? parts.join(" · ") : formatSavedDate(v.savedAt)
 }
 
 const GaragePane = ({ onClose, onAddNew }: GaragePaneProps) => {
   const router = useRouter()
   const { countryCode } = useParams() as { countryCode: string }
-  const { vehicles, active, setActive, remove } = useGarage()
+  const { vehicles, active, setActive, remove, add } = useGarage()
 
   const selectVehicle = (id: string) => {
     setActive(id)
     onClose()
     router.push(`/${countryCode}/store`)
+  }
+
+  const removeVehicle = (v: Vehicle) => {
+    const label = [v.year, v.make, v.model, v.trim].filter(Boolean).join(" ")
+    // Snapshot the fields needed to restore — strip id + savedAt so the undo path
+    // creates a new vehicle via add() (which assigns a fresh id and timestamp).
+    const restore: NewVehicle = {
+      year: v.year,
+      make: v.make,
+      model: v.model,
+      trim: v.trim,
+      boltPattern: v.boltPattern,
+      hubBore: v.hubBore,
+      notes: v.notes,
+    }
+    remove(v.id)
+    toast(`Removed ${label}`, {
+      action: {
+        label: "Undo",
+        onClick: () => add(restore),
+      },
+    })
   }
 
   if (vehicles.length === 0) {
@@ -49,14 +74,9 @@ const GaragePane = ({ onClose, onAddNew }: GaragePaneProps) => {
         <div style={{ fontSize: 13, color: "var(--graphite)", marginBottom: 12 }}>
           No vehicles saved yet.
         </div>
-        <button
-          type="button"
-          onClick={onAddNew}
-          className="btn btn-primary"
-          style={{ height: 40, padding: "0 18px", fontSize: 12 }}
-        >
+        <Button onClick={onAddNew} size="sm">
           Add your first vehicle
-        </button>
+        </Button>
       </div>
     )
   }
@@ -101,6 +121,7 @@ const GaragePane = ({ onClose, onAddNew }: GaragePaneProps) => {
               }}
             >
               <span
+                aria-hidden
                 style={{
                   width: 36,
                   height: 36,
@@ -130,12 +151,9 @@ const GaragePane = ({ onClose, onAddNew }: GaragePaneProps) => {
                     {label}
                   </span>
                   {isActive && (
-                    <span
-                      className="fits-chip"
-                      style={{ fontSize: 9, height: 18, padding: "0 6px" }}
-                    >
+                    <Chip variant="accent" size="sm" className="px-2 py-0 text-[9px] uppercase">
                       ACTIVE
-                    </span>
+                    </Chip>
                   )}
                 </div>
                 <div
@@ -151,23 +169,16 @@ const GaragePane = ({ onClose, onAddNew }: GaragePaneProps) => {
               </div>
               <Icon name="arrow-right" size={16} color="#8A8A8E" />
             </button>
-            <button
-              type="button"
-              onClick={() => remove(v.id)}
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => removeVehicle(v)}
               aria-label={`Remove ${label}`}
               title="Remove"
-              style={{
-                background: "none",
-                border: "none",
-                padding: 4,
-                cursor: "pointer",
-                color: "var(--ink-soft)",
-                display: "inline-flex",
-                flexShrink: 0,
-              }}
+              className="h-7 w-7 text-[var(--ink-soft)]"
             >
               <Icon name="x" size={14} />
-            </button>
+            </Button>
           </div>
         )
       })}

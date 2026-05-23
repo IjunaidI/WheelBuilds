@@ -1,4 +1,4 @@
-﻿import Icon, { IconName } from "@modules/common/components/icon"
+import Icon, { IconName } from "@modules/common/components/icon"
 
 const ITEMS: { icon: IconName; h: string; s: string }[] = [
   { icon: "shipping", h: "Free shipping $199+", s: "Lower 48, ground" },
@@ -25,7 +25,8 @@ const TrustStrip = () => (
           alignItems: "center",
           gap: 14,
           padding: "28px 32px",
-          borderRight: i < ITEMS.length - 1 ? "1px solid var(--hairline)" : "none",
+          borderRight:
+            i < ITEMS.length - 1 ? "1px solid var(--hairline)" : "none",
         }}
       >
         <Icon name={it.icon} size={22} strokeWidth={1.4} />

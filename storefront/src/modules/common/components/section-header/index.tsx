@@ -1,9 +1,10 @@
 import Display from "@modules/common/components/display"
+import Label from "@modules/common/components/label"
 
 type SectionHeaderProps = {
   /** Optional huge orange counter (e.g. "08"). Skips the column when absent. */
   counter?: string
-  /** Optional small label above the title (e.g. "FRESH DROPS"). */
+  /** Optional small label above the title (e.g. "FRESH DROPS"). String is auto-wrapped in `<Label>`; pass a node for full control. */
   eyebrow?: React.ReactNode
   /** Section heading text. */
   title: string
@@ -53,7 +54,11 @@ const SectionHeader = ({
         </Display>
       )}
       <div style={{ paddingBottom: counter ? 12 : 0 }}>
-        {eyebrow && <div style={{ marginBottom: 8 }}>{eyebrow}</div>}
+        {eyebrow && (
+          <div style={{ marginBottom: 12 }}>
+            {typeof eyebrow === "string" ? <Label>{eyebrow}</Label> : eyebrow}
+          </div>
+        )}
         <Display size={40}>{title}</Display>
         {description && (
           <p

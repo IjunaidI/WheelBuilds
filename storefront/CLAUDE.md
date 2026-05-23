@@ -218,6 +218,50 @@ The legacy [`modules/store/`](src/modules/store/) ships alongside as the referen
 
 `TODO(integration)` comments in the rail mark places that need follow-up: the Vehicle band's "only show wheels that fit" toggle (depends on Phase 2.1 fitment data) and the Price section's TextInputs (should become a `<Slider>` once a real min/max range is available from Meilisearch).
 
+## Product Detail (PDP)
+
+The `/products/[handle]` route is the product detail page. It lives at [`modules/product-detail/`](src/modules/product-detail/) and follows the same mock-first / single-adapter pattern as Discovery. **As of Jan 2026 the data is mocked — every handle resolves to the same dummy `BLACKLINE BL-7 MONOBLOCK`.** This means every product card on the site (home `NewDropsRow`, Discovery grid, PDP related row) routes to a working PDP, even though no real catalog is wired.
+
+Layout:
+
+```
+src/modules/product-detail/
+├── data/
+│   ├── types.ts             — ProductDetail (extends DiscoveryProduct + adds
+│   │                          description, specs, finishOptions, sizeOptions,
+│   │                          boltPatternOptions, fitment, relatedHandles)
+│   ├── mock-detail.ts       — one fully-populated product
+│   └── get-product.ts       — adapter: getProductDetail(handle) +
+│                              getRelatedProducts(product). THE SEAM.
+├── components/
+│   ├── breadcrumb/          — Wheels > Brand > Model
+│   ├── hero/
+│   │   ├── index.tsx        — owns finish/size/bolt-pattern state
+│   │   ├── gallery.tsx      — big wheel render + finish-switcher thumbs
+│   │   ├── variant-picker.tsx — size matrix + bolt pattern + offset readout
+│   │   └── purchase-panel.tsx — brand/name/price/desc/fitment chip/Add to cart
+│   ├── specs/               — engineering stat grid + spotlight blurb
+│   ├── fitment/             — vehicle-compat list + active-vehicle status band
+│   └── related/             — "Similar wheels" — reuses DiscoveryProductCard
+└── templates/
+    └── index.tsx            — composes everything; server component
+```
+
+**Integration seam (when real data wiring lands):**
+
+1. Replace the body of `getProductDetail(handle)` in [data/get-product.ts](src/modules/product-detail/data/get-product.ts) with `lib/data/products.ts → getProductByHandle(handle, region.id)`. Region resolution: see the legacy `modules/store/templates/paginated-products.tsx`.
+2. Map Medusa product + variants → `ProductDetail`. Variants become `sizeOptions` (one per Diameter×Width); variant metadata carries weight/offset/finish/bolt-pattern. The vendor-sync apply pipeline already populates these on the catalog.
+3. `getRelatedProducts` becomes a sibling `getProductsList` filtered by collection_id or tag_id.
+4. `fitment` comes from the Phase 2.1 fitment table (currently empty). Return `[]` when no data — the Fitment section gracefully degrades.
+5. Restore `generateStaticParams` and `notFound()` for missing handles in [the page](src/app/[countryCode]/(main)/products/[handle]/page.tsx). Today every handle resolves to mock.
+
+Three `TODO(integration)` anchors are sprinkled in the code:
+- `purchase-panel.tsx` Add-to-cart → wire `lib/data/cart.ts → addToCart`
+- `purchase-panel.tsx` Save-to-wishlist → wire when a wishlist Server Action exists
+- `fitment/index.tsx` heuristic — replace the make+model substring check with a real fitment-table lookup once Phase 2.1 data lands
+
+The legacy [`modules/products/`](src/modules/products/) ships alongside as the reference for the real Medusa data wiring. Nothing imports it from the new PDP path — delete it once the swap is done.
+
 ## Gotchas
 
 - **`SideMenu`** ([modules/layout/components/side-menu](src/modules/layout/components/side-menu/index.tsx)) is orphaned — the new nav doesn't import it. It still references `/search` which no longer exists. Harmless dead code. Don't extend it; either delete it or replace it with a new wheel-builds-styled mobile menu.

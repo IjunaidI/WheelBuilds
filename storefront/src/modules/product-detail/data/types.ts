@@ -12,14 +12,30 @@
 import { Finish } from "@modules/common/components/wheel"
 import { DiscoveryProduct } from "@modules/discovery/data/types"
 
+/** One offset (ET) option under a Diameter × Width combo. */
+export type OffsetVariant = {
+  /** ET in mm. Positive = inboard (tucked), lower = pushed out to the fender. */
+  value: number
+  /** Backspace, e.g. `5.65"`. */
+  backspaceIn: string
+  /** Lip depth (front-face to barrel rim), e.g. `0.85"`. */
+  lipDepthIn?: string
+  /** Hub-to-lock steering clearance, e.g. `5.2"`. */
+  hubToLockIn?: string
+}
+
 /** A specific Diameter × Width combination available for this product. */
 export type SizeOption = {
   /** Diameter in inches. */
   diameter: number
   /** Width in inches. */
   width: number
-  /** Offset (mm). One Diameter×Width may have multiple offsets — pick a representative. */
+  /** Offset (mm) — the OEM / default pick. Equals `oemOffsetMm` if provided, else the only offset. */
   offsetMm: number
+  /** All ET options available under this size, with per-offset spec detail. Falls back to a single entry derived from `offsetMm`. */
+  offsetVariants?: OffsetVariant[]
+  /** OEM-recommended ET for this size on the active vehicle. Selecting anything else flips to a CustomFit override. */
+  oemOffsetMm?: number
   /** Per-wheel weight in pounds. */
   weightLb: number
   /** Stock state. `low_stock` shows a warning chip; `out_of_stock` disables the variant. */

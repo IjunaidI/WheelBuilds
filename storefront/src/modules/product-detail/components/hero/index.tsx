@@ -1,11 +1,13 @@
 "use client"
 
-import { useMemo, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { Finish } from "@modules/common/components/wheel"
 import { ProductDetail, SizeOption } from "../../data/types"
 import Gallery from "./gallery"
 import VariantPicker from "./variant-picker"
 import PurchasePanel from "./purchase-panel"
+import AutoFitmentCard from "./auto-fitment-card"
+import AdvancedFitmentPanel from "./advanced-fitment-panel"
 
 type HeroProps = {
   product: ProductDetail
@@ -13,8 +15,14 @@ type HeroProps = {
 
 /**
  * The PDP hero. Owns the variant-selection state (finish / size / bolt
- * pattern) and threads it down to Gallery and PurchasePanel. Kept client so
- * the picks are interactive without page reloads.
+ * pattern / offset) and threads it down to Gallery, PurchasePanel, and the
+ * fitment cards. Kept client so the picks are interactive without page reloads.
+ *
+ * Fitment flow: size matrix → AutoFitmentCard (auto-set to OEM offset, switches
+ * to "Custom override" if the user touches the Advanced disclosure) →
+ * AdvancedFitmentPanel (the only way to override — collapsed by default).
+ * Stance pickers are deliberately gone; OEM auto-fit covers the default case
+ * and pros get the raw ET chips one click away.
  *
  * Layout:
  *   small+: 2-col split — Gallery left, purchase+picker right
@@ -37,6 +45,19 @@ const Hero = ({ product }: HeroProps) => {
   const [selectedBoltPattern, setSelectedBoltPattern] = useState<string>(
     product.boltPatternOptions[0] ?? product.boltPattern
   )
+
+  const offsetVariants = selectedSize.offsetVariants ?? []
+  const oemOffsetMm = selectedSize.oemOffsetMm ?? selectedSize.offsetMm
+  const [selectedOffsetMm, setSelectedOffsetMm] = useState<number>(oemOffsetMm)
+
+  // When the size changes, snap the offset back to the new size's OEM pick.
+  useEffect(() => {
+    setSelectedOffsetMm(oemOffsetMm)
+  }, [selectedSize, oemOffsetMm])
+
+  const isOem = selectedOffsetMm === oemOffsetMm
+  const currentOffset =
+    offsetVariants.find((o) => o.value === selectedOffsetMm) ?? null
 
   const unitPriceCents =
     selectedSize.priceCentsOverride ?? product.priceCents
@@ -62,6 +83,22 @@ const Hero = ({ product }: HeroProps) => {
           selectedBoltPattern={selectedBoltPattern}
           onBoltPatternChange={setSelectedBoltPattern}
         />
+        <AutoFitmentCard
+          sizeLabel={`${selectedSize.diameter}×${selectedSize.width}`}
+          offsetMm={selectedOffsetMm}
+          backspaceIn={currentOffset?.backspaceIn}
+          isOem={isOem}
+          onResetToOem={() => setSelectedOffsetMm(oemOffsetMm)}
+        />
+        {offsetVariants.length > 1 && (
+          <AdvancedFitmentPanel
+            sizeLabel={`${selectedSize.diameter}×${selectedSize.width}`}
+            offsetVariants={offsetVariants}
+            selectedOffsetMm={selectedOffsetMm}
+            oemOffsetMm={oemOffsetMm}
+            onSelectOffset={setSelectedOffsetMm}
+          />
+        )}
       </div>
     </section>
   )

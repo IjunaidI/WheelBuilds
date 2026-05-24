@@ -41,14 +41,52 @@ export const MOCK_PRODUCT_DETAIL: ProductDetail = {
   },
   finishOptions: ["black", "bronze", "silver"],
   sizeOptions: [
-    { diameter: 19, width: 8.5, offsetMm: 35, weightLb: 19.8, availability: "in_stock" },
-    { diameter: 19, width: 9.5, offsetMm: 30, weightLb: 20.6, availability: "in_stock" },
-    { diameter: 20, width: 9, offsetMm: 35, weightLb: 21.4, availability: "in_stock" },
-    { diameter: 20, width: 10, offsetMm: 25, weightLb: 22.0, availability: "low_stock" },
-    { diameter: 21, width: 9, offsetMm: 38, weightLb: 22.6, availability: "in_stock" },
+    {
+      diameter: 19, width: 8.5, offsetMm: 35, oemOffsetMm: 35, weightLb: 19.8, availability: "in_stock",
+      offsetVariants: [
+        { value: 30, backspaceIn: '5.31"', lipDepthIn: '0.95"', hubToLockIn: '5.5"' },
+        { value: 35, backspaceIn: '5.50"', lipDepthIn: '0.75"', hubToLockIn: '5.3"' },
+      ],
+    },
+    {
+      diameter: 19, width: 9.5, offsetMm: 30, oemOffsetMm: 30, weightLb: 20.6, availability: "in_stock",
+      offsetVariants: [
+        { value: 25, backspaceIn: '5.74"', lipDepthIn: '1.05"', hubToLockIn: '5.4"' },
+        { value: 30, backspaceIn: '5.93"', lipDepthIn: '0.85"', hubToLockIn: '5.2"' },
+      ],
+    },
+    {
+      diameter: 20, width: 9, offsetMm: 35, oemOffsetMm: 35, weightLb: 21.4, availability: "in_stock",
+      offsetVariants: [
+        { value: 23, backspaceIn: '5.18"', lipDepthIn: '1.10"', hubToLockIn: '5.6"' },
+        { value: 30, backspaceIn: '5.47"', lipDepthIn: '0.95"', hubToLockIn: '5.4"' },
+        { value: 35, backspaceIn: '5.65"', lipDepthIn: '0.85"', hubToLockIn: '5.2"' },
+      ],
+    },
+    {
+      diameter: 20, width: 10, offsetMm: 25, oemOffsetMm: 30, weightLb: 22.0, availability: "low_stock",
+      offsetVariants: [
+        { value: 25, backspaceIn: '6.18"', lipDepthIn: '1.05"', hubToLockIn: '5.2"' },
+        { value: 30, backspaceIn: '6.43"', lipDepthIn: '0.95"', hubToLockIn: '5.0"' },
+        { value: 35, backspaceIn: '6.62"', lipDepthIn: '0.75"', hubToLockIn: '4.8"' },
+      ],
+    },
+    { diameter: 21, width: 9, offsetMm: 38, oemOffsetMm: 38, weightLb: 22.6, availability: "in_stock" },
     { diameter: 21, width: 10.5, offsetMm: 28, weightLb: 23.4, availability: "out_of_stock" },
-    { diameter: 22, width: 9, offsetMm: 38, weightLb: 23.8, availability: "in_stock" },
-    { diameter: 22, width: 10.5, offsetMm: 30, weightLb: 24.6, availability: "in_stock" },
+    {
+      diameter: 22, width: 9, offsetMm: 38, oemOffsetMm: 38, weightLb: 23.8, availability: "in_stock",
+      offsetVariants: [
+        { value: 30, backspaceIn: '5.62"', lipDepthIn: '0.75"', hubToLockIn: '5.5"' },
+        { value: 38, backspaceIn: '5.93"', lipDepthIn: '0.65"', hubToLockIn: '5.4"' },
+      ],
+    },
+    {
+      diameter: 22, width: 10.5, offsetMm: 30, oemOffsetMm: 30, weightLb: 24.6, availability: "in_stock",
+      offsetVariants: [
+        { value: 30, backspaceIn: '6.43"', lipDepthIn: '0.95"', hubToLockIn: '5.0"' },
+        { value: 35, backspaceIn: '6.62"', lipDepthIn: '0.75"', hubToLockIn: '4.8"' },
+      ],
+    },
   ],
   boltPatternOptions: ["5×114.3", "5×120", "5×130"],
   fitment: [

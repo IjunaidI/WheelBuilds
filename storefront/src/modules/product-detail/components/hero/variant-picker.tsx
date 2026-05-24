@@ -128,9 +128,8 @@ const VariantPicker = ({
         </div>
       </div>
 
-      {/* Offset readout (derived from selected size) */}
-      <div className="grid grid-cols-3 gap-3 pt-4 border-t border-[var(--hairline)]">
-        <Stat label="Offset" value={`${selectedSize.offsetMm >= 0 ? "+" : ""}${selectedSize.offsetMm} mm`} />
+      {/* Weight + stock readout. Offset moved to the AutoFitmentCard below. */}
+      <div className="grid grid-cols-2 gap-3 pt-4 border-t border-[var(--hairline)]">
         <Stat label="Weight" value={`${selectedSize.weightLb} lb`} />
         <Stat
           label="Status"

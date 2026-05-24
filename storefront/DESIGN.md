@@ -296,12 +296,12 @@ What's wired today:
 
 Still on the polish list:
 
-- Scroll-linked reveals on home sections (consider [Motion](https://motion.dev) — successor to framer-motion — if/when needed)
-- Skeleton loaders for the catalog / search results / PDP
+- ~~Scroll-linked reveals on home sections~~ — **deliberately not wired**. Commerce pages should be instantly scannable; fade-in-on-scroll hides product cards behind a delay and breaks the "scan-grid-decide" loop. If a launch hero on a one-off marketing page wants entry animation, scope it there.
+- ~~Skeleton loaders for the catalog / search results / PDP~~ Done — see [Skeleton primitive](src/components/ui/skeleton.tsx) and the `/store/loading.tsx` + `/products/[handle]/loading.tsx` route fallbacks.
 - ~~Mobile breakpoints~~ Done — see §2 Responsive scale
-- Hero entry stagger
+- ~~Hero entry stagger~~ Not wired (same reason as scroll reveals — adds zero commerce value).
 
-Rule of thumb: **use the primitives' built-in motion before adding any of your own**. If you need custom motion that isn't one of `transform` / `opacity` / `border-color` on a CSS transition, reach for Vaul/tailwindcss-animate utilities; only escalate to a JS animation lib (Motion) when scroll/gesture/spring physics genuinely matter.
+Rule of thumb: **use the primitives' built-in motion, nothing more**. Vaul drives the drawer, tailwindcss-animate drives the data-state primitives, hover transitions live on `transform` / `opacity` / `border-color`. Don't add JS animation libraries (framer-motion / Motion). If a future surface genuinely needs scroll/gesture/spring physics, talk about it first — the answer for commerce surfaces is almost always "no."
 
 ## 8. Anti-patterns (don't do these)
 
@@ -337,14 +337,30 @@ The three-tier rule: shadcn for **behavior**, WB composed primitives for **visua
 
 These don't change the design contract above, but they're tracked so the next iteration knows the gaps.
 
-- **Consistency sweep.** Hero, NewDropsRow, ShopByStyle are on the new primitives. `featured-blocks`, `shop-by-brand`, `build-gallery`, `trust-strip`, `newsletter`, the footer, the GaragePill, and the search drawer internals (`header`, `popular-searches`, `recent-searches`, `find-by-vehicle/*`) still hand-roll their headers, labels, and chips. Same primitives, no new shapes — straight find/replace pass.
-- **Cart dropdown.** Still HeadlessUI Popover. Migrate to shadcn `<DropdownMenu>` — it's already wired and themed.
-- **Form primitives.** `<Field>` / `<Input>` / `<Select>` for the newsletter input, drawer search box, YMM selects. Right now each of those is a one-off inline-styled input.
-- **Toasts.** `<Toaster>` is mounted but unused. Cart-add, cart-remove, fitment-saved, copy-to-clipboard, form-error are the obvious first callers.
-- ~~**Mobile.**~~ Done — every section has a responsive variant. Home grids collapse 6→2 cols, Discovery rail becomes a bottom Vaul drawer, PDP hero stacks, nav gets a hamburger left Vaul drawer. See §2 Responsive scale + the [MobileMenu](src/modules/layout/components/mobile-menu/index.tsx) and [MobileFilterTrigger](src/modules/discovery/components/filter-rail/mobile-trigger.tsx) components.
-- **Discovery (catalog) page.** Designed but not built. Filter rail + 4-up product grid + active-filter chips.
-- **Product Detail.** Designed but not built. Fitment matrix, offset diagrams, stance previews — the most complex screen.
-- **Mood/Accent/Display tweaks.** Three orthogonal axes were designed; only one combination ships. Adding the other modes is a separate, fully scoped piece of work (Tweaks panel + state plumbing + CSS variants).
-- **Imagery.** Every photographic element is currently an `ImgPlaceholder`. When real photography lands, swap to `next/image`, set explicit aspect ratios, and decide on a CDN strategy.
-- **Skeleton loading.** No skeletons yet. The Discovery/Product Detail pages will need them. `shadcn add skeleton` is the next add when we get there.
-- **Motion polish.** Hero entry stagger, scroll-linked reveals, fine-grained hover micro-interactions. Drawer slide-in is now handled by Vaul — strike from the list.
+### What's shipped from the original design bundle
+
+Every screen from the Wheel Builds design handoff is built. Visual + interaction layer is production-grade.
+
+- ✅ **Home** — hero + 7 sections (NewDrops, ShopByStyle, FeaturedBlocks ×3, ShopByBrand, BuildGallery, TrustStrip, Newsletter), fully responsive
+- ✅ **Nav + Footer** — desktop primary nav + mobile hamburger drawer; 5-col footer that collapses cleanly
+- ✅ **Search drawer** — Vaul `direction="right"`, Cmd/Ctrl+K, garage / YMM / popular / recent / trending sections
+- ✅ **Discovery (catalog)** — filter rail (Vehicle / Category / Brand / Diameter / Bolt Pattern / Finish / Price), sort dropdown, active filter chips, 4-up product grid, pagination, empty state. Mobile rail collapses to a bottom Vaul drawer.
+- ✅ **Product Detail** — breadcrumb, hero (gallery + variant picker + purchase panel), specs grid, fitment list, related products. Variant picks (finish / size matrix / bolt pattern), quantity stepper, add-to-cart toast, save-to-wishlist toast all interactive.
+- ✅ **Mobile** — single `small:1024px` breakpoint across every surface. See §2 Responsive scale.
+- ✅ **Consistency sweep, cart dropdown, form primitives, toasts, skeleton loading** — all rolled in along the way.
+
+### Out of scope (called out in the original bundle, deferred at project start)
+
+- **Mood / Accent / Display tweaks panel.** Three orthogonal axes (Garage / Gallery / Editorial mood × Surgical / Confident / High accent × Wide / Tall / Stencil display) — the shipped storefront bakes in **Garage · High · Wide**. Adding the others is a separate scoped project (state plumbing + CSS variants + the panel UI).
+
+### Engineering follow-up that doesn't affect the design contract
+
+- **Real Meilisearch + Medusa data wiring on Discovery and PDP.** Three integration seams clearly marked:
+  - [discovery/data/get-products.ts](src/modules/discovery/data/get-products.ts) — list + facets
+  - [product-detail/data/get-product.ts](src/modules/product-detail/data/get-product.ts) — single + related
+  - [discovery/data/use-discovery-query.ts](src/modules/discovery/data/use-discovery-query.ts) — URL filter state (stays unchanged)
+- **Cart server-action wiring on PDP** — `addToCart` and `wishlist.save` currently toast only. See `TODO(integration)` anchors in [purchase-panel.tsx](src/modules/product-detail/components/hero/purchase-panel.tsx).
+- **Real product imagery.** Every photographic surface is `<ImgPlaceholder>`. When photography lands, swap for `next/image`, set explicit aspect ratios, decide on the CDN. Wheel renders (CSS conic + SVG overlay) stay where they are — they're not placeholders, they're the product.
+- **Phase 2.1 vehicle fitment data.** PDP Fitment section uses a substring make+model heuristic today; swap for a real fitment-join lookup. Also unlocks the FilterRail "only show wheels that fit" toggle.
+- **Replace legacy Medusa modules.** `modules/store/`, `modules/products/` are kept as the reference for real Medusa wiring (`getRegion`, `getProductByHandle`, `getProductsListWithSort`). Delete once the adapters above swap from mock to real.
+- **Auth / Cart / Checkout / Account pages.** Still on the boilerplate's Medusa-UI design (intentionally outside `.frame`). Bringing them into the WB design layer is its own project — they're not part of the original design bundle.

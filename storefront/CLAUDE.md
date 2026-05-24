@@ -8,6 +8,29 @@ For visual / design rules, the canonical reference is [`DESIGN.md`](DESIGN.md). 
 
 A MedusaJS 2.x Next.js 15 (App Router, React 19) storefront for **Wheel Builds** — a wheels + tires e-commerce site. The current visual layer is a custom design (garage / blueprint aesthetic, surgical orange #FF6A00, Antonio display type) ported from a Claude Design handoff. The Medusa data layer underneath is unchanged from the boilerplate.
 
+## Design coverage
+
+Every screen from the original Wheel Builds design bundle is built. The work is **chrome-complete, data-mocked**: the visual layer + interaction patterns are production-grade, but Discovery and PDP read from in-memory mock adapters until the Medusa + Meilisearch wiring lands. The home, search drawer, nav, footer, and cart use real (or empty-real) data already.
+
+| Surface | Route | Status | Notes |
+|---|---|---|---|
+| Home | `/` | **Shipped** | Hero + 7 sections, fully responsive |
+| Nav (desktop + mobile) | (all `(main)` routes) | **Shipped** | 56px mobile utility bar + hamburger Vaul drawer; 40px desktop utility + 56px primary nav |
+| Footer | (all `(main)` routes) | **Shipped** | 5-col desktop → 2-col xsmall+ → stacked mobile |
+| Search drawer | `(main)/layout.tsx` mount | **Shipped** | Vaul `direction="right"`, opens via Cmd/Ctrl+K, search trigger, garage pill, hero tiles |
+| Discovery (catalog) | `/store` | **Shipped (chrome, mock data)** | Filter rail (Vehicle / Category / Brand / Diameter / Bolt Pattern / Finish / Price), sort dropdown, active-filter chips, paginated grid, empty state. Mobile rail collapses to a bottom Vaul drawer with active-count badge + "View N results" footer. Integration seam at [data/get-products.ts](src/modules/discovery/data/get-products.ts). |
+| Product Detail | `/products/[handle]` | **Shipped (chrome, mock data)** | Breadcrumb, hero (gallery + variant picker + purchase panel), specs grid, fitment list with active-vehicle status, related products. Every handle resolves to a single dummy product. Integration seam at [data/get-product.ts](src/modules/product-detail/data/get-product.ts). |
+| Mobile responsive | (all surfaces above) | **Shipped** | One `small:` breakpoint at 1024px divides mobile and desktop. Discovery rail → bottom drawer, nav → hamburger, hero headline 132→64px, grids collapse 6→2 cols, hero split → stacked, etc. |
+
+**Out of scope** (called out in the original design bundle but skipped at project start):
+- The Tweaks panel that switches between three Mood / three Accent / three Display axes. The shipped storefront bakes in **Garage mood · High accent · Wide display**; adding the other modes is a separate scoped piece of work (state plumbing + CSS variants + the panel itself).
+
+**Engineering follow-up that doesn't affect the design contract** (see also DESIGN.md §10):
+- Real Meilisearch + Medusa data wiring on Discovery and PDP (chrome-first was the explicit project choice). Three integration seams clearly marked; recipes in [the Discovery](#discovery-catalog-page) and [PDP](#product-detail-pdp) sections below.
+- Real product photography (every photographic element is an `<ImgPlaceholder>` today).
+- Cart server-action wiring on PDP add-to-cart and wishlist (currently toast only).
+- Phase 2.1 vehicle fitment data (currently a substring heuristic in the Fitment section).
+
 ## Layout
 
 ```
@@ -264,11 +287,12 @@ The legacy [`modules/products/`](src/modules/products/) ships alongside as the r
 
 ## Gotchas
 
-- **`SideMenu`** ([modules/layout/components/side-menu](src/modules/layout/components/side-menu/index.tsx)) is orphaned — the new nav doesn't import it. It still references `/search` which no longer exists. Harmless dead code. Don't extend it; either delete it or replace it with a new wheel-builds-styled mobile menu.
-- **Cart dropdown's popover** still uses Headless UI inline-portal (not React Portal), so its contents stay inside `.frame` and the design CSS variables resolve. Replacement path when it's time: swap it for shadcn [`<DropdownMenu>`](src/components/ui/dropdown-menu.tsx) — that primitive's content className already includes `frame ` so it works inside a true portal. The HeadlessUI dropdown is still here only because no one has touched it yet.
-- **Featured-products module** ([modules/home/components/featured-products](src/modules/home/components/featured-products)) is dead code (no longer imported by the home page). Delete it during a cleanup pass, not as part of feature work.
+- **`SideMenu`** ([modules/layout/components/side-menu](src/modules/layout/components/side-menu/index.tsx)) is orphaned — the new nav uses [`MobileMenu`](src/modules/layout/components/mobile-menu/index.tsx) (Vaul drawer) instead. SideMenu still references `/search` which no longer exists. Harmless dead code — delete during a cleanup pass.
+- **Cart dropdown** is on shadcn [`<Popover>`](src/components/ui/popover.tsx) (via Radix portal); the inner content uses `className="frame"` so WB tokens resolve. The dropdown trigger is a `<PopoverAnchor asChild>` wrapping the cart link, which lets the link still navigate to `/cart` on click while the panel opens on hover.
+- **The cart preview's "Go to cart" button** is still the legacy `@medusajs/ui` `<Button>` (not the new shadcn `<Button>`). It's only used inside the cart-dropdown chrome; swap when convenient. Other cart/account/checkout legacy pages still use Medusa-UI components everywhere — that's intentional, they're outside `.frame`.
+- **Featured-products module** ([modules/home/components/featured-products](src/modules/home/components/featured-products)) is dead code (no longer imported by the home page). Delete during a cleanup pass.
 - **`(main)` layout's `.frame` applies to every page in the group**, including `/store`, `/cart`, `/products/[handle]`, etc. Those pages don't use the design classes, but they inherit `.frame`'s background (faint grid pattern on `#FAFAF8`) and base font size. If a future page needs a different chrome (e.g. a fully bleached PDP), wrap that page in a counter-class or move `.frame` to a per-page wrapper.
-- **No mobile breakpoints on the home page yet** — sections use fixed pixel paddings (`80px 80px`) and grid template columns like `repeat(6, 1fr)`. The home is desktop-only until the next polish pass adds responsive rules.
+- **No scroll-reveal / fade-in-on-scroll animations** — they were prototyped and removed; commerce pages should be instantly scannable. Stick to the existing hover lifts on cards + the shadcn/Vaul primitive motion. If a future surface genuinely needs an entry animation (a special-edition launch hero, say), add it scoped to that one section rather than globally.
 
 ## Adding new pages or sections
 

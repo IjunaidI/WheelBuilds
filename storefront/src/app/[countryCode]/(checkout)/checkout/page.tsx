@@ -1,9 +1,9 @@
 import { Metadata } from "next"
-import { notFound } from "next/navigation"
 
 import Wrapper from "@modules/checkout/components/payment-wrapper"
 import CheckoutForm from "@modules/checkout/templates/checkout-form"
 import CheckoutSummary from "@modules/checkout/templates/checkout-summary"
+import EmptyCart from "@modules/checkout/templates/empty-cart"
 import Display from "@modules/common/components/display"
 import Label from "@modules/common/components/label"
 import { enrichLineItems, retrieveCart } from "@lib/data/cart"
@@ -16,9 +16,7 @@ export const metadata: Metadata = {
 
 const fetchCart = async () => {
   const cart = await retrieveCart()
-  if (!cart) {
-    return notFound()
-  }
+  if (!cart) return null
 
   if (cart?.items?.length) {
     const enrichedItems = await enrichLineItems(cart?.items, cart?.region_id!)
@@ -31,6 +29,13 @@ const fetchCart = async () => {
 export default async function Checkout() {
   const cart = await fetchCart()
   const customer = await getCustomer()
+
+  // Empty cart / no active cart: render the WB empty state instead of 404.
+  // Real cart wiring on the PDP will populate a cart before the user lands
+  // here, but direct-navigation and post-purchase clears need a soft landing.
+  if (!cart || !cart.items?.length) {
+    return <EmptyCart />
+  }
 
   const firstName = customer?.first_name
   const isReturning = Boolean(customer)

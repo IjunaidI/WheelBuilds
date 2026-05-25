@@ -1,6 +1,7 @@
 "use client"
 
 import { useState } from "react"
+import { useParams, useRouter } from "next/navigation"
 import { toast } from "sonner"
 import Display from "@modules/common/components/display"
 import Label from "@modules/common/components/label"
@@ -31,7 +32,10 @@ const PurchasePanel = ({
   unitPriceCents,
 }: PurchasePanelProps) => {
   const { active } = useGarage()
+  const router = useRouter()
+  const { countryCode } = useParams() as { countryCode: string }
   const [quantity, setQuantity] = useState(4) // wheels sell in sets of 4 by default
+  const [buying, setBuying] = useState(false)
 
   const stepQty = (delta: number) =>
     setQuantity((q) => Math.max(1, Math.min(99, q + delta)))
@@ -42,6 +46,17 @@ const PurchasePanel = ({
     toast.success("Added to cart", {
       description: `${quantity} × ${product.name} (${selectedSize.diameter}×${selectedSize.width})`,
     })
+  }
+
+  const handleBuyNow = async () => {
+    // TODO(integration): replace with addToCart() then router.push to checkout.
+    // Today this is mock — toast + route to /checkout so the user can see the
+    // full purchase flow chrome.
+    setBuying(true)
+    toast.success("Heading to checkout", {
+      description: `${quantity} × ${product.name} (${selectedSize.diameter}×${selectedSize.width})`,
+    })
+    router.push(`/${countryCode}/checkout`)
   }
 
   const handleSave = () => {
@@ -105,7 +120,7 @@ const PurchasePanel = ({
 
       <Separator className="my-6" />
 
-      {/* Quantity + CTA */}
+      {/* Quantity + Add to cart + heart */}
       <div className="flex items-stretch gap-3">
         {/* Quantity stepper — replaces TextInput type="number" for a tidier feel */}
         <div className="inline-flex items-center border border-[var(--hairline)] rounded-[var(--radius)] h-14 bg-white">
@@ -157,6 +172,19 @@ const PurchasePanel = ({
           <Icon name="heart" size={18} />
         </Button>
       </div>
+
+      {/* Buy now — skips the cart, jumps straight to checkout. Inverted ink
+          treatment so it complements the orange Add-to-cart without competing
+          for the primary slot. */}
+      <Button
+        onClick={handleBuyNow}
+        disabled={selectedSize.availability === "out_of_stock" || buying}
+        className="mt-3 w-full bg-[var(--ink)] text-white hover:bg-[var(--ink)]/90"
+        style={{ height: 56, fontSize: 14 }}
+      >
+        Buy now · {formatUsd(unitPriceCents * quantity)}
+        <Icon name="arrow-right" size={16} color="white" />
+      </Button>
 
       {/* Trust strip — compressed for the purchase panel */}
       <div className="grid grid-cols-3 gap-4 pt-6 mt-2">

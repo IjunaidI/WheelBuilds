@@ -22,7 +22,7 @@ const RecentSearches = ({ onClose }: RecentSearchesProps) => {
 
   const go = (q: string) => {
     onClose()
-    router.push(`/${countryCode}/results/${encodeURIComponent(q)}`)
+    router.push(`/${countryCode}/store?q=${encodeURIComponent(q)}`)
   }
 
   return (

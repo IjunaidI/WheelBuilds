@@ -32,7 +32,7 @@ const Header = ({ onClose }: HeaderProps) => {
     if (!trimmed) return
     addRecentSearch(trimmed)
     onClose()
-    router.push(`/${countryCode}/results/${encodeURIComponent(trimmed)}`)
+    router.push(`/${countryCode}/store?q=${encodeURIComponent(trimmed)}`)
   }
 
   return (

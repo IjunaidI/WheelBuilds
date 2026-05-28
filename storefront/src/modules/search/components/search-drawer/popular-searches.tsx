@@ -26,7 +26,7 @@ const PopularSearches = ({ onClose }: PopularSearchesProps) => {
   const submit = (q: string) => {
     addRecentSearch(q)
     onClose()
-    router.push(`/${countryCode}/results/${encodeURIComponent(q)}`)
+    router.push(`/${countryCode}/store?q=${encodeURIComponent(q)}`)
   }
 
   return (

@@ -62,6 +62,20 @@ function toSizeOptions(
         ...(existing.offsetVariants ?? []),
         { value: offsetMm, backspaceIn: "" },
       ]
+      // Best availability across sibling offsets — if ANY offset under this
+      // size is in stock, the size cell shows in_stock so the picker isn't
+      // suppressed; the offset-level picker handles the per-variant choice.
+      const rank = { in_stock: 2, low_stock: 1, out_of_stock: 0 } as const
+      const next = availabilityOf(qty)
+      if (rank[next] > rank[existing.availability]) existing.availability = next
+      // Min non-zero price across sibling offsets for the "from" price shown
+      // at the size level.
+      if (priceCents > 0) {
+        existing.priceCentsOverride =
+          existing.priceCentsOverride && existing.priceCentsOverride > 0
+            ? Math.min(existing.priceCentsOverride, priceCents)
+            : priceCents
+      }
     } else {
       byKey.set(key, {
         diameter,
@@ -71,7 +85,7 @@ function toSizeOptions(
         offsetVariants: [{ value: offsetMm, backspaceIn: "" }],
         weightLb: productWeightLb,
         availability: availabilityOf(qty),
-        priceCentsOverride: priceCents || undefined,
+        priceCentsOverride: priceCents > 0 ? priceCents : undefined,
       })
     }
   }

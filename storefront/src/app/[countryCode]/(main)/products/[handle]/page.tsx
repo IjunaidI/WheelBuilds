@@ -11,15 +11,11 @@ type Props = {
 }
 
 /**
- * Product Detail (PDP) page. Currently powered by MOCK data — every handle
- * resolves to the same dummy product. See
- * `modules/product-detail/data/get-product.ts` for the integration seam.
- *
- * The legacy `modules/products/` (`ProductTemplate`) and the
- * `getProductByHandle` / `getRegion` / `generateStaticParams` flows still
- * ship in the repo and are the reference for the real Medusa wiring. Once
- * the swap lands, restore `generateStaticParams` and `notFound()` for
- * missing handles.
+ * Product Detail (PDP) page. Reads the authoritative product (live price +
+ * inventory) from the Medusa Store API via
+ * `modules/product-detail/data/get-product.ts`. Unknown handles 404 because
+ * the adapter throws `notFound()`, which propagates through both
+ * `generateMetadata` and `ProductPage`.
  */
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { handle } = await params

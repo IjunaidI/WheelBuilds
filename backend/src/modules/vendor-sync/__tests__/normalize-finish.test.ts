@@ -25,4 +25,16 @@ describe("normalizeFinish", () => {
     expect(normalizeFinish("")).toBe("black")
     expect(normalizeFinish("Rainbow Glitter")).toBe("black")
   })
+
+  it("prefers bronze over silver when both keywords are present", () => {
+    // BRONZE is checked before SILVER, so "bronze" wins over "chrome".
+    expect(normalizeFinish("Bronze Chrome")).toBe("bronze")
+  })
+
+  it("covers the remaining keyword buckets", () => {
+    expect(normalizeFinish("Brass")).toBe("bronze")
+    expect(normalizeFinish("Graphite")).toBe("silver")
+    expect(normalizeFinish("Titanium")).toBe("silver")
+    expect(normalizeFinish("Gray")).toBe("silver")
+  })
 })

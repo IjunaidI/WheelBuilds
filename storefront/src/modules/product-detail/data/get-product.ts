@@ -1,75 +1,190 @@
 /**
- * Product Detail adapter — the integration seam between the PDP UI and the
- * data source. Everything in `modules/product-detail/components/*` reads from
- * this file (and `./types`).
+ * Product Detail adapter — real Medusa wiring.
  *
- * Current state: **MOCK**. Returns the same `MOCK_PRODUCT_DETAIL` for any
- * handle the URL throws at it. Related products come from the Discovery
- * mock catalog filtered to a handful of plausible siblings.
+ * Reads the authoritative product (live price + inventory) from the Medusa
+ * Store API, so PDP never shows a stale Meilisearch snapshot. Maps the
+ * Medusa product + its variants → ProductDetail. Types stay stable.
  *
- * To wire real data (see [storefront/CLAUDE.md "Product Detail" section]):
- *
- *   1. Replace the body of `getProductDetail(handle)` with a Medusa fetch
- *      via `lib/data/products.ts → getProductByHandle(handle, region.id)`.
- *      Region resolution mirrors the legacy `modules/store/templates/
- *      paginated-products.tsx` pattern.
- *   2. Map the Medusa product + its variants → `ProductDetail`. Variants
- *      become `sizeOptions` (one per Diameter×Width); variant metadata
- *      carries weight/offset/finish/bolt-pattern. The vendor-sync apply
- *      pipeline already populates these on the catalog.
- *   3. `relatedHandles` come from the same brand or same category — issue
- *      a sibling `getProductsList` call filtered by collection_id or by
- *      tag_id (depending on how categories shake out).
- *   4. `fitment` comes from the Phase 2.1 fitment table (currently empty —
- *      see STOREFRONT_PHASE2_PLAN.md). Return [] when no data, the UI
- *      degrades to "no fitment confirmed yet".
- *   5. Wire `notFound()` for missing handles — today every handle resolves
- *      to the mock.
+ * fitment: [] until Spec 2 (wheel-size.com). The Fitment section degrades to
+ * "no fitment confirmed yet" on an empty list.
  */
 
+import { notFound } from "next/navigation"
+import { HttpTypes } from "@medusajs/types"
+import { getProductByHandle, getProductsList } from "@lib/data/products"
+import { getRegion } from "@lib/data/regions"
 import { DiscoveryProduct } from "@modules/discovery/data/types"
-import { MOCK_CATALOG } from "@modules/discovery/data/mock-products"
-import { ProductDetail } from "./types"
-import { MOCK_PRODUCT_DETAIL } from "./mock-detail"
+import { Finish } from "@modules/common/components/wheel"
+import { ProductDetail, SizeOption } from "./types"
 
-export async function getProductDetail(handle: string): Promise<ProductDetail> {
-  // MOCK: the handle is ignored — every product card lands here.
-  // Wire as: const product = await getProductByHandle(handle, region.id)
-  //          if (!product) notFound()
-  //          return mapMedusaProductToDetail(product)
-  return {
-    ...MOCK_PRODUCT_DETAIL,
-    // Pretend the URL handle is what we returned, so breadcrumbs / canonical
-    // URLs feel like the user clicked a real product.
-    handle: handle || MOCK_PRODUCT_DETAIL.handle,
-  }
+const DEFAULT_COUNTRY = process.env.NEXT_PUBLIC_DEFAULT_REGION || "us"
+
+const num = (v: unknown): number =>
+  typeof v === "number" && Number.isFinite(v) ? v : 0
+
+function normalizeFinish(raw: unknown): Finish {
+  const s = String(raw ?? "").toLowerCase()
+  if (/bronze|gold|copper|brass/.test(s)) return "bronze"
+  if (/silver|chrome|machined|polished|gunmetal|gr[ae]y|titanium|graphite/.test(s))
+    return "silver"
+  return "black"
+}
+
+function availabilityOf(qty: number): SizeOption["availability"] {
+  if (qty <= 0) return "out_of_stock"
+  if (qty <= 4) return "low_stock"
+  return "in_stock"
 }
 
 /**
- * Returns related products for the PDP "Similar wheels" row. Currently picks
- * a few off the mock discovery catalog; real wiring is a sibling Medusa
- * fetch filtered by brand or by shared category.
+ * Group variants into the Diameter×Width size matrix the hero expects.
+ * `productWeightLb` is the single product-level weight (vendor data has no
+ * per-size weight) — applied to every size.
  */
+function toSizeOptions(
+  variants: HttpTypes.StoreProductVariant[],
+  productWeightLb: number
+): SizeOption[] {
+  const byKey = new Map<string, SizeOption>()
+  for (const v of variants) {
+    const m = (v.metadata ?? {}) as Record<string, unknown>
+    const diameter = num(m.wheel_diameter_in)
+    const width = num(m.wheel_width_in)
+    const offsetMm = num(m.offset_mm)
+    const key = `${diameter}x${width}`
+    const qty = num((v as any).inventory_quantity)
+    const priceCents = Math.round(
+      num((v.calculated_price as any)?.calculated_amount) * 100
+    )
+    const existing = byKey.get(key)
+    if (existing) {
+      existing.offsetVariants = [
+        ...(existing.offsetVariants ?? []),
+        { value: offsetMm, backspaceIn: "" },
+      ]
+    } else {
+      byKey.set(key, {
+        diameter,
+        width,
+        offsetMm,
+        oemOffsetMm: offsetMm,
+        offsetVariants: [{ value: offsetMm, backspaceIn: "" }],
+        weightLb: productWeightLb,
+        availability: availabilityOf(qty),
+        priceCentsOverride: priceCents || undefined,
+      })
+    }
+  }
+  return Array.from(byKey.values()).sort(
+    (a, b) => a.diameter - b.diameter || a.width - b.width
+  )
+}
+
+function mapToDetail(product: HttpTypes.StoreProduct): ProductDetail {
+  const pmeta = (product.metadata ?? {}) as Record<string, unknown>
+  const variants = product.variants ?? []
+  const rep = (variants[0]?.metadata ?? {}) as Record<string, unknown>
+  const finish = normalizeFinish(pmeta.finish)
+
+  // "From" price across variants — corrected from the plan's MAX_SAFE_INTEGER
+  // pattern, which would render a price-less product as ~$90 quadrillion.
+  const variantPricesCents = variants
+    .map((v) =>
+      Math.round(num((v.calculated_price as any)?.calculated_amount) * 100)
+    )
+    .filter((n) => n > 0)
+  const fromCents = variantPricesCents.length ? Math.min(...variantPricesCents) : 0
+
+  const boltPatterns = Array.from(
+    new Set(
+      variants
+        .map((v) => String((v.metadata as any)?.bolt_pattern_raw ?? ""))
+        .filter(Boolean)
+    )
+  )
+
+  const weightLb = num((product as any).weight) / 453.592
+
+  return {
+    // DiscoveryProduct base
+    id: product.id!,
+    handle: product.handle!,
+    brand: String(pmeta.brand ?? ""),
+    name: product.title ?? "",
+    priceCents: fromCents,
+    finish,
+    diameter: num(rep.wheel_diameter_in),
+    width: num(rep.wheel_width_in),
+    boltPattern: boltPatterns[0] ?? "",
+    categories: [],
+    isNew: false,
+    fitsActiveVehicle: false,
+
+    // ProductDetail extras
+    description: product.description ?? "",
+    specs: {
+      construction: "—", // Spec §5: not in vendor data (plan gap 4.1).
+      weightLb,
+      loadRatingLb: num(rep.load_rating_lb),
+      centerBoreMm: num(rep.center_bore_mm),
+      countryOfOrigin: "—",
+      warranty: "—",
+      finishOptions: 1,
+    },
+    finishOptions: [finish],
+    sizeOptions: toSizeOptions(variants, weightLb),
+    boltPatternOptions: boltPatterns,
+    fitment: [], // Spec 2
+    relatedHandles: [],
+  }
+}
+
+export async function getProductDetail(handle: string): Promise<ProductDetail> {
+  const region = await getRegion(DEFAULT_COUNTRY)
+  if (!region) notFound()
+  const product = await getProductByHandle(handle, region.id)
+  if (!product) notFound()
+  return mapToDetail(product)
+}
+
 export async function getRelatedProducts(
   product: ProductDetail
 ): Promise<DiscoveryProduct[]> {
-  // Pick the first N items from the mock catalog whose handle is in
-  // `product.relatedHandles`, plus extras from the same brand to fill the row.
-  const byHandle = new Map(MOCK_CATALOG.map((p) => [p.handle, p]))
-  const chosen: DiscoveryProduct[] = []
+  const region = await getRegion(DEFAULT_COUNTRY)
+  if (!region) return []
 
-  for (const h of product.relatedHandles) {
-    const match = byHandle.get(h)
-    if (match) chosen.push(match)
-  }
+  // Re-read the product to get its brand collection id. getProductByHandle is
+  // React.cache'd, so this dedupes with the fetch in getProductDetail (free).
+  const full = await getProductByHandle(product.handle, region.id)
+  const collectionId = (full as any)?.collection_id
+  if (!collectionId) return []
 
-  if (chosen.length < 4) {
-    for (const p of MOCK_CATALOG) {
-      if (chosen.find((c) => c.id === p.id)) continue
-      chosen.push(p)
-      if (chosen.length >= 6) break
-    }
-  }
+  // Same brand collection, excluding the current product.
+  const { response } = await getProductsList({
+    queryParams: { collection_id: [collectionId], limit: 8 } as any,
+    countryCode: DEFAULT_COUNTRY,
+  })
 
-  return chosen.slice(0, 6)
+  return response.products
+    .filter((p) => p.handle !== product.handle)
+    .slice(0, 6)
+    .map((p) => {
+      const m = (p.variants?.[0]?.metadata ?? {}) as Record<string, unknown>
+      const pmeta = (p.metadata ?? {}) as Record<string, unknown>
+      return {
+        id: p.id!,
+        handle: p.handle!,
+        brand: String(pmeta.brand ?? ""),
+        name: p.title ?? "",
+        priceCents: Math.round(
+          num((p.variants?.[0]?.calculated_price as any)?.calculated_amount) *
+            100
+        ),
+        finish: normalizeFinish(pmeta.finish),
+        diameter: num(m.wheel_diameter_in),
+        width: num(m.wheel_width_in),
+        boltPattern: String(m.bolt_pattern_raw ?? ""),
+        categories: [],
+      }
+    })
 }

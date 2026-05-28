@@ -62,6 +62,9 @@ export function buildSearchDocument(product: IndexableProduct) {
       boltRaw.push(bp)
       boltCanonical.push(...canonicalBoltPatterns(bp))
     }
+    // USD-only by design: vendor-sync stores MSRP as integer cents under "usd"
+    // (Math.round(msrpUsd * 100)). A non-USD deployment yields no matches here,
+    // so price_min/price_max fall back to 0 — revisit when multi-currency lands.
     for (const p of v.prices ?? []) {
       if (p.currency_code === "usd" && Number.isFinite(p.amount)) {
         usdPrices.push(p.amount)
@@ -90,3 +93,10 @@ export function buildSearchDocument(product: IndexableProduct) {
     price_max: usdPrices.length ? Math.max(...usdPrices) : 0,
   }
 }
+
+/**
+ * The flat document shape produced for each wheel — the cross-module contract
+ * read by the Meilisearch index settings and downstream search consumers.
+ * Derived from the function's return so it can never drift from what is built.
+ */
+export type WheelSearchDocument = NonNullable<ReturnType<typeof buildSearchDocument>>

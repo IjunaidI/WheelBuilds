@@ -1,157 +1,203 @@
 /**
- * Discovery data adapter — the integration seam between the UI and the data
- * source. Everything in `modules/discovery/components/*` reads from this file
- * (and `./types`).
+ * Discovery data adapter — real Meilisearch wiring.
  *
- * Current state: **MOCK**. Filters and pagination are computed in-memory from
- * `MOCK_CATALOG`. Facet counts come from `mock-facets.ts`.
+ * Powers everything in `modules/discovery/components/*`. Reads the products
+ * index built by the backend transformer (see
+ * backend/src/modules/vendor-sync/search/build-search-document.ts).
  *
- * To wire real data (see [storefront/CLAUDE.md "Discovery (catalog)" section]):
+ * - Hits + total: one filtered search (the current page).
+ * - Facet counts: disjunctive — each facet dimension is counted with the
+ *   OTHER filters applied (not its own), via a multiSearch batch.
+ * - `vehicleConstraint` (Spec 2) is appended to every filter when present;
+ *   it is always absent in this spec.
  *
- *   1. Replace the body of `getDiscoveryProducts(query)` with a Meilisearch
- *      call. The Meilisearch index settings are in
- *      `backend/medusa-config.js` under the plugin block. The relevant
- *      attributes are already indexed (brand, finish, diameter, width,
- *      bolt_pattern, categories, price).
- *   2. Map Meilisearch hits to `DiscoveryProduct` — keep the shape stable so
- *      no consumer changes.
- *   3. Pull `facets` from Meilisearch's `facetDistribution` on the same
- *      response. Drop `getDiscoveryFacets` (it's only used while mocking).
- *   4. The function stays async — the UI awaits it from a Server Component
- *      (the templates render via Suspense), so no client-side fetch state to
- *      manage. Real Medusa price lookups (region-scoped) happen here too.
+ * Types stay stable — no consumer changes.
  *
- * The mock adapter is **deterministic**: same query → same result, no
- * Math.random(), so SSR matches client.
+ * NOTE: `parseQueryFromSearchParams` lives in `./types` (not here) so that
+ * client components (use-discovery-query.ts) can import it without pulling in
+ * this file's server-only Meilisearch client.
  */
 
+import { meili, PRODUCTS_INDEX } from "@lib/meilisearch"
 import {
   DEFAULT_PAGE_SIZE,
+  DiscoveryFilters,
+  DiscoveryProduct,
   DiscoveryQuery,
   DiscoveryResult,
-  EMPTY_FILTERS,
+  FacetCounts,
   SortOption,
 } from "./types"
-import { MOCK_CATALOG } from "./mock-products"
-import { computeFacets } from "./mock-facets"
+import { Finish } from "@modules/common/components/wheel"
 
-const matches = (
-  product: (typeof MOCK_CATALOG)[number],
-  f: DiscoveryQuery["filters"]
-) => {
-  if (f.categories.length && !f.categories.some((c) => product.categories.includes(c))) {
-    return false
-  }
-  if (f.brands.length && !f.brands.includes(product.brand)) return false
-  if (f.diameters.length && !f.diameters.includes(product.diameter)) return false
-  if (f.boltPatterns.length && !f.boltPatterns.includes(product.boltPattern)) {
-    return false
-  }
-  if (f.finishes.length && !f.finishes.includes(product.finish)) return false
-  if (f.priceMinCents != null && product.priceCents < f.priceMinCents) return false
-  if (f.priceMaxCents != null && product.priceCents > f.priceMaxCents) return false
-  return true
-}
+// Re-export so any existing imports from this file keep working.
+export { parseQueryFromSearchParams } from "./types"
 
-const sortBy = (sort: SortOption) => {
-  switch (sort) {
-    case "price-asc":
-      return (a: any, b: any) => a.priceCents - b.priceCents
-    case "price-desc":
-      return (a: any, b: any) => b.priceCents - a.priceCents
-    case "name-asc":
-      return (a: any, b: any) => a.name.localeCompare(b.name)
-    case "newest":
-      // Mock catalog has no createdAt — fall back to isNew first, then id.
-      return (a: any, b: any) => {
-        if (a.isNew !== b.isNew) return a.isNew ? -1 : 1
-        return b.id.localeCompare(a.id)
-      }
-    case "relevance":
-    default:
-      return undefined
-  }
-}
+const FACET_FIELDS = ["brand", "diameters", "bolt_patterns", "finish"] as const
+
+const NEW_DAYS = 30
+const NEW_MS = NEW_DAYS * 24 * 60 * 60 * 1000
+
+/** Escape a value for a Meilisearch filter string literal. */
+const lit = (v: string | number) =>
+  typeof v === "number" ? String(v) : `"${String(v).replace(/"/g, '\\"')}"`
 
 /**
- * Returns the page slice + total count + facet distribution for the current
- * filter+sort+page combination. Always async so the call site is
- * Meilisearch-ready.
+ * Build the array of filter clauses for a set of DiscoveryFilters, optionally
+ * skipping one dimension (used for disjunctive facet counting) and always
+ * scoping to wheels + any vehicle constraint.
  */
+function buildFilters(
+  f: DiscoveryFilters,
+  q: DiscoveryQuery,
+  skip?: keyof DiscoveryFilters
+): string[] {
+  const clauses: string[] = ['product_type = "wheel"']
+
+  if (skip !== "brands" && f.brands.length)
+    clauses.push(`brand IN [${f.brands.map(lit).join(", ")}]`)
+  if (skip !== "diameters" && f.diameters.length)
+    clauses.push(`diameters IN [${f.diameters.map(lit).join(", ")}]`)
+  if (skip !== "boltPatterns" && f.boltPatterns.length)
+    clauses.push(`bolt_patterns IN [${f.boltPatterns.map(lit).join(", ")}]`)
+  if (skip !== "finishes" && f.finishes.length)
+    clauses.push(`finish IN [${f.finishes.map(lit).join(", ")}]`)
+  if (f.priceMinCents != null) clauses.push(`price_min >= ${f.priceMinCents}`)
+  if (f.priceMaxCents != null) clauses.push(`price_min <= ${f.priceMaxCents}`)
+
+  if (q.vehicleConstraint?.length) clauses.push(...q.vehicleConstraint)
+
+  return clauses
+}
+
+function sortExpr(sort: SortOption): string[] {
+  switch (sort) {
+    case "price-asc":
+      return ["price_min:asc"]
+    case "price-desc":
+      return ["price_min:desc"]
+    case "newest":
+      return ["created_at:desc"]
+    case "name-asc":
+      return ["title:asc"]
+    case "relevance":
+    default:
+      return []
+  }
+}
+
+type Hit = {
+  id: string
+  handle: string
+  title: string
+  brand: string
+  finish: Finish
+  thumbnail: string | null
+  diameters: number[]
+  widths: number[]
+  bolt_patterns: string[]
+  price_min: number
+  price_max: number
+  created_at: string | null
+}
+
+function hitToProduct(h: Hit): DiscoveryProduct {
+  const createdMs = h.created_at ? Date.parse(h.created_at) : NaN
+  return {
+    id: h.id,
+    handle: h.handle,
+    name: h.title,
+    brand: h.brand,
+    priceCents: h.price_min,
+    finish: (h.finish as Finish) ?? "black",
+    diameter: h.diameters?.[0] ?? 0,
+    width: h.widths?.[0] ?? 0,
+    boltPattern: h.bolt_patterns?.[0] ?? "",
+    categories: [], // Spec §5 G2: no backend source yet.
+    isNew: Number.isFinite(createdMs) ? Date.now() - createdMs < NEW_MS : false,
+  }
+}
+
+function emptyResult(pageSize: number): DiscoveryResult {
+  return {
+    products: [],
+    totalCount: 0,
+    pageSize,
+    facets: {
+      categories: {},
+      brands: {},
+      diameters: {},
+      boltPatterns: {},
+      finishes: {},
+    },
+  }
+}
+
 export async function getDiscoveryProducts(
   query: DiscoveryQuery
 ): Promise<DiscoveryResult> {
   const pageSize = DEFAULT_PAGE_SIZE
-  const filtered = MOCK_CATALOG.filter((p) => matches(p, query.filters))
-  const sorter = sortBy(query.sort)
-  const sorted = sorter ? [...filtered].sort(sorter) : filtered
-  const start = (query.page - 1) * pageSize
-  const products = sorted.slice(start, start + pageSize)
+  const offset = (query.page - 1) * pageSize
 
-  // Facets are computed on the FILTERED set EXCEPT for the dimension being
-  // counted — so e.g. brand counts reflect everything except brand filters.
-  // The Meilisearch equivalent is "disjunctive facets". For mock simplicity
-  // we compute against the un-filtered catalog and ignore that subtlety.
-  // When wiring real data, request facets per dimension with the other
-  // filters applied.
-  const facets = computeFacets(MOCK_CATALOG)
-
-  return {
-    products,
-    totalCount: filtered.length,
-    pageSize,
-    facets,
-  }
-}
-
-/**
- * Read filter + sort + page state from URL search params. Used by the
- * Discovery server component to derive its query. The inverse — writing
- * filters back to the URL — lives in the client components (router.push
- * with new params).
- */
-export function parseQueryFromSearchParams(
-  sp: Record<string, string | string[] | undefined> | undefined
-): DiscoveryQuery {
-  if (!sp) return { filters: EMPTY_FILTERS, sort: "relevance", page: 1 }
-
-  const arr = (k: string): string[] => {
-    const v = sp[k]
-    if (!v) return []
-    return Array.isArray(v) ? v : v.split(",").filter(Boolean)
-  }
-  const num = (k: string): number | undefined => {
-    const v = sp[k]
-    if (!v) return undefined
-    const n = Number(Array.isArray(v) ? v[0] : v)
-    return Number.isFinite(n) ? n : undefined
+  // One hits query + one facet query per dimension (disjunctive), batched.
+  const facetQueryByDim: Record<string, keyof DiscoveryFilters> = {
+    brand: "brands",
+    diameters: "diameters",
+    bolt_patterns: "boltPatterns",
+    finish: "finishes",
   }
 
-  const sortRaw = (Array.isArray(sp.sort) ? sp.sort[0] : sp.sort) ?? "relevance"
-  const sort: SortOption = [
-    "relevance",
-    "price-asc",
-    "price-desc",
-    "newest",
-    "name-asc",
-  ].includes(sortRaw as SortOption)
-    ? (sortRaw as SortOption)
-    : "relevance"
+  try {
+    const { results } = await meili.multiSearch({
+      queries: [
+        {
+          indexUid: PRODUCTS_INDEX,
+          q: query.q ?? "",
+          filter: buildFilters(query.filters, query).join(" AND "),
+          sort: sortExpr(query.sort),
+          limit: pageSize,
+          offset,
+        },
+        ...FACET_FIELDS.map((field) => ({
+          indexUid: PRODUCTS_INDEX,
+          q: query.q ?? "",
+          filter: buildFilters(
+            query.filters,
+            query,
+            facetQueryByDim[field]
+          ).join(" AND "),
+          facets: [field],
+          limit: 0,
+        })),
+      ],
+    })
 
-  return {
-    filters: {
-      categories: arr("categories"),
-      brands: arr("brands"),
-      diameters: arr("diameters")
-        .map((s) => Number(s))
-        .filter((n) => Number.isFinite(n)),
-      boltPatterns: arr("boltPatterns"),
-      finishes: arr("finishes") as DiscoveryQuery["filters"]["finishes"],
-      priceMinCents: num("priceMin"),
-      priceMaxCents: num("priceMax"),
-    },
-    sort,
-    page: Math.max(1, num("page") ?? 1),
-    q: (Array.isArray(sp.q) ? sp.q[0] : sp.q) || undefined,
+    const [hitsRes, ...facetRes] = results
+    // facetRes is in the same order as FACET_FIELDS.
+    const facetByField: Record<string, Record<string, number>> = {}
+    FACET_FIELDS.forEach((field, i) => {
+      facetByField[field] =
+        (facetRes[i] as any)?.facetDistribution?.[field] ?? {}
+    })
+
+    const facets: FacetCounts = {
+      categories: {}, // Spec §5 G2: no backend source yet.
+      brands: facetByField["brand"],
+      diameters: facetByField["diameters"],
+      boltPatterns: facetByField["bolt_patterns"],
+      finishes: facetByField["finish"],
+    }
+
+    return {
+      products: (hitsRes.hits as Hit[]).map(hitToProduct),
+      totalCount:
+        (hitsRes as any).estimatedTotalHits ?? hitsRes.hits.length,
+      pageSize,
+      facets,
+    }
+  } catch (e) {
+    // Meilisearch unreachable / index missing → empty state, not a crash.
+    console.error("[discovery] Meilisearch query failed:", e)
+    return emptyResult(pageSize)
   }
 }

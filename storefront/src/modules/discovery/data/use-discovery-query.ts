@@ -20,7 +20,7 @@ import {
   EMPTY_FILTERS,
   SortOption,
 } from "./types"
-import { parseQueryFromSearchParams } from "./get-products"
+import { parseQueryFromSearchParams } from "./types"
 
 type ScalarFilterKey = "priceMinCents" | "priceMaxCents"
 type ArrayFilterKey = Exclude<keyof DiscoveryFilters, ScalarFilterKey>

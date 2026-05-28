@@ -78,8 +78,13 @@ export type DiscoveryQuery = {
   filters: DiscoveryFilters
   sort: SortOption
   page: number
-  /** Free-text search term. Not yet wired in the UI; reserved for future. */
+  /** Free-text search term (from the search drawer). */
   q?: string
+  /**
+   * Spec 2 (fitment) seam: extra Meilisearch filter clauses derived from the
+   * active vehicle's wheel-size.com spec. Empty/undefined in this spec.
+   */
+  vehicleConstraint?: string[]
 }
 
 /** Per-facet counts returned alongside the product list. */
@@ -99,3 +104,54 @@ export type DiscoveryResult = {
 }
 
 export const DEFAULT_PAGE_SIZE = 12
+
+/**
+ * Read filter + sort + page state from URL search params. Kept here (not in
+ * get-products.ts) so client components such as `use-discovery-query.ts` can
+ * import it without pulling in the server-only Meilisearch client.
+ */
+export function parseQueryFromSearchParams(
+  sp: Record<string, string | string[] | undefined> | undefined
+): DiscoveryQuery {
+  if (!sp) return { filters: EMPTY_FILTERS, sort: "relevance", page: 1 }
+
+  const arr = (k: string): string[] => {
+    const v = sp[k]
+    if (!v) return []
+    return Array.isArray(v) ? v : v.split(",").filter(Boolean)
+  }
+  const num = (k: string): number | undefined => {
+    const v = sp[k]
+    if (!v) return undefined
+    const n = Number(Array.isArray(v) ? v[0] : v)
+    return Number.isFinite(n) ? n : undefined
+  }
+
+  const sortRaw = (Array.isArray(sp.sort) ? sp.sort[0] : sp.sort) ?? "relevance"
+  const sort: SortOption = [
+    "relevance",
+    "price-asc",
+    "price-desc",
+    "newest",
+    "name-asc",
+  ].includes(sortRaw as SortOption)
+    ? (sortRaw as SortOption)
+    : "relevance"
+
+  return {
+    filters: {
+      categories: arr("categories"),
+      brands: arr("brands"),
+      diameters: arr("diameters")
+        .map((s) => Number(s))
+        .filter((n) => Number.isFinite(n)),
+      boltPatterns: arr("boltPatterns"),
+      finishes: arr("finishes") as DiscoveryQuery["filters"]["finishes"],
+      priceMinCents: num("priceMin"),
+      priceMaxCents: num("priceMax"),
+    },
+    sort,
+    page: Math.max(1, num("page") ?? 1),
+    q: (Array.isArray(sp.q) ? sp.q[0] : sp.q) || undefined,
+  }
+}

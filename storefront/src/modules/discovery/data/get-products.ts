@@ -19,6 +19,7 @@
  */
 
 import { meili, PRODUCTS_INDEX } from "@lib/meilisearch"
+import type { MultiSearchResult } from "meilisearch"
 import {
   DEFAULT_PAGE_SIZE,
   DiscoveryFilters,
@@ -172,12 +173,11 @@ export async function getDiscoveryProducts(
       ],
     })
 
-    const [hitsRes, ...facetRes] = results
+    const [hitsRes, ...facetRes] = results as MultiSearchResult<Hit>[]
     // facetRes is in the same order as FACET_FIELDS.
     const facetByField: Record<string, Record<string, number>> = {}
     FACET_FIELDS.forEach((field, i) => {
-      facetByField[field] =
-        (facetRes[i] as any)?.facetDistribution?.[field] ?? {}
+      facetByField[field] = facetRes[i]?.facetDistribution?.[field] ?? {}
     })
 
     const facets: FacetCounts = {
@@ -189,9 +189,8 @@ export async function getDiscoveryProducts(
     }
 
     return {
-      products: (hitsRes.hits as Hit[]).map(hitToProduct),
-      totalCount:
-        (hitsRes as any).estimatedTotalHits ?? hitsRes.hits.length,
+      products: hitsRes.hits.map(hitToProduct),
+      totalCount: hitsRes.estimatedTotalHits ?? hitsRes.hits.length,
       pageSize,
       facets,
     }

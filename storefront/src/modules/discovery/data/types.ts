@@ -1,16 +1,15 @@
 /**
- * Discovery data types.
+ * Discovery data types + URL-param parser.
  *
- * These shapes are intentionally close to what Meilisearch (the planned filter
- * backend) and Medusa's Store Product API return, so the swap from mock data
- * to real data is mostly a body change in the adapter functions:
- *
+ * Shape contract for the Meilisearch adapter (data/get-products.ts):
  *   - DiscoveryProduct mirrors a flattened Medusa product variant + cover image
  *   - FacetCounts mirrors Meilisearch's `facetDistribution` shape
  *   - DiscoveryQuery is the URL-search-param-derived input
  *
- * When real wiring lands (see `data/get-products.ts`), keep these types stable
- * — every consumer in `modules/discovery/components/*` reads from them.
+ * Every consumer in `modules/discovery/components/*` reads these shapes — keep
+ * them stable. `parseQueryFromSearchParams` is co-located here (rather than in
+ * the adapter) so the client `useDiscoveryQuery` hook can import it without
+ * pulling the server-only Meilisearch client into the client bundle.
  */
 
 import { Finish } from "@modules/common/components/wheel"
@@ -53,8 +52,9 @@ export const SORT_LABELS: Record<SortOption, string> = {
 
 /**
  * The keys correspond 1:1 with the filter sections in the rail. Adding a new
- * filter = add a key here + a section in `<FilterRail>` + a facet bucket in
- * `mock-facets.ts` (and later in the real Meilisearch index attributes).
+ * filter = add a key here + a section in `<FilterRail>` + a filterable
+ * attribute in `backend/medusa-config.js` + a clause in the adapter's
+ * `buildFilters` / `FACET_FIELDS`.
  */
 export type DiscoveryFilters = {
   categories: string[]

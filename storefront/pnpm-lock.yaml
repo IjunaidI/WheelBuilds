@@ -93,8 +93,8 @@ importers:
         specifier: 0.0.18
         version: 0.0.18
       meilisearch:
-        specifier: ^0.58.0
-        version: 0.58.0
+        specifier: ^0.51.0
+        version: 0.51.0
       next:
         specifier: ^15.5.15
         version: 15.5.15(@babel/core@7.29.0)(@playwright/test@1.57.0)(react-dom@19.0.4(react@19.0.4))(react@19.0.4)
@@ -3437,9 +3437,8 @@ packages:
   meilisearch@0.25.1:
     resolution: {integrity: sha512-20jO0pK9BhghxHSkOLbdoYn58h/Z0PNL3JQcRq7ipNIeqrxkAetCZZ6ttJC3uxcz0jVglmiFoSXu3Z/lEOLOLQ==}
 
-  meilisearch@0.58.0:
-    resolution: {integrity: sha512-MXFlU+JVG2I3tDI4brS3UHxEv2fjOROP24TPP16c8dGHTulb1kxMgXvKP0x4ImvUcsVVJFi4QXP0JNDS/TaWaw==}
-    engines: {node: ^20.19.0 || >=22.12.0}
+  meilisearch@0.51.0:
+    resolution: {integrity: sha512-IuNsYyT8r/QLhU33XDZdXWUT6cA/nACCHHZc+NHkNuaU55LELRxff1uBJhpJcwjYaAPEEmeWrzBhYl2XlhJdAg==}
 
   merge-stream@2.0.0:
     resolution: {integrity: sha512-abv/qOcuPfk3URPfDzmZU1LKmuw8kT+0nIHvKrKgFrwifol/doWcdA4ZqsWQ8ENrFKkd67Mfpo/LovbIUsbt3w==}
@@ -8382,7 +8381,7 @@ snapshots:
     transitivePeerDependencies:
       - encoding
 
-  meilisearch@0.58.0: {}
+  meilisearch@0.51.0: {}
 
   merge-stream@2.0.0: {}
 

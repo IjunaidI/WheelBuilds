@@ -38,9 +38,9 @@ function snap(mm: number): number {
 }
 
 function format(count: number, mm: number): string {
-  // Trim a trailing ".0": 127.0 → "127", keep "114.3".
-  const pcd = Number.isInteger(mm) ? String(mm) : String(mm)
-  return `${count}x${pcd}`
+  // JS's String() never produces a trailing ".0" for integer-valued numbers,
+  // so 127.0 → "127" and 114.3 → "114.3" naturally.
+  return `${count}x${mm}`
 }
 
 export function canonicalBoltPatterns(input: string): string[] {

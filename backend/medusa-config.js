@@ -184,7 +184,8 @@ const medusaConfig = {
             indexSettings: {
               searchableAttributes: ['title', 'brand', 'skus'],
               displayedAttributes: [
-                'id', 'handle', 'title', 'thumbnail', 'brand', 'finish', 'skus',
+                'id', 'handle', 'title', 'description', 'thumbnail', 'brand',
+                'finish', 'skus',
                 'diameters', 'widths', 'offsets', 'bolt_patterns',
                 'bolt_patterns_canonical', 'center_bores',
                 'price_min', 'price_max', 'created_at', 'product_type',
@@ -206,8 +207,7 @@ const medusaConfig = {
             transformer: (product) =>
               buildSearchDocument(product) ?? {
                 id: product.id,
-                product_type:
-                  (product.metadata && product.metadata.product_type) || 'non-wheel',
+                product_type: product?.metadata?.product_type || 'non-wheel',
               },
           }
         }

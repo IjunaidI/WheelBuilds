@@ -52,7 +52,20 @@ const nextConfig = {
   },
   serverRuntimeConfig: {
     port: process.env.PORT || 3000
-  }
+  },
+  webpack: (config, { dev, nextRuntime }) => {
+    // Next 15.5.x dev mode pushes an `EvalSourceMapDevToolPlugin` into every
+    // bundle, including the Edge runtime bundle that runs middleware. Edge
+    // rejects eval() ("Code generation from strings disallowed"), so strip the
+    // plugin from the Edge bundle. Setting `config.devtool` does nothing here —
+    // Next already sets it to `false` and emits eval via the plugin.
+    if (dev && nextRuntime === "edge" && Array.isArray(config.plugins)) {
+      config.plugins = config.plugins.filter(
+        (plugin) => plugin?.constructor?.name !== "EvalSourceMapDevToolPlugin"
+      )
+    }
+    return config
+  },
 }
 
 module.exports = nextConfig

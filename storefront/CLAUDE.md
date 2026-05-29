@@ -10,7 +10,7 @@ A MedusaJS 2.x Next.js 15 (App Router, React 19) storefront for **Wheel Builds**
 
 ## Design coverage
 
-Every screen from the original Wheel Builds design bundle is built. The work is **chrome-complete, data-mocked**: the visual layer + interaction patterns are production-grade, but Discovery and PDP read from in-memory mock adapters until the Medusa + Meilisearch wiring lands. The home, search drawer, nav, footer, and cart use real (or empty-real) data already.
+Every screen from the original Wheel Builds design bundle is built. As of Spec 1 the work is **chrome-complete and data-live**: Discovery reads from Meilisearch (vendor-sync-indexed wheel docs) and PDP reads from the Medusa Store API. The home, search drawer, nav, footer, and cart were already wired against real data; Spec 2 layers on the wheel-size.com fitment join.
 
 | Surface | Route | Status | Notes |
 |---|---|---|---|
@@ -18,18 +18,17 @@ Every screen from the original Wheel Builds design bundle is built. The work is 
 | Nav (desktop + mobile) | (all `(main)` routes) | **Shipped** | 56px mobile utility bar + hamburger Vaul drawer; 40px desktop utility + 56px primary nav |
 | Footer | (all `(main)` routes) | **Shipped** | 5-col desktop → 2-col xsmall+ → stacked mobile |
 | Search drawer | `(main)/layout.tsx` mount | **Shipped** | Vaul `direction="right"`, opens via Cmd/Ctrl+K, search trigger, garage pill, hero tiles |
-| Discovery (catalog) | `/store` | **Shipped (chrome, mock data)** | Filter rail (Vehicle / Category / Brand / Diameter / Bolt Pattern / Finish / Price), sort dropdown, active-filter chips, paginated grid, empty state. Mobile rail collapses to a bottom Vaul drawer with active-count badge + "View N results" footer. Integration seam at [data/get-products.ts](src/modules/discovery/data/get-products.ts). |
-| Product Detail | `/products/[handle]` | **Shipped (chrome, mock data)** | Breadcrumb, hero (gallery + variant picker + purchase panel), specs grid, fitment list with active-vehicle status, related products. Every handle resolves to a single dummy product. Integration seam at [data/get-product.ts](src/modules/product-detail/data/get-product.ts). |
+| Discovery (catalog) | `/store` | **Shipped (live data)** | Filter rail (Vehicle / Brand / Diameter / Bolt Pattern / Finish / Price), sort dropdown, active-filter chips, paginated grid, empty state. Mobile rail collapses to a bottom Vaul drawer with active-count badge + "View N results" footer. Data comes from a disjunctive Meilisearch `multiSearch` (one hits query + one facet query per dimension, each facet counted with the OTHER filters applied). |
+| Product Detail | `/products/[handle]` | **Shipped (live data)** | Breadcrumb, hero (gallery + variant picker + purchase panel), specs grid, fitment list with active-vehicle status, related products. Reads live from the Medusa Store API; bogus handles 404 via `notFound()` propagated through `generateMetadata` + the page. |
 | Mobile responsive | (all surfaces above) | **Shipped** | One `small:` breakpoint at 1024px divides mobile and desktop. Discovery rail → bottom drawer, nav → hamburger, hero headline 132→64px, grids collapse 6→2 cols, hero split → stacked, etc. |
 
 **Out of scope** (called out in the original design bundle but skipped at project start):
 - The Tweaks panel that switches between three Mood / three Accent / three Display axes. The shipped storefront bakes in **Garage mood · High accent · Wide display**; adding the other modes is a separate scoped piece of work (state plumbing + CSS variants + the panel itself).
 
 **Engineering follow-up that doesn't affect the design contract** (see also DESIGN.md §10):
-- Real Meilisearch + Medusa data wiring on Discovery and PDP (chrome-first was the explicit project choice). Three integration seams clearly marked; recipes in [the Discovery](#discovery-catalog-page) and [PDP](#product-detail-pdp) sections below.
 - Real product photography (every photographic element is an `<ImgPlaceholder>` today).
 - Cart server-action wiring on PDP add-to-cart and wishlist (currently toast only).
-- Phase 2.1 vehicle fitment data (currently a substring heuristic in the Fitment section).
+- Phase 2.1 vehicle fitment data — Spec 1 wired the substrate (`bolt_patterns_canonical` index field + `DiscoveryQuery.vehicleConstraint` seam + the canonical bolt-pattern normalizer); Spec 2 lands the wheel-size.com client + matcher + persistent garage.
 
 ## Layout
 
@@ -41,15 +40,15 @@ storefront/src/
 │   │   ├── page.tsx      # Home — composes the design's home sections
 │   │   ├── store/        # catalog
 │   │   ├── products/[handle]/
-│   │   ├── categories/, collections/, cart/, account/, order/
-│   │   └── results/[query]/  # search results route
+│   │   └── categories/, collections/, cart/, account/, order/
 │   └── (checkout)/       # separate layout for the checkout flow
 ├── components/ui/        # shadcn primitives (drawer, sheet, dialog, dropdown-menu, tooltip, sonner, command, button)
 ├── lib/
 │   ├── garage/           # vehicle garage abstraction (swap-ready for Phase 2.2)
 │   ├── stores/           # tiny client-side stores (search-open, recent-searches)
 │   ├── data/             # Medusa API calls (cart, customer, orders, regions, products…)
-│   ├── search-client.ts  # Meilisearch wrapper
+│   ├── meilisearch.ts    # server-only MeiliSearch client (Discovery adapter)
+│   ├── search-client.ts  # client-side InstantSearch wrapper (legacy; kept for any client widgets)
 │   ├── utils.ts          # cn() helper for shadcn / WB primitives
 │   └── util/             # legacy util/ dir — env, money, etc.
 ├── modules/
@@ -117,8 +116,9 @@ Same pattern (module-level state + emitter set + `useSyncExternalStore`). If you
 
 - The drawer is mounted once in `(main)/layout.tsx` via [`<SearchMount />`](src/modules/search/components/search-mount/index.tsx). It wraps a [Vaul `<Drawer direction="right">`](src/components/ui/drawer.tsx) which owns Esc/overlay-click/drag-to-dismiss/scroll-lock/focus-trap/slide-animation. The only custom behavior left in SearchMount is the global `Cmd/Ctrl+K` opener.
 - Triggers: the nav search icon ([`SearchTrigger`](src/modules/search/components/search-trigger/index.tsx)), the [`GaragePill`](src/modules/layout/components/garage-pill/index.tsx) in the nav, and the hero's vehicle tiles + "USE MY GARAGE" button.
-- Submit → `/<countryCode>/results/<encoded query>` via the existing [`search()`](src/modules/search/actions.ts) Server Action and [`SearchResultsTemplate`](src/modules/search/templates/search-results-template/).
-- The Year/Make/Model pane writes the new vehicle to the garage, sets it active, then routes to `/store`. Once Phase 2.1 lands, the destination becomes a fitment-filtered URL — change that one route in [`ymm-pane.tsx`](src/modules/search/components/search-drawer/find-by-vehicle/ymm-pane.tsx) and [`garage-pane.tsx`](src/modules/search/components/search-drawer/find-by-vehicle/garage-pane.tsx).
+- Text submit → `/<countryCode>/store?q=<encoded query>`. Discovery's server-component adapter reads `q` into Meilisearch full-text search (`searchableAttributes: title, brand, skus`). Recent-search and trending chips route the same way.
+- Popular-search chips route to facet filter URL params (`?finishes=black`, `?diameters=20`) rather than free-text `q`, because chip values are facet axes. (The legacy `search()` Server Action and `SearchResultsTemplate` were retired in Task 9.)
+- The Year/Make/Model pane writes the new vehicle to the garage, sets it active, then routes to `/store`. Spec 2 appends the fitment query param via `DiscoveryQuery.vehicleConstraint` — no change to [`ymm-pane.tsx`](src/modules/search/components/search-drawer/find-by-vehicle/ymm-pane.tsx) or [`garage-pane.tsx`](src/modules/search/components/search-drawer/find-by-vehicle/garage-pane.tsx) beyond appending a search-param tail.
 
 ## Fonts
 
@@ -131,7 +131,7 @@ Loaded via `next/font/google` in [`app/layout.tsx`](src/app/layout.tsx): Antonio
 - Server: get it from `params` (`{ params: Promise<{ countryCode: string }> }` in Next 15).
 - Client: `const { countryCode } = useParams() as { countryCode: string }`.
 - For links, use [`LocalizedClientLink`](src/modules/common/components/localized-client-link/index.tsx) — it prepends the country code automatically.
-- For imperative `router.push(...)`, prepend it yourself: `router.push(`/${countryCode}/results/${encodeURIComponent(q)}`)`.
+- For imperative `router.push(...)`, prepend it yourself: `router.push(`/${countryCode}/store?q=${encodeURIComponent(q)}`)`.
 
 ## Build + verification
 
@@ -201,18 +201,22 @@ The pattern when extending: if a section needs interactive behavior (drawer, dro
 
 ## Discovery (catalog) page
 
-The `/store` route is the catalog / discovery page. It lives at [`modules/discovery/`](src/modules/discovery/) and is composed from the WB primitives + shadcn primitives + a small mock data layer. **As of Jan 2026 the data is mocked — only the chrome is wired.** The mock catalog and facets ship deterministic results so SSR/CSR match.
+The `/store` route is the catalog / discovery page. It lives at [`modules/discovery/`](src/modules/discovery/) and is composed from the WB primitives + shadcn primitives + a server-only Meilisearch adapter. Data is live via a disjunctive `multiSearch` adapter — one hits query + one per-dimension facet query, each facet counted with the OTHER filters applied so toggling within a dimension never collapses its own counts to zero.
 
 Layout:
 
 ```
 src/modules/discovery/
 ├── data/
-│   ├── types.ts                 — DiscoveryProduct, DiscoveryFilters, FacetCounts, SortOption
-│   ├── mock-products.ts         — 60-row deterministic catalog
-│   ├── mock-facets.ts           — facet count computation from mock catalog
-│   ├── get-products.ts          — adapter: parses URL params, filters/sorts/paginates,
-│   │                              returns DiscoveryResult. The integration seam.
+│   ├── types.ts                 — DiscoveryProduct, DiscoveryFilters, FacetCounts, SortOption.
+│   │                              Also exports parseQueryFromSearchParams (moved from
+│   │                              get-products so the client useDiscoveryQuery hook can
+│   │                              import it without pulling server-only transitively).
+│   ├── get-products.ts          — real Meilisearch multiSearch adapter with disjunctive
+│   │                              facets. Reads URL ?q into full-text search; scopes to
+│   │                              product_type = "wheel". vehicleConstraint?: string[]
+│   │                              is the Spec 2 seam. Returns empty DiscoveryResult on
+│   │                              Meilisearch failure (never throws).
 │   └── use-discovery-query.ts   — client hook: reads filters from search params,
 │                                   provides toggleArrayFilter/setSort/setPage/clearAll
 ├── components/
@@ -227,23 +231,23 @@ src/modules/discovery/
     └── index.tsx                — composes everything; server component
 ```
 
-**Source of truth for filter state is URL search params** (`?categories=street&brands=BLACKLINE+FORGED&diameters=22&sort=price-asc&page=2`). The server component re-runs whenever any param changes; client components write back via `useDiscoveryQuery` (which delegates to `router.push`).
+**Source of truth for filter state is URL search params** (`?brands=BLACKLINE+FORGED&diameters=22&sort=price-asc&page=2`). The server component re-runs whenever any param changes; client components write back via `useDiscoveryQuery` (which delegates to `router.push`). The adapter also reads `?q=<text>` into Meilisearch full-text search.
 
-**Integration seam (when real data wiring lands):**
+**Live wiring:**
 
-1. Replace the body of `getDiscoveryProducts(query)` in [data/get-products.ts](src/modules/discovery/data/get-products.ts) with a Meilisearch query. Meilisearch is already wired in `backend/medusa-config.js`; index attributes (brand, finish, diameter, bolt_pattern, categories, price) need to be added to the plugin block.
-2. Map Meilisearch hits → `DiscoveryProduct`. Shape stays stable; no consumer changes.
-3. Pull `facets` from the same response's `facetDistribution`. Drop `mock-facets.ts`.
-4. Region-scoped Medusa price lookups happen in the adapter too (see `modules/store/templates/paginated-products.tsx` for the existing region resolution).
-5. `useDiscoveryQuery` does **not** change — it only manipulates URL params.
+1. One `meili.multiSearch` batch: a hits query + N facet queries (`FACET_FIELDS = [brand, diameters, bolt_patterns, finish]`), each facet query counted with the OTHER filters applied via the `buildFilters` `skip` arg so disjunctive counts stay correct within a dimension.
+2. Hits → `DiscoveryProduct` via `hitToProduct` (price_min is integer cents, read directly into `priceCents`).
+3. The indexed doc is produced by [`backend/src/modules/vendor-sync/search/build-search-document.ts`](../backend/src/modules/vendor-sync/search/build-search-document.ts) (per-product transformer; returns `null` for non-wheels, which `medusa-config.js` coalesces into `{id, product_type:"non-wheel"}`). Index settings — `filterableAttributes`, `sortableAttributes`, `searchableAttributes`, `displayedAttributes` — are wired in [`backend/medusa-config.js`](../backend/medusa-config.js) on the `@rokmohar/medusa-plugin-meilisearch` plugin block.
+4. `vehicleConstraint?: string[]` on `DiscoveryQuery` is the Spec 2 seam — empty in Spec 1. Spec 2 appends extra Meilisearch filter clauses derived from the active vehicle's wheel-size.com spec.
+5. `useDiscoveryQuery` only manipulates URL params — no change there.
 
-The legacy [`modules/store/`](src/modules/store/) ships alongside as the reference for real Medusa wiring (it has working `getProductsListWithSort` / `getRegion` calls). Nothing imports it anymore — delete it once the discovery adapter is real.
+`modules/store/` is **retained** (not deleted) because `SortOptions`, `RefinementList`, and `PaginatedProducts` are still imported by the categories page, collections page, `lib/data/products.ts`, `lib/util/sort-products.ts`, `modules/categories/templates`, and `modules/collections/templates`.
 
-`TODO(integration)` comments in the rail mark places that need follow-up: the Vehicle band's "only show wheels that fit" toggle (depends on Phase 2.1 fitment data) and the Price section's TextInputs (should become a `<Slider>` once a real min/max range is available from Meilisearch).
+`TODO(integration)` comments in the rail still mark follow-ups: the Vehicle band's "only show wheels that fit" toggle is now wired for Spec 2 to feed `DiscoveryQuery.vehicleConstraint`; the Price section's TextInputs should become a `<Slider>` once a real min/max range is surfaced from Meilisearch.
 
 ## Product Detail (PDP)
 
-The `/products/[handle]` route is the product detail page. It lives at [`modules/product-detail/`](src/modules/product-detail/) and follows the same mock-first / single-adapter pattern as Discovery. **As of Jan 2026 the data is mocked — every handle resolves to the same dummy `BLACKLINE BL-7 MONOBLOCK`.** This means every product card on the site (home `NewDropsRow`, Discovery grid, PDP related row) routes to a working PDP, even though no real catalog is wired.
+The `/products/[handle]` route is the product detail page. It lives at [`modules/product-detail/`](src/modules/product-detail/) and follows the same single-adapter pattern as Discovery. Data is live from the Medusa Store API (price + stock authoritative) via `getProductByHandle`, which is `React.cache`'d so `getRelatedProducts` dedupes the lookup.
 
 Layout:
 
@@ -252,10 +256,14 @@ src/modules/product-detail/
 ├── data/
 │   ├── types.ts             — ProductDetail (extends DiscoveryProduct + adds
 │   │                          description, specs, finishOptions, sizeOptions,
-│   │                          boltPatternOptions, fitment, relatedHandles)
-│   ├── mock-detail.ts       — one fully-populated product
-│   └── get-product.ts       — adapter: getProductDetail(handle) +
-│                              getRelatedProducts(product). THE SEAM.
+│   │                          boltPatternOptions, fitment, relatedHandles).
+│   │                          OffsetVariant has optional priceCents so the PDP
+│   │                          can price the SELECTED offset, not the size minimum.
+│   └── get-product.ts       — real Medusa Store API adapter. Maps variants →
+│                              Diameter×Width sizeOptions with best-availability +
+│                              min-non-zero-price across sibling offsets;
+│                              getRelatedProducts queries by same brand collection_id;
+│                              bogus handle → notFound().
 ├── components/
 │   ├── breadcrumb/          — Wheels > Brand > Model
 │   ├── hero/
@@ -270,20 +278,22 @@ src/modules/product-detail/
     └── index.tsx            — composes everything; server component
 ```
 
-**Integration seam (when real data wiring lands):**
+**Live wiring:**
 
-1. Replace the body of `getProductDetail(handle)` in [data/get-product.ts](src/modules/product-detail/data/get-product.ts) with `lib/data/products.ts → getProductByHandle(handle, region.id)`. Region resolution: see the legacy `modules/store/templates/paginated-products.tsx`.
-2. Map Medusa product + variants → `ProductDetail`. Variants become `sizeOptions` (one per Diameter×Width); variant metadata carries weight/offset/finish/bolt-pattern. The vendor-sync apply pipeline already populates these on the catalog.
-3. `getRelatedProducts` becomes a sibling `getProductsList` filtered by collection_id or tag_id.
-4. `fitment` comes from the Phase 2.1 fitment table (currently empty). Return `[]` when no data — the Fitment section gracefully degrades.
-5. Restore `generateStaticParams` and `notFound()` for missing handles in [the page](src/app/[countryCode]/(main)/products/[handle]/page.tsx). Today every handle resolves to mock.
+1. `getProductDetail(handle)`: `getRegion(DEFAULT_COUNTRY)` → `getProductByHandle(handle, region.id)`. The `lib/data/products.ts` fields string now includes `+collection_id` so `getRelatedProducts` can find the brand collection.
+2. `notFound()` in the adapter propagates through both `generateMetadata` and the page component — bogus handles 404 cleanly.
+3. `mapToDetail`: groups variants by `${diameter}x${width}` into `sizeOptions`; sibling offsets accumulate as `offsetVariants`; availability uses best-of-siblings ranking (`in_stock` > `low_stock` > `out_of_stock`) so the size cell shows `in_stock` when ANY offset is available; `priceCentsOverride` = min non-zero across siblings. Per-offset `priceCents` on `OffsetVariant` lets the panel price the selected offset, not the size minimum.
+4. `getRelatedProducts`: queries the same brand `collection_id`, capped at 6, excludes self.
+5. `fitment`: `[]` (Spec 2). The Fitment section degrades gracefully on empty.
+6. Specs grid: `construction` / `countryOfOrigin` / `warranty` default to `"—"` (not in vendor data — gap 4.1). `weightLb = product.weight / 453.592` (Medusa stores grams).
+7. The finish normalization rule lives in the adapter as a byte-equivalent copy of [`backend/src/modules/vendor-sync/search/normalize-finish.ts`](../backend/src/modules/vendor-sync/search/normalize-finish.ts) — keep them in lockstep.
 
-Three `TODO(integration)` anchors are sprinkled in the code:
+Three `TODO(integration)` anchors remain in the code:
 - `purchase-panel.tsx` Add-to-cart → wire `lib/data/cart.ts → addToCart`
 - `purchase-panel.tsx` Save-to-wishlist → wire when a wishlist Server Action exists
-- `fitment/index.tsx` heuristic — replace the make+model substring check with a real fitment-table lookup once Phase 2.1 data lands
+- `fitment/index.tsx` — Spec 2 will replace the substring heuristic with a wheel-size.com fitment match
 
-The legacy [`modules/products/`](src/modules/products/) ships alongside as the reference for the real Medusa data wiring. Nothing imports it from the new PDP path — delete it once the swap is done.
+`modules/products/` is **retained** (not deleted) because `Thumbnail` is imported by `modules/account/components/order-card`, `modules/cart/components/item`, `modules/checkout/templates/checkout-summary`, `modules/layout/components/cart-dropdown`, and `modules/order/components/item`.
 
 ## Gotchas
 
@@ -293,6 +303,7 @@ The legacy [`modules/products/`](src/modules/products/) ships alongside as the r
 - **Featured-products module** ([modules/home/components/featured-products](src/modules/home/components/featured-products)) is dead code (no longer imported by the home page). Delete during a cleanup pass.
 - **`(main)` layout's `.frame` applies to every page in the group**, including `/store`, `/cart`, `/products/[handle]`, etc. Those pages don't use the design classes, but they inherit `.frame`'s background (faint grid pattern on `#FAFAF8`) and base font size. If a future page needs a different chrome (e.g. a fully bleached PDP), wrap that page in a counter-class or move `.frame` to a per-page wrapper.
 - **No scroll-reveal / fade-in-on-scroll animations** — they were prototyped and removed; commerce pages should be instantly scannable. Stick to the existing hover lifts on cards + the shadcn/Vaul primitive motion. If a future surface genuinely needs an entry animation (a special-edition launch hero, say), add it scoped to that one section rather than globally.
+- **`/<countryCode>/results/*` now 404s.** Task 9 deleted the legacy route and Task 8 retired every internal navigation to it. External bookmarks or indexed URLs still pointing there will break — a redirect rule in `next.config.js` (`/results/:query → /store?q=:query`) would be a nice SEO guard but is intentionally out of scope for Spec 1.
 
 ## Adding new pages or sections
 

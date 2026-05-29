@@ -10,6 +10,15 @@ Companion docs:
 
 ---
 
+## Recently shipped (Spec 1)
+
+The fitment-ready catalog + faceted search work is live on this branch ([spec](docs/superpowers/specs/2026-05-28-fitment-ready-catalog-search-design.md), [plan](docs/superpowers/plans/2026-05-28-fitment-ready-catalog-search.md)).
+
+- **Closed:** gap 2.3 (Search facets) for **wheels**. Tires remain pending — they need a separate spec (different facet axes, plus a tire grouping rule that does not exist yet).
+- **Substrate for gap 2.1 (Fitment) is wired:** `bolt_patterns_canonical` is the indexed join key with wheel-size.com; `DiscoveryQuery.vehicleConstraint?: string[]` is the Meilisearch-filter seam Spec 2 fills; `canonicalBoltPatterns` is a shippable shared util the fitment client will reuse verbatim. Spec 2 is therefore a thin filter-derivation layer over the existing index, not a new subsystem.
+
+---
+
 ## Tier definitions
 
 | Tier | Meaning |
@@ -37,9 +46,9 @@ Sizes are rough: S (≤ 1 day), M (2-5 days), L (1-2 weeks), XL (>2 weeks).
 
 | # | Gap | Detail | Dependency | Size |
 |---|---|---|---|---|
-| 2.1 | Fitment data | Vehicle-to-SKU compatibility mapping. Vehicle taxonomy is year × make × model × (submodel/drive depending on data source). **WheelPros does NOT ship fitment data.** Candidate external source: [wheel-size.com REST API](https://developer.wheel-size.com/) — covers `usdm` (US domestic market) region with bolt pattern, PCD, offset, OE + aftermarket tire sizes, rim dimensions. Different from vendor-sync architecturally: either runtime API with caching, or bulk import (Enterprise tier only). **This is the elephant in Phase 2.** | — | XL |
+| 2.1 | Fitment data | Vehicle-to-SKU compatibility mapping. **WheelPros ships no fitment data.** Source: [wheel-size.com REST API](https://developer.wheel-size.com/) on the Basic tier (~$450/yr, 5k hits/day, single API-key auth). Granularity is finer than feared — `/modifications/` is the leaf endpoint, returning trim × body × engine per model-year; drivetrain is a string inside `trim_attributes[]`. TPMS is **not** in the response (separate sourcing problem for §2.5). **Lazy-cache architecture:** call `/search/by_model/` when a real user adds a vehicle to their garage, call `/by_rim/search/` when a real user opens a wheel PDP, persist responses in our DB indefinitely. TOS forbids bulk pre-fetching or cron-driven cache warming — caching is permitted only on responses to human-initiated calls. Implications: §2.3 facets can't pre-index fitment, and PDP "fits these vehicles" populates lazily on first organic visit. **Spec 1 wired the substrate:** `bolt_patterns_canonical` is indexed + filterable on every wheel doc (canonical "{count}x{pcd_mm}" snapped to standard PCD — the wheel-size.com join key); `DiscoveryQuery.vehicleConstraint?: string[]` is the Meilisearch-filter seam already plumbed through `/store`; `canonicalBoltPatterns` is a shareable util. Spec 2 is a thin filter-derivation layer over the existing index, not a new subsystem. | — | L |
 | 2.2 | Vehicle garage | Customer saves vehicle(s); storefront filters and recommends from them. New `customer_vehicle` table linked to Medusa customers. | 2.1 | M |
-| 2.3 | Search facets | Meilisearch indexes only `title/desc/sku/handle` today. Real wheel/tire search needs `filterableAttributes` for Bolt Pattern, Diameter, Width, Offset, Brand, Finish, Tire Size, Construction. Same plugin, larger index config. | — | S backend + frontend work |
+| 2.3 | ✓ Search facets (wheels) | **Wheels done (Spec 1).** The Meilisearch product index now carries the full wheel facet axes — `brand`, `finish`, `diameters`, `widths`, `bolt_patterns`, `bolt_patterns_canonical`, `offsets`, `center_bores`, `price_min`, `price_max`, `product_type` — plus sortable `price_min`, `created_at`, `title`. Indexing is driven by a per-product transformer in [`backend/src/modules/vendor-sync/search/build-search-document.ts`](backend/src/modules/vendor-sync/search/build-search-document.ts), wired in `medusa-config.js`. Discovery (`/store`) performs disjunctive faceted multi-search against this index. **Tires still pending** — they need a separate spec (different facet axes, plus a tire grouping rule that does not exist yet). | — | done (wheels) / S+M (tires) |
 | 2.4 | Set-of-4 quick add | Most wheel orders are 4. PDP default qty = 4, "Buy as set" button, optional lug-kit upsell. Backend already supports quantity; this is mostly storefront. | — | S backend + M frontend |
 | 2.5 | TPMS upsell | Tires need TPMS sensors for newer vehicles. Single TPMS SKU offered as a qty-matched upsell on every tire PDP. Backend: manually create TPMS product + a related-product link. | — | S backend + M frontend |
 | 2.6 | MAP enforcement | Vendor agreements typically forbid publicly displaying MAP. Policy options: show MSRP always, MAP only in cart, MAP only logged-in, click-to-reveal. Today MSRP is the variant price; MAP is in variant metadata but never surfaced. Policy is mostly a business/legal decision; the implementation follows. | — | M |
@@ -84,10 +93,10 @@ Sizes are rough: S (≤ 1 day), M (2-5 days), L (1-2 weeks), XL (>2 weeks).
 ## Recommended phasing
 
 **Phase 2a — Storefront unblocking (≈ 1 week)**
-1.1, 1.2, 1.3, 1.4, 2.3 (search index config), 2.6 (MAP policy + minimum implementation). After this you can launch a generic-but-functional storefront.
+1.1, 1.2, 1.3, 1.4, 2.6 (MAP policy + minimum implementation). After this you can launch a generic-but-functional storefront. (2.3 wheels shipped via Spec 1; tire facets carry forward into a later tire-specific spec.)
 
 **Phase 2b — Industry features (≈ 3-5 weeks, fitment dominates)**
-2.1 (fitment ingestion), 2.2 (garage), 2.4 (set-of-4), 2.5 (TPMS), 2.7 (brand pages). After this the site IS a wheels-and-tires storefront, not a generic shop.
+2.1 (fitment ingestion — Spec 2 leverages the Spec 1 substrate, so this is a thin filter-derivation layer over the existing index + a persistent-garage swap rather than the originally-feared XL), 2.2 (garage), 2.4 (set-of-4), 2.5 (TPMS), 2.7 (brand pages). After this the site IS a wheels-and-tires storefront, not a generic shop.
 
 **Phase 3 — Production hardening (≈ 2-3 weeks)**
 3.1 → 3.5 in sequence (shipping → routing → PO → webhooks → reservation), 3.6 (RMA), 3.7 (emails). Required before significant real-customer traffic.
@@ -106,7 +115,7 @@ These are not technical questions; they need information from outside the codeba
 
 | Gap | Open question |
 |---|---|
-| 2.1 Fitment | wheel-size.com is the candidate data source. Three decisions outstanding: (a) **pricing tier** — runtime API integration ($450-$1,570/yr, capped at 5k-40k hits/day) vs Enterprise (custom quote, the only tier with explicit commercial-use language and bulk-database option); (b) **schema granularity** — confirm whether `search/by_model` returns trim/submodel/drivetrain or only make+model+year (their headline example uses only year/make/model, which would be coarser than typical US dealer practice); (c) **commercial-use terms** at `/api-tos` — confirm we can use the data to power a B2C storefront, and whether attribution is required. |
+| 2.1 Fitment | **Resolved 2026-05-27.** Source: wheel-size.com Basic tier (~$450/yr, 5k hits/day). Schema: `/modifications/` returns trim × body × engine per model-year (drivetrain as a string in `trim_attributes[]`); reverse lookup via `/by_rim/search/`. Commercial use is permitted — we are a customer of fitment data, not a competitor to wheel-size.com itself; caching is permitted on responses to human-initiated calls (no automated bulk fetch or warming). Residual one-time items before build: validate response shape with a Sandbox key against ~5 known vehicles; one-time legal pass on Russia governing law + $100 liability cap + AS-IS data disclaimer; source TPMS data separately for §2.5. |
 | 2.6 MAP enforcement | What does the dealer agreement with WheelPros actually require? "MAP" by itself is ambiguous; the legal answer dictates the technical policy. |
 | 3.1-3.5 Drop-ship | What channel does WheelPros use for PO submission and status (SFTP folder structure, sFTP file naming, real API endpoint)? Cadence of status files? |
 | 1.3 Sales tax | Are you committing to TaxJar/Avalara monthly cost, or building per-state rates manually? Wholesale dealer license sometimes complicates this. |

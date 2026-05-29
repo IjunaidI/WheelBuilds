@@ -72,6 +72,7 @@ export async function stageFeed(
       run_id: runId,
       vendor_code: adapter.vendorCode,
       part_number: normalized.partNumber,
+      group_key: normalized.groupKey,
       row_json: parsedRow.raw,
       normalized,
       content_hash: contentHash,

@@ -4,6 +4,7 @@ const VendorProductCurrent = model.define("vendor_product_current", {
   id: model.id().primaryKey(),
   vendor_code: model.text(),
   part_number: model.text(),
+  group_key: model.text(),
   content_hash: model.text(),
   medusa_product_id: model.text().nullable(),
   medusa_variant_id: model.text().nullable(),
@@ -16,6 +17,7 @@ const VendorProductCurrent = model.define("vendor_product_current", {
   { on: ["vendor_code", "part_number"], unique: true },
   { on: ["medusa_product_id"] },
   { on: ["vendor_code", "content_hash"] },
+  { on: ["vendor_code", "group_key"] },
 ])
 
 export default VendorProductCurrent

@@ -1,7 +1,7 @@
 import { ExecArgs } from "@medusajs/framework/types"
 import { ContainerRegistrationKeys } from "@medusajs/framework/utils"
 import { VENDOR_SYNC_MODULE } from "../modules/vendor-sync"
-import { computeDiff } from "../modules/vendor-sync/pipeline/diff"
+import { computeGroupDiff } from "../modules/vendor-sync/pipeline/diff"
 import { applyChanges } from "../modules/vendor-sync/pipeline/apply"
 
 const ALLOWED_STATUSES = ["completed", "diffing", "failed"]
@@ -80,12 +80,25 @@ export default async function vendorSyncApply({ container }: ExecArgs) {
     })
 
     logger.info(`[apply] Re-computing diff against current state...`)
-    const diff = await computeDiff(vendorSyncService, runId, vendorCode)
+    const diff = await computeGroupDiff(vendorSyncService, runId, vendorCode)
+
+    let newParts = 0
+    let changedParts = 0
+    let discontinuedParts = 0
+    for (const g of diff.newGroups) newParts += g.part_numbers.length
+    for (const g of diff.changedGroups) {
+      newParts += g.added_part_numbers.length
+      changedParts += g.changed_part_numbers.length
+      discontinuedParts += g.removed_part_numbers.length
+    }
+    for (const g of diff.discontinuedGroups)
+      discontinuedParts += g.part_numbers.length
 
     logger.info(
-      `[apply] Diff: ${diff.newPartNumbers.length} new, ` +
-        `${diff.changedPartNumbers.length} changed, ` +
-        `${diff.discontinuedPartNumbers.length} discontinued`
+      `[apply] Diff: newGroups=${diff.newGroups.length} ` +
+        `changedGroups=${diff.changedGroups.length} ` +
+        `discontinuedGroups=${diff.discontinuedGroups.length} ` +
+        `(${newParts} new parts, ${changedParts} changed parts, ${discontinuedParts} discontinued parts)`
     )
 
     const result = await applyChanges(
@@ -124,27 +137,28 @@ export default async function vendorSyncApply({ container }: ExecArgs) {
     logger.info(`Vendor:              ${vendorCode}`)
     logger.info(`Run ID:              ${runId}`)
     logger.info(`Final status:        ${result.cancelled ? "cancelled" : "completed"}`)
-    logger.info(`Processed:           ${result.processedCount}`)
+    logger.info(`Product groups:      ${result.groupCount}`)
+    logger.info(`Variants processed:  ${result.processedCount}`)
     logger.info(`Errors:              ${result.errorCount}`)
     logger.info(`Duration:            ${elapsed}s`)
     if (result.errors.length > 0) {
       const grouped = new Map<string, string[]>()
       for (const err of result.errors) {
         const list = grouped.get(err.error) ?? []
-        list.push(err.partNumber)
+        list.push(err.groupKey ?? err.partNumber ?? "(unknown)")
         grouped.set(err.error, list)
       }
       logger.info("Errors by message:")
       const sortedGroups = Array.from(grouped.entries()).sort(
         (a, b) => b[1].length - a[1].length
       )
-      for (const [message, partNumbers] of sortedGroups) {
-        logger.info(`  [${partNumbers.length}x] ${message}`)
-        for (const pn of partNumbers.slice(0, 3)) {
-          logger.info(`     - ${pn}`)
+      for (const [message, subjects] of sortedGroups) {
+        logger.info(`  [${subjects.length}x] ${message}`)
+        for (const subject of subjects.slice(0, 3)) {
+          logger.info(`     - ${subject}`)
         }
-        if (partNumbers.length > 3) {
-          logger.info(`     - ...and ${partNumbers.length - 3} more`)
+        if (subjects.length > 3) {
+          logger.info(`     - ...and ${subjects.length - 3} more`)
         }
       }
     }

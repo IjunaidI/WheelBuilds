@@ -2,8 +2,10 @@ import { listCartShippingMethods } from "@lib/data/fulfillment"
 import { listCartPaymentMethods } from "@lib/data/payment"
 import { HttpTypes } from "@medusajs/types"
 import Addresses from "@modules/checkout/components/addresses"
+import ExpressPay from "@modules/checkout/components/express-pay"
 import Payment from "@modules/checkout/components/payment"
 import Review from "@modules/checkout/components/review"
+import SectionShell from "@modules/checkout/components/section-shell"
 import Shipping from "@modules/checkout/components/shipping"
 
 export default async function CheckoutForm({
@@ -25,23 +27,21 @@ export default async function CheckoutForm({
   }
 
   return (
-    <div>
-      <div className="w-full grid grid-cols-1 gap-y-8">
-        <div>
+    <div className="flex flex-col gap-6">
+      <ExpressPay />
+      <div className="w-full flex flex-col gap-4">
+        <SectionShell num={1} title="Shipping address">
           <Addresses cart={cart} customer={customer} />
-        </div>
-
-        <div>
+        </SectionShell>
+        <SectionShell num={2} title="Shipping method">
           <Shipping cart={cart} availableShippingMethods={shippingMethods} />
-        </div>
-
-        <div>
+        </SectionShell>
+        <SectionShell num={3} title="Payment">
           <Payment cart={cart} availablePaymentMethods={paymentMethods} />
-        </div>
-
-        <div>
+        </SectionShell>
+        <SectionShell num={4} title="Review & place order">
           <Review cart={cart} />
-        </div>
+        </SectionShell>
       </div>
     </div>
   )

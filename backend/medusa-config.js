@@ -31,6 +31,7 @@ import {
   VENDOR_SYNC_APPLY_CONCURRENCY,
   VENDOR_SYNC_DRY_RUN,
 } from 'lib/constants';
+import { buildSearchDocument } from 'modules/vendor-sync/search/build-search-document';
 
 loadEnv(process.env.NODE_ENV, process.cwd());
 
@@ -173,13 +174,41 @@ const medusaConfig = {
           products: {
             type: 'products',
             enabled: true,
-            fields: ['id', 'title', 'description', 'handle', 'variant_sku', 'thumbnail'],
+            // Widened so the transformer receives variants + metadata + prices.
+            fields: [
+              'id', 'title', 'description', 'handle', 'thumbnail', 'created_at',
+              'metadata',
+              'variants.sku', 'variants.metadata',
+              'variants.prices.amount', 'variants.prices.currency_code',
+            ],
             indexSettings: {
-              searchableAttributes: ['title', 'description', 'variant_sku'],
-              displayedAttributes: ['id', 'handle', 'title', 'description', 'variant_sku', 'thumbnail'],
-              filterableAttributes: ['id', 'handle'],
+              searchableAttributes: ['title', 'brand', 'skus'],
+              displayedAttributes: [
+                'id', 'handle', 'title', 'description', 'thumbnail', 'brand',
+                'finish', 'skus',
+                'diameters', 'widths', 'offsets', 'bolt_patterns',
+                'bolt_patterns_canonical', 'center_bores',
+                'price_min', 'price_max', 'created_at', 'product_type',
+              ],
+              filterableAttributes: [
+                'brand', 'finish', 'diameters', 'widths', 'bolt_patterns',
+                'bolt_patterns_canonical', 'offsets', 'center_bores',
+                'price_min', 'price_max', 'product_type',
+              ],
+              sortableAttributes: ['price_min', 'created_at', 'title'],
             },
             primaryKey: 'id',
+            // The plugin falls back to its DEFAULT transformer when ours returns a
+            // falsy value (`transformer?.(doc) ?? defaultTransformer(doc)`), so we
+            // must never return null. buildSearchDocument returns null for
+            // non-wheels; map that to a minimal doc carrying product_type so the
+            // storefront's `product_type = "wheel"` filter excludes it (tires are
+            // a later spec).
+            transformer: (product) =>
+              buildSearchDocument(product) ?? {
+                id: product.id,
+                product_type: product?.metadata?.product_type || 'non-wheel',
+              },
           }
         }
       }

@@ -24,6 +24,11 @@ export interface NormalizedRecordBase {
   mapUsd: number
   runDateVendor: Date
   stockByWarehouse: Record<string, number>
+  // Key that buckets rows into the same Medusa product. Multiple rows
+  // sharing a groupKey become one product with N variants. Per-record-type
+  // derivation rules: wheels in adapters/wheelpros-wheels/group-key.ts;
+  // tires fall back to partNumber until a tire grouping rule is defined.
+  groupKey: string
 }
 
 export interface WheelNormalizedRecord extends NormalizedRecordBase {

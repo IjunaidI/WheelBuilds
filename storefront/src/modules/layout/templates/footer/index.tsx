@@ -1,153 +1,129 @@
-import { getCategoriesList } from "@lib/data/categories"
-import { getCollectionsList } from "@lib/data/collections"
-import { Text, clx } from "@medusajs/ui"
-
 import LocalizedClientLink from "@modules/common/components/localized-client-link"
-import MedusaCTA from "@modules/layout/components/medusa-cta"
+import Icon from "@modules/common/components/icon"
+import Logo from "@modules/common/components/logo"
+import Label from "@modules/common/components/label"
+
+const FOOTER_COLUMNS: { h: string; items: { label: string; href: string }[] }[] = [
+  {
+    h: "Shop",
+    items: [
+      { label: "All Wheels", href: "/store" },
+      { label: "New Drops", href: "/collections" },
+      { label: "Off-Road", href: "/categories" },
+      { label: "Luxury", href: "/categories" },
+      { label: "Street", href: "/categories" },
+      { label: "Truck & Dually", href: "/categories" },
+    ],
+  },
+  {
+    h: "Brands",
+    items: [
+      { label: "Forgiato Type", href: "/collections" },
+      { label: "Vossen Type", href: "/collections" },
+      { label: "Method Type", href: "/collections" },
+      { label: "Fuel Type", href: "/collections" },
+      { label: "All Brands", href: "/collections" },
+    ],
+  },
+  {
+    h: "Help",
+    items: [
+      { label: "Fitment Guide", href: "#" },
+      { label: "Bolt Pattern", href: "#" },
+      { label: "Returns", href: "#" },
+      { label: "Shipping", href: "#" },
+      { label: "Contact", href: "#" },
+    ],
+  },
+  {
+    h: "Company",
+    items: [
+      { label: "About", href: "#" },
+      { label: "Build Gallery", href: "#" },
+      { label: "Press", href: "#" },
+      { label: "Careers", href: "#" },
+      { label: "Dealers", href: "#" },
+    ],
+  },
+]
+
+const SOCIALS: { name: "instagram" | "youtube" | "tiktok" | "facebook"; label: string }[] = [
+  { name: "instagram", label: "Instagram" },
+  { name: "youtube", label: "YouTube" },
+  { name: "tiktok", label: "TikTok" },
+  { name: "facebook", label: "Facebook" },
+]
 
 export default async function Footer() {
-  const { collections } = await getCollectionsList(0, 6)
-  const { product_categories } = await getCategoriesList(0, 6)
-
   return (
-    <footer className="border-t border-ui-border-base w-full">
-      <div className="content-container flex flex-col w-full">
-        <div className="flex flex-col gap-y-6 xsmall:flex-row items-start justify-between py-40">
-          <div>
-            <LocalizedClientLink
-              href="/"
-              className="txt-compact-xlarge-plus text-ui-fg-subtle hover:text-ui-fg-base uppercase"
-            >
-              Medusa Store
-            </LocalizedClientLink>
-          </div>
-          <div className="text-small-regular gap-10 md:gap-x-16 grid grid-cols-2 sm:grid-cols-3">
-            {product_categories && product_categories?.length > 0 && (
-              <div className="flex flex-col gap-y-2">
-                <span className="txt-small-plus txt-ui-fg-base">
-                  Categories
-                </span>
-                <ul
-                  className="grid grid-cols-1 gap-2"
-                  data-testid="footer-categories"
-                >
-                  {product_categories?.slice(0, 6).map((c) => {
-                    if (c.parent_category) {
-                      return
-                    }
-
-                    const children =
-                      c.category_children?.map((child) => ({
-                        name: child.name,
-                        handle: child.handle,
-                        id: child.id,
-                      })) || null
-
-                    return (
-                      <li
-                        className="flex flex-col gap-2 text-ui-fg-subtle txt-small"
-                        key={c.id}
-                      >
-                        <LocalizedClientLink
-                          className={clx(
-                            "hover:text-ui-fg-base",
-                            children && "txt-small-plus"
-                          )}
-                          href={`/categories/${c.handle}`}
-                          data-testid="category-link"
-                        >
-                          {c.name}
-                        </LocalizedClientLink>
-                        {children && (
-                          <ul className="grid grid-cols-1 ml-3 gap-2">
-                            {children &&
-                              children.map((child) => (
-                                <li key={child.id}>
-                                  <LocalizedClientLink
-                                    className="hover:text-ui-fg-base"
-                                    href={`/categories/${child.handle}`}
-                                    data-testid="category-link"
-                                  >
-                                    {child.name}
-                                  </LocalizedClientLink>
-                                </li>
-                              ))}
-                          </ul>
-                        )}
-                      </li>
-                    )
-                  })}
-                </ul>
-              </div>
-            )}
-            {collections && collections.length > 0 && (
-              <div className="flex flex-col gap-y-2">
-                <span className="txt-small-plus txt-ui-fg-base">
-                  Collections
-                </span>
-                <ul
-                  className={clx(
-                    "grid grid-cols-1 gap-2 text-ui-fg-subtle txt-small",
-                    {
-                      "grid-cols-2": (collections?.length || 0) > 3,
-                    }
-                  )}
-                >
-                  {collections?.slice(0, 6).map((c) => (
-                    <li key={c.id}>
-                      <LocalizedClientLink
-                        className="hover:text-ui-fg-base"
-                        href={`/collections/${c.handle}`}
-                      >
-                        {c.title}
-                      </LocalizedClientLink>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
-            <div className="flex flex-col gap-y-2">
-              <span className="txt-small-plus txt-ui-fg-base">Medusa</span>
-              <ul className="grid grid-cols-1 gap-y-2 text-ui-fg-subtle txt-small">
-                <li>
-                  <a
-                    href="https://github.com/medusajs"
-                    target="_blank"
-                    rel="noreferrer"
-                    className="hover:text-ui-fg-base"
-                  >
-                    GitHub
-                  </a>
-                </li>
-                <li>
-                  <a
-                    href="https://docs.medusajs.com"
-                    target="_blank"
-                    rel="noreferrer"
-                    className="hover:text-ui-fg-base"
-                  >
-                    Documentation
-                  </a>
-                </li>
-                <li>
-                  <a
-                    href="https://github.com/medusajs/nextjs-starter-medusa"
-                    target="_blank"
-                    rel="noreferrer"
-                    className="hover:text-ui-fg-base"
-                  >
-                    Source code
-                  </a>
-                </li>
-              </ul>
-            </div>
+    <footer
+      className="px-5 pt-12 pb-8 xsmall:px-8 small:px-20 small:pt-16 bg-white"
+      style={{ borderTop: "1px solid var(--hairline)" }}
+    >
+      {/*
+        Mobile  : 1-col stack — brand block, then each link column full-width.
+        xsmall+ : 2-col grid of link columns; brand block above spans both.
+        small+  : 5-col original layout (1.6fr 1fr 1fr 1fr 1fr).
+      */}
+      <div className="grid grid-cols-1 xsmall:grid-cols-2 small:grid-cols-[1.6fr_1fr_1fr_1fr_1fr] gap-x-8 gap-y-10 mb-12 small:mb-14">
+        <div className="xsmall:col-span-2 small:col-span-1">
+          <LocalizedClientLink
+            href="/"
+            style={{ textDecoration: "none", display: "inline-flex" }}
+          >
+            <Logo size={20} />
+          </LocalizedClientLink>
+          <div className="text-[13px] text-[var(--graphite)] mt-4 max-w-[260px] leading-[1.6]">
+            Authorized dealer for 40+ premium aftermarket wheel brands. Built
+            in Long Beach.
           </div>
         </div>
-        <div className="flex w-full mb-16 justify-between text-ui-fg-muted">
-          <Text className="txt-compact-small">
-            © {new Date().getFullYear()} Medusa Store. All rights reserved.
-          </Text>
-          <MedusaCTA />
+        {FOOTER_COLUMNS.map((col) => (
+          <div key={col.h}>
+            <Label tone="muted" style={{ marginBottom: 14, display: "block" }}>
+              {col.h}
+            </Label>
+            {col.items.map((it) => (
+              <LocalizedClientLink
+                key={it.label}
+                href={it.href}
+                style={{
+                  display: "block",
+                  fontSize: 13,
+                  color: "var(--graphite)",
+                  marginBottom: 8,
+                  textDecoration: "none",
+                }}
+              >
+                {it.label}
+              </LocalizedClientLink>
+            ))}
+          </div>
+        ))}
+      </div>
+      <div
+        className="pt-5 flex flex-col xsmall:flex-row gap-4 xsmall:gap-0 xsmall:justify-between xsmall:items-center"
+        style={{ borderTop: "1px solid var(--hairline)" }}
+      >
+        <Label
+          tone="muted"
+          style={{ letterSpacing: "0.04em" }}
+          className="leading-relaxed"
+        >
+          © {new Date().getFullYear()} WHEEL/BUILDS, INC. · ALL RIGHTS
+          RESERVED · TERMS · PRIVACY
+        </Label>
+        <div className="flex gap-3.5 items-center text-[var(--ink)]">
+          {SOCIALS.map((s) => (
+            <a
+              key={s.name}
+              href="#"
+              aria-label={s.label}
+              style={{ color: "inherit", display: "inline-flex" }}
+            >
+              <Icon name={s.name} size={16} />
+            </a>
+          ))}
         </div>
       </div>
     </footer>

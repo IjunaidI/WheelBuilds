@@ -6,7 +6,7 @@ import VendorProductCurrent from "./models/vendor-product-current"
 import { resolveAdapter } from "./adapters/registry"
 import { fetchFeed } from "./pipeline/fetch"
 import { stageFeed } from "./pipeline/stage"
-import { computeDiff } from "./pipeline/diff"
+import { computeGroupDiff, GroupDiffResult } from "./pipeline/diff"
 import { applyChanges } from "./pipeline/apply"
 
 interface Logger {
@@ -212,16 +212,19 @@ class VendorSyncService extends MedusaService({
       this.logger_.info(
         `[vendor-sync] [${runId}] stage=diffing vendor=${vendorCode}`
       )
-      const diff = await computeDiff(this, runId, vendorCode)
+      const diff = await computeGroupDiff(this, runId, vendorCode)
+      const counts = countDiffParts(diff)
       await (this as any).updateVendorFeedRuns({
         id: runId,
-        new_count: diff.newPartNumbers.length,
-        changed_count: diff.changedPartNumbers.length,
-        discontinued_count: diff.discontinuedPartNumbers.length,
+        new_count: counts.newCount,
+        changed_count: counts.changedCount,
+        discontinued_count: counts.discontinuedCount,
       })
 
       this.logger_.info(
-        `[vendor-sync] [${runId}] stage=diffed vendor=${vendorCode} new=${diff.newPartNumbers.length} changed=${diff.changedPartNumbers.length} discontinued=${diff.discontinuedPartNumbers.length}`
+        `[vendor-sync] [${runId}] stage=diffed vendor=${vendorCode} ` +
+          `newGroups=${diff.newGroups.length} changedGroups=${diff.changedGroups.length} discontinuedGroups=${diff.discontinuedGroups.length} ` +
+          `newParts=${counts.newCount} changedParts=${counts.changedCount} discontinuedParts=${counts.discontinuedCount}`
       )
 
       // 8. Threshold check
@@ -234,11 +237,11 @@ class VendorSyncService extends MedusaService({
 
       if (
         currentCount > 0 &&
-        diff.discontinuedPartNumbers.length / currentCount > threshold
+        counts.discontinuedCount / currentCount > threshold
       ) {
         this.logger_.warn(
           `[vendor-sync] [${runId}] Discontinue ratio ` +
-            `${diff.discontinuedPartNumbers.length}/${currentCount} ` +
+            `${counts.discontinuedCount}/${currentCount} ` +
             `exceeds threshold ${threshold}. Awaiting approval.`
         )
         await (this as any).updateVendorFeedRuns({
@@ -344,11 +347,13 @@ class VendorSyncService extends MedusaService({
       const vendorCode = run.vendor_code
 
       // Re-compute diff from existing staging data
-      const diff = await computeDiff(this, runId, vendorCode)
+      const diff = await computeGroupDiff(this, runId, vendorCode)
+      const counts = countDiffParts(diff)
 
       this.logger_.info(
-        `[vendor-sync] [${runId}] Approved. Applying: ${diff.newPartNumbers.length} new, ` +
-          `${diff.changedPartNumbers.length} changed, ${diff.discontinuedPartNumbers.length} discontinued`
+        `[vendor-sync] [${runId}] Approved. Applying: ` +
+          `newGroups=${diff.newGroups.length} changedGroups=${diff.changedGroups.length} discontinuedGroups=${diff.discontinuedGroups.length} ` +
+          `newParts=${counts.newCount} changedParts=${counts.changedCount} discontinuedParts=${counts.discontinuedCount}`
       )
 
       const result = await applyChanges(
@@ -412,11 +417,13 @@ class VendorSyncService extends MedusaService({
     })
 
     try {
-      const diff = await computeDiff(this, runId, vendorCode)
+      const diff = await computeGroupDiff(this, runId, vendorCode)
+      const counts = countDiffParts(diff)
 
       this.logger_.info(
-        `[vendor-sync] [${runId}] Replaying: ${diff.newPartNumbers.length} new, ` +
-          `${diff.changedPartNumbers.length} changed, ${diff.discontinuedPartNumbers.length} discontinued`
+        `[vendor-sync] [${runId}] Replaying: ` +
+          `newGroups=${diff.newGroups.length} changedGroups=${diff.changedGroups.length} discontinuedGroups=${diff.discontinuedGroups.length} ` +
+          `newParts=${counts.newCount} changedParts=${counts.changedCount} discontinuedParts=${counts.discontinuedCount}`
       )
 
       const result = await applyChanges(
@@ -502,15 +509,45 @@ class VendorSyncService extends MedusaService({
       return
     }
 
-    // Build a minimal diff and apply
-    const diff = {
-      newPartNumbers: isNew ? [partNumber] : [],
-      changedPartNumbers: isChanged ? [partNumber] : [],
-      discontinuedPartNumbers: [],
-    }
+    // Build a minimal group-aware diff and apply. A single-SKU replay
+    // is always a one-variant group (either new or changed inside an
+    // existing group).
+    const groupKey = stagingRow.group_key
+    const diff: GroupDiffResult = isNew
+      ? {
+          newGroups: currentRow
+            ? // The current row exists but is discontinued; treat as
+              // re-adding to the existing group. Use the changedGroup
+              // path with added_part_numbers.
+              []
+            : [{ group_key: groupKey, part_numbers: [partNumber] }],
+          changedGroups: currentRow
+            ? [
+                {
+                  group_key: groupKey,
+                  added_part_numbers: [partNumber],
+                  removed_part_numbers: [],
+                  changed_part_numbers: [],
+                },
+              ]
+            : [],
+          discontinuedGroups: [],
+        }
+      : {
+          newGroups: [],
+          changedGroups: [
+            {
+              group_key: groupKey,
+              added_part_numbers: [],
+              removed_part_numbers: [],
+              changed_part_numbers: [partNumber],
+            },
+          ],
+          discontinuedGroups: [],
+        }
 
     this.logger_.info(
-      `[vendor-sync] Replaying SKU ${partNumber} (${isNew ? "new" : "changed"}) from run ${runId}`
+      `[vendor-sync] Replaying SKU ${partNumber} (${isNew ? "new" : "changed"}) in group ${groupKey} from run ${runId}`
     )
 
     await applyChanges(
@@ -522,6 +559,31 @@ class VendorSyncService extends MedusaService({
       this.logger_
     )
   }
+}
+
+/**
+ * Roll a GroupDiffResult up into part-number-level counters so the
+ * vendor_feed_run row keeps the pre-grouping semantic (admin UI reads
+ * "new_count" as a SKU count, not a group count). Removed variants from
+ * a still-alive group count as discontinued.
+ */
+function countDiffParts(diff: GroupDiffResult): {
+  newCount: number
+  changedCount: number
+  discontinuedCount: number
+} {
+  let newCount = 0
+  let changedCount = 0
+  let discontinuedCount = 0
+  for (const g of diff.newGroups) newCount += g.part_numbers.length
+  for (const g of diff.changedGroups) {
+    newCount += g.added_part_numbers.length
+    changedCount += g.changed_part_numbers.length
+    discontinuedCount += g.removed_part_numbers.length
+  }
+  for (const g of diff.discontinuedGroups)
+    discontinuedCount += g.part_numbers.length
+  return { newCount, changedCount, discontinuedCount }
 }
 
 export default VendorSyncService

@@ -7,6 +7,7 @@ import {
   parseOptionalNumber,
 } from '../../utils/parse-helpers'
 import { wheelRawRowSchema } from './schema'
+import { computeWheelGroupKey } from './group-key'
 
 const VENDOR_CODE = 'wheelpros-wheels'
 
@@ -42,13 +43,16 @@ export function normalizeWheelRow(row: ParsedRow): WheelNormalizedRecord {
   }
 
   const imageUrl = raw['ImageURL']?.trim() || null
+  const displayStyleNo = raw['DisplayStyleNo']?.trim() || null
+  const finish = raw['Finish']?.trim() || null
+  const brand = raw['Brand']
 
   return {
     productType: 'wheel',
     partNumber: row.partNumber,
     vendorCode: VENDOR_CODE,
     title: raw['PartDescription'],
-    brand: raw['Brand'],
+    brand,
     imageUrl,
     invOrderType: raw['InvOrderType'],
     totalQoh: warehouseSum > 0 ? warehouseSum : totalQoh,
@@ -56,8 +60,14 @@ export function normalizeWheelRow(row: ParsedRow): WheelNormalizedRecord {
     mapUsd: parsePrice(raw['MAP_USD']),
     runDateVendor: parseVendorDate(raw['RunDate']),
     stockByWarehouse,
-    displayStyleNo: raw['DisplayStyleNo']?.trim() || null,
-    finish: raw['Finish']?.trim() || null,
+    groupKey: computeWheelGroupKey({
+      brand,
+      displayStyleNo,
+      finish,
+      partNumber: row.partNumber,
+    }),
+    displayStyleNo,
+    finish,
     diameterIn,
     widthIn,
     boltCount: boltResult?.boltCount ?? null,

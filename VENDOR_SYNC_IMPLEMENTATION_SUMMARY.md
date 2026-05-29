@@ -13,11 +13,13 @@ Last verified end-to-end against the dev DB on 2026-05-21: 39 wheels + 11 tires 
 Pulls two CSV feeds (`wheelInvPriceData.csv`, `tireInvPriceData.csv`) from the WheelPros distributor system, diffs them against the last applied state, and applies only the changes to Medusa products, brand collections, stock locations, and inventory levels. Runs every 12 hours via a scheduled job; can also be invoked manually via scripts or the admin API.
 
 ```
-Local CSV (Phase 1) ──► fetch ──► stage ──► diff ──► [threshold check] ──► apply ──► Medusa products
-                                                                                  └─► inventory levels
+Local CSV (Phase 1) ──► fetch ──► stage ──► group-aware diff ──► [threshold check] ──► apply ──► Medusa products
+                                                                                              └─► inventory levels
 ```
 
 Idempotent: re-running with the same feed is a no-op (RunDate short-circuit if the vendor timestamp is unchanged; content-hash dedup otherwise). Image-less rows are filtered out at staging — they never enter the diff or the apply.
+
+**Wheel grouping.** Multiple wheel rows that share `Brand + DisplayStyleNo + Finish` collapse into ONE Medusa product with N variants. Variant axes: Bolt Pattern, Diameter, Width, Offset. A row with empty `DisplayStyleNo` becomes its own single-variant product via the per-SKU fallback key `sku:<partNumber>`. Tires currently keep one-product-per-row.
 
 ---
 
@@ -62,7 +64,7 @@ pnpm exec medusa exec ./src/scripts/vendor-sync-backfill-inventory.ts     # repa
 
 ## Architecture in one paragraph
 
-The pipeline is a Medusa business module with four MikroORM tables (`vendor_feed_run`, `vendor_feed_staging`, `vendor_stock_staging`, `vendor_product_current`) and a thin service that orchestrates fetch → stage → diff → apply against any registered `VendorAdapter`. Two adapters ship: `wheelpros-wheels` and `wheelpros-tires`, sharing the same pipeline infrastructure but with separate parse/normalize logic and separate run lifecycles. Diff is a pure function over staging × current rows; new / changed / discontinued sets are passed to `applyChanges` which composes Medusa 2.0 core flows (`createProductsWorkflow`, `updateProductsWorkflow`, `batchInventoryItemLevelsWorkflow`). Sequential per-process apply with try/catch around each part_number — no external queue. Process-local cancel flag lets the cancel admin endpoint stop an `applying` run between part_numbers.
+The pipeline is a Medusa business module with four MikroORM tables (`vendor_feed_run`, `vendor_feed_staging`, `vendor_stock_staging`, `vendor_product_current`) and a thin service that orchestrates fetch → stage → diff → apply against any registered `VendorAdapter`. Two adapters ship: `wheelpros-wheels` and `wheelpros-tires`, sharing the same pipeline infrastructure but with separate parse/normalize logic and separate run lifecycles. The group-aware diff is a pure function over staging × current rows bucketed by `group_key`; it emits three disjoint sets — `newGroups`, `changedGroups` (added / removed / changed variants inside an existing product), and `discontinuedGroups` — which `applyChanges` consumes to compose Medusa 2.0 core flows (`createProductsWorkflow`, `updateProductsWorkflow`, `createProductVariantsWorkflow`, `updateProductVariantsWorkflow`, `updateProductOptionsWorkflow`, `batchInventoryItemLevelsWorkflow`). Sequential per-process apply with try/catch around each group — no external queue. Process-local cancel flag lets the cancel admin endpoint stop an `applying` run between groups.
 
 ---
 
@@ -73,22 +75,23 @@ The pipeline is a Medusa business module with four MikroORM tables (`vendor_feed
 | [`models/`](backend/src/modules/vendor-sync/models/) | MikroORM data models for the four tables |
 | [`migrations/Migration20260517220005.ts`](backend/src/modules/vendor-sync/migrations/Migration20260517220005.ts) | Creates all four tables |
 | [`migrations/Migration20260521150000.ts`](backend/src/modules/vendor-sync/migrations/Migration20260521150000.ts) | Adds `failed_part_numbers` jsonb column to `vendor_feed_run` |
-| [`adapters/types.ts`](backend/src/modules/vendor-sync/adapters/types.ts) | `VendorAdapter` interface + discriminated-union `NormalizedRecord` (`WheelNormalizedRecord` \| `TireNormalizedRecord`) |
+| [`adapters/types.ts`](backend/src/modules/vendor-sync/adapters/types.ts) | `VendorAdapter` interface + discriminated-union `NormalizedRecord` (`WheelNormalizedRecord` \| `TireNormalizedRecord`); both carry a `groupKey` field |
+| [`adapters/wheelpros-wheels/group-key.ts`](backend/src/modules/vendor-sync/adapters/wheelpros-wheels/group-key.ts) | Pure helper that derives a wheel `groupKey` from brand + DisplayStyleNo + Finish (per-SKU fallback when DisplayStyleNo is empty) |
+| [`pipeline/wheel-grouping.ts`](backend/src/modules/vendor-sync/pipeline/wheel-grouping.ts) | Pure helpers used by the apply path: option/variant builders, four-axis collision detector, group title/handle |
 | [`adapters/registry.ts`](backend/src/modules/vendor-sync/adapters/registry.ts) | `resolveAdapter('wheelpros-wheels' \| 'wheelpros-tires')` |
 | [`adapters/wheelpros-wheels/`](backend/src/modules/vendor-sync/adapters/wheelpros-wheels/) | Wheel adapter (parse, normalize, schema) |
 | [`adapters/wheelpros-tires/`](backend/src/modules/vendor-sync/adapters/wheelpros-tires/) | Tire adapter; reuses `parse-helpers` + `tire-parse-helpers` |
 | [`pipeline/fetch.ts`](backend/src/modules/vendor-sync/pipeline/fetch.ts) | Reads local CSV, archives a copy to `static/vendor-feeds/<vendor>/<timestamp>.csv` |
 | [`pipeline/stage.ts`](backend/src/modules/vendor-sync/pipeline/stage.ts) | Streams parsed rows into staging tables; skips rows with empty `ImageURL` |
-| [`pipeline/diff.ts`](backend/src/modules/vendor-sync/pipeline/diff.ts) | Pure-function diff; `computeDiff` wraps it with DB queries |
+| [`pipeline/diff.ts`](backend/src/modules/vendor-sync/pipeline/diff.ts) | Pure-function diff; `computeGroupDiff` is the production entry point (group-aware), `computeDiff` is the part-level legacy still used by tests |
 | [`pipeline/bootstrap.ts`](backend/src/modules/vendor-sync/pipeline/bootstrap.ts) | Idempotent: US region, sales channel, `Wheels`/`Tires` categories, brand collections, shipping profile, stock locations |
-| [`pipeline/apply.ts`](backend/src/modules/vendor-sync/pipeline/apply.ts) | Sequential apply with try/catch per part_number, cancel-poll, query.graph for `inventory_item_id` |
+| [`pipeline/apply.ts`](backend/src/modules/vendor-sync/pipeline/apply.ts) | Group-aware sequential apply with try/catch per group, cancel-poll between groups, query.graph for `inventory_item_id`. Routes new/changed/discontinued groups to per-type handlers; tires still go one-product-one-variant |
 | [`pipeline/apply-stock.ts`](backend/src/modules/vendor-sync/pipeline/apply-stock.ts) | `batchInventoryItemLevelsWorkflow` + pure `computeStockChanges` |
-| [`pipeline/apply-discontinue.ts`](backend/src/modules/vendor-sync/pipeline/apply-discontinue.ts) | Sets `status: 'draft'` + `metadata.discontinued_at`; idempotent; reads existing metadata from the live product |
-| [`pipeline/build-metadata.ts`](backend/src/modules/vendor-sync/pipeline/build-metadata.ts) | Maps `NormalizedRecord` → product metadata (wheel-fields vs tire-fields) |
+| [`pipeline/build-metadata.ts`](backend/src/modules/vendor-sync/pipeline/build-metadata.ts) | Two pure helpers: `buildProductMetadata` (group-constant fields) and `buildVariantMetadata` (per-row fields). The apply path drafts the product only when ALL variants in a group are discontinued; individual-variant departure marks the variant via metadata.discontinued + zeroed stock instead |
 | [`service.ts`](backend/src/modules/vendor-sync/service.ts) | `VendorSyncService`: orchestrator + cancel flag + `run`/`approveAndApply`/`replayRun`/`replaySku` |
 | [`jobs/vendor-sync-tick.ts`](backend/src/jobs/vendor-sync-tick.ts) | Cron entry |
 | [`api/admin/vendor-sync/`](backend/src/api/admin/vendor-sync/) | Admin endpoints (list runs, detail, approve, cancel, replay) |
-| [`scripts/vendor-sync-*.ts`](backend/src/scripts/) | dry-run, apply, mock, cleanup, backfill-inventory |
+| [`scripts/vendor-sync-*.ts`](backend/src/scripts/) | dry-run, apply, mock, cleanup, backfill-inventory, dev-wipe |
 | [`__fixtures__/`](backend/src/modules/vendor-sync/__fixtures__/) | wheels-small.csv + v2, tires-small.csv + v2 |
 | [`__tests__/`](backend/src/modules/vendor-sync/__tests__/) | 82 passing unit tests + integration scaffold (4 `it.todo`s gated behind `RUN_INTEGRATION=true`) |
 
@@ -99,20 +102,22 @@ The pipeline is a Medusa business module with four MikroORM tables (`vendor_feed
 ```
 vendor_feed_run                     vendor_feed_staging
   id, vendor_code, status              run_id, vendor_code, part_number
-  row_count, skipped_no_image_count    row_json, normalized, content_hash
-  new_count, changed_count,
-  discontinued_count                 vendor_stock_staging
-  failed_part_numbers (jsonb)          run_id, vendor_code, part_number
-  approved_by, approved_at             warehouse_code, qoh
-  source_filename, source_archive_key
-  run_date_vendor                    vendor_product_current
-  started_at, finished_at              vendor_code, part_number  ← natural key
-                                        content_hash
-                                        medusa_product_id, medusa_variant_id,
-                                        inventory_item_id
-                                        normalized (jsonb)
-                                        applied_at, discontinued_at
-                                        last_seen_run_id
+  row_count, skipped_no_image_count    group_key
+  new_count, changed_count,            row_json, normalized, content_hash
+  discontinued_count
+  failed_part_numbers (jsonb)        vendor_stock_staging
+  approved_by, approved_at             run_id, vendor_code, part_number
+  source_filename, source_archive_key  warehouse_code, qoh
+  run_date_vendor
+  started_at, finished_at            vendor_product_current
+                                       vendor_code, part_number  ← natural key
+                                       group_key                 ← shared across siblings
+                                       content_hash
+                                       medusa_product_id, medusa_variant_id,
+                                       inventory_item_id
+                                       normalized (jsonb)
+                                       applied_at, discontinued_at
+                                       last_seen_run_id
 ```
 
 `vendor_product_current.content_hash` advances **only on successful apply**. A failed apply leaves the previous canonical state untouched and the next run will re-diff and re-attempt the failed SKUs.

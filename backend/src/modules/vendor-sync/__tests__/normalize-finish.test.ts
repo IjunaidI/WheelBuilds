@@ -37,4 +37,18 @@ describe("normalizeFinish", () => {
     expect(normalizeFinish("Titanium")).toBe("silver")
     expect(normalizeFinish("Gray")).toBe("silver")
   })
+
+  it("treats a black wheel with a milled/machined/chrome accent as black", () => {
+    // "black" dominates a silver-accent keyword — a Gloss Black Machined wheel
+    // is a black wheel to a shopper, and must bucket identically to its Milled
+    // sibling (the two used to split silver vs black).
+    expect(normalizeFinish("Gloss Black Machined")).toBe("black")
+    expect(normalizeFinish("Gloss Black Milled")).toBe("black")
+    expect(normalizeFinish("Black Chrome")).toBe("black")
+  })
+
+  it("buckets bare machined/milled (no black) as silver", () => {
+    expect(normalizeFinish("Machined")).toBe("silver")
+    expect(normalizeFinish("Milled")).toBe("silver")
+  })
 })

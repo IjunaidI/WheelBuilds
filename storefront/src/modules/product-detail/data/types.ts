@@ -22,6 +22,8 @@ export type OffsetVariant = {
   lipDepthIn?: string
   /** Hub-to-lock steering clearance, e.g. `5.2"`. */
   hubToLockIn?: string
+  /** This offset's own price in cents. The hero shows this for the selected ET; falls back to the size-level price when absent. */
+  priceCents?: number
 }
 
 /** A specific Diameter × Width combination available for this product. */

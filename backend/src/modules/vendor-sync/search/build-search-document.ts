@@ -62,9 +62,10 @@ export function buildSearchDocument(product: IndexableProduct) {
       boltRaw.push(bp)
       boltCanonical.push(...canonicalBoltPatterns(bp))
     }
-    // USD-only by design: vendor-sync stores MSRP as integer cents under "usd"
-    // (Math.round(msrpUsd * 100)). A non-USD deployment yields no matches here,
-    // so price_min/price_max fall back to 0 — revisit when multi-currency lands.
+    // USD-only by design: vendor-sync stores MSRP in MAJOR units under "usd"
+    // (the amount Medusa v2 + cart/checkout treat as dollars). A non-USD
+    // deployment yields no matches here, so price_min/price_max fall back to 0
+    // — revisit when multi-currency lands.
     for (const p of v.prices ?? []) {
       if (p.currency_code === "usd" && Number.isFinite(p.amount)) {
         usdPrices.push(p.amount)
@@ -89,8 +90,11 @@ export function buildSearchDocument(product: IndexableProduct) {
     center_bores: uniqSorted(centerBores),
     bolt_patterns: uniqStr(boltRaw),
     bolt_patterns_canonical: uniqStr(boltCanonical),
-    price_min: usdPrices.length ? Math.min(...usdPrices) : 0,
-    price_max: usdPrices.length ? Math.max(...usdPrices) : 0,
+    // Major units → integer cents: the storefront's DiscoveryProduct.priceCents
+    // contract (the Discovery card divides by 100). PDP reads live Medusa
+    // calculated_amount (major units) and ×100 itself, so the two surfaces agree.
+    price_min: usdPrices.length ? Math.round(Math.min(...usdPrices) * 100) : 0,
+    price_max: usdPrices.length ? Math.round(Math.max(...usdPrices) * 100) : 0,
   }
 }
 

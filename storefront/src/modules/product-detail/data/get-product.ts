@@ -22,10 +22,14 @@ const DEFAULT_COUNTRY = process.env.NEXT_PUBLIC_DEFAULT_REGION || "us"
 const num = (v: unknown): number =>
   typeof v === "number" && Number.isFinite(v) ? v : 0
 
+// Byte-equivalent to the backend's normalize-finish.ts (which the index uses).
+// Keep the two in lockstep so the PDP swatch matches the Discovery grid swatch.
+// Precedence: bronze → explicit "black" (dominates a silver accent) → silver → black.
 function normalizeFinish(raw: unknown): Finish {
   const s = String(raw ?? "").toLowerCase()
   if (/bronze|gold|copper|brass/.test(s)) return "bronze"
-  if (/silver|chrome|machined|polished|gunmetal|gr[ae]y|titanium|graphite/.test(s))
+  if (s.includes("black")) return "black"
+  if (/silver|chrome|machined|milled|polished|gunmetal|gr[ae]y|titanium|graphite/.test(s))
     return "silver"
   return "black"
 }
@@ -60,7 +64,7 @@ function toSizeOptions(
     if (existing) {
       existing.offsetVariants = [
         ...(existing.offsetVariants ?? []),
-        { value: offsetMm, backspaceIn: "" },
+        { value: offsetMm, backspaceIn: "", priceCents: priceCents > 0 ? priceCents : undefined },
       ]
       // Best availability across sibling offsets — if ANY offset under this
       // size is in stock, the size cell shows in_stock so the picker isn't
@@ -82,7 +86,7 @@ function toSizeOptions(
         width,
         offsetMm,
         oemOffsetMm: offsetMm,
-        offsetVariants: [{ value: offsetMm, backspaceIn: "" }],
+        offsetVariants: [{ value: offsetMm, backspaceIn: "", priceCents: priceCents > 0 ? priceCents : undefined }],
         weightLb: productWeightLb,
         availability: availabilityOf(qty),
         priceCentsOverride: priceCents > 0 ? priceCents : undefined,

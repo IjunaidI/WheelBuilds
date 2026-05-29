@@ -59,8 +59,12 @@ const Hero = ({ product }: HeroProps) => {
   const currentOffset =
     offsetVariants.find((o) => o.value === selectedOffsetMm) ?? null
 
+  // Price the *selected* offset, not the size's cheapest — multi-offset sizes
+  // can carry different MSRPs. Falls back to the size "from" price, then product.
   const unitPriceCents =
-    selectedSize.priceCentsOverride ?? product.priceCents
+    currentOffset?.priceCents ??
+    selectedSize.priceCentsOverride ??
+    product.priceCents
 
   return (
     <section className="grid grid-cols-1 small:grid-cols-2 gap-10 small:gap-16 items-start">

@@ -109,6 +109,11 @@ const FilterSections = ({ facets, hideClearAll }: FilterSectionsProps) => {
     ? `${active.year} ${active.make} ${active.model}`
     : "Pick a vehicle for fitment"
 
+  // Spec §5 G2: no backend category source in this cut, so the adapter returns
+  // an empty `categories` facet. Hide the section entirely rather than render a
+  // permanently-empty, dead accordion at the top of the rail.
+  const hasCategories = Object.keys(facets.categories).length > 0
+
   return (
     <>
       <div className="rounded-[var(--radius)] border border-[var(--hairline)] bg-white p-4 mb-4">
@@ -139,20 +144,24 @@ const FilterSections = ({ facets, hideClearAll }: FilterSectionsProps) => {
         defaultValue={["category", "brand", "diameter", "finish"]}
         className="rounded-[var(--radius)] border border-[var(--hairline)] bg-white px-4"
       >
-        <AccordionItem value="category" className="border-b-0">
-          <AccordionTrigger>Category</AccordionTrigger>
-          <AccordionContent>
-            <ChecklistSection
-              facetMap={facets.categories}
-              selected={filters.categories}
-              onToggle={(v) => toggleArrayFilter("categories", v)}
-              labelMap={CATEGORY_LABELS}
-              formatKey={(k) => k}
-            />
-          </AccordionContent>
-        </AccordionItem>
+        {hasCategories && (
+          <>
+            <AccordionItem value="category" className="border-b-0">
+              <AccordionTrigger>Category</AccordionTrigger>
+              <AccordionContent>
+                <ChecklistSection
+                  facetMap={facets.categories}
+                  selected={filters.categories}
+                  onToggle={(v) => toggleArrayFilter("categories", v)}
+                  labelMap={CATEGORY_LABELS}
+                  formatKey={(k) => k}
+                />
+              </AccordionContent>
+            </AccordionItem>
 
-        <Separator />
+            <Separator />
+          </>
+        )}
 
         <AccordionItem value="brand">
           <AccordionTrigger>Brand</AccordionTrigger>

@@ -10,7 +10,10 @@ const product = {
   variants: [
     {
       sku: "W-1",
-      prices: [{ amount: 36999, currency_code: "usd" }],
+      // Vendor-sync stores MSRP in MAJOR units (dollars) — what Medusa v2 +
+      // cart/checkout expect. The index carries CENTS (×100) for the
+      // storefront's `priceCents` contract.
+      prices: [{ amount: 369.99, currency_code: "usd" }],
       metadata: {
         wheel_diameter_in: 17,
         wheel_width_in: 8.5,
@@ -21,7 +24,7 @@ const product = {
     },
     {
       sku: "W-2",
-      prices: [{ amount: 41999, currency_code: "usd" }],
+      prices: [{ amount: 419.99, currency_code: "usd" }],
       metadata: {
         wheel_diameter_in: 18,
         wheel_width_in: 9,
@@ -51,6 +54,16 @@ describe("buildSearchDocument", () => {
       price_min: 36999,
       price_max: 41999,
     })
+  })
+
+  it("converts major-unit USD prices to integer cents", () => {
+    const doc = buildSearchDocument({
+      ...product,
+      variants: [
+        { sku: "a", prices: [{ amount: 12.5, currency_code: "usd" }], metadata: {} },
+      ],
+    } as any)
+    expect(doc).toMatchObject({ price_min: 1250, price_max: 1250 })
   })
 
   it("returns null for non-wheel products (excluded from this index cut)", () => {

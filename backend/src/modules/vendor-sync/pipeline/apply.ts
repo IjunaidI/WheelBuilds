@@ -354,7 +354,7 @@ async function applyNewTireGroup(
               metadata: buildVariantMetadata(r),
               prices: [
                 {
-                  amount: Math.round(r.msrpUsd * 100),
+                  amount: r.msrpUsd,
                   currency_code: "usd",
                 },
               ],
@@ -414,7 +414,7 @@ async function applyChangedGroup(
         metadata: buildVariantMetadata(r),
         prices: [
           {
-            amount: Math.round(r.msrpUsd * 100),
+            amount: r.msrpUsd,
             currency_code: "usd",
           },
         ],
@@ -707,7 +707,7 @@ function buildWheelVariantInput(r: WheelNormalizedRecord) {
     metadata: buildVariantMetadata(r),
     prices: [
       {
-        amount: Math.round(r.msrpUsd * 100),
+        amount: r.msrpUsd,
         currency_code: "usd",
       },
     ],

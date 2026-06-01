@@ -25,7 +25,7 @@ export async function GET(req: MedusaRequest, res: MedusaResponse): Promise<void
       year,
       region,
     })
-    res.json(fitment)
+    res.json({ fitment })
   } catch (err) {
     if (err instanceof QuotaOutageError) {
       res.status(503).json({ error: "fitment unavailable" })

@@ -1,5 +1,6 @@
 import { sdk } from "@lib/config"
 import type { VehicleFitment } from "@lib/garage/types"
+import { unwrapFitment } from "./fitment-unwrap"
 
 export const getMakes = () => sdk.client.fetch<{ makes: any }>("/store/vehicle-catalog/makes")
 export const getModels = (make: string) => sdk.client.fetch<{ models: any }>(`/store/vehicle-catalog/models?make=${make}`)
@@ -9,9 +10,11 @@ export const getModifications = (make: string, model: string, year: string) =>
 
 export async function getFitmentByVehicle(make: string, model: string, modification: string, region = "usdm"): Promise<VehicleFitment | { error: "unavailable" }> {
   try {
-    const r = await sdk.client.fetch<{ fitment: VehicleFitment }>(
+    const body = await sdk.client.fetch<unknown>(
       `/store/fitment/by-vehicle?make=${make}&model=${model}&modification=${encodeURIComponent(modification)}&region=${region}`)
-    return r.fitment
+    const fitment = unwrapFitment(body)
+    if (!fitment) return { error: "unavailable" }
+    return fitment
   } catch (e: any) {
     // Guard multiple error shapes: sdk.client.fetch may surface the status as e.status or e.response?.status.
     const status = e?.status ?? e?.response?.status

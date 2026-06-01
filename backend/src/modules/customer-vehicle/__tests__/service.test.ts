@@ -20,3 +20,28 @@ describe("activate enforces single-active", () => {
     expect(rows.find(r => r.id === "z").is_active).toBe(true) // other customer untouched
   })
 })
+
+describe("createForCustomer enforces the invariant", () => {
+  function makeCreateService() {
+    const rows: any[] = []
+    const svc = new (CustomerVehicleService as any)({})
+    svc.listCustomerVehicles = async (f: any) =>
+      rows.filter(r => r.customer_id === f.customer_id && (f.client_id === undefined || r.client_id === f.client_id))
+    svc.createCustomerVehicles = async (data: any) => { const row = { id: `id_${rows.length}`, ...data }; rows.push(row); return row }
+    return { svc, rows }
+  }
+
+  it("always creates inactive even if is_active is somehow passed", async () => {
+    const { svc } = makeCreateService()
+    const v = await svc.createForCustomer("c1", { client_id: "k1", year: 2021, make: "Ford", model: "F-150", is_active: true } as any)
+    expect(v.is_active).toBe(false)
+  })
+
+  it("is idempotent on (customer_id, client_id)", async () => {
+    const { svc, rows } = makeCreateService()
+    await svc.createForCustomer("c1", { client_id: "k1", year: 2021, make: "Ford", model: "F-150" })
+    const again = await svc.createForCustomer("c1", { client_id: "k1", year: 2021, make: "Ford", model: "F-150" })
+    expect(rows.length).toBe(1)
+    expect(again.client_id).toBe("k1")
+  })
+})

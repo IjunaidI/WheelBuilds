@@ -10,13 +10,20 @@ describe("normalizeByModel", () => {
   it("derives canonical bolt patterns via canonicalBoltPatterns (5x114.3 sedan)", () => {
     const f = normalizeByModel(fx("sedan-5x114_3"), { modificationSlug: "accord-2021", region: "usdm" })
     expect(f.status).toBe("ok")
-    expect(f.canonicalBoltPatterns).toContain("5x114.3")
-    expect(f.hubBoreMm).toBeGreaterThan(0)
-    expect(f.source).toEqual({ modificationSlug: "accord-2021", region: "usdm" })
+    expect(f.canonicalBoltPatterns).toEqual(["5x114.3"])
+    expect(f.hubBoreMm).toBe(67.1) // technical.centre_bore arrives as the STRING "67.1"
+    expect(f.source.region).toBe("usdm")
   })
 
-  it("returns not_found for an empty data array", () => {
-    const f = normalizeByModel({ data: [] }, { modificationSlug: "x", region: "usdm" })
+  it("reads a string centre_bore on a truck (8x180, 124.1)", () => {
+    const f = normalizeByModel(fx("truck-8x180"), { modificationSlug: "silverado-2500-hd", region: "usdm" })
+    expect(f.status).toBe("ok")
+    expect(f.canonicalBoltPatterns).toEqual(["8x180"])
+    expect(f.hubBoreMm).toBe(124.1)
+  })
+
+  it("returns not_found for a real empty-data recording", () => {
+    const f = normalizeByModel(fx("nodata"), { modificationSlug: "x", region: "usdm" })
     expect(f.status).toBe("not_found")
     expect(f.canonicalBoltPatterns).toEqual([])
   })

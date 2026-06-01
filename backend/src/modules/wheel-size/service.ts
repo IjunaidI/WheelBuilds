@@ -45,9 +45,9 @@ class WheelSizeService extends MedusaService({ WheelSizeCatalog, WheelSizeFitmen
     return next <= this.ceiling_
   }
 
-  async getFitment(p: { modificationSlug: string; region?: string }): Promise<VehicleFitment> {
+  async getFitment(p: { make: string; model: string; modificationSlug?: string; year?: string; region?: string }): Promise<VehicleFitment> {
     const region = p.region ?? this.options_.defaultRegion ?? "usdm"
-    const cache_key = `${p.modificationSlug}|${region}`
+    const cache_key = [p.make, p.model, (p.modificationSlug ?? p.year ?? ""), region].join("|")
 
     const cached = await this.listWheelSizeFitments({ cache_key })
     if (cached[0]) {
@@ -55,19 +55,19 @@ class WheelSizeService extends MedusaService({ WheelSizeCatalog, WheelSizeFitmen
       return { status: c.status, canonicalBoltPatterns: c.canonical_bolt_patterns ?? [],
         hubBoreMm: c.hub_bore_mm ?? null, diameterWindow: c.diameter_window ?? null,
         widthWindow: c.width_window ?? null, offsetWindow: c.offset_window ?? null,
-        source: { modificationSlug: p.modificationSlug, region } }
+        source: { modificationSlug: p.modificationSlug ?? "", region } }
     }
 
     const underQuota = await this.incrementAndCheckQuota()
     if (!underQuota) throw new QuotaOutageError()
 
-    const res = await this.client_.byModel({ modification: p.modificationSlug, region })
+    const res = await this.client_.byModel({ make: p.make, model: p.model, modification: p.modificationSlug, year: p.year, region })
     // Classification (spec §10): any non-2xx => outage (this build folds wheel-size 5xx/network
     // into the same user-facing "fitment unavailable" 503; the storefront data layer retries first).
     // A 200 with empty `data` is genuine no-data => not_found (handled by normalizeByModel below).
     if (res.status >= 300) throw new QuotaOutageError()
 
-    const fitment = normalizeByModel(res.body, { modificationSlug: p.modificationSlug, region })
+    const fitment = normalizeByModel(res.body, { modificationSlug: p.modificationSlug ?? "", region })
     await this.createWheelSizeFitments({
       cache_key, region, raw: res.body, canonical_bolt_patterns: fitment.canonicalBoltPatterns,
       hub_bore_mm: fitment.hubBoreMm, diameter_window: fitment.diameterWindow,

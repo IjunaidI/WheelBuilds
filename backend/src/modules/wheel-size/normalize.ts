@@ -5,6 +5,13 @@ import { RawByModel, RawWheelEntry, VehicleFitment, Window } from "./types"
 const num = (v: unknown): number | null =>
   typeof v === "number" && Number.isFinite(v) ? v : null
 
+// Loose numeric reader: accepts a JSON string ("67.1") OR a number. The real v2
+// API returns technical.centre_bore as a STRING, which num() would drop to null.
+const numLoose = (v: unknown): number | null => {
+  const n = typeof v === "string" ? parseFloat(v) : v
+  return typeof n === "number" && Number.isFinite(n) ? n : null
+}
+
 function windowFrom(values: (number | null)[]): Window {
   const nums = values.filter((v): v is number => typeof v === "number" && Number.isFinite(v))
   if (!nums.length) return null
@@ -29,7 +36,7 @@ export function normalizeByModel(
     : []
 
   // Defensive hub-bore read: technical.centre_bore, falling back to a top-level centre_bore.
-  const hubBoreMm = num(tech.centre_bore) ?? num(entry.centre_bore)
+  const hubBoreMm = numLoose(tech.centre_bore) ?? numLoose(entry.centre_bore)
   if (hubBoreMm == null) {
     // eslint-disable-next-line no-console
     console.warn("[wheel-size] centre_bore absent on by_model response", source)

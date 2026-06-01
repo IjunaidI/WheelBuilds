@@ -20,8 +20,12 @@ export class WheelSizeClient {
     if (!empty) { try { body = JSON.parse(text) } catch { body = null } }
     return { status: res.status, empty, body }
   }
-  byModel(p: { modification: string; region: string }): Promise<ClientResult> {
-    return this.get("/search/by_model/", { modification: p.modification, region: p.region })
+  // Real v2 contract: by_model REQUIRES make+model. modification (or year) narrows the trim.
+  byModel(p: { make: string; model: string; modification?: string; year?: string; region: string }): Promise<ClientResult> {
+    const params: Record<string, string> = { make: p.make, model: p.model, region: p.region }
+    if (p.modification) params.modification = p.modification
+    else if (p.year) params.year = p.year
+    return this.get("/search/by_model/", params)
   }
   // Cataloging (lazy). Slugs per Task-1 findings.
   makes(): Promise<ClientResult> { return this.get("/makes/", {}) }

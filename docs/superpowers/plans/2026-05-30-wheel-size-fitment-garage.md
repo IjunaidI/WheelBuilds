@@ -1089,7 +1089,7 @@ git commit -m "feat(api): customer garage CRUD + activate, scoped to auth actor"
 - Create: `storefront/vitest.config.ts`
 - Modify: `storefront/package.json`
 
-- [ ] **Step 1: Install vitest** (pnpm-on-Windows workaround): `cd storefront && npx -y pnpm@9.10.0 add -D vitest`
+- [ ] **Step 1: Install vitest** (pnpm-on-Windows workaround): `cd storefront && npx -y pnpm@9.10.0 add -D vitest@^2.1.9`. **Pin to v2 (^2.1.9), not v4** — vitest 4 requires `vite@^6||^7||^8` as a peer, which pnpm refuses to resolve in this React-19 repo (`Conflicting peer dependencies: vite`), and `vitest run` then crashes with `Cannot find package 'vite'`. v2.1.9 bundles its own `vite@5.4.x` and installs cleanly. *(Confirmed during Batch-1 implementation — commit `ae40f41`.)*
 
 - [ ] **Step 2: Add config.**
 

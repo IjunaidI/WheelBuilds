@@ -13,6 +13,8 @@ export async function getFitmentByVehicle(make: string, model: string, modificat
     const body = await sdk.client.fetch<unknown>(
       `/store/fitment/by-vehicle?make=${make}&model=${model}&modification=${encodeURIComponent(modification)}&region=${region}`)
     const fitment = unwrapFitment(body)
+    // null means a malformed/unrecognized response shape; treat as unavailable —
+    // the YMM pane only distinguishes fitment vs. error.
     if (!fitment) return { error: "unavailable" }
     return fitment
   } catch (e: any) {

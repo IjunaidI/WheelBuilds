@@ -24,6 +24,7 @@ describe("unwrapFitment", () => {
   })
   it("returns null for an unrelated/empty body", () => {
     expect(unwrapFitment(undefined)).toBeNull()
+    expect(unwrapFitment(null)).toBeNull()
     expect(unwrapFitment({})).toBeNull()
     expect(unwrapFitment({ error: "unavailable" })).toBeNull()
   })

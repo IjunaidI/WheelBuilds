@@ -1,4 +1,5 @@
 import DiscoveryHeader from "../components/header"
+import FitmentSync from "../components/fitment-sync"
 import ActiveChips from "../components/active-chips"
 import FilterRail from "../components/filter-rail"
 import MobileFilterTrigger from "../components/filter-rail/mobile-trigger"
@@ -34,6 +35,7 @@ const DiscoveryTemplate = ({
 
   return (
     <section className="px-5 pt-6 pb-16 xsmall:px-8 small:px-20 small:pt-8 small:pb-20">
+      <FitmentSync />
       <DiscoveryHeader totalCount={result.totalCount} />
       <ActiveChips />
       <MobileFilterTrigger

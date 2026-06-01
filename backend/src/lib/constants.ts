@@ -113,3 +113,10 @@ export const VENDOR_WHEELPROS_WHEELS_ENABLED = process.env.VENDOR_WHEELPROS_WHEE
 export const VENDOR_WHEELPROS_WHEEL_FEED_PATH = process.env.VENDOR_WHEELPROS_WHEEL_FEED_PATH
 export const VENDOR_WHEELPROS_TIRES_ENABLED = process.env.VENDOR_WHEELPROS_TIRES_ENABLED
 export const VENDOR_WHEELPROS_TIRE_FEED_PATH = process.env.VENDOR_WHEELPROS_TIRE_FEED_PATH
+
+/**
+ * (optional) wheel-size.com API configuration
+ */
+export const WHEEL_SIZE_API_KEY = process.env.WHEEL_SIZE_API_KEY
+export const WHEEL_SIZE_BASE_URL = process.env.WHEEL_SIZE_BASE_URL
+export const WHEEL_SIZE_REGION = process.env.WHEEL_SIZE_REGION

@@ -30,6 +30,9 @@ import {
   VENDOR_SYNC_DISCONTINUE_THRESHOLD,
   VENDOR_SYNC_APPLY_CONCURRENCY,
   VENDOR_SYNC_DRY_RUN,
+  WHEEL_SIZE_API_KEY,
+  WHEEL_SIZE_BASE_URL,
+  WHEEL_SIZE_REGION,
 } from 'lib/constants';
 import { buildSearchDocument } from 'modules/vendor-sync/search/build-search-document';
 
@@ -159,6 +162,15 @@ const medusaConfig = {
             feedPath: VENDOR_WHEELPROS_TIRE_FEED_PATH,
           },
         },
+      },
+    }] : []),
+    ...(WHEEL_SIZE_API_KEY ? [{
+      resolve: './src/modules/wheel-size',
+      options: {
+        apiKey: WHEEL_SIZE_API_KEY,
+        baseUrl: WHEEL_SIZE_BASE_URL ?? 'https://api.wheel-size.com/v2',
+        defaultRegion: WHEEL_SIZE_REGION ?? 'usdm',
+        dailyCeiling: 5000,
       },
     }] : []),
     { resolve: './src/modules/customer-vehicle' },

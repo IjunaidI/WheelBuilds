@@ -4,6 +4,7 @@ import { productFitsVehicle } from "../product-fits"
 describe("productFitsVehicle", () => {
   it("is true when any canonical pattern intersects", () => {
     expect(productFitsVehicle(["5x114.3", "5x120"], ["5x114.3"])).toBe(true)
+    expect(productFitsVehicle(["5x114.3"], ["5x120", "5x114.3"])).toBe(true)
   })
   it("is false when there is no intersection", () => {
     expect(productFitsVehicle(["6x139.7"], ["5x114.3"])).toBe(false)

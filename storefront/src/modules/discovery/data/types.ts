@@ -34,8 +34,6 @@ export type DiscoveryProduct = {
   categories: string[]
   /** "NEW" tag in the product card. */
   isNew?: boolean
-  /** When the active garage vehicle is in scope, set this to mark the card. */
-  fitsActiveVehicle?: boolean
 }
 
 export type SortOption =

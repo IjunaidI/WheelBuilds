@@ -21,8 +21,8 @@ const formatSavedDate = (iso: string): string => {
 
 const formatSpecs = (v: Vehicle): string => {
   const parts: string[] = []
-  if (v.boltPattern) parts.push(v.boltPattern)
-  if (v.hubBore) parts.push(`${v.hubBore} hub`)
+  if (v.canonicalBoltPatterns?.length) parts.push(v.canonicalBoltPatterns[0])
+  if (v.hubBoreMm) parts.push(`${v.hubBoreMm} hub`)
   if (v.notes) parts.push(v.notes)
   return parts.length ? parts.join(" · ") : formatSavedDate(v.savedAt)
 }
@@ -47,8 +47,13 @@ const GaragePane = ({ onClose, onAddNew }: GaragePaneProps) => {
       make: v.make,
       model: v.model,
       trim: v.trim,
-      boltPattern: v.boltPattern,
-      hubBore: v.hubBore,
+      modificationSlug: v.modificationSlug,
+      canonicalBoltPatterns: v.canonicalBoltPatterns,
+      hubBoreMm: v.hubBoreMm,
+      diameterWindow: v.diameterWindow,
+      widthWindow: v.widthWindow,
+      offsetWindow: v.offsetWindow,
+      fitmentStatus: v.fitmentStatus,
       notes: v.notes,
     }
     remove(v.id)

@@ -1992,6 +1992,17 @@ git add -A && git commit -m "test(fitment): live verification checklist complete
 
 ---
 
+## Parked work (blocked on the Sandbox key and/or a dev DB)
+
+Tracked here so nothing deferred is lost. As of the Batch-1/Batch-2 implementation, these remain open:
+
+- **Task 1 — the Sandbox validation gate** (needs the wheel-size.com Sandbox key): real `by-model-*.json` + `catalog-*.json` fixtures, the parity result on the non-standard-PCD truck → the GO / EXTEND-STANDARD-PCDS / BLOCK decision, the exact v2 JSON paths, the `by_model` param contract, the quota signal, and the `actor_id` spike (the `actor_id` part needs only the dev backend, not the key).
+- **Reconcile the provisional code with Task 1:** `wheel-size/normalize.ts` + `types.ts` JSON paths and the synthetic `__fixtures__/by-model-sedan-5x114_3.json` must be replaced with the real recorded responses; `client.ts` endpoint paths + the `by_model` param contract confirmed.
+- **`STANDARD_PCDS` extension + Meilisearch re-index** — only if Task 1 = EXTEND (Task 2 Steps 2–3, currently skipped).
+- **Both modules' migrations** (needs a dev DB): run once, after both `wheel-size` and `customer-vehicle` are registered — `medusa db:generate wheelSizeModuleService`, `medusa db:generate customerVehicleModuleService`, then `db:migrate`. (Task 5/6/7's migration steps were deferred.)
+- **Manual/runtime verification** of every store route (Tasks 8–10) and the storefront garage/Discovery/PDP wiring — needs the backend running.
+- **Task 25** end-to-end verification + the conditional re-index check.
+
 ## Notes for the executor
 
 - **Task 1 is a hard gate.** Do not start Phase 2+ until the findings doc records a GO or EXTEND decision. If BLOCK, stop and escalate.

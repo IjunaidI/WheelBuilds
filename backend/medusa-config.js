@@ -161,6 +161,7 @@ const medusaConfig = {
         },
       },
     }] : []),
+    { resolve: './src/modules/customer-vehicle' },
   ],
   plugins: [
   ...(MEILISEARCH_HOST && MEILISEARCH_ADMIN_KEY ? [{

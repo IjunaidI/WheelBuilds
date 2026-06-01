@@ -7,3 +7,14 @@ export function vehiclesToMerge(local: Vehicle[], remote: Vehicle[]): NewVehicle
   const seen = new Set(remote.map(key))
   return local.filter((v) => !seen.has(key(v))).map(({ id, savedAt, ...nv }) => nv as NewVehicle)
 }
+
+/**
+ * Decide which local vehicles to push into the account on login. Returns []
+ * unless the remote garage's initial load succeeded — merging against an
+ * unread account would re-add everything under fresh client_ids and duplicate
+ * rows that the (customer_id, client_id) guard cannot catch.
+ */
+export function planMerge(local: Vehicle[], remote: Vehicle[], loadOk: boolean): NewVehicle[] {
+  if (!loadOk) return []
+  return vehiclesToMerge(local, remote)
+}

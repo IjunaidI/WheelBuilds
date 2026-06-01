@@ -23,8 +23,17 @@ export class MedusaGarage implements GarageProvider {
   private vehicles: Vehicle[] = []
   private activeId: string | null = null
   private listeners = new Set<() => void>()
+  private loaded: Promise<void>
+  private loadOk = false
 
-  constructor() { if (typeof window !== "undefined") void this.load() }
+  constructor() {
+    this.loaded = typeof window !== "undefined" ? this.load() : Promise.resolve()
+  }
+
+  /** Resolves once the initial account load has settled (success or failure). */
+  ready(): Promise<void> { return this.loaded }
+  /** True only if the initial account load actually succeeded. */
+  isLoaded(): boolean { return this.loadOk }
 
   private emit() { this.listeners.forEach((l) => l()) }
   private async load() {
@@ -33,8 +42,9 @@ export class MedusaGarage implements GarageProvider {
       this.vehicles = vehicles.map(fromWire)
       const active = vehicles.find((v: any) => v.is_active)
       this.activeId = active ? (active.client_id ?? active.id) : (this.vehicles[0]?.id ?? null)
+      this.loadOk = true
       this.emit()
-    } catch { /* stay empty on failure; toast handled by callers */ }
+    } catch { this.loadOk = false /* stay empty on failure; toast handled by callers */ }
   }
 
   list(): Vehicle[] { return this.vehicles }

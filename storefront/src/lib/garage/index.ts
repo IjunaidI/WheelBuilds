@@ -3,7 +3,7 @@ import type { Vehicle, NewVehicle } from "./types"
 import { LocalStorageGarage } from "./local-storage-garage"
 import { MedusaGarage } from "./medusa-garage"
 import { getCustomer } from "@lib/data/customer" // returns the customer or null (NOT "retrieveCustomer")
-import { vehiclesToMerge } from "./merge"
+import { planMerge } from "./merge"
 
 class RoutingGarage implements GarageProvider {
   private local = new LocalStorageGarage()
@@ -22,7 +22,11 @@ class RoutingGarage implements GarageProvider {
     try { authed = !!(await getCustomer()) } catch { authed = false }
     if (authed) {
       if (!this.remote) this.remote = new MedusaGarage()
-      if (!this.merged) { await this.mergeLocalIntoRemote(); this.merged = true }
+      await this.remote.ready()                       // wait for the account to load before merging
+      if (!this.merged && this.remote.isLoaded()) {
+        await this.mergeLocalIntoRemote()
+        this.merged = true
+      }
       this.current = this.remote
     } else {
       this.current = this.local
@@ -33,9 +37,9 @@ class RoutingGarage implements GarageProvider {
 
   private async mergeLocalIntoRemote() {
     if (!this.remote) return
-    const toAdd = vehiclesToMerge(this.local.list(), this.remote.list()) // pure, unit-tested (Task 19 Step 0)
+    const toAdd = planMerge(this.local.list(), this.remote.list(), this.remote.isLoaded())
     for (const nv of toAdd) this.remote.add(nv) // re-add through remote (mints client_id; idempotent server-side)
-    this.local.clear() // clear() added to LocalStorageGarage in Step 2
+    if (this.remote.isLoaded()) this.local.clear() // only drop local once we know the account state
   }
 
   list() { return this.current.list() }

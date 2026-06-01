@@ -12,3 +12,17 @@ describe("vehiclesToMerge", () => {
   })
   it("returns [] when local is empty", () => { expect(vehiclesToMerge([], [v(2020,"a","b")])).toEqual([]) })
 })
+
+import { planMerge } from "./merge"
+
+describe("planMerge", () => {
+  it("returns [] when the remote load did not succeed (never merge into an unknown account)", () => {
+    const local = [v(2021, "Ford", "F-150", "XLT")]
+    expect(planMerge(local, [], false)).toEqual([])
+  })
+  it("dedupes against the loaded remote when load succeeded", () => {
+    const local = [v(2021, "Ford", "F-150", "XLT"), v(2018, "Jeep", "Wrangler")]
+    const remote = [v(2021, "ford", "f-150", "xlt")]
+    expect(planMerge(local, remote, true).map((x) => x.model)).toEqual(["Wrangler"])
+  })
+})

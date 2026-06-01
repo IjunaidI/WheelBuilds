@@ -110,6 +110,14 @@ export class LocalStorageGarage implements GarageProvider {
     return readVehicles().find((v) => v.id === id) ?? null
   }
 
+  clear(): void {
+    if (typeof window !== "undefined") {
+      window.localStorage.removeItem(VEHICLES_KEY)
+      window.localStorage.removeItem(ACTIVE_KEY)
+    }
+    this.emit()
+  }
+
   subscribe(listener: () => void): () => void {
     this.listeners.add(listener)
     return () => {

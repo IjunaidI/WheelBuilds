@@ -43,6 +43,7 @@ export const useGarage = () => {
     vehicles: snapshot.vehicles,
     active: snapshot.active,
     add: (v: NewVehicle) => garage.add(v),
+    update: (id: string, patch: Partial<NewVehicle>) => garage.update(id, patch),
     remove: (id: string) => garage.remove(id),
     setActive: (id: string | null) => garage.setActive(id),
   }

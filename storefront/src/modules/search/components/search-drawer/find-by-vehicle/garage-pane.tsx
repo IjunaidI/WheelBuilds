@@ -34,8 +34,14 @@ const GaragePane = ({ onClose, onAddNew }: GaragePaneProps) => {
 
   const selectVehicle = (id: string) => {
     setActive(id)
+    const v = vehicles.find((veh) => veh.id === id)
+    const patterns = v?.canonicalBoltPatterns ?? []
+    const fitParam =
+      v?.fitmentStatus === "ok" && patterns.length
+        ? `?fit=${patterns.join(",")}`
+        : ""
     onClose()
-    router.push(`/${countryCode}/store`)
+    router.push(`/${countryCode}/store${fitParam}`)
   }
 
   const removeVehicle = (v: Vehicle) => {

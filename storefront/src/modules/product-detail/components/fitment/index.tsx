@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button"
 import { Separator } from "@/components/ui/separator"
 import { useGarage } from "@lib/garage/use-garage"
 import { openSearch } from "@lib/stores/search-store"
+import { fitsVehicle } from "@lib/fitment/fits-vehicle"
 import { FitmentEntry, ProductDetail } from "../../data/types"
 
 type FitmentProps = {
@@ -25,15 +26,10 @@ type FitmentProps = {
 const Fitment = ({ product }: FitmentProps) => {
   const { active } = useGarage()
 
-  // Heuristic for "does the active vehicle fit?" — naive substring match
-  // against the make + model. Replace with real fitment table lookup later.
-  const activeFits = active
-    ? product.fitment.some(
-        (f) =>
-          f.make.toLowerCase() === active.make.toLowerCase() &&
-          f.model.toLowerCase() === active.model.toLowerCase()
-      )
-    : null
+  // Parametric fitment check against the active vehicle's wheel-size.com spec
+  // (bolt pattern + hub bore hard gates, plus the diameter/width/offset window).
+  const verdict = active ? fitsVehicle(product, active) : null
+  const activeFits = verdict?.fits ?? null
 
   return (
     <section className="border-t border-[var(--hairline)] py-16 small:py-20">
@@ -79,24 +75,25 @@ const Fitment = ({ product }: FitmentProps) => {
             activeFits ? (
               <>
                 <div className="text-[14px] font-semibold text-[var(--ink)]">
-                  Confirmed fit for your{" "}
+                  Fits your{" "}
                   {active.year} {active.make} {active.model}
                   {active.trim ? ` ${active.trim}` : ""}
                 </div>
                 <div className="text-[12px] text-[var(--ink-soft)] mt-0.5">
-                  Add this wheel to cart — we'll verify final offset against your
-                  build at order review.
+                  {verdict && !verdict.withinWindow
+                    ? "Bolt pattern and hub bore clear, but this size is outside the typical size window for your vehicle — confirm offset before ordering."
+                    : "Add this wheel to cart — we'll verify final offset against your build at order review."}
                 </div>
               </>
             ) : (
               <>
                 <div className="text-[14px] font-semibold text-[var(--ink)]">
-                  Your {active.year} {active.make} {active.model} isn't on the
-                  confirmed list.
+                  Doesn't fit your {active.year} {active.make} {active.model}
+                  {active.trim ? ` ${active.trim}` : ""}.
                 </div>
                 <div className="text-[12px] text-[var(--ink-soft)] mt-0.5">
-                  This wheel might still fit with the right offset. Talk to
-                  fitment support before ordering.
+                  {verdict?.reasons[0] ??
+                    "This wheel might still fit with the right offset. Talk to fitment support before ordering."}
                 </div>
               </>
             )
@@ -125,6 +122,7 @@ const Fitment = ({ product }: FitmentProps) => {
       <div className="grid grid-cols-1 small:grid-cols-2 gap-x-8 gap-y-0 border-t border-[var(--hairline)]">
         {product.fitment.map((f, i) => {
           const isActive =
+            Boolean(activeFits) &&
             active &&
             f.make.toLowerCase() === active.make.toLowerCase() &&
             f.model.toLowerCase() === active.model.toLowerCase()

@@ -13,6 +13,7 @@ import { notFound } from "next/navigation"
 import { HttpTypes } from "@medusajs/types"
 import { getProductByHandle, getProductsList } from "@lib/data/products"
 import { getRegion } from "@lib/data/regions"
+import { canonicalBoltPatterns } from "@lib/fitment/canonical-bolt-pattern"
 import { DiscoveryProduct } from "@modules/discovery/data/types"
 import { Finish } from "@modules/common/components/wheel"
 import { ProductDetail, SizeOption } from "./types"
@@ -152,6 +153,9 @@ function mapToDetail(product: HttpTypes.StoreProduct): ProductDetail {
     finishOptions: [finish],
     sizeOptions: toSizeOptions(variants, weightLb),
     boltPatternOptions: boltPatterns,
+    boltPatternsCanonical: Array.from(
+      new Set(boltPatterns.flatMap((raw) => canonicalBoltPatterns(raw)))
+    ),
     fitment: [], // Spec 2
     relatedHandles: [],
   }

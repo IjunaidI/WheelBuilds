@@ -1,0 +1,670 @@
+{
+  "status": 200,
+  "body": {
+    "data": [
+      {
+        "slug": "c112811761",
+        "name": "6.6TD",
+        "body": null,
+        "trim": "6.6TD",
+        "trim_scoring": null,
+        "trim_attributes": [],
+        "trim_body_types": [],
+        "trim_levels": [
+          "WT",
+          "LT",
+          "LTZ",
+          "High Country"
+        ],
+        "make": {
+          "slug": "chevrolet",
+          "name": "Chevrolet",
+          "name_en": "Chevrolet"
+        },
+        "model": {
+          "slug": "silverado-2500-hd",
+          "name": "Silverado 2500 HD",
+          "name_en": "Silverado 2500 HD"
+        },
+        "generation": {
+          "slug": "03e4d3f831",
+          "name": "IV (T1XX)",
+          "platform": "",
+          "start": 2020,
+          "end": 2023,
+          "bodies": [
+            {
+              "slug": "cc3d7fc970",
+              "name": "Pickup Crew Cab",
+              "image": "https://cdn.wheel-size.com/automobile/body/chevrolet-silverado-2500-hd-2020-2023-1758809120.38755.jpg"
+            },
+            {
+              "slug": "e4c4e24edd",
+              "name": "Pickup Regular Cab, 2d",
+              "image": "https://cdn.wheel-size.com/automobile/body/chevrolet-silverado-2500-hd-2020-2023-1758809120.889424.jpg"
+            },
+            {
+              "slug": "f668bd04d1",
+              "name": "Pickup Double Cab",
+              "image": "https://cdn.wheel-size.com/automobile/body/chevrolet-silverado-2500-hd-2020-2023-1758809121.1137075.jpg"
+            }
+          ]
+        },
+        "start_year": 2020,
+        "end_year": 2023,
+        "engine": {
+          "fuel": "Diesel",
+          "capacity": "6.6",
+          "type": "V8",
+          "power": {
+            "kW": 332,
+            "PS": 451,
+            "hp": 445
+          },
+          "code": "L5P"
+        },
+        "regions": [
+          "cdm",
+          "usdm"
+        ],
+        "technical": {
+          "wheel_fasteners": {
+            "type": "Lug nuts",
+            "thread_size": "M14 x 1.5"
+          },
+          "wheel_tightening_torque": "190 Nm",
+          "stud_holes": 8,
+          "pcd": 180,
+          "centre_bore": "124.1",
+          "bolt_pattern": "8x180",
+          "rear_axis_stud_holes": null,
+          "rear_axis_pcd": null,
+          "rear_axis_centre_bore": null,
+          "rear_axis_bolt_pattern": "N/A"
+        },
+        "tire_type": "SUV",
+        "wheels": [
+          {
+            "is_stock": true,
+            "showing_fp_only": true,
+            "is_extra_load_tires": false,
+            "is_recommended_for_winter": false,
+            "is_runflat_tires": false,
+            "is_pressed_steel_rims": false,
+            "front": {
+              "rim": "7.5Jx17 ET44",
+              "rim_diameter": 17,
+              "rim_width": 7.5,
+              "rim_offset": 44,
+              "tire_full": "LT245/75R17 121/118R/E",
+              "tire": "LT245/75R17",
+              "load_index": 121,
+              "speed_index": "R",
+              "tire_pressure": {
+                "bar": 4.1,
+                "psi": 59,
+                "kPa": 410
+              },
+              "tire_sizing_system": "lt-metric",
+              "tire_construction": "R",
+              "tire_width": 245,
+              "tire_aspect_ratio": 75,
+              "tire_diameter": null,
+              "tire_section_width": null,
+              "tire_is_82series": false,
+              "tire_alpha_numeric": null,
+              "tire_width_mm": 245,
+              "tire_diameter_mm": 799,
+              "tire_weight_kg": 23.76
+            },
+            "rear": {
+              "rim": "",
+              "rim_diameter": null,
+              "rim_width": null,
+              "rim_offset": null,
+              "tire_full": "",
+              "tire": "",
+              "load_index": null,
+              "speed_index": null,
+              "tire_pressure": {
+                "bar": 5.5,
+                "psi": 80,
+                "kPa": 550
+              },
+              "tire_sizing_system": null,
+              "tire_construction": null,
+              "tire_width": null,
+              "tire_aspect_ratio": null,
+              "tire_diameter": null,
+              "tire_section_width": null,
+              "tire_is_82series": false,
+              "tire_alpha_numeric": null,
+              "tire_width_mm": null,
+              "tire_diameter_mm": null,
+              "tire_weight_kg": null
+            }
+          },
+          {
+            "is_stock": true,
+            "showing_fp_only": true,
+            "is_extra_load_tires": false,
+            "is_recommended_for_winter": false,
+            "is_runflat_tires": false,
+            "is_pressed_steel_rims": false,
+            "front": {
+              "rim": "7.5Jx17 ET44",
+              "rim_diameter": 17,
+              "rim_width": 7.5,
+              "rim_offset": 44,
+              "tire_full": "LT265/70R17 121/118Q/E",
+              "tire": "LT265/70R17",
+              "load_index": 121,
+              "speed_index": "Q",
+              "tire_pressure": {
+                "bar": 4.1,
+                "psi": 59,
+                "kPa": 410
+              },
+              "tire_sizing_system": "lt-metric",
+              "tire_construction": "R",
+              "tire_width": 265,
+              "tire_aspect_ratio": 70,
+              "tire_diameter": null,
+              "tire_section_width": null,
+              "tire_is_82series": false,
+              "tire_alpha_numeric": null,
+              "tire_width_mm": 265,
+              "tire_diameter_mm": 803,
+              "tire_weight_kg": 25.33
+            },
+            "rear": {
+              "rim": "",
+              "rim_diameter": null,
+              "rim_width": null,
+              "rim_offset": null,
+              "tire_full": "",
+              "tire": "",
+              "load_index": null,
+              "speed_index": null,
+              "tire_pressure": {
+                "bar": 5.5,
+                "psi": 80,
+                "kPa": 550
+              },
+              "tire_sizing_system": null,
+              "tire_construction": null,
+              "tire_width": null,
+              "tire_aspect_ratio": null,
+              "tire_diameter": null,
+              "tire_section_width": null,
+              "tire_is_82series": false,
+              "tire_alpha_numeric": null,
+              "tire_width_mm": null,
+              "tire_diameter_mm": null,
+              "tire_weight_kg": null
+            }
+          },
+          {
+            "is_stock": true,
+            "showing_fp_only": true,
+            "is_extra_load_tires": false,
+            "is_recommended_for_winter": false,
+            "is_runflat_tires": false,
+            "is_pressed_steel_rims": false,
+            "front": {
+              "rim": "8Jx18 ET44",
+              "rim_diameter": 18,
+              "rim_width": 8,
+              "rim_offset": 44,
+              "tire_full": "LT275/70R18 125/122S/E",
+              "tire": "LT275/70R18",
+              "load_index": 125,
+              "speed_index": "S",
+              "tire_pressure": {
+                "bar": 4.1,
+                "psi": 59,
+                "kPa": 410
+              },
+              "tire_sizing_system": "lt-metric",
+              "tire_construction": "R",
+              "tire_width": 275,
+              "tire_aspect_ratio": 70,
+              "tire_diameter": null,
+              "tire_section_width": null,
+              "tire_is_82series": false,
+              "tire_alpha_numeric": null,
+              "tire_width_mm": 275,
+              "tire_diameter_mm": 842,
+              "tire_weight_kg": 27.6
+            },
+            "rear": {
+              "rim": "",
+              "rim_diameter": null,
+              "rim_width": null,
+              "rim_offset": null,
+              "tire_full": "",
+              "tire": "",
+              "load_index": null,
+              "speed_index": null,
+              "tire_pressure": {
+                "bar": 5.5,
+                "psi": 80,
+                "kPa": 550
+              },
+              "tire_sizing_system": null,
+              "tire_construction": null,
+              "tire_width": null,
+              "tire_aspect_ratio": null,
+              "tire_diameter": null,
+              "tire_section_width": null,
+              "tire_is_82series": false,
+              "tire_alpha_numeric": null,
+              "tire_width_mm": null,
+              "tire_diameter_mm": null,
+              "tire_weight_kg": null
+            }
+          },
+          {
+            "is_stock": false,
+            "showing_fp_only": true,
+            "is_extra_load_tires": false,
+            "is_recommended_for_winter": false,
+            "is_runflat_tires": false,
+            "is_pressed_steel_rims": false,
+            "front": {
+              "rim": "8.5Jx20 ET47",
+              "rim_diameter": 20,
+              "rim_width": 8.5,
+              "rim_offset": 47,
+              "tire_full": "LT275/65R20 126/123S/E",
+              "tire": "LT275/65R20",
+              "load_index": 126,
+              "speed_index": "S",
+              "tire_pressure": {
+                "bar": 4.1,
+                "psi": 59,
+                "kPa": 410
+              },
+              "tire_sizing_system": "lt-metric",
+              "tire_construction": "R",
+              "tire_width": 275,
+              "tire_aspect_ratio": 65,
+              "tire_diameter": null,
+              "tire_section_width": null,
+              "tire_is_82series": false,
+              "tire_alpha_numeric": null,
+              "tire_width_mm": 275,
+              "tire_diameter_mm": 866,
+              "tire_weight_kg": 28.01
+            },
+            "rear": {
+              "rim": "",
+              "rim_diameter": null,
+              "rim_width": null,
+              "rim_offset": null,
+              "tire_full": "",
+              "tire": "",
+              "load_index": null,
+              "speed_index": null,
+              "tire_pressure": {
+                "bar": 5.5,
+                "psi": 80,
+                "kPa": 550
+              },
+              "tire_sizing_system": null,
+              "tire_construction": null,
+              "tire_width": null,
+              "tire_aspect_ratio": null,
+              "tire_diameter": null,
+              "tire_section_width": null,
+              "tire_is_82series": false,
+              "tire_alpha_numeric": null,
+              "tire_width_mm": null,
+              "tire_diameter_mm": null,
+              "tire_weight_kg": null
+            }
+          }
+        ],
+        "configurator": null
+      },
+      {
+        "slug": "785fd4ef52",
+        "name": "6.6i",
+        "body": null,
+        "trim": "6.6i",
+        "trim_scoring": null,
+        "trim_attributes": [],
+        "trim_body_types": [],
+        "trim_levels": [
+          "WT",
+          "LT",
+          "LTZ",
+          "High Country",
+          "Custom"
+        ],
+        "make": {
+          "slug": "chevrolet",
+          "name": "Chevrolet",
+          "name_en": "Chevrolet"
+        },
+        "model": {
+          "slug": "silverado-2500-hd",
+          "name": "Silverado 2500 HD",
+          "name_en": "Silverado 2500 HD"
+        },
+        "generation": {
+          "slug": "03e4d3f831",
+          "name": "IV (T1XX)",
+          "platform": "",
+          "start": 2020,
+          "end": 2023,
+          "bodies": [
+            {
+              "slug": "cc3d7fc970",
+              "name": "Pickup Crew Cab",
+              "image": "https://cdn.wheel-size.com/automobile/body/chevrolet-silverado-2500-hd-2020-2023-1758809120.38755.jpg"
+            },
+            {
+              "slug": "e4c4e24edd",
+              "name": "Pickup Regular Cab, 2d",
+              "image": "https://cdn.wheel-size.com/automobile/body/chevrolet-silverado-2500-hd-2020-2023-1758809120.889424.jpg"
+            },
+            {
+              "slug": "f668bd04d1",
+              "name": "Pickup Double Cab",
+              "image": "https://cdn.wheel-size.com/automobile/body/chevrolet-silverado-2500-hd-2020-2023-1758809121.1137075.jpg"
+            }
+          ]
+        },
+        "start_year": 2020,
+        "end_year": 2023,
+        "engine": {
+          "fuel": "Petrol",
+          "capacity": "6.6",
+          "type": "V8",
+          "power": {
+            "kW": 299,
+            "PS": 407,
+            "hp": 401
+          },
+          "code": "L8T"
+        },
+        "regions": [
+          "cdm",
+          "medm",
+          "usdm"
+        ],
+        "technical": {
+          "wheel_fasteners": {
+            "type": "Lug nuts",
+            "thread_size": "M14 x 1.5"
+          },
+          "wheel_tightening_torque": "190 Nm",
+          "stud_holes": 8,
+          "pcd": 180,
+          "centre_bore": "124.1",
+          "bolt_pattern": "8x180",
+          "rear_axis_stud_holes": null,
+          "rear_axis_pcd": null,
+          "rear_axis_centre_bore": null,
+          "rear_axis_bolt_pattern": "N/A"
+        },
+        "tire_type": "SUV",
+        "wheels": [
+          {
+            "is_stock": true,
+            "showing_fp_only": true,
+            "is_extra_load_tires": false,
+            "is_recommended_for_winter": false,
+            "is_runflat_tires": false,
+            "is_pressed_steel_rims": false,
+            "front": {
+              "rim": "7.5Jx17 ET44",
+              "rim_diameter": 17,
+              "rim_width": 7.5,
+              "rim_offset": 44,
+              "tire_full": "LT245/75R17 121/118R/E",
+              "tire": "LT245/75R17",
+              "load_index": 121,
+              "speed_index": "R",
+              "tire_pressure": {
+                "bar": 4.1,
+                "psi": 59,
+                "kPa": 410
+              },
+              "tire_sizing_system": "lt-metric",
+              "tire_construction": "R",
+              "tire_width": 245,
+              "tire_aspect_ratio": 75,
+              "tire_diameter": null,
+              "tire_section_width": null,
+              "tire_is_82series": false,
+              "tire_alpha_numeric": null,
+              "tire_width_mm": 245,
+              "tire_diameter_mm": 799,
+              "tire_weight_kg": 23.76
+            },
+            "rear": {
+              "rim": "",
+              "rim_diameter": null,
+              "rim_width": null,
+              "rim_offset": null,
+              "tire_full": "",
+              "tire": "",
+              "load_index": null,
+              "speed_index": null,
+              "tire_pressure": {
+                "bar": 5.5,
+                "psi": 80,
+                "kPa": 550
+              },
+              "tire_sizing_system": null,
+              "tire_construction": null,
+              "tire_width": null,
+              "tire_aspect_ratio": null,
+              "tire_diameter": null,
+              "tire_section_width": null,
+              "tire_is_82series": false,
+              "tire_alpha_numeric": null,
+              "tire_width_mm": null,
+              "tire_diameter_mm": null,
+              "tire_weight_kg": null
+            }
+          },
+          {
+            "is_stock": true,
+            "showing_fp_only": true,
+            "is_extra_load_tires": false,
+            "is_recommended_for_winter": false,
+            "is_runflat_tires": false,
+            "is_pressed_steel_rims": false,
+            "front": {
+              "rim": "7.5Jx17 ET44",
+              "rim_diameter": 17,
+              "rim_width": 7.5,
+              "rim_offset": 44,
+              "tire_full": "LT265/70R17 121/118Q/E",
+              "tire": "LT265/70R17",
+              "load_index": 121,
+              "speed_index": "Q",
+              "tire_pressure": {
+                "bar": 4.1,
+                "psi": 59,
+                "kPa": 410
+              },
+              "tire_sizing_system": "lt-metric",
+              "tire_construction": "R",
+              "tire_width": 265,
+              "tire_aspect_ratio": 70,
+              "tire_diameter": null,
+              "tire_section_width": null,
+              "tire_is_82series": false,
+              "tire_alpha_numeric": null,
+              "tire_width_mm": 265,
+              "tire_diameter_mm": 803,
+              "tire_weight_kg": 25.33
+            },
+            "rear": {
+              "rim": "",
+              "rim_diameter": null,
+              "rim_width": null,
+              "rim_offset": null,
+              "tire_full": "",
+              "tire": "",
+              "load_index": null,
+              "speed_index": null,
+              "tire_pressure": {
+                "bar": 5.5,
+                "psi": 80,
+                "kPa": 550
+              },
+              "tire_sizing_system": null,
+              "tire_construction": null,
+              "tire_width": null,
+              "tire_aspect_ratio": null,
+              "tire_diameter": null,
+              "tire_section_width": null,
+              "tire_is_82series": false,
+              "tire_alpha_numeric": null,
+              "tire_width_mm": null,
+              "tire_diameter_mm": null,
+              "tire_weight_kg": null
+            }
+          },
+          {
+            "is_stock": true,
+            "showing_fp_only": true,
+            "is_extra_load_tires": false,
+            "is_recommended_for_winter": false,
+            "is_runflat_tires": false,
+            "is_pressed_steel_rims": false,
+            "front": {
+              "rim": "8Jx18 ET44",
+              "rim_diameter": 18,
+              "rim_width": 8,
+              "rim_offset": 44,
+              "tire_full": "LT275/70R18 125/122Q/E",
+              "tire": "LT275/70R18",
+              "load_index": 125,
+              "speed_index": "Q",
+              "tire_pressure": {
+                "bar": 4.1,
+                "psi": 59,
+                "kPa": 410
+              },
+              "tire_sizing_system": "lt-metric",
+              "tire_construction": "R",
+              "tire_width": 275,
+              "tire_aspect_ratio": 70,
+              "tire_diameter": null,
+              "tire_section_width": null,
+              "tire_is_82series": false,
+              "tire_alpha_numeric": null,
+              "tire_width_mm": 275,
+              "tire_diameter_mm": 842,
+              "tire_weight_kg": 27.6
+            },
+            "rear": {
+              "rim": "",
+              "rim_diameter": null,
+              "rim_width": null,
+              "rim_offset": null,
+              "tire_full": "",
+              "tire": "",
+              "load_index": null,
+              "speed_index": null,
+              "tire_pressure": {
+                "bar": 5.5,
+                "psi": 80,
+                "kPa": 550
+              },
+              "tire_sizing_system": null,
+              "tire_construction": null,
+              "tire_width": null,
+              "tire_aspect_ratio": null,
+              "tire_diameter": null,
+              "tire_section_width": null,
+              "tire_is_82series": false,
+              "tire_alpha_numeric": null,
+              "tire_width_mm": null,
+              "tire_diameter_mm": null,
+              "tire_weight_kg": null
+            }
+          },
+          {
+            "is_stock": true,
+            "showing_fp_only": true,
+            "is_extra_load_tires": false,
+            "is_recommended_for_winter": false,
+            "is_runflat_tires": false,
+            "is_pressed_steel_rims": false,
+            "front": {
+              "rim": "8.5Jx20 ET47",
+              "rim_diameter": 20,
+              "rim_width": 8.5,
+              "rim_offset": 47,
+              "tire_full": "LT275/65R20 126/123Q/E",
+              "tire": "LT275/65R20",
+              "load_index": 126,
+              "speed_index": "Q",
+              "tire_pressure": {
+                "bar": 4.1,
+                "psi": 59,
+                "kPa": 410
+              },
+              "tire_sizing_system": "lt-metric",
+              "tire_construction": "R",
+              "tire_width": 275,
+              "tire_aspect_ratio": 65,
+              "tire_diameter": null,
+              "tire_section_width": null,
+              "tire_is_82series": false,
+              "tire_alpha_numeric": null,
+              "tire_width_mm": 275,
+              "tire_diameter_mm": 866,
+              "tire_weight_kg": 28.01
+            },
+            "rear": {
+              "rim": "",
+              "rim_diameter": null,
+              "rim_width": null,
+              "rim_offset": null,
+              "tire_full": "",
+              "tire": "",
+              "load_index": null,
+              "speed_index": null,
+              "tire_pressure": {
+                "bar": 5.5,
+                "psi": 80,
+                "kPa": 550
+              },
+              "tire_sizing_system": null,
+              "tire_construction": null,
+              "tire_width": null,
+              "tire_aspect_ratio": null,
+              "tire_diameter": null,
+              "tire_section_width": null,
+              "tire_is_82series": false,
+              "tire_alpha_numeric": null,
+              "tire_width_mm": null,
+              "tire_diameter_mm": null,
+              "tire_weight_kg": null
+            }
+          }
+        ],
+        "configurator": null
+      }
+    ],
+    "meta": {
+      "count": 2,
+      "offset": 0,
+      "limit": 50,
+      "regions": {
+        "limit": 50,
+        "usdm": 2,
+        "cdm": 2,
+        "medm": 1
+      }
+    }
+  }
+}

@@ -1,0 +1,14 @@
+{
+  "status": 200,
+  "body": {
+    "data": [],
+    "meta": {
+      "count": 0,
+      "offset": 0,
+      "limit": 50,
+      "regions": {
+        "limit": 50
+      }
+    }
+  }
+}

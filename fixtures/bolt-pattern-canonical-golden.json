@@ -1,0 +1,10 @@
+[
+  { "input": "5X120",       "output": ["5x120"] },
+  { "input": "5X5.0",       "output": ["5x127"] },
+  { "input": "5X114.3",     "output": ["5x114.3"] },
+  { "input": "5X4.49",      "output": ["5x114.3"] },
+  { "input": "6X135/5.5",   "output": ["6x135", "6x139.7"] },
+  { "input": "6X155",       "output": ["6x155"] },
+  { "input": "",            "output": [] },
+  { "input": "N/A",         "output": [] }
+]

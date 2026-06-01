@@ -13,6 +13,7 @@
  */
 
 import { Finish } from "@modules/common/components/wheel"
+import { vehicleToConstraints, fitParamToPatterns } from "./vehicle-constraint"
 
 export type DiscoveryProduct = {
   id: string
@@ -138,6 +139,13 @@ export function parseQueryFromSearchParams(
     ? (sortRaw as SortOption)
     : "relevance"
 
+  // fit: absent => no constraint; "0" => explicit off; else CSV of canonical patterns.
+  const fitRaw = typeof sp.fit === "string" ? sp.fit : Array.isArray(sp.fit) ? sp.fit[0] : undefined
+  const vehicleConstraint =
+    fitRaw && fitRaw !== "0"
+      ? vehicleToConstraints({ canonicalBoltPatterns: fitParamToPatterns(fitRaw) })
+      : undefined
+
   return {
     filters: {
       categories: arr("categories"),
@@ -153,5 +161,6 @@ export function parseQueryFromSearchParams(
     sort,
     page: Math.max(1, num("page") ?? 1),
     q: (Array.isArray(sp.q) ? sp.q[0] : sp.q) || undefined,
+    ...(vehicleConstraint?.length ? { vehicleConstraint } : {}),
   }
 }

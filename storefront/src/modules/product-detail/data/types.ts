@@ -86,6 +86,9 @@ export type ProductDetail = DiscoveryProduct & {
   /** Bolt patterns the product supports. */
   boltPatternOptions: string[]
 
+  /** Canonical bolt patterns ("{count}x{pcd_mm}") derived from boltPatternOptions — the fitment join key. */
+  boltPatternsCanonical: string[]
+
   /** Vehicles confirmed to fit. Real source: a fitment join table per Phase 2.1. */
   fitment: FitmentEntry[]
 

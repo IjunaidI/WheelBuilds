@@ -20,6 +20,7 @@
     "dev": "medusa develop",
     "email:dev": "email dev --dir=./src/modules/email-notifications/templates --port=3002",
     "test:sync": "jest --passWithNoTests src/modules/vendor-sync",
+    "test:fitment": "jest src/modules/wheel-size src/modules/customer-vehicle",
     "vendor-sync:dry-run": "medusa exec ./src/scripts/vendor-sync-dry-run.ts",
     "vendor-sync:apply": "medusa exec ./src/scripts/vendor-sync-apply.ts"
   },

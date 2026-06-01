@@ -1,13 +1,22 @@
+export type FitWindow = { min: number; max: number } | null
+export type VehicleFitment = {
+  status: "ok" | "not_found"
+  canonicalBoltPatterns: string[]
+  hubBoreMm: number | null
+  diameterWindow: FitWindow; widthWindow: FitWindow; offsetWindow: FitWindow
+  source: { modificationSlug: string; region: string }
+}
 export type Vehicle = {
   id: string
   year: number
   make: string
   model: string
   trim?: string
-  /** Fitment fields — empty today, populated once 2.1 (wheel-size.com) lands. */
-  boltPattern?: string
-  hubBore?: string
-  /** Free-form user note: stock, 2.5" lift, etc. */
+  modificationSlug?: string
+  canonicalBoltPatterns?: string[]
+  hubBoreMm?: number
+  diameterWindow?: FitWindow; widthWindow?: FitWindow; offsetWindow?: FitWindow
+  fitmentStatus?: "ok" | "not_found"
   notes?: string
   savedAt: string
 }

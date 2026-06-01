@@ -1,5 +1,6 @@
 "use client"
 
+import { usePathname, useRouter, useSearchParams } from "next/navigation"
 import { useGarage } from "@lib/garage/use-garage"
 import { openSearch } from "@lib/stores/search-store"
 import Icon from "@modules/common/components/icon"
@@ -97,6 +98,9 @@ type FilterSectionsProps = {
  */
 const FilterSections = ({ facets, hideClearAll }: FilterSectionsProps) => {
   const { active } = useGarage()
+  const router = useRouter()
+  const pathname = usePathname()
+  const sp = useSearchParams()
   const {
     filters,
     toggleArrayFilter,
@@ -135,8 +139,20 @@ const FilterSections = ({ facets, hideClearAll }: FilterSectionsProps) => {
           </span>
           <Icon name="chevron-down" size={14} color="#8A8A8E" />
         </button>
-        {/* TODO(integration): when Phase 2.1 fitment data lands, wire an
-            extra "Only show wheels that fit" toggle below this band. */}
+        {active && sp.get("fit") !== "0" ? (
+          <button
+            type="button"
+            className="mt-2 text-[12px] text-[var(--ink-soft)] underline"
+            onClick={() => {
+              const n = new URLSearchParams(Array.from(sp.entries()))
+              n.set("fit", "0")
+              n.delete("page")
+              router.replace(`${pathname}?${n.toString()}`)
+            }}
+          >
+            Show all wheels
+          </button>
+        ) : null}
       </div>
 
       <Accordion

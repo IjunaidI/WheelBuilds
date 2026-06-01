@@ -1,0 +1,558 @@
+{
+  "status": 200,
+  "body": {
+    "data": [
+      {
+        "slug": "32b586f1cd",
+        "name": "3.0i",
+        "body": null,
+        "trim": "3.0i",
+        "trim_scoring": null,
+        "trim_attributes": [],
+        "trim_body_types": [],
+        "trim_levels": [
+          "GT"
+        ],
+        "make": {
+          "slug": "mitsubishi",
+          "name": "Mitsubishi",
+          "name_en": "Mitsubishi"
+        },
+        "model": {
+          "slug": "outlander",
+          "name": "Outlander",
+          "name_en": "Outlander"
+        },
+        "generation": {
+          "slug": "18d10dc6e6",
+          "name": "III (GF) Facelift",
+          "platform": "GS",
+          "start": 2015,
+          "end": 2018,
+          "bodies": [
+            {
+              "slug": "d2a27e83d4",
+              "name": "SUV, 5d",
+              "image": "https://cdn.wheel-size.com/automobile/body/mitsubishi-outlander-2015-2018-1617602940.7345116.webp"
+            }
+          ]
+        },
+        "start_year": 2016,
+        "end_year": 2018,
+        "engine": {
+          "fuel": "Petrol",
+          "capacity": null,
+          "type": "V6",
+          "power": {
+            "kW": 167,
+            "PS": 227,
+            "hp": 224
+          },
+          "code": "6B31"
+        },
+        "regions": [
+          "usdm"
+        ],
+        "technical": {
+          "wheel_fasteners": {
+            "type": "Lug nuts",
+            "thread_size": "M12 x 1.5"
+          },
+          "wheel_tightening_torque": "88 - 108 Nm",
+          "stud_holes": 5,
+          "pcd": 114.3,
+          "centre_bore": "67.1",
+          "bolt_pattern": "5x114.3",
+          "rear_axis_stud_holes": null,
+          "rear_axis_pcd": null,
+          "rear_axis_centre_bore": null,
+          "rear_axis_bolt_pattern": "N/A"
+        },
+        "tire_type": "SUV",
+        "wheels": [
+          {
+            "is_stock": true,
+            "showing_fp_only": true,
+            "is_extra_load_tires": false,
+            "is_recommended_for_winter": false,
+            "is_runflat_tires": false,
+            "is_pressed_steel_rims": false,
+            "front": {
+              "rim": "7Jx18 ET38",
+              "rim_diameter": 18,
+              "rim_width": 7,
+              "rim_offset": 38,
+              "tire_full": "225/55R18 97H",
+              "tire": "225/55R18",
+              "load_index": 97,
+              "speed_index": "H",
+              "tire_pressure": {
+                "bar": 2.4,
+                "psi": 35,
+                "kPa": 240
+              },
+              "tire_sizing_system": "metric",
+              "tire_construction": "R",
+              "tire_width": 225,
+              "tire_aspect_ratio": 55,
+              "tire_diameter": null,
+              "tire_section_width": null,
+              "tire_is_82series": false,
+              "tire_alpha_numeric": null,
+              "tire_width_mm": 225,
+              "tire_diameter_mm": 705,
+              "tire_weight_kg": 11.15
+            },
+            "rear": {
+              "rim": "",
+              "rim_diameter": null,
+              "rim_width": null,
+              "rim_offset": null,
+              "tire_full": "",
+              "tire": "",
+              "load_index": null,
+              "speed_index": null,
+              "tire_pressure": null,
+              "tire_sizing_system": null,
+              "tire_construction": null,
+              "tire_width": null,
+              "tire_aspect_ratio": null,
+              "tire_diameter": null,
+              "tire_section_width": null,
+              "tire_is_82series": false,
+              "tire_alpha_numeric": null,
+              "tire_width_mm": null,
+              "tire_diameter_mm": null,
+              "tire_weight_kg": null
+            }
+          },
+          {
+            "is_stock": false,
+            "showing_fp_only": true,
+            "is_extra_load_tires": false,
+            "is_recommended_for_winter": false,
+            "is_runflat_tires": false,
+            "is_pressed_steel_rims": false,
+            "front": {
+              "rim": "7.5Jx18 ET38",
+              "rim_diameter": 18,
+              "rim_width": 7.5,
+              "rim_offset": 38,
+              "tire_full": "245/50R18 98V",
+              "tire": "245/50R18",
+              "load_index": 98,
+              "speed_index": "V",
+              "tire_pressure": {
+                "bar": 2.6,
+                "psi": 38,
+                "kPa": 260
+              },
+              "tire_sizing_system": "metric",
+              "tire_construction": "R",
+              "tire_width": 245,
+              "tire_aspect_ratio": 50,
+              "tire_diameter": null,
+              "tire_section_width": null,
+              "tire_is_82series": false,
+              "tire_alpha_numeric": null,
+              "tire_width_mm": 245,
+              "tire_diameter_mm": 702,
+              "tire_weight_kg": 11.91
+            },
+            "rear": {
+              "rim": "",
+              "rim_diameter": null,
+              "rim_width": null,
+              "rim_offset": null,
+              "tire_full": "",
+              "tire": "",
+              "load_index": null,
+              "speed_index": null,
+              "tire_pressure": null,
+              "tire_sizing_system": "metric",
+              "tire_construction": "R",
+              "tire_width": null,
+              "tire_aspect_ratio": null,
+              "tire_diameter": null,
+              "tire_section_width": null,
+              "tire_is_82series": false,
+              "tire_alpha_numeric": null,
+              "tire_width_mm": null,
+              "tire_diameter_mm": null,
+              "tire_weight_kg": null
+            }
+          },
+          {
+            "is_stock": false,
+            "showing_fp_only": true,
+            "is_extra_load_tires": false,
+            "is_recommended_for_winter": false,
+            "is_runflat_tires": false,
+            "is_pressed_steel_rims": false,
+            "front": {
+              "rim": "8Jx19 ET35",
+              "rim_diameter": 19,
+              "rim_width": 8,
+              "rim_offset": 35,
+              "tire_full": "245/45ZR19 97W",
+              "tire": "245/45ZR19",
+              "load_index": 97,
+              "speed_index": "W",
+              "tire_pressure": {
+                "bar": 2.6,
+                "psi": 38,
+                "kPa": 260
+              },
+              "tire_sizing_system": "metric",
+              "tire_construction": "R",
+              "tire_width": 245,
+              "tire_aspect_ratio": 45,
+              "tire_diameter": null,
+              "tire_section_width": null,
+              "tire_is_82series": false,
+              "tire_alpha_numeric": null,
+              "tire_width_mm": 245,
+              "tire_diameter_mm": 703,
+              "tire_weight_kg": 11.77
+            },
+            "rear": {
+              "rim": "",
+              "rim_diameter": null,
+              "rim_width": null,
+              "rim_offset": null,
+              "tire_full": "",
+              "tire": "",
+              "load_index": null,
+              "speed_index": null,
+              "tire_pressure": null,
+              "tire_sizing_system": "metric",
+              "tire_construction": "R",
+              "tire_width": null,
+              "tire_aspect_ratio": null,
+              "tire_diameter": null,
+              "tire_section_width": null,
+              "tire_is_82series": false,
+              "tire_alpha_numeric": null,
+              "tire_width_mm": null,
+              "tire_diameter_mm": null,
+              "tire_weight_kg": null
+            }
+          },
+          {
+            "is_stock": false,
+            "showing_fp_only": true,
+            "is_extra_load_tires": false,
+            "is_recommended_for_winter": false,
+            "is_runflat_tires": false,
+            "is_pressed_steel_rims": false,
+            "front": {
+              "rim": "6.5Jx16 ET38",
+              "rim_diameter": 16,
+              "rim_width": 6.5,
+              "rim_offset": 38,
+              "tire_full": "215/70R16 99H",
+              "tire": "215/70R16",
+              "load_index": 99,
+              "speed_index": "H",
+              "tire_pressure": {
+                "bar": 2.4,
+                "psi": 35,
+                "kPa": 240
+              },
+              "tire_sizing_system": "metric",
+              "tire_construction": "R",
+              "tire_width": 215,
+              "tire_aspect_ratio": 70,
+              "tire_diameter": null,
+              "tire_section_width": null,
+              "tire_is_82series": false,
+              "tire_alpha_numeric": null,
+              "tire_width_mm": 215,
+              "tire_diameter_mm": 707,
+              "tire_weight_kg": 11.09
+            },
+            "rear": {
+              "rim": "",
+              "rim_diameter": null,
+              "rim_width": null,
+              "rim_offset": null,
+              "tire_full": "",
+              "tire": "",
+              "load_index": null,
+              "speed_index": null,
+              "tire_pressure": null,
+              "tire_sizing_system": "metric",
+              "tire_construction": "R",
+              "tire_width": null,
+              "tire_aspect_ratio": null,
+              "tire_diameter": null,
+              "tire_section_width": null,
+              "tire_is_82series": false,
+              "tire_alpha_numeric": null,
+              "tire_width_mm": null,
+              "tire_diameter_mm": null,
+              "tire_weight_kg": null
+            }
+          }
+        ],
+        "configurator": null
+      },
+      {
+        "slug": "bf30060203",
+        "name": "2.4i",
+        "body": null,
+        "trim": "2.4i",
+        "trim_scoring": null,
+        "trim_attributes": [],
+        "trim_body_types": [],
+        "trim_levels": [
+          "ES",
+          "SE",
+          "LE",
+          "SEL"
+        ],
+        "make": {
+          "slug": "mitsubishi",
+          "name": "Mitsubishi",
+          "name_en": "Mitsubishi"
+        },
+        "model": {
+          "slug": "outlander",
+          "name": "Outlander",
+          "name_en": "Outlander"
+        },
+        "generation": {
+          "slug": "18d10dc6e6",
+          "name": "III (GF) Facelift",
+          "platform": "GS",
+          "start": 2015,
+          "end": 2018,
+          "bodies": [
+            {
+              "slug": "d2a27e83d4",
+              "name": "SUV, 5d",
+              "image": "https://cdn.wheel-size.com/automobile/body/mitsubishi-outlander-2015-2018-1617602940.7345116.webp"
+            }
+          ]
+        },
+        "start_year": 2016,
+        "end_year": 2018,
+        "engine": {
+          "fuel": "Petrol",
+          "capacity": "2.4",
+          "type": "I4",
+          "power": {
+            "kW": 124,
+            "PS": 169,
+            "hp": 166
+          },
+          "code": "4J12"
+        },
+        "regions": [
+          "medm",
+          "usdm"
+        ],
+        "technical": {
+          "wheel_fasteners": {
+            "type": "Lug nuts",
+            "thread_size": "M12 x 1.5"
+          },
+          "wheel_tightening_torque": "88 - 108 Nm",
+          "stud_holes": 5,
+          "pcd": 114.3,
+          "centre_bore": "67.1",
+          "bolt_pattern": "5x114.3",
+          "rear_axis_stud_holes": null,
+          "rear_axis_pcd": null,
+          "rear_axis_centre_bore": null,
+          "rear_axis_bolt_pattern": "N/A"
+        },
+        "tire_type": "SUV",
+        "wheels": [
+          {
+            "is_stock": true,
+            "showing_fp_only": true,
+            "is_extra_load_tires": false,
+            "is_recommended_for_winter": false,
+            "is_runflat_tires": false,
+            "is_pressed_steel_rims": false,
+            "front": {
+              "rim": "7Jx18 ET38",
+              "rim_diameter": 18,
+              "rim_width": 7,
+              "rim_offset": 38,
+              "tire_full": "225/55R18 97H",
+              "tire": "225/55R18",
+              "load_index": 97,
+              "speed_index": "H",
+              "tire_pressure": {
+                "bar": 2.4,
+                "psi": 35,
+                "kPa": 240
+              },
+              "tire_sizing_system": "metric",
+              "tire_construction": "R",
+              "tire_width": 225,
+              "tire_aspect_ratio": 55,
+              "tire_diameter": null,
+              "tire_section_width": null,
+              "tire_is_82series": false,
+              "tire_alpha_numeric": null,
+              "tire_width_mm": 225,
+              "tire_diameter_mm": 705,
+              "tire_weight_kg": 11.15
+            },
+            "rear": {
+              "rim": "",
+              "rim_diameter": null,
+              "rim_width": null,
+              "rim_offset": null,
+              "tire_full": "",
+              "tire": "",
+              "load_index": null,
+              "speed_index": null,
+              "tire_pressure": null,
+              "tire_sizing_system": null,
+              "tire_construction": null,
+              "tire_width": null,
+              "tire_aspect_ratio": null,
+              "tire_diameter": null,
+              "tire_section_width": null,
+              "tire_is_82series": false,
+              "tire_alpha_numeric": null,
+              "tire_width_mm": null,
+              "tire_diameter_mm": null,
+              "tire_weight_kg": null
+            }
+          },
+          {
+            "is_stock": false,
+            "showing_fp_only": true,
+            "is_extra_load_tires": false,
+            "is_recommended_for_winter": false,
+            "is_runflat_tires": false,
+            "is_pressed_steel_rims": false,
+            "front": {
+              "rim": "7.5Jx19 ET38",
+              "rim_diameter": 19,
+              "rim_width": 7.5,
+              "rim_offset": 38,
+              "tire_full": "225/50R19 97V",
+              "tire": "225/50R19",
+              "load_index": 97,
+              "speed_index": "V",
+              "tire_pressure": {
+                "bar": 2.6,
+                "psi": 38,
+                "kPa": 260
+              },
+              "tire_sizing_system": "metric",
+              "tire_construction": "R",
+              "tire_width": 225,
+              "tire_aspect_ratio": 50,
+              "tire_diameter": null,
+              "tire_section_width": null,
+              "tire_is_82series": false,
+              "tire_alpha_numeric": null,
+              "tire_width_mm": 225,
+              "tire_diameter_mm": 708,
+              "tire_weight_kg": 11.06
+            },
+            "rear": {
+              "rim": "",
+              "rim_diameter": null,
+              "rim_width": null,
+              "rim_offset": null,
+              "tire_full": "",
+              "tire": "",
+              "load_index": null,
+              "speed_index": null,
+              "tire_pressure": null,
+              "tire_sizing_system": "metric",
+              "tire_construction": "R",
+              "tire_width": null,
+              "tire_aspect_ratio": null,
+              "tire_diameter": null,
+              "tire_section_width": null,
+              "tire_is_82series": false,
+              "tire_alpha_numeric": null,
+              "tire_width_mm": null,
+              "tire_diameter_mm": null,
+              "tire_weight_kg": null
+            }
+          },
+          {
+            "is_stock": false,
+            "showing_fp_only": true,
+            "is_extra_load_tires": false,
+            "is_recommended_for_winter": false,
+            "is_runflat_tires": false,
+            "is_pressed_steel_rims": false,
+            "front": {
+              "rim": "6.5Jx16 ET38",
+              "rim_diameter": 16,
+              "rim_width": 6.5,
+              "rim_offset": 38,
+              "tire_full": "215/70R16 99H",
+              "tire": "215/70R16",
+              "load_index": 99,
+              "speed_index": "H",
+              "tire_pressure": {
+                "bar": 2.4,
+                "psi": 35,
+                "kPa": 240
+              },
+              "tire_sizing_system": "metric",
+              "tire_construction": "R",
+              "tire_width": 215,
+              "tire_aspect_ratio": 70,
+              "tire_diameter": null,
+              "tire_section_width": null,
+              "tire_is_82series": false,
+              "tire_alpha_numeric": null,
+              "tire_width_mm": 215,
+              "tire_diameter_mm": 707,
+              "tire_weight_kg": 11.09
+            },
+            "rear": {
+              "rim": "",
+              "rim_diameter": null,
+              "rim_width": null,
+              "rim_offset": null,
+              "tire_full": "",
+              "tire": "",
+              "load_index": null,
+              "speed_index": null,
+              "tire_pressure": null,
+              "tire_sizing_system": "metric",
+              "tire_construction": "R",
+              "tire_width": null,
+              "tire_aspect_ratio": null,
+              "tire_diameter": null,
+              "tire_section_width": null,
+              "tire_is_82series": false,
+              "tire_alpha_numeric": null,
+              "tire_width_mm": null,
+              "tire_diameter_mm": null,
+              "tire_weight_kg": null
+            }
+          }
+        ],
+        "configurator": null
+      }
+    ],
+    "meta": {
+      "count": 2,
+      "offset": 0,
+      "limit": 50,
+      "regions": {
+        "limit": 50,
+        "usdm": 2,
+        "eudm": 3,
+        "russia": 3,
+        "jdm": 4,
+        "medm": 2
+      }
+    }
+  }
+}

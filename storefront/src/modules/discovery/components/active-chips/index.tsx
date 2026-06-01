@@ -1,8 +1,10 @@
 "use client"
 
+import { usePathname, useRouter, useSearchParams } from "next/navigation"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import Icon from "@modules/common/components/icon"
+import { useGarage } from "@lib/garage/use-garage"
 import { useDiscoveryQuery } from "../../data/use-discovery-query"
 
 const FINISH_LABELS: Record<string, string> = {
@@ -31,8 +33,21 @@ const ActiveChips = () => {
     clearAll,
     isAnyFilterActive,
   } = useDiscoveryQuery()
+  const { active } = useGarage()
+  const router = useRouter()
+  const pathname = usePathname()
+  const sp = useSearchParams()
 
-  if (!isAnyFilterActive) return null
+  const fitActive = active != null && sp.get("fit") !== null && sp.get("fit") !== "0"
+
+  const showAll = () => {
+    const n = new URLSearchParams(Array.from(sp.entries()))
+    n.set("fit", "0")
+    n.delete("page")
+    router.replace(`${pathname}?${n.toString()}`)
+  }
+
+  if (!isAnyFilterActive && !fitActive) return null
 
   type ChipRow = {
     key: string
@@ -41,6 +56,14 @@ const ActiveChips = () => {
   }
 
   const chips: ChipRow[] = []
+
+  if (fitActive && active) {
+    chips.push({
+      key: "fit",
+      label: `Fits: ${active.year} ${active.make} ${active.model}`,
+      onRemove: showAll,
+    })
+  }
 
   for (const c of filters.categories) {
     chips.push({

@@ -30,6 +30,7 @@ import {
   SortOption,
 } from "./types"
 import { Finish } from "@modules/common/components/wheel"
+import { lit } from "./escape"
 
 // Re-export so any existing imports from this file keep working.
 export { parseQueryFromSearchParams } from "./types"
@@ -38,10 +39,6 @@ const FACET_FIELDS = ["brand", "diameters", "bolt_patterns", "finish"] as const
 
 const NEW_DAYS = 30
 const NEW_MS = NEW_DAYS * 24 * 60 * 60 * 1000
-
-/** Escape a value for a Meilisearch filter string literal. */
-const lit = (v: string | number) =>
-  typeof v === "number" ? String(v) : `"${String(v).replace(/"/g, '\\"')}"`
 
 /**
  * Build the array of filter clauses for a set of DiscoveryFilters, optionally

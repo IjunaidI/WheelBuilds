@@ -76,6 +76,17 @@ export class LocalStorageGarage implements GarageProvider {
     return vehicle
   }
 
+  update(id: string, patch: Partial<NewVehicle>): Vehicle {
+    const list = this.list()
+    const idx = list.findIndex((v) => v.id === id)
+    if (idx === -1) throw new Error(`vehicle ${id} not found`)
+    const updated = { ...list[idx], ...patch }
+    const next = [...list.slice(0, idx), updated, ...list.slice(idx + 1)]
+    writeVehicles(next) // module-level free function (NOT this.writeVehicles) — the same one add()/remove() call
+    this.emit()
+    return updated
+  }
+
   remove(id: string): void {
     const next = readVehicles().filter((v) => v.id !== id)
     writeVehicles(next)
@@ -97,6 +108,14 @@ export class LocalStorageGarage implements GarageProvider {
     const id = readActiveId()
     if (!id) return null
     return readVehicles().find((v) => v.id === id) ?? null
+  }
+
+  clear(): void {
+    if (typeof window !== "undefined") {
+      window.localStorage.removeItem(VEHICLES_KEY)
+      window.localStorage.removeItem(ACTIVE_KEY)
+    }
+    this.emit()
   }
 
   subscribe(listener: () => void): () => void {

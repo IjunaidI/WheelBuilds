@@ -28,6 +28,8 @@ export type DiscoveryProduct = {
   diameter: number
   width: number
   boltPattern: string
+  /** Canonical bolt patterns ("{count}x{pcd_mm}") used to badge fit vs the active vehicle. */
+  boltPatternsCanonical: string[]
   /** Category slugs the product belongs to (e.g. "off-road", "luxury"). */
   categories: string[]
   /** "NEW" tag in the product card. */

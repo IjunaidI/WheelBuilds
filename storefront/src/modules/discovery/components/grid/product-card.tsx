@@ -3,6 +3,7 @@ import Wheel from "@modules/common/components/wheel"
 import Label from "@modules/common/components/label"
 import Display from "@modules/common/components/display"
 import Chip from "@modules/common/components/chip"
+import FitBadge from "./fit-badge"
 import { DiscoveryProduct } from "../../data/types"
 
 const FINISH_SWATCH: Record<string, string> = {
@@ -41,13 +42,7 @@ const DiscoveryProductCard = ({ product }: DiscoveryProductCardProps) => (
           </Chip>
         </div>
       )}
-      {product.fitsActiveVehicle && (
-        <div className="absolute top-2.5 right-2.5">
-          <Chip variant="accent" size="sm" dot>
-            FITS
-          </Chip>
-        </div>
-      )}
+      <FitBadge patterns={product.boltPatternsCanonical} />
     </div>
 
     <div className="p-3 flex flex-col gap-1">

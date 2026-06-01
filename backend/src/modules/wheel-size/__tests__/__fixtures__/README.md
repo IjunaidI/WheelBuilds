@@ -1,0 +1,1 @@
+SYNTHETIC/PROVISIONAL fixtures built to the documented wheel-size.com v2 shape. Task 1 (Sandbox validation gate) MUST replace by-model-*.json with REAL recorded responses and reconcile normalize.ts JSON paths before launch.

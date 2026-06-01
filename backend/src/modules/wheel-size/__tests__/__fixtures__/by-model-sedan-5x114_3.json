@@ -1,0 +1,1 @@
+{ "status": 200, "body": { "data": [ { "technical": { "bolt_pattern": "5x114.3", "pcd": 114.3, "stud_holes": 5, "centre_bore": 64.1 }, "wheels": [ { "is_stock": true, "front": { "rim_diameter": 17, "rim_width": 7, "rim_offset": 45 }, "rear": null }, { "is_stock": false, "front": { "rim_diameter": 19, "rim_width": 8.5, "rim_offset": 35 }, "rear": null } ] } ] } }

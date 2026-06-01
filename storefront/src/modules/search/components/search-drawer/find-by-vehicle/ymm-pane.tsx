@@ -200,7 +200,7 @@ const YmmPane = ({ onClose }: YmmPaneProps) => {
       })
       setActive(vehicle.id)
       // fire the (human-initiated) fitment lookup, then write it back
-      const fitment = await getFitmentByVehicle(modificationSlug, "usdm")
+      const fitment = await getFitmentByVehicle(make, model, modificationSlug, "usdm")
       let fitParam = ""
       if (fitment && !("error" in fitment)) {
         update(vehicle.id, {

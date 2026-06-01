@@ -7,10 +7,10 @@ export const getYears = (make: string, model: string) => sdk.client.fetch<{ year
 export const getModifications = (make: string, model: string, year: string) =>
   sdk.client.fetch<{ modifications: any }>(`/store/vehicle-catalog/modifications?make=${make}&model=${model}&year=${year}`)
 
-export async function getFitmentByVehicle(modificationSlug: string, region = "usdm"): Promise<VehicleFitment | { error: "unavailable" }> {
+export async function getFitmentByVehicle(make: string, model: string, modification: string, region = "usdm"): Promise<VehicleFitment | { error: "unavailable" }> {
   try {
     const r = await sdk.client.fetch<{ fitment: VehicleFitment }>(
-      `/store/fitment/by-vehicle?modification=${encodeURIComponent(modificationSlug)}&region=${region}`)
+      `/store/fitment/by-vehicle?make=${make}&model=${model}&modification=${encodeURIComponent(modification)}&region=${region}`)
     return r.fitment
   } catch (e: any) {
     // Guard multiple error shapes: sdk.client.fetch may surface the status as e.status or e.response?.status.

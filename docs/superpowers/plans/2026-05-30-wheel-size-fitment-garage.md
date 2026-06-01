@@ -1992,16 +1992,17 @@ git add -A && git commit -m "test(fitment): live verification checklist complete
 
 ---
 
-## Parked work (blocked on the Sandbox key and/or a dev DB)
+## Parked work
 
-Tracked here so nothing deferred is lost. As of the Batch-1/Batch-2 implementation, these remain open:
+✅ **Task 1 — DONE (GO).** Validated against the live v2 API on 2026-06-01; findings + decision in [`docs/superpowers/specs/2026-05-30-wheel-size-task1-findings.md`](../specs/2026-05-30-wheel-size-task1-findings.md). Parity holds (incl. the non-standard-PCD truck `8x180`) → **no `STANDARD_PCDS` change, no re-index**. Real fixtures recorded.
+✅ **Provisional-code reconciliation — DONE.** `by_model` now takes `make+model+modification` (the API rejects modification alone with a 400); `centre_bore` parsed as a string; synthetic fixtures replaced with real recordings.
 
-- **Task 1 — the Sandbox validation gate** (needs the wheel-size.com Sandbox key): real `by-model-*.json` + `catalog-*.json` fixtures, the parity result on the non-standard-PCD truck → the GO / EXTEND-STANDARD-PCDS / BLOCK decision, the exact v2 JSON paths, the `by_model` param contract, the quota signal, and the `actor_id` spike (the `actor_id` part needs only the dev backend, not the key).
-- **Reconcile the provisional code with Task 1:** `wheel-size/normalize.ts` + `types.ts` JSON paths and the synthetic `__fixtures__/by-model-sedan-5x114_3.json` must be replaced with the real recorded responses; `client.ts` endpoint paths + the `by_model` param contract confirmed.
-- **`STANDARD_PCDS` extension + Meilisearch re-index** — only if Task 1 = EXTEND (Task 2 Steps 2–3, currently skipped).
-- **Both modules' migrations** (needs a dev DB): run once, after both `wheel-size` and `customer-vehicle` are registered — `medusa db:generate wheelSizeModuleService`, `medusa db:generate customerVehicleModuleService`, then `db:migrate`. (Task 5/6/7's migration steps were deferred.)
-- **Manual/runtime verification** of every store route (Tasks 8–10) and the storefront garage/Discovery/PDP wiring — needs the backend running.
-- **Task 25** end-to-end verification + the conditional re-index check.
+Still open (need a **dev DB / running backend** — NOT the key):
+
+- **`actor_id` spike** — confirm Medusa's store customer-auth middleware populates `auth_context.actor_id` on the custom `/store/*` routes (needs the dev backend + a customer login). If null, register `defineMiddlewares` per Task 10 Step 1.
+- **Both modules' migrations** — run once, after both `wheel-size` and `customer-vehicle` are registered: `medusa db:generate wheelSizeModuleService`, `medusa db:generate customerVehicleModuleService`, then `db:migrate`. (Task 5/6/7's migration steps were deferred.)
+- **Manual/runtime verification** of every store route (Tasks 8–10) and the storefront garage/Discovery/PDP wiring — needs the backend running + synced wheels in Meilisearch.
+- **Task 25** end-to-end verification.
 
 ## Notes for the executor
 

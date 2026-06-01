@@ -287,6 +287,7 @@ src/modules/product-detail/
 5. `fitment`: `[]` (Spec 2). The Fitment section degrades gracefully on empty.
 6. Specs grid: `construction` / `countryOfOrigin` / `warranty` default to `"—"` (not in vendor data — gap 4.1). `weightLb = product.weight / 453.592` (Medusa stores grams).
 7. The finish normalization rule lives in the adapter as a byte-equivalent copy of [`backend/src/modules/vendor-sync/search/normalize-finish.ts`](../backend/src/modules/vendor-sync/search/normalize-finish.ts) — keep them in lockstep.
+8. [`lib/fitment/canonical-bolt-pattern.ts`](src/lib/fitment/canonical-bolt-pattern.ts) is a lockstep twin of the backend [`canonicalBoltPatterns`](../backend/src/modules/vendor-sync/search/bolt-pattern-canonical.ts); the shared [`fixtures/bolt-pattern-canonical-golden.json`](../fixtures/bolt-pattern-canonical-golden.json) test guards drift — keep them in sync.
 
 Three `TODO(integration)` anchors remain in the code:
 - `purchase-panel.tsx` Add-to-cart → wire `lib/data/cart.ts → addToCart`

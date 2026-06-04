@@ -1,5 +1,7 @@
 # Plan 1 — Fitment End-to-End Implementation Plan
 
+> **✅ STATUS — DONE & merged to `main`** (prior session; fast-forward to `3ca3f04`, branch `fix/fitment-end-to-end` deleted). The response-envelope fix is live (`by-vehicle` returns `{ fitment }`, storefront unwraps via `unwrapFitment`); wheel-size store routes degrade to empty/503 instead of 500; `.env.template` documents the activation keys; the per-card FITS badge is live. Backend 178 + storefront 25 unit tests green.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Make "select a vehicle → the catalog filters to fitting wheels" actually work end-to-end, fix the deterministic response-envelope bug that currently kills it, stop the catalog routes from returning 500 when wheel-size is unconfigured, document the activation env vars, and light up the per-card FITS badge.

@@ -8,6 +8,18 @@
 
 ---
 
+## ✅ Status (2026-06-04)
+
+All three sub-plans are **DONE and merged to `main`** (local — not yet pushed to `origin`):
+
+| Plan | Status | Commits | Notes |
+|---|---|---|---|
+| 1 — Fitment end-to-end | ✅ merged | →`3ca3f04` (branch `fix/fitment-end-to-end`, deleted) | envelope fix live; 178 backend + 25 storefront tests green |
+| 2 — Garage hardening | ✅ merged | `3d81afc`→`69a0a95` | partial unique single-active index applied to prod DB |
+| 3 — Live vendor SFTP feed | ✅ merged | `5337f5a`→`34c153b` (9 commits) | live SFTP dry-run verified; `source_modify_time` migration applied to prod; catalog-writing `apply` not yet run. See [`2026-06-04-plan-3-completion-and-validation.md`](./2026-06-04-plan-3-completion-and-validation.md) |
+
+**Remaining for the combined live smoke** (pick a vehicle → filtered, freshly-imported wheels): run `vendor-sync:apply` once to populate the prod catalog, then follow Plan 1 Task 5.
+
 ## The three sub-plans
 
 | # | Plan | File | What it fixes | Pillar after |

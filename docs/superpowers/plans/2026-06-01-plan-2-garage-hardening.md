@@ -1,5 +1,7 @@
 # Plan 2 — Garage Hardening Implementation Plan
 
+> **✅ STATUS — DONE & merged to `main`** (prior session; fast-forward `3ca3f04`→`69a0a95`, commits `3d81afc`→`b7fc3d1`→`69a0a95`, local). DB-level single-active partial unique index (`Migration20260602090000`, **applied to prod DB**), `service.createForCustomer` invariant + zod body validation, and the merge-on-login duplicate-row race fixed (`MedusaGarage.ready()` + `planMerge`). Backend 6 + storefront 4 new unit tests green.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Close the three correctness gaps in the (otherwise working) garage: make single-active-vehicle enforced at the database level, stop `POST` from creating an active vehicle that bypasses the invariant (and validate the request body), and fix the merge-on-login race that inserts duplicate vehicle rows.

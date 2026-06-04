@@ -1,5 +1,7 @@
 # Plan 3 — Live Vendor SFTP Feed Implementation Plan
 
+> **✅ STATUS — DONE & merged to `main` (2026-06-04).** All 9 tasks implemented task-by-task via a multi-agent Workflow (implement → spec-review → quality-review, file-edits-only), with every test / `tsc` / commit / DB / network step run by the orchestrator. Fast-forward merged `69a0a95`→`34c153b` (9 commits, local — not pushed to `origin`). **Live-verified** against the real vendor SFTP (`sftp.wheelpros.com:/CommonFeed/USD/WHEEL/wheelInvPriceData.csv`): dry-run pass 1 fetched the real **14.1 MB** file (41,787 rows → 34,777 staged → 2,941 new groups); pass 2 short-circuited `reason=sftp-unchanged` in 7.4 s. The `source_modify_time` migration was applied to the prod DB. **Two deviations from the steps below:** (Task 6) `medusa db:generate vendorSyncModuleService` emits a *drop-everything* migration for this module, so only the snapshot was taken from the CLI and the migration body was **hand-authored** as the minimal `ALTER ADD COLUMN`; (Task 9) the catalog-writing `vendor-sync:apply` was intentionally **NOT run** (gated) — the prod catalog stays wheel-less until an apply/cron-tick. Full step-by-step record + re-validation checklist: [`2026-06-04-plan-3-completion-and-validation.md`](./2026-06-04-plan-3-completion-and-validation.md).
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Turn the CSV import from a hardcoded local-sample-file demo into a real, scheduled pull of the newest matching feed file from the vendor's SFTP server — reusing the existing `stage → diff → apply` pipeline unchanged — with filename/mtime delta detection to skip re-downloading unchanged feeds, and finally threading the long-dead `feedPath` config knob.
@@ -37,7 +39,7 @@
 **Files:**
 - Modify: `backend/package.json`
 
-- [ ] **Step 1: Install**
+- [x] **Step 1: Install**
 
 Run (from `backend/`):
 
@@ -46,11 +48,11 @@ npx -y pnpm@9.10.0 add ssh2-sftp-client
 npx -y pnpm@9.10.0 add -D @types/ssh2-sftp-client
 ```
 
-- [ ] **Step 2: Verify**
+- [x] **Step 2: Verify**
 
 Confirm `ssh2-sftp-client` appears under `dependencies` and `@types/ssh2-sftp-client` under `devDependencies` in `backend/package.json`.
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add backend/package.json backend/pnpm-lock.yaml
@@ -66,7 +68,7 @@ git commit -m "chore(vendor-sync): add ssh2-sftp-client for live feed pulls"
 - Create: `backend/src/modules/vendor-sync/feed-source/pick-newest.ts`
 - Test: `backend/src/modules/vendor-sync/__tests__/pick-newest.test.ts`
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Create `backend/src/modules/vendor-sync/__tests__/pick-newest.test.ts`:
 
@@ -91,12 +93,12 @@ describe("pickNewestFeed", () => {
 })
 ```
 
-- [ ] **Step 2: Run it to verify it fails**
+- [x] **Step 2: Run it to verify it fails**
 
 Run (from `backend/`): `npx jest src/modules/vendor-sync/__tests__/pick-newest.test.ts`
 Expected: FAIL — cannot find module `../feed-source/pick-newest`.
 
-- [ ] **Step 3: Create the types and the helper**
+- [x] **Step 3: Create the types and the helper**
 
 Create `backend/src/modules/vendor-sync/feed-source/types.ts`:
 
@@ -151,12 +153,12 @@ export function pickNewestFeed(files: RemoteFile[], pattern: RegExp): RemoteFile
 }
 ```
 
-- [ ] **Step 4: Run it to verify it passes**
+- [x] **Step 4: Run it to verify it passes**
 
 Run (from `backend/`): `npx jest src/modules/vendor-sync/__tests__/pick-newest.test.ts`
 Expected: PASS — 3 passed.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add backend/src/modules/vendor-sync/feed-source/types.ts backend/src/modules/vendor-sync/feed-source/pick-newest.ts backend/src/modules/vendor-sync/__tests__/pick-newest.test.ts
@@ -171,7 +173,7 @@ git commit -m "feat(vendor-sync): pure pickNewestFeed selector + feed-source typ
 - Create: `backend/src/modules/vendor-sync/feed-source/is-new-feed.ts`
 - Test: `backend/src/modules/vendor-sync/__tests__/is-new-feed.test.ts`
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Create `backend/src/modules/vendor-sync/__tests__/is-new-feed.test.ts`:
 
@@ -194,12 +196,12 @@ describe("isNewFeed", () => {
 })
 ```
 
-- [ ] **Step 2: Run it to verify it fails**
+- [x] **Step 2: Run it to verify it fails**
 
 Run (from `backend/`): `npx jest src/modules/vendor-sync/__tests__/is-new-feed.test.ts`
 Expected: FAIL — cannot find module `../feed-source/is-new-feed`.
 
-- [ ] **Step 3: Create the helper**
+- [x] **Step 3: Create the helper**
 
 Create `backend/src/modules/vendor-sync/feed-source/is-new-feed.ts`:
 
@@ -216,12 +218,12 @@ export function isNewFeed(
 }
 ```
 
-- [ ] **Step 4: Run it to verify it passes**
+- [x] **Step 4: Run it to verify it passes**
 
 Run (from `backend/`): `npx jest src/modules/vendor-sync/__tests__/is-new-feed.test.ts`
 Expected: PASS — 4 passed.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add backend/src/modules/vendor-sync/feed-source/is-new-feed.ts backend/src/modules/vendor-sync/__tests__/is-new-feed.test.ts
@@ -237,7 +239,7 @@ git commit -m "feat(vendor-sync): pure isNewFeed delta helper for SFTP feeds"
 
 **Note on testing:** this file is the thin I/O boundary (connect/list/download). Its decision logic lives entirely in the already-tested `pickNewestFeed` + `isNewFeed`. It is verified manually against a real server in Task 9, not via a unit test (which would require an SFTP server fixture).
 
-- [ ] **Step 1: Create the downloader**
+- [x] **Step 1: Create the downloader**
 
 Create `backend/src/modules/vendor-sync/feed-source/sftp.ts`:
 
@@ -294,12 +296,12 @@ export async function downloadNewestViaSftp(
 }
 ```
 
-- [ ] **Step 2: Type-check**
+- [x] **Step 2: Type-check**
 
 Run (from `backend/`): `npx tsc --noEmit`
 Expected: no errors in `feed-source/*` (the `@types/ssh2-sftp-client` from Task 1 provides the `Client` types).
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add backend/src/modules/vendor-sync/feed-source/sftp.ts
@@ -313,7 +315,7 @@ git commit -m "feat(vendor-sync): SFTP downloader (list -> pick newest -> delta 
 **Files:**
 - Create: `backend/src/modules/vendor-sync/feed-source/resolve-feed.ts`
 
-- [ ] **Step 1: Create the resolver**
+- [x] **Step 1: Create the resolver**
 
 Create `backend/src/modules/vendor-sync/feed-source/resolve-feed.ts`:
 
@@ -337,7 +339,7 @@ export async function resolveFeed(cfg: FeedConfig, lastSeen: LastSeen | null): P
 }
 ```
 
-- [ ] **Step 2: Type-check and commit**
+- [x] **Step 2: Type-check and commit**
 
 Run (from `backend/`): `npx tsc --noEmit` — expected: clean for `feed-source/*`.
 
@@ -356,7 +358,7 @@ git commit -m "feat(vendor-sync): resolveFeed router for local-file / sftp / def
 
 **Why:** the SFTP delta needs to remember the last-seen remote mtime. Stored as text (not number) because epoch-ms overflows PostgreSQL `int4`.
 
-- [ ] **Step 1: Add the column to the model**
+- [x] **Step 1: Add the column to the model**
 
 In `backend/src/modules/vendor-sync/models/vendor-feed-run.ts`, add a field after `source_archive_key` (line 7):
 
@@ -366,7 +368,7 @@ In `backend/src/modules/vendor-sync/models/vendor-feed-run.ts`, add a field afte
   source_modify_time: model.text().nullable(),
 ```
 
-- [ ] **Step 2: Generate the migration + refresh the tracked snapshot**
+- [x] **Step 2: Generate the migration + refresh the tracked snapshot**
 
 Run (from `backend/`):
 
@@ -384,12 +386,12 @@ alter table if exists "vendor_feed_run" add column if not exists "source_modify_
 
 and `.snapshot-vendor-sync-module.json` is updated to include the new column.
 
-- [ ] **Step 3: Apply the migration**
+- [x] **Step 3: Apply the migration**
 
 Run (from `backend/`): `npx medusa db:migrate`
 Expected: the new migration runs without error.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add backend/src/modules/vendor-sync/models/vendor-feed-run.ts backend/src/modules/vendor-sync/migrations
@@ -404,7 +406,7 @@ git commit -m "feat(vendor-sync): track source_modify_time on runs for SFTP delt
 - Modify: `backend/medusa-config.js`
 - Modify: `backend/src/modules/vendor-sync/service.ts` (options type only)
 
-- [ ] **Step 1: Extend the module options type**
+- [x] **Step 1: Extend the module options type**
 
 In `backend/src/modules/vendor-sync/service.ts`, add the import and extend the `vendors` value type (lines 18-27):
 
@@ -423,7 +425,7 @@ export interface VendorSyncModuleOptions {
 }
 ```
 
-- [ ] **Step 2: Build the SFTP config in medusa-config.js**
+- [x] **Step 2: Build the SFTP config in medusa-config.js**
 
 At the top of `backend/medusa-config.js`, where the existing `VENDOR_WHEELPROS_*` env vars are read, add reads for the new SFTP vars (mirror the existing `VENDOR_WHEELPROS_WHEEL_FEED_PATH` line). Then, just before the `vendors:` block (around line 155), build the config objects:
 
@@ -468,7 +470,7 @@ Then add `sftp` to each vendor entry in the existing `vendors` block:
 
 > Make sure the new `VENDOR_WHEELPROS_*_SFTP_*` identifiers are added wherever the file destructures `process.env` (same place `VENDOR_WHEELPROS_WHEEL_FEED_PATH` is read). `filePattern` is stored as a STRING (not a RegExp) so `JSON.stringify(medusaConfig)` at the bottom of the file still serializes cleanly.
 
-- [ ] **Step 3: Type-check and commit**
+- [x] **Step 3: Type-check and commit**
 
 Run (from `backend/`): `npx tsc --noEmit` — expected: clean for the touched files.
 
@@ -486,7 +488,7 @@ git commit -m "feat(vendor-sync): wire per-vendor SFTP config from env"
 
 **Why:** this is where the dead `feedPath` finally gets used and SFTP downloads happen. The resolution runs before `resolveAdapter`, with an early short-circuit when the SFTP feed is unchanged (cheaper than the existing RunDate short-circuit, which needs the file content).
 
-- [ ] **Step 1: Add the import**
+- [x] **Step 1: Add the import**
 
 Near the top of `backend/src/modules/vendor-sync/service.ts`, with the other pipeline imports:
 
@@ -494,7 +496,7 @@ Near the top of `backend/src/modules/vendor-sync/service.ts`, with the other pip
 import { resolveFeed } from "./feed-source/resolve-feed"
 ```
 
-- [ ] **Step 2: Resolve the feed and pass it to the adapter**
+- [x] **Step 2: Resolve the feed and pass it to the adapter**
 
 In `run()`, find the start of the `try {` block and the line `const adapter = resolveAdapter(vendorCode)` (≈ line 137). Replace that single line with the feed-resolution block:
 
@@ -547,12 +549,12 @@ In `run()`, find the start of the `try {` block and the line `const adapter = re
 
 Everything below (the fetch step at ≈ line 139 onward) is unchanged — `descriptor.sourceFilename` is the basename of the resolved path, which for SFTP equals the remote filename (the downloader names the temp file after it), so the existing run-row update keeps recording the right `source_filename`.
 
-- [ ] **Step 3: Run the vendor-sync unit suite (no regressions)**
+- [x] **Step 3: Run the vendor-sync unit suite (no regressions)**
 
 Run (from `backend/`): `npx -y pnpm@9.10.0 run test:sync`
 Expected: all existing pure-function tests pass (the new `pick-newest` / `is-new-feed` tests are included under `src/modules/vendor-sync`).
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add backend/src/modules/vendor-sync/service.ts
@@ -566,7 +568,7 @@ git commit -m "feat(vendor-sync): resolve SFTP/local feed in run loop + skip unc
 **Files:**
 - Modify: `backend/.env.template`
 
-- [ ] **Step 1: Document the SFTP env vars**
+- [x] **Step 1: Document the SFTP env vars**
 
 In `backend/.env.template`, under the `# --- Vendor Sync ...` block, replace the feed-path comments with both options:
 
@@ -597,7 +599,7 @@ In `backend/.env.template`, under the `# --- Vendor Sync ...` block, replace the
 # VENDOR_SYNC_DRY_RUN=false
 ```
 
-- [ ] **Step 2: Manual live verification (run once against the real SFTP server)**
+- [x] **Step 2: Manual live verification (run once against the real SFTP server)** — _dry-run pass 1 (fetched) + pass 2 (`sftp-unchanged`) DONE; the catalog-writing `vendor-sync:apply` was intentionally **NOT run** (gated)._
 
 Set the `*_WHEEL_SFTP_*` vars + `VENDOR_WHEELPROS_WHEELS_ENABLED=true` in `backend/.env`, then (from `backend/`):
 
@@ -608,7 +610,7 @@ npx -y pnpm@9.10.0 run vendor-sync:dry-run wheelpros-wheels
 
 Confirm the log shows `stage=fetched ... file=<the real remote filename>` (not `wheelInvPriceData.csv`) and a non-zero byte count. Then run it a SECOND time and confirm it logs `stage=short-circuited reason=sftp-unchanged` (delta detection working). Apply with `vendor-sync:apply <run-id>` and confirm wheels land in the catalog.
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add backend/.env.template

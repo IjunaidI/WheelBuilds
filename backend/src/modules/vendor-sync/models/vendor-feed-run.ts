@@ -5,6 +5,7 @@ const VendorFeedRun = model.define("vendor_feed_run", {
   vendor_code: model.text(),
   source_filename: model.text(),
   source_archive_key: model.text().nullable(),
+  source_modify_time: model.text().nullable(),
   run_date_vendor: model.dateTime().nullable(),
   row_count: model.number().default(0),
   skipped_no_image_count: model.number().default(0),

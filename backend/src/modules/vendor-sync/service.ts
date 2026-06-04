@@ -8,6 +8,7 @@ import { fetchFeed } from "./pipeline/fetch"
 import { stageFeed } from "./pipeline/stage"
 import { computeGroupDiff, GroupDiffResult } from "./pipeline/diff"
 import { applyChanges } from "./pipeline/apply"
+import { SftpConfig } from "./feed-source/types"
 
 interface Logger {
   info(message: string, ...args: any[]): void
@@ -22,7 +23,7 @@ export interface VendorSyncModuleOptions {
   dryRun?: boolean
   vendors?: Record<
     string,
-    { enabled?: boolean; feedPath?: string }
+    { enabled?: boolean; feedPath?: string; sftp?: SftpConfig }
   >
 }
 

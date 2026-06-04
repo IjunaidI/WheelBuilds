@@ -26,6 +26,20 @@ import {
   VENDOR_WHEELPROS_TIRES_ENABLED,
   VENDOR_WHEELPROS_WHEEL_FEED_PATH,
   VENDOR_WHEELPROS_TIRE_FEED_PATH,
+  VENDOR_WHEELPROS_WHEEL_SFTP_HOST,
+  VENDOR_WHEELPROS_WHEEL_SFTP_PORT,
+  VENDOR_WHEELPROS_WHEEL_SFTP_USER,
+  VENDOR_WHEELPROS_WHEEL_SFTP_PASSWORD,
+  VENDOR_WHEELPROS_WHEEL_SFTP_PRIVATE_KEY,
+  VENDOR_WHEELPROS_WHEEL_SFTP_DIR,
+  VENDOR_WHEELPROS_WHEEL_SFTP_PATTERN,
+  VENDOR_WHEELPROS_TIRE_SFTP_HOST,
+  VENDOR_WHEELPROS_TIRE_SFTP_PORT,
+  VENDOR_WHEELPROS_TIRE_SFTP_USER,
+  VENDOR_WHEELPROS_TIRE_SFTP_PASSWORD,
+  VENDOR_WHEELPROS_TIRE_SFTP_PRIVATE_KEY,
+  VENDOR_WHEELPROS_TIRE_SFTP_DIR,
+  VENDOR_WHEELPROS_TIRE_SFTP_PATTERN,
   VENDOR_SYNC_FEED_ARCHIVE_BUCKET,
   VENDOR_SYNC_DISCONTINUE_THRESHOLD,
   VENDOR_SYNC_APPLY_CONCURRENCY,
@@ -37,6 +51,26 @@ import {
 import { buildSearchDocument } from 'modules/vendor-sync/search/build-search-document';
 
 loadEnv(process.env.NODE_ENV, process.cwd());
+
+const buildSftp = (host, port, user, pass, key, dir, pattern) =>
+  host ? {
+    host,
+    port: port ? parseInt(port, 10) : 22,
+    username: user,
+    password: pass || undefined,
+    privateKey: key || undefined,
+    remoteDir: dir,
+    filePattern: pattern || '.*\\.csv$',
+  } : undefined
+
+const wheelSftp = buildSftp(
+  VENDOR_WHEELPROS_WHEEL_SFTP_HOST, VENDOR_WHEELPROS_WHEEL_SFTP_PORT, VENDOR_WHEELPROS_WHEEL_SFTP_USER,
+  VENDOR_WHEELPROS_WHEEL_SFTP_PASSWORD, VENDOR_WHEELPROS_WHEEL_SFTP_PRIVATE_KEY,
+  VENDOR_WHEELPROS_WHEEL_SFTP_DIR, VENDOR_WHEELPROS_WHEEL_SFTP_PATTERN)
+const tireSftp = buildSftp(
+  VENDOR_WHEELPROS_TIRE_SFTP_HOST, VENDOR_WHEELPROS_TIRE_SFTP_PORT, VENDOR_WHEELPROS_TIRE_SFTP_USER,
+  VENDOR_WHEELPROS_TIRE_SFTP_PASSWORD, VENDOR_WHEELPROS_TIRE_SFTP_PRIVATE_KEY,
+  VENDOR_WHEELPROS_TIRE_SFTP_DIR, VENDOR_WHEELPROS_TIRE_SFTP_PATTERN)
 
 const medusaConfig = {
   projectConfig: {
@@ -156,10 +190,12 @@ const medusaConfig = {
           'wheelpros-wheels': {
             enabled: VENDOR_WHEELPROS_WHEELS_ENABLED === 'true',
             feedPath: VENDOR_WHEELPROS_WHEEL_FEED_PATH,
+            sftp: wheelSftp,
           },
           'wheelpros-tires': {
             enabled: VENDOR_WHEELPROS_TIRES_ENABLED === 'true',
             feedPath: VENDOR_WHEELPROS_TIRE_FEED_PATH,
+            sftp: tireSftp,
           },
         },
       },

@@ -8,6 +8,7 @@ import { fetchFeed } from "./pipeline/fetch"
 import { stageFeed } from "./pipeline/stage"
 import { computeGroupDiff, GroupDiffResult } from "./pipeline/diff"
 import { applyChanges } from "./pipeline/apply"
+import { resolveFeed } from "./feed-source/resolve-feed"
 import { SftpConfig } from "./feed-source/types"
 
 interface Logger {
@@ -134,8 +135,50 @@ class VendorSyncService extends MedusaService({
     const startTime = Date.now()
 
     try {
-      // 3. Resolve adapter
-      const adapter = resolveAdapter(vendorCode)
+      // 3. Resolve the feed source (local file or SFTP newest) with delta short-circuit
+      const vendorOpts = (this.options_.vendors ?? {})[vendorCode] ?? {}
+      const [lastForDelta] = await (this as any).listVendorFeedRuns(
+        { vendor_code: vendorCode, status: "completed" },
+        { order: { started_at: "DESC" }, take: 1 }
+      )
+      const lastSeen = lastForDelta?.source_filename
+        ? { name: lastForDelta.source_filename, modifyTime: Number(lastForDelta.source_modify_time ?? 0) }
+        : null
+
+      const feed = await resolveFeed(
+        { feedPath: vendorOpts.feedPath, sftp: vendorOpts.sftp },
+        lastSeen
+      )
+
+      if (feed.kind === "empty") {
+        this.logger_.warn(`[vendor-sync] [${runId}] no feed file found for ${vendorCode}`)
+        await (this as any).updateVendorFeedRuns({
+          id: runId, status: "completed", error_message: "no feed file found", finished_at: new Date(),
+        })
+        return { runId }
+      }
+
+      if (feed.kind === "unchanged") {
+        const durationMs = Date.now() - startTime
+        this.logger_.info(
+          `[vendor-sync] [${runId}] stage=short-circuited reason=sftp-unchanged vendor=${vendorCode} file=${feed.sourceName} durationMs=${durationMs}`
+        )
+        await (this as any).updateVendorFeedRuns({
+          id: runId, status: "completed",
+          source_filename: feed.sourceName, source_modify_time: String(feed.modifyTime),
+          finished_at: new Date(),
+        })
+        return { runId }
+      }
+
+      const adapter = resolveAdapter(
+        vendorCode,
+        feed.kind === "file" ? { csvPath: feed.csvPath } : undefined
+      )
+
+      if (feed.kind === "file" && feed.modifyTime != null) {
+        await (this as any).updateVendorFeedRuns({ id: runId, source_modify_time: String(feed.modifyTime) })
+      }
 
       // 4. Fetch
       this.logger_.info(

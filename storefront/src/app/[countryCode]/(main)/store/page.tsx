@@ -17,12 +17,12 @@ type StorePageProps = {
 }
 
 /**
- * Discovery (catalog) page. Currently powered by MOCK data — see
- * `modules/discovery/data/get-products.ts` for the integration seam.
+ * Discovery (catalog) page. Live data via the Meilisearch Discovery adapter
+ * (getDiscoveryProducts) — see `modules/discovery/data/get-products.ts`.
  *
  * The legacy `modules/store/` (`StoreTemplate`, `PaginatedProducts`,
- * `RefinementList`) still ships and is the reference for the real
- * Medusa Store API wiring when this page swaps from mock to real.
+ * `RefinementList`) is retained because other routes (categories, collections)
+ * still import from it.
  */
 export default async function StorePage({ searchParams }: StorePageProps) {
   const sp = await searchParams

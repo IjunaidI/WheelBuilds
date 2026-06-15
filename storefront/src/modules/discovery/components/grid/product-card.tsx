@@ -21,12 +21,11 @@ type DiscoveryProductCardProps = {
 }
 
 /**
- * Discovery product card. Replaces the home-only `new-drops-row/product-card`
- * pattern with one that handles sale prices, fitment chips, and the wider
- * variant grid (4-up on `medium+`).
- *
- * When real data lands, `handle` resolves to a real product page; today the
- * link goes to /products/<mock-handle> which 404s — that's fine for chrome.
+ * Discovery product card — the canonical product tile. Renders the real vendor
+ * thumbnail (with a <Wheel> fallback), a NEW chip, the FitBadge island, sale
+ * pricing, and the variant summary. `handle` resolves to the real PDP. Reused
+ * by the Discovery grid, the PDP "Similar wheels" row, and the home NEW THIS
+ * WEEK rail.
  */
 const DiscoveryProductCard = ({ product }: DiscoveryProductCardProps) => (
   <LocalizedClientLink

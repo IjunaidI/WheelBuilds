@@ -72,6 +72,16 @@ const tireSftp = buildSftp(
   VENDOR_WHEELPROS_TIRE_SFTP_PASSWORD, VENDOR_WHEELPROS_TIRE_SFTP_PRIVATE_KEY,
   VENDOR_WHEELPROS_TIRE_SFTP_DIR, VENDOR_WHEELPROS_TIRE_SFTP_PATTERN)
 
+// Dev/test-only feed truncation. Outside production we cap how many CSV rows
+// vendor-sync stages so local "first import" runs finish fast instead of
+// staging + diffing + applying the entire feed. Override the row count with
+// VENDOR_SYNC_DEV_MAX_ROWS; in production NODE_ENV==='production' => undefined
+// => full feed. (medusa develop sets NODE_ENV=development before .env loads,
+// so this triggers for local dev even if .env says NODE_ENV=Local.)
+const devMaxRows = process.env.NODE_ENV !== 'production'
+  ? parseInt(process.env.VENDOR_SYNC_DEV_MAX_ROWS ?? '1000', 10)
+  : undefined
+
 const medusaConfig = {
   projectConfig: {
     databaseUrl: DATABASE_URL,
@@ -186,6 +196,7 @@ const medusaConfig = {
         applyConcurrency: parseInt(VENDOR_SYNC_APPLY_CONCURRENCY ?? '8', 10),
         archiveBucket: VENDOR_SYNC_FEED_ARCHIVE_BUCKET ?? 'vendor-feeds',
         dryRun: VENDOR_SYNC_DRY_RUN === 'true',
+        devMaxRows,
         vendors: {
           'wheelpros-wheels': {
             enabled: VENDOR_WHEELPROS_WHEELS_ENABLED === 'true',

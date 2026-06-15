@@ -18,17 +18,24 @@ interface Logger {
 /**
  * Stage a vendor feed: parse, normalize, hash, and insert into staging tables.
  * Rows with empty imageUrl are skipped (counted but not inserted).
+ *
+ * When `maxRows` is a positive number, only the first `maxRows` CSV rows are
+ * consumed before staging stops. This is the dev/test truncation knob (wired
+ * from medusa-config's `devMaxRows`) so local runs finish fast instead of
+ * staging + diffing + applying the entire vendor feed.
  */
 export async function stageFeed(
   adapter: VendorAdapter,
   descriptor: VendorFeedDescriptor,
   service: any,
   runId: string,
-  logger: Logger
+  logger: Logger,
+  maxRows?: number
 ): Promise<StageResult> {
   let rowCount = 0
   let stagedCount = 0
   let skippedNoImageCount = 0
+  let truncated = false
 
   let feedStagingBatch: any[] = []
   let stockStagingBatch: any[] = []
@@ -48,6 +55,10 @@ export async function stageFeed(
   }
 
   for await (const parsedRow of adapter.parse(descriptor)) {
+    if (maxRows != null && maxRows > 0 && rowCount >= maxRows) {
+      truncated = true
+      break
+    }
     rowCount++
 
     let normalized
@@ -114,7 +125,8 @@ export async function stageFeed(
   })
 
   logger.info(
-    `Staging complete: ${rowCount} rows parsed, ${stagedCount} staged, ${skippedNoImageCount} skipped (no image)`
+    `Staging complete: ${rowCount} rows parsed, ${stagedCount} staged, ${skippedNoImageCount} skipped (no image)` +
+      (truncated ? ` [TRUNCATED to maxRows=${maxRows} — dev mode]` : '')
   )
 
   return { rowCount, stagedCount, skippedNoImageCount }

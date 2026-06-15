@@ -22,6 +22,12 @@ export interface VendorSyncModuleOptions {
   applyConcurrency?: number
   archiveBucket?: string
   dryRun?: boolean
+  /**
+   * Dev/test only: cap how many CSV rows the staging step consumes so local
+   * runs finish fast. Set from medusa-config when NODE_ENV !== 'production'.
+   * Undefined in production => full feed is staged.
+   */
+  devMaxRows?: number
   vendors?: Record<
     string,
     { enabled?: boolean; feedPath?: string; sftp?: SftpConfig }
@@ -241,10 +247,12 @@ class VendorSyncService extends MedusaService({
       })
 
       // 6. Stage
+      const devMaxRows = this.options_.devMaxRows
       this.logger_.info(
-        `[vendor-sync] [${runId}] stage=staging vendor=${vendorCode}`
+        `[vendor-sync] [${runId}] stage=staging vendor=${vendorCode}` +
+          (devMaxRows ? ` devMaxRows=${devMaxRows}` : '')
       )
-      await stageFeed(adapter, descriptor, this, runId, this.logger_)
+      await stageFeed(adapter, descriptor, this, runId, this.logger_, devMaxRows)
 
       // Transition to diffing
       await (this as any).updateVendorFeedRuns({

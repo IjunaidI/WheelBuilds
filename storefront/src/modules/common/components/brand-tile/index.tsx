@@ -20,20 +20,29 @@ const BrandTile = ({ name, href, count }: BrandTileProps) => (
   >
     <span
       style={{
-        fontFamily: "var(--display)",
-        fontWeight: 900,
-        fontSize: 22,
-        color: "var(--ink)",
-        letterSpacing: "0.04em",
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        gap: 4,
       }}
     >
-      {name}
+      <span
+        style={{
+          fontFamily: "var(--display)",
+          fontWeight: 900,
+          fontSize: 22,
+          color: "var(--ink)",
+          letterSpacing: "0.04em",
+        }}
+      >
+        {name}
+      </span>
+      {typeof count === "number" && (
+        <Label tone="muted">
+          {count} {count === 1 ? "wheel" : "wheels"}
+        </Label>
+      )}
     </span>
-    {typeof count === "number" && (
-      <Label tone="muted" style={{ marginTop: 4, display: "block" }}>
-        {count} {count === 1 ? "wheel" : "wheels"}
-      </Label>
-    )}
   </LocalizedClientLink>
 )
 

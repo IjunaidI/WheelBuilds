@@ -108,6 +108,7 @@ function hitToProduct(h: Hit): DiscoveryProduct {
     name: h.title,
     brand: h.brand,
     priceCents: h.price_min,
+    thumbnail: h.thumbnail ?? null,
     finish: (h.finish as Finish) ?? "black",
     diameter: h.diameters?.[0] ?? 0,
     width: h.widths?.[0] ?? 0,

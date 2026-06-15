@@ -72,6 +72,7 @@ const Hero = ({ product }: HeroProps) => {
         finishes={product.finishOptions}
         activeFinish={activeFinish}
         onFinishChange={setActiveFinish}
+        thumbnail={product.thumbnail}
       />
       <div className="flex flex-col gap-8">
         <PurchasePanel

@@ -1,3 +1,4 @@
+import Image from "next/image"
 import LocalizedClientLink from "@modules/common/components/localized-client-link"
 import Wheel from "@modules/common/components/wheel"
 import Label from "@modules/common/components/label"
@@ -34,7 +35,17 @@ const DiscoveryProductCard = ({ product }: DiscoveryProductCardProps) => (
     aria-label={`${product.brand} ${product.name}`}
   >
     <div className="relative aspect-square bg-[var(--soft)] flex items-center justify-center overflow-hidden">
-      <Wheel size={180} finish={product.finish} />
+      {product.thumbnail ? (
+        <Image
+          src={product.thumbnail}
+          alt={`${product.brand} ${product.name}`}
+          fill
+          sizes="(min-width: 1024px) 25vw, 50vw"
+          className="object-contain p-4"
+        />
+      ) : (
+        <Wheel size={180} finish={product.finish} />
+      )}
       {product.isNew && (
         <div className="absolute top-2.5 left-2.5">
           <Chip variant="accent" size="sm">

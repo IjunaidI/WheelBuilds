@@ -131,6 +131,7 @@ function mapToDetail(product: HttpTypes.StoreProduct): ProductDetail {
     brand: String(pmeta.brand ?? ""),
     name: product.title ?? "",
     priceCents: fromCents,
+    thumbnail: product.thumbnail ?? null,
     finish,
     diameter: num(rep.wheel_diameter_in),
     width: num(rep.wheel_width_in),
@@ -201,6 +202,7 @@ export async function getRelatedProducts(
           num((p.variants?.[0]?.calculated_price as any)?.calculated_amount) *
             100
         ),
+        thumbnail: p.thumbnail ?? null,
         finish: normalizeFinish(pmeta.finish),
         diameter: num(m.wheel_diameter_in),
         width: num(m.wheel_width_in),

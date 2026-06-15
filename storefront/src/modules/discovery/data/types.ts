@@ -24,6 +24,8 @@ export type DiscoveryProduct = {
   priceCents: number
   /** Optional sale price (cents). Renders as struck-through original + accent sale price. */
   originalPriceCents?: number
+  /** Cover image URL (vendor CDN). Null when the product has no image. */
+  thumbnail: string | null
   finish: Finish
   diameter: number
   width: number

@@ -20,6 +20,14 @@ const nextConfig = {
         protocol: "http",
         hostname: "localhost",
       },
+      { // WheelPros vendor product imagery — vendor-sync writes these URLs as product thumbnails
+        protocol: "https",
+        hostname: "assets.wheelpros.com",
+      },
+      {
+        protocol: "https",
+        hostname: "images.wheelpros.com",
+      },
       ...(process.env.NEXT_PUBLIC_BASE_URL
         ? [{ // Note: needed to serve images from /public folder
             protocol: process.env.NEXT_PUBLIC_BASE_URL.startsWith("https") ? "https" : "http",

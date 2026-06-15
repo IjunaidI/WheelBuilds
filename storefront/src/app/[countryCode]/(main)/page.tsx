@@ -8,6 +8,7 @@ import ShopByBrand from "@modules/home/components/shop-by-brand"
 import BuildGallery from "@modules/home/components/build-gallery"
 import TrustStrip from "@modules/home/components/trust-strip"
 import Newsletter from "@modules/home/components/newsletter"
+import { getHomeCatalog } from "@modules/home/data/get-home-catalog"
 
 export const metadata: Metadata = {
   title: "Wheel Builds — Premium Aftermarket Wheels & Fitment",
@@ -16,15 +17,18 @@ export const metadata: Metadata = {
 }
 
 export default async function Home() {
+  const { facets } = await getHomeCatalog()
+  const brandCount = Object.keys(facets.brands).length
+
   return (
     <>
-      <Hero />
+      <Hero brandCount={brandCount} />
       <NewDropsRow />
       <ShopByStyle />
       <FeaturedBlocks />
       <ShopByBrand />
       <BuildGallery />
-      <TrustStrip />
+      <TrustStrip brandCount={brandCount} />
       <Newsletter />
     </>
   )

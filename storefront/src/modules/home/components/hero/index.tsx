@@ -10,14 +10,7 @@ import { Button } from "@/components/ui/button"
 import { openSearch } from "@lib/stores/search-store"
 import { useGarage } from "@lib/garage/use-garage"
 
-const TRUST_POINTS = [
-  { l: "Fitment guaranteed", s: "Or your money back" },
-  { l: "Free returns", s: "30 days, unmounted" },
-  { l: "Free ship $199+", s: "2–3 day delivery" },
-  { l: "Authorized dealer", s: "42 brands" },
-]
-
-const Hero = () => {
+const Hero = ({ brandCount }: { brandCount?: number }) => {
   const { active, vehicles } = useGarage()
 
   const garageCountLabel =
@@ -30,6 +23,13 @@ const Hero = () => {
   const primaryCtaText = active
     ? `Find My Fit · See wheels for your ${active.make}`
     : "Find My Fit · Start with your vehicle"
+
+  const TRUST_POINTS = [
+    { l: "Fitment guaranteed", s: "Or your money back" },
+    { l: "Free returns", s: "30 days, unmounted" },
+    { l: "Free ship $199+", s: "2–3 day delivery" },
+    { l: "Authorized dealer", s: brandCount ? `${brandCount} brands` : "Premium brands" },
+  ]
 
   return (
     <section className="relative overflow-hidden px-5 pt-12 pb-16 xsmall:px-8 small:px-20 small:pt-20 small:pb-24">

@@ -18,7 +18,7 @@ export default async function vendorSyncTick(container: MedusaContainer) {
       logger.info(
         `[vendor-sync-tick] Starting sync for vendor: ${vendorCode}`
       )
-      await service.run(vendorCode)
+      await service.run(vendorCode, { container })
       logger.info(
         `[vendor-sync-tick] Completed sync for vendor: ${vendorCode}`
       )

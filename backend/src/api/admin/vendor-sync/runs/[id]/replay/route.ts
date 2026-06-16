@@ -23,7 +23,7 @@ export async function POST(req: MedusaRequest, res: MedusaResponse) {
     return
   }
 
-  await service.replayRun(id)
+  await service.replayRun(id, req.scope)
 
   // Re-fetch to return the latest state
   const [updated] = await service.listVendorFeedRuns({ id })

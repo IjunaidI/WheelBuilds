@@ -61,7 +61,10 @@ export async function POST(req: MedusaRequest, res: MedusaResponse) {
   }
 
   // Synchronous run -- admin knowingly triggered it
-  const { runId } = await service.run(vendor_code, { dryRun: dry_run })
+  const { runId } = await service.run(vendor_code, {
+    dryRun: dry_run,
+    container: req.scope,
+  })
 
   res.status(201).json({ run_id: runId })
 }

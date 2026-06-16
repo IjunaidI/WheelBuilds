@@ -19,7 +19,7 @@ export async function POST(req: MedusaRequest, res: MedusaResponse) {
     return
   }
 
-  await service.replaySku(vendor_code, partNumber)
+  await service.replaySku(vendor_code, partNumber, req.scope)
 
   res.json({
     message: "replay completed",

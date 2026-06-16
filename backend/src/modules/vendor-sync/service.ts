@@ -1,4 +1,5 @@
 import { MedusaService } from "@medusajs/framework/utils"
+import type { MedusaContainer } from "@medusajs/framework/types"
 import VendorFeedRun from "./models/vendor-feed-run"
 import VendorFeedStaging from "./models/vendor-feed-staging"
 import VendorStockStaging from "./models/vendor-stock-staging"
@@ -8,6 +9,7 @@ import { fetchFeed } from "./pipeline/fetch"
 import { stageFeed } from "./pipeline/stage"
 import { computeGroupDiff, GroupDiffResult } from "./pipeline/diff"
 import { applyChanges } from "./pipeline/apply"
+import { resolveApplyContainer } from "./pipeline/resolve-apply-container"
 import { resolveFeed } from "./feed-source/resolve-feed"
 import { SftpConfig } from "./feed-source/types"
 
@@ -106,7 +108,7 @@ class VendorSyncService extends MedusaService({
    */
   async run(
     vendorCode: string,
-    options?: { dryRun?: boolean }
+    options?: { dryRun?: boolean; container?: MedusaContainer }
   ): Promise<{ runId: string }> {
     const isDryRun = options?.dryRun ?? this.options_.dryRun ?? false
     const threshold = this.options_.discontinueThreshold ?? 0.05
@@ -327,7 +329,7 @@ class VendorSyncService extends MedusaService({
         `[vendor-sync] [${runId}] stage=applying vendor=${vendorCode}`
       )
       const applyResult = await applyChanges(
-        this.container_,
+        resolveApplyContainer(options?.container, this.container_),
         this,
         runId,
         vendorCode,
@@ -385,7 +387,11 @@ class VendorSyncService extends MedusaService({
    * Approve a paused run (awaiting_approval) and apply its diff.
    * Re-computes the diff from existing staging data, then applies.
    */
-  async approveAndApply(runId: string, actorId?: string): Promise<void> {
+  async approveAndApply(
+    runId: string,
+    actorId?: string,
+    container?: MedusaContainer
+  ): Promise<void> {
     // Record who approved and when
     await (this as any).updateVendorFeedRuns({
       id: runId,
@@ -409,7 +415,7 @@ class VendorSyncService extends MedusaService({
       )
 
       const result = await applyChanges(
-        this.container_,
+        resolveApplyContainer(container, this.container_),
         this,
         runId,
         vendorCode,
@@ -456,7 +462,7 @@ class VendorSyncService extends MedusaService({
    * Replay a completed or failed run: re-diff from existing staging data
    * and re-apply all changes.
    */
-  async replayRun(runId: string): Promise<void> {
+  async replayRun(runId: string, container?: MedusaContainer): Promise<void> {
     const [run] = await (this as any).listVendorFeedRuns({ id: runId })
     if (!run) throw new Error(`Run ${runId} not found`)
 
@@ -479,7 +485,7 @@ class VendorSyncService extends MedusaService({
       )
 
       const result = await applyChanges(
-        this.container_,
+        resolveApplyContainer(container, this.container_),
         this,
         runId,
         vendorCode,
@@ -526,7 +532,11 @@ class VendorSyncService extends MedusaService({
    * Replay a single SKU: find the most recent staging row, classify it
    * against the current state, and apply the appropriate action.
    */
-  async replaySku(vendorCode: string, partNumber: string): Promise<void> {
+  async replaySku(
+    vendorCode: string,
+    partNumber: string,
+    container?: MedusaContainer
+  ): Promise<void> {
     // Find the most recent staging row for this vendor + part number
     const [stagingRow] = await (this as any).listVendorFeedStagings(
       { vendor_code: vendorCode, part_number: partNumber },
@@ -603,7 +613,7 @@ class VendorSyncService extends MedusaService({
     )
 
     await applyChanges(
-      this.container_,
+      resolveApplyContainer(container, this.container_),
       this,
       runId,
       vendorCode,

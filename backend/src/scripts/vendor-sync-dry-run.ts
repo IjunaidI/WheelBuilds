@@ -19,6 +19,7 @@ export default async function vendorSyncDryRun({ container }: ExecArgs) {
   // Run the full pipeline in dry-run mode
   const { runId } = await (vendorSyncService as any).run(vendorCode, {
     dryRun: true,
+    container,
   })
 
   const elapsed = ((Date.now() - startTime) / 1000).toFixed(1)

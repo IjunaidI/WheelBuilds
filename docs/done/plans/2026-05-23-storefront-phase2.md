@@ -55,7 +55,7 @@ git log --oneline -8
 # Backend unit tests for vendor-sync + the search triad
 # (the only test script wired up; ~4s, no DB).
 cd backend && pnpm test:sync
-# Expect: passing, 0 failing (test counts: see docs/STATUS.md)
+# Expect: all passing, 0 failing (exact counts: see docs/STATUS.md)
 
 # Confirm a wheel doc shape in Meilisearch.
 # MEILISEARCH_HOST + MEILISEARCH_ADMIN_KEY are the BACKEND env-var names
@@ -142,7 +142,7 @@ Spec 1 docs: [spec](../specs/2026-05-28-fitment-ready-catalog-search-design.md) 
 
 ### Verification on this commit
 
-- Backend `pnpm test:sync` → passed / 0 failed (test counts: see docs/STATUS.md).
+- Backend `pnpm test:sync` → all passing / 0 failed (exact counts: see docs/STATUS.md).
 - Storefront `tsc` clean on the touched files (pre-existing drift in `lib/data/*` and `modules/order/*` is unrelated; see `storefront/CLAUDE.md`).
 - `pnpm build:next` compiles.
 

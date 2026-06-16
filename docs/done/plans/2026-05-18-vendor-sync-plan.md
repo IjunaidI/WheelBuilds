@@ -412,7 +412,7 @@ Steps, in order, all inside the same Node process:
      - `thumbnail`, `images: [{ url: imageUrl }]` — both set to the vendor CDN URL (OQ2 pass-through)
      - `weight`, `collection_id`, `category_ids: [categoryId]`, `sales_channels`, `shipping_profile_id`, `external_id: partNumber`
      - `metadata: buildProductMetadata(normalized)` — see §5.4
-     - One variant: `{ title: 'Default', sku: partNumber, manage_inventory: true, allow_backorder: false, prices: [{ amount: msrpUsd  // dollars in Medusa (cents only in the Meili index), currency_code: 'usd' }] }`
+     - One variant: `{ title: 'Default', sku: partNumber, manage_inventory: true, allow_backorder: false, prices: [{ amount: msrpUsd, currency_code: 'usd' }] }` — `amount` is in **dollars** (Medusa); the Meilisearch transformer converts to integer cents.
    - Insert `vendor_product_current` with `medusa_product_id`, `medusa_variant_id`, `inventory_item_id` (extracted from the workflow result), `content_hash`, `normalized`, `last_seen_run_id`, `applied_at = now()`.
 3. **Update changed products** — iterate `diffResult.changedPartNumbers`. For each:
    - Read staging row and existing `vendor_product_current` row.

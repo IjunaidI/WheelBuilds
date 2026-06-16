@@ -1,11 +1,14 @@
 "use client"
 
+import { useState } from "react"
 import { useRouter, useParams } from "next/navigation"
 import { toast } from "sonner"
 import Icon from "@modules/common/components/icon"
+import Spinner from "@modules/common/icons/spinner"
 import Chip from "@modules/common/components/chip"
 import { Button } from "@/components/ui/button"
 import { useGarage } from "@lib/garage/use-garage"
+import { getFitmentByVehicle } from "@lib/data/fitment"
 import { Vehicle, NewVehicle } from "@lib/garage/types"
 
 type GaragePaneProps = {
@@ -30,16 +33,57 @@ const formatSpecs = (v: Vehicle): string => {
 const GaragePane = ({ onClose, onAddNew }: GaragePaneProps) => {
   const router = useRouter()
   const { countryCode } = useParams() as { countryCode: string }
-  const { vehicles, active, setActive, remove, add } = useGarage()
+  const { vehicles, active, setActive, remove, add, update } = useGarage()
+  const [selectingId, setSelectingId] = useState<string | null>(null)
 
-  const selectVehicle = (id: string) => {
-    setActive(id)
+  const selectVehicle = async (id: string) => {
     const v = vehicles.find((veh) => veh.id === id)
-    const patterns = v?.canonicalBoltPatterns ?? []
-    const fitParam =
-      v?.fitmentStatus === "ok" && patterns.length
-        ? `?fit=${patterns.join(",")}`
-        : ""
+    if (!v) return
+    setActive(id)
+
+    let patterns = v.canonicalBoltPatterns ?? []
+    // A saved vehicle that was added before its fitment resolved (or whose
+    // fitment didn't persist) has no stored bolt patterns. Re-resolve it from
+    // the vehicle's identity so the garage tab applies the fit exactly like the
+    // Year/Make/Model tab does — instead of silently dropping to /store.
+    if (!(v.fitmentStatus === "ok" && patterns.length)) {
+      setSelectingId(id)
+      try {
+        const fitment = await getFitmentByVehicle(
+          v.make,
+          v.model,
+          v.modificationSlug ?? "",
+          String(v.year),
+          "usdm"
+        )
+        if (fitment && !("error" in fitment)) {
+          update(id, {
+            canonicalBoltPatterns: fitment.canonicalBoltPatterns,
+            hubBoreMm: fitment.hubBoreMm ?? undefined,
+            diameterWindow: fitment.diameterWindow,
+            widthWindow: fitment.widthWindow,
+            offsetWindow: fitment.offsetWindow,
+            fitmentStatus: fitment.status,
+          })
+          if (fitment.status === "ok" && fitment.canonicalBoltPatterns.length) {
+            patterns = fitment.canonicalBoltPatterns
+          } else {
+            toast("No fitment data for this vehicle yet", {
+              description:
+                "We couldn't find wheel specs for it — showing the full catalog.",
+            })
+          }
+        } else if (fitment && "error" in fitment) {
+          toast.error("Fitment temporarily unavailable", {
+            description: "Please contact support.",
+          })
+        }
+      } finally {
+        setSelectingId(null)
+      }
+    }
+
+    const fitParam = patterns.length ? `?fit=${patterns.join(",")}` : ""
     onClose()
     router.push(`/${countryCode}/store${fitParam}`)
   }
@@ -117,6 +161,7 @@ const GaragePane = ({ onClose, onAddNew }: GaragePaneProps) => {
             <button
               type="button"
               onClick={() => selectVehicle(v.id)}
+              disabled={selectingId !== null}
               aria-label={`Use ${label}`}
               style={{
                 flex: 1,
@@ -178,7 +223,11 @@ const GaragePane = ({ onClose, onAddNew }: GaragePaneProps) => {
                   {formatSpecs(v)}
                 </div>
               </div>
-              <Icon name="arrow-right" size={16} color="#8A8A8E" />
+              {selectingId === v.id ? (
+                <Spinner size="16" color="#8A8A8E" />
+              ) : (
+                <Icon name="arrow-right" size={16} color="#8A8A8E" />
+              )}
             </button>
             <Button
               variant="ghost"

@@ -212,8 +212,17 @@ const YmmPane = ({ onClose }: YmmPaneProps) => {
           offsetWindow: fitment.offsetWindow,
           fitmentStatus: fitment.status,
         })
-        if (fitment.status === "ok" && fitment.canonicalBoltPatterns.length)
+        if (fitment.status === "ok" && fitment.canonicalBoltPatterns.length) {
           fitParam = `?fit=${fitment.canonicalBoltPatterns.join(",")}`
+        } else {
+          // status === "not_found" (or "ok" with no bolt pattern): wheel-size has
+          // no fitment for this vehicle, so there is nothing to filter by. Tell the
+          // user instead of silently dropping them on the unfiltered catalog.
+          toast("No fitment data for this vehicle yet", {
+            description:
+              "We couldn't find wheel specs for it — showing the full catalog.",
+          })
+        }
       } else if (fitment && "error" in fitment) {
         toast.error("Fitment temporarily unavailable", {
           description: "Please contact support.",

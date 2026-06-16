@@ -18,8 +18,16 @@ export default function FitmentSync() {
     const activePatterns = active?.canonicalBoltPatterns ?? []
     const desired = activePatterns.length ? patternsToFitParam(activePatterns) : null
 
-    if (!desired && fit) { replace(null); return }            // case 2: no active vehicle → strip
-    if (desired && fit !== desired) { replace(desired); return } // case 1 & 3: set / replace stale
+    // Sync ?fit TO the active vehicle's bolt patterns, but never auto-STRIP a
+    // fit that is already in the URL. The garage loads asynchronously (and, when
+    // signed in, RoutingGarage swaps the local provider for the remote one ~1s
+    // after boot), so the active vehicle's patterns are routinely unavailable
+    // for a beat — and permanently for a vehicle wheel-size has no data on.
+    // Stripping in that window yanked the user off a valid fitment result
+    // (including the "no wheels fit this vehicle" empty state) ~1s after load,
+    // which read as "it filtered, then bounced back to the full catalog."
+    // Clearing fitment is an explicit user action: the "Fits: …" chip sets fit=0.
+    if (desired && fit !== desired) { replace(desired); return } // set / replace stale
 
     function replace(value: string | null) {
       const next = new URLSearchParams(Array.from(sp.entries()))

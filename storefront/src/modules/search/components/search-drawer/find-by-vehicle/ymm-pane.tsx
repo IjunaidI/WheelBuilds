@@ -4,6 +4,7 @@ import { FormEvent, useEffect, useState } from "react"
 import { useParams, useRouter } from "next/navigation"
 import { toast } from "sonner"
 import Icon from "@modules/common/components/icon"
+import Spinner from "@modules/common/icons/spinner"
 import Label from "@modules/common/components/label"
 import Field from "@modules/common/components/field"
 import Select from "@modules/common/components/select"
@@ -200,7 +201,7 @@ const YmmPane = ({ onClose }: YmmPaneProps) => {
       })
       setActive(vehicle.id)
       // fire the (human-initiated) fitment lookup, then write it back
-      const fitment = await getFitmentByVehicle(make, model, modificationSlug, "usdm")
+      const fitment = await getFitmentByVehicle(make, model, modificationSlug, year, "usdm")
       let fitParam = ""
       if (fitment && !("error" in fitment)) {
         update(vehicle.id, {
@@ -321,7 +322,15 @@ const YmmPane = ({ onClose }: YmmPaneProps) => {
         </Field>
       </div>
       <Button type="submit" disabled={!canSubmit} className="w-full mt-2">
-        Find My Fit <Icon name="arrow-right" size={16} color="white" />
+        {submitting ? (
+          <>
+            <Spinner size="16" color="white" /> Checking fit…
+          </>
+        ) : (
+          <>
+            Find My Fit <Icon name="arrow-right" size={16} color="white" />
+          </>
+        )}
       </Button>
       <Label
         tone="muted"

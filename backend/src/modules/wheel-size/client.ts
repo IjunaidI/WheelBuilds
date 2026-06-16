@@ -20,11 +20,14 @@ export class WheelSizeClient {
     if (!empty) { try { body = JSON.parse(text) } catch { body = null } }
     return { status: res.status, empty, body }
   }
-  // Real v2 contract: by_model REQUIRES make+model. modification (or year) narrows the trim.
+  // Real v2 contract: by_model REQUIRES make+model AND `year` (or `generation`).
+  // `modification` only narrows the trim — it does NOT satisfy the year/generation
+  // requirement, so it must be sent IN ADDITION to year, never instead of it.
+  // (Sending modification alone => 400 VALIDATION_ERROR, which broke every lookup.)
   byModel(p: { make: string; model: string; modification?: string; year?: string; region: string }): Promise<ClientResult> {
     const params: Record<string, string> = { make: p.make, model: p.model, region: p.region }
+    if (p.year) params.year = p.year
     if (p.modification) params.modification = p.modification
-    else if (p.year) params.year = p.year
     return this.get("/search/by_model/", params)
   }
   // Cataloging (lazy). Slugs per Task-1 findings.

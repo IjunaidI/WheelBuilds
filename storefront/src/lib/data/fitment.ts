@@ -8,10 +8,13 @@ export const getYears = (make: string, model: string) => sdk.client.fetch<{ year
 export const getModifications = (make: string, model: string, year: string) =>
   sdk.client.fetch<{ modifications: any }>(`/store/vehicle-catalog/modifications?make=${make}&model=${model}&year=${year}`)
 
-export async function getFitmentByVehicle(make: string, model: string, modification: string, region = "usdm"): Promise<VehicleFitment | { error: "unavailable" }> {
+export async function getFitmentByVehicle(make: string, model: string, modification: string, year: string, region = "usdm"): Promise<VehicleFitment | { error: "unavailable" }> {
   try {
+    // wheel-size /search/by_model/ REQUIRES year (or generation); modification only
+    // narrows the trim. Omitting year => 400 => fitment never resolves => no filtering.
+    const yearParam = year ? `&year=${encodeURIComponent(year)}` : ""
     const body = await sdk.client.fetch<unknown>(
-      `/store/fitment/by-vehicle?make=${make}&model=${model}&modification=${encodeURIComponent(modification)}&region=${region}`)
+      `/store/fitment/by-vehicle?make=${make}&model=${model}&modification=${encodeURIComponent(modification)}${yearParam}&region=${region}`)
     const fitment = unwrapFitment(body)
     // null means a malformed/unrecognized response shape; treat as unavailable —
     // the YMM pane only distinguishes fitment vs. error.

@@ -19,4 +19,23 @@ describe("WheelSizeClient", () => {
     expect(r.empty).toBe(false)
     expect(r.body?.data?.[0]?.technical?.pcd).toBe(114.3)
   })
+
+  // wheel-size v2 /search/by_model/ REJECTS (400 VALIDATION_ERROR) unless `year`
+  // (or `generation`) is present; `modification` only narrows the trim and does
+  // NOT satisfy the requirement. So year must be sent even when a modification is
+  // also provided — the old `else if` dropped it and broke every fitment lookup.
+  it("sends year in the by_model query even when a modification is also provided", async () => {
+    let captured = ""
+    const fakeFetch = async (url: string) => {
+      captured = url
+      return { status: 200, text: async () => "{}" } as any
+    }
+    const c = new WheelSizeClient({ apiKey: "k", baseUrl: "https://api.wheel-size.com/v2", fetchImpl: fakeFetch })
+    await c.byModel({ make: "abarth", model: "500", modification: "836bce4e66", year: "2008", region: "usdm" })
+    const qs = new URL(captured).searchParams
+    expect(qs.get("year")).toBe("2008")
+    expect(qs.get("modification")).toBe("836bce4e66")
+    expect(qs.get("make")).toBe("abarth")
+    expect(qs.get("model")).toBe("500")
+  })
 })

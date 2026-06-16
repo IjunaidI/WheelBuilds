@@ -1,5 +1,7 @@
 # Vendor Sync — Open Questions, Answered
 
+> _Corrected 2026-06-17 — see [docs/STATUS.md](../../STATUS.md). Original was pre-rename / pre-cents-fix; preserved as historical record below._
+
 Audit trail for the eight open questions surfaced before producing `VENDOR_SYNC_PLAN.md`. Each question records the asked options and the user's answer. Decisions here are referenced from the plan by `OQ#`.
 
 Date asked / answered: 2026-05-17.
@@ -77,9 +79,9 @@ Date asked / answered: 2026-05-17.
 - Provide SFTP credentials now and use real SFTP from day one
 - Vendor delivers feed via HTTPS/S3/other mechanism
 
-**Answer:** **Mock against local CSV for Phase 1.** Phase 1 reads the file from `VENDOR_TERAFLEX_FEED_PATH` (defaults to `./wheelInvPriceData.csv`). The `VendorAdapter.fetch()` abstraction makes the SFTP swap a tiny follow-up PR — only `pipeline/fetch.ts` and the adapter's `fetch()` method change. SFTP env var names are reserved in `.env.template` and `constants.ts` from PR 1 so the swap doesn't touch the registration boilerplate.
+**Answer:** **Mock against local CSV for Phase 1.** Phase 1 reads the file from `VENDOR_WHEELPROS_WHEEL_FEED_PATH` (defaults to `./wheelInvPriceData.csv`). The `VendorAdapter.fetch()` abstraction makes the SFTP swap a tiny follow-up PR — only `pipeline/fetch.ts` and the adapter's `fetch()` method change. SFTP env var names are reserved in `.env.template` and `constants.ts` from PR 1 so the swap doesn't touch the registration boilerplate.
 
-**Where applied:** Plan §1 row Q5; §4 (TeraflexAdapter sketch using `fs.readFile`); §9 (placeholder env vars); §13 PR 2 acceptance.
+**Where applied:** Plan §1 row Q5; §4 (WheelProsAdapter sketch using `fs.readFile`); §9 (placeholder env vars); §13 PR 2 acceptance.
 
 ---
 
@@ -93,10 +95,10 @@ Date asked / answered: 2026-05-17.
 - Phased: dry-run, then apply a small subset, then full catalog
 
 **Answer:** **Manual dry-run, then apply, then cron.** Concretely:
-1. `pnpm vendor-sync:dry-run teraflex` — fetches, parses, stages, diffs, prints summary. No Medusa mutations.
+1. `pnpm vendor-sync:dry-run wheelpros-wheels` — fetches, parses, stages, diffs, prints summary. No Medusa mutations.
 2. User reviews the run row in the admin UI (`GET /admin/vendor-sync/runs/<id>`).
 3. `pnpm vendor-sync:apply <run-id>` — applies that exact run.
-4. Once the result is verified good, set `VENDOR_TERAFLEX_ENABLED=true` and the cron takes over.
+4. Once the result is verified good, set `VENDOR_WHEELPROS_WHEELS_ENABLED=true` and the cron takes over.
 
 **Where applied:** Plan §1 row Q6; §11 (test strategy); §13 PR 2/3/4 acceptance criteria; PR 8 enables the cron.
 
@@ -142,7 +144,7 @@ Date asked / answered: 2026-05-17.
 
 **Answer:** **Implement both in Phase 1.** Both CSVs come from the same vendor/distributor system (identical warehouse codes 1001-1088, same pricing structure, same RunDate format). The tire adapter is a second parser + normalizer — incremental effort on top of the shared pipeline infrastructure. Shipping both means the storefront has a complete wheel-and-tire catalog from day one.
 
-**Where applied:** Plan §1 row Q9; §2 (module layout adds `teraflex-tires/` directory); §4 (discriminated union); §13 PR 2b.
+**Where applied:** Plan §1 row Q9; §2 (module layout adds `wheelpros-tires/` directory); §4 (discriminated union); §13 PR 2b.
 
 ---
 
@@ -165,12 +167,12 @@ Date asked / answered: 2026-05-17.
 **Question:** How should we register wheel vs tire feeds from the same vendor/distributor?
 
 **Options offered:**
-- Two adapter instances: `teraflex-wheels` and `teraflex-tires`
+- Two adapter instances: `wheelpros-wheels` and `wheelpros-tires`
 - One adapter handling both CSVs in one run
 
 **Answer:** **Two adapter instances.** Each has its own `vendorCode`, feed path env var, and independent dry-run/apply cycle. They run independently in the cron. `vendor_product_current` uses `(vendor_code, part_number)` as the unique key, guaranteeing zero collision even if a part_number appeared in both feeds. Clean separation — easy to enable/disable one without the other.
 
-**Where applied:** Plan §1 row Q11; §2 (separate adapter directories); §4 (two adapter classes); §9 (separate env vars `VENDOR_TERAFLEX_WHEELS_ENABLED` / `VENDOR_TERAFLEX_TIRES_ENABLED`); §13 PR 2 and PR 2b.
+**Where applied:** Plan §1 row Q11; §2 (separate adapter directories); §4 (two adapter classes); §9 (separate env vars `VENDOR_WHEELPROS_WHEELS_ENABLED` / `VENDOR_WHEELPROS_TIRES_ENABLED`); §13 PR 2 and PR 2b.
 
 ---
 
@@ -193,5 +195,5 @@ Date asked / answered: 2026-05-17.
 - The brand collection (OQ3) and stock locations (OQ4) are both bootstrapped lazily — created on first appearance during a sync run, not in a one-shot seed script. This keeps the sync self-contained and avoids drift between an explicit seed and the live feed.
 - The price column (OQ1) and the revised image policy (OQ2) together mean a product in Phase 1 is: title + vendor CDN image + brand collection + category (Wheels or Tires) + type-specific dimensions metadata + one USD price + per-warehouse stock. Only products with a populated `ImageURL` are imported. In the sample data this means zero wheel products (no images) and 4 tire products. The full production feed may differ — the dry-run output makes this visible before any apply.
 - The dry-run-first workflow (OQ6) plus the discontinue threshold (architectural decision A10) are two independent guard rails: OQ6 protects against the *first* run; A10 protects every subsequent run.
-- The two adapters (OQ11) share the same pipeline infrastructure but run independently. The dry-run + apply workflow happens separately for each: `pnpm vendor-sync:dry-run teraflex-wheels`, review, apply, then `pnpm vendor-sync:dry-run teraflex-tires`, review, apply. The cron runs both on the same 12h schedule but each has its own in-progress guard.
+- The two adapters (OQ11) share the same pipeline infrastructure but run independently. The dry-run + apply workflow happens separately for each: `pnpm vendor-sync:dry-run wheelpros-wheels`, review, apply, then `pnpm vendor-sync:dry-run wheelpros-tires`, review, apply. The cron runs both on the same 12h schedule but each has its own in-progress guard.
 - Tire description parsing (OQ12) is the one area with meaningful uncertainty. The regex-based parser covers the three patterns visible in the sample (`235/55ZR17`, `LT37X12.50R18`, `12.4-24 8PR`), but the full 45k-row feed will contain formats not in the sample. The plan mitigates this by making unparsed dimensions produce `null` (not errors) and logging WARN so the patterns can be extended before apply.

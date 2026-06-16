@@ -1,5 +1,7 @@
 # Home Catalog Wiring Implementation Plan
 
+> _Corrected 2026-06-17 — see [docs/STATUS.md](../../STATUS.md). Original was pre-rename / pre-cents-fix; preserved as historical record below._
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Wire the homepage NEW THIS WEEK, SHOP BY STYLE, and TRUSTED BRANDS sections to real Meilisearch data through reusable components with working `/store?<facet>=` links, showing no fabricated numbers.
@@ -801,4 +803,4 @@ Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>"
 - FEATURED BLOCKS, BUILD GALLERY, NEWSLETTER stay editorial/placeholder (no data source).
 - Wishlist persistence, newsletter submit, BuildGallery post count — separate follow-ups.
 - A real backend **style taxonomy** is future work (spec §6); when it lands, only `style-map.ts` (and the backend) change — `CategoryTile`/`ShopByStyle` are unaffected.
-- The `vendor-sync` service container bug (cron/admin-approve can't apply) is unrelated to this plan; tracked separately.
+- Fixed in edfd89a (resolve-apply-container.ts); cron + admin-approve now apply.

@@ -1,5 +1,7 @@
 # Master Plan — Wheels & Tires Store: Fitment + Garage + Live Import
 
+> _Corrected 2026-06-17 — see [docs/STATUS.md](../../STATUS.md). Original was pre-rename / pre-cents-fix; preserved as historical record below._
+
 > **For agentic workers:** This is an INDEX plan. It sequences three self-contained sub-plans, each of which produces working, testable software on its own. Execute them in the recommended order below. Each sub-plan carries its own task-by-task checklist; use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans per sub-plan.
 
 **Goal:** Take the project from "garage works, but the headline fitment feature is dead-on-arrival and CSV import is a local-sample demo" to "import live vendor inventory over SFTP, build a garage, and have the catalog filter to the selected vehicle" — end to end, backend to frontend. (Checkout remains out of scope.)
@@ -18,7 +20,7 @@ All three sub-plans are **DONE and merged to `main`** (local — not yet pushed 
 | 2 — Garage hardening | ✅ merged | `3d81afc`→`69a0a95` | partial unique single-active index applied to prod DB |
 | 3 — Live vendor SFTP feed | ✅ merged | `5337f5a`→`34c153b` (9 commits) | live SFTP dry-run verified; `source_modify_time` migration applied to prod; catalog-writing `apply` not yet run. See [`2026-06-04-plan-3-completion-and-validation.md`](./2026-06-04-plan-3-completion-and-validation.md) |
 
-**Remaining for the combined live smoke** (pick a vehicle → filtered, freshly-imported wheels): run `vendor-sync:apply` once to populate the prod catalog, then follow Plan 1 Task 5.
+**Done (2026-06-16):** apply ran end-to-end (~248 wheels live); the apply-container bug is fixed (edfd89a). See docs/STATUS.md.
 
 ## The three sub-plans
 

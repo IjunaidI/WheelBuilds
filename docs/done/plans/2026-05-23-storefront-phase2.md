@@ -1,5 +1,7 @@
 # Storefront Phase 2 — Discovery Loop + Deferred Backlog
 
+> _Corrected 2026-06-17 — see [docs/STATUS.md](../../STATUS.md). Original was pre-rename / pre-cents-fix; preserved as historical record below._
+
 This doc tracks the **discovery loop** (land → browse → filter + sort → add vehicle → see only fitting wheels) and keeps an inventory of everything intentionally deferred until that loop closes. Spec 1 shipped the first four steps for wheels; Spec 2 — wheel-size.com fitment + persistent garage — closes the last one. Shipping, checkout, RMA, payment, tax, and other "ending step" gaps are explicitly out of scope until the loop is whole.
 
 Audience for the storefront is **B2C consumers** (end drivers buying for their own vehicle); the B2B portal angle is out of scope.
@@ -53,7 +55,7 @@ git log --oneline -8
 # Backend unit tests for vendor-sync + the search triad
 # (the only test script wired up; ~4s, no DB).
 cd backend && pnpm test:sync
-# Expect: 157 passing, 0 failing
+# Expect: passing, 0 failing (test counts: see docs/STATUS.md)
 
 # Confirm a wheel doc shape in Meilisearch.
 # MEILISEARCH_HOST + MEILISEARCH_ADMIN_KEY are the BACKEND env-var names
@@ -140,7 +142,7 @@ Spec 1 docs: [spec](../specs/2026-05-28-fitment-ready-catalog-search-design.md) 
 
 ### Verification on this commit
 
-- Backend `pnpm test:sync` → 157 passed / 0 failed.
+- Backend `pnpm test:sync` → passed / 0 failed (test counts: see docs/STATUS.md).
 - Storefront `tsc` clean on the touched files (pre-existing drift in `lib/data/*` and `modules/order/*` is unrelated; see `storefront/CLAUDE.md`).
 - `pnpm build:next` compiles.
 

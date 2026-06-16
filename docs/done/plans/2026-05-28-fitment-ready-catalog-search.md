@@ -1,5 +1,7 @@
 # Fitment-Ready Catalog + Faceted Search Implementation Plan
 
+> _Corrected 2026-06-17 — see [docs/STATUS.md](../../STATUS.md). Original was pre-rename / pre-cents-fix; preserved as historical record below. Note: "Teraflex Nomad" below is a test-fixture wheel brand name, not a reference to the vendor system (which was renamed to wheelpros)._
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Wire the mock Wheel Builds storefront (Discovery + PDP + search) to the real Medusa catalog and stand up faceted Meilisearch search for wheels, with the index built deliberately as the substrate for spec-match vehicle fitment.

@@ -1,5 +1,7 @@
 # Vendor Sync — Implementation Summary
 
+> _Corrected 2026-06-17 — see [docs/STATUS.md](../STATUS.md). Original was pre-rename / pre-cents-fix; preserved as historical record below._
+
 A short, "what shipped and how to use it" companion to [`vendor-sync-plan`](../done/plans/2026-05-18-vendor-sync-plan.md) (design + rationale) and [`vendor-sync open-questions`](../done/specs/2026-05-18-vendor-sync-open-questions.md) (decisions audit). If you just need to understand the system, start here.
 
 Module location: [`backend/src/modules/vendor-sync/`](backend/src/modules/vendor-sync/).
@@ -93,7 +95,7 @@ The pipeline is a Medusa business module with four MikroORM tables (`vendor_feed
 | [`api/admin/vendor-sync/`](backend/src/api/admin/vendor-sync/) | Admin endpoints (list runs, detail, approve, cancel, replay) |
 | [`scripts/vendor-sync-*.ts`](backend/src/scripts/) | dry-run, apply, mock, cleanup, backfill-inventory, dev-wipe |
 | [`__fixtures__/`](backend/src/modules/vendor-sync/__fixtures__/) | wheels-small.csv + v2, tires-small.csv + v2 |
-| [`__tests__/`](backend/src/modules/vendor-sync/__tests__/) | 82 passing unit tests + integration scaffold (4 `it.todo`s gated behind `RUN_INTEGRATION=true`) |
+| [`__tests__/`](backend/src/modules/vendor-sync/__tests__/) | unit tests + integration scaffold (4 `it.todo`s gated behind `RUN_INTEGRATION=true`) (test counts: see docs/STATUS.md) |
 
 ---
 
@@ -161,7 +163,7 @@ All under `/admin/vendor-sync/`, all admin-auth-gated.
 - Apply created 37 wheels + 4 tires in Medusa with: correct title, USD price from `MSRP_USD`, brand collection, `Wheels` or `Tires` category, vendor CDN thumbnail, dimension/spec metadata, single `Default` variant with `manage_inventory: true`.
 - Inventory levels written per warehouse: 18 wheels and 2 tires had non-zero stock; the rest correctly have no inventory levels (zero everywhere).
 - Stock locations auto-created on first appearance (e.g. `Warehouse 1014`).
-- 82 unit tests pass in 4 seconds.
+- Unit tests pass in ~4 seconds (test counts: see docs/STATUS.md).
 - Meilisearch incremental indexing works: each `createProductsWorkflow` call triggers a `product.created` event the plugin subscribes to.
 
 ---
@@ -195,4 +197,4 @@ All under `/admin/vendor-sync/`, all admin-auth-gated.
 - Design + rationale: [`vendor-sync-plan`](../done/plans/2026-05-18-vendor-sync-plan.md)
 - Decisions audit: [`vendor-sync open-questions`](../done/specs/2026-05-18-vendor-sync-open-questions.md)
 - Per-module recipe: [`backend/src/modules/vendor-sync/README.md`](backend/src/modules/vendor-sync/README.md)
-- Project-level conventions: [`CLAUDE.md`](CLAUDE.md)
+- Project-level conventions: [`CLAUDE.md`](../../CLAUDE.md)

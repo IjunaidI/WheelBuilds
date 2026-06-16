@@ -1,5 +1,7 @@
 # Vendor Inventory Sync Pipeline — Phase 1 Implementation Plan
 
+> _Corrected 2026-06-17 — see [docs/STATUS.md](../../STATUS.md). Original was pre-rename / pre-cents-fix; preserved as historical record below._
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to land remaining work PR-by-PR.
 
 **Goal:** A two-feed (wheels + tires) vendor inventory sync pipeline running against the existing Medusa 2.13.6 backend, pulling CSVs from WheelPros, diffing them against last-applied state, and applying only the changes to Medusa products, stock locations, and inventory levels.
@@ -410,7 +412,7 @@ Steps, in order, all inside the same Node process:
      - `thumbnail`, `images: [{ url: imageUrl }]` — both set to the vendor CDN URL (OQ2 pass-through)
      - `weight`, `collection_id`, `category_ids: [categoryId]`, `sales_channels`, `shipping_profile_id`, `external_id: partNumber`
      - `metadata: buildProductMetadata(normalized)` — see §5.4
-     - One variant: `{ title: 'Default', sku: partNumber, manage_inventory: true, allow_backorder: false, prices: [{ amount: msrpUsd * 100, currency_code: 'usd' }] }`
+     - One variant: `{ title: 'Default', sku: partNumber, manage_inventory: true, allow_backorder: false, prices: [{ amount: msrpUsd  // dollars in Medusa (cents only in the Meili index), currency_code: 'usd' }] }`
    - Insert `vendor_product_current` with `medusa_product_id`, `medusa_variant_id`, `inventory_item_id` (extracted from the workflow result), `content_hash`, `normalized`, `last_seen_run_id`, `applied_at = now()`.
 3. **Update changed products** — iterate `diffResult.changedPartNumbers`. For each:
    - Read staging row and existing `vendor_product_current` row.
@@ -544,9 +546,9 @@ All routes use the existing admin auth middleware (file-based routing under `src
 | `VENDOR_SYNC_APPLY_CONCURRENCY`       | reserved (currently unread)    | —              | Reserved for future parallel apply. Sequential today. |
 | `VENDOR_SYNC_DRY_RUN`                 | optional                       | `false`        | When `true`, every scheduled tick stops after the diff. |
 | `VENDOR_WHEELPROS_WHEELS_ENABLED`     | required to activate           | `false`        | Master switch for the wheels adapter. |
-| `VENDOR_WHEELPROS_WHEELS_FEED_PATH`   | required if wheels enabled     | `./wheelInvPriceData.csv` | Local CSV path. |
+| `VENDOR_WHEELPROS_WHEEL_FEED_PATH`    | required if wheels enabled     | `./wheelInvPriceData.csv` | Local CSV path. |
 | `VENDOR_WHEELPROS_TIRES_ENABLED`      | required to activate           | `false`        | Master switch for the tires adapter. |
-| `VENDOR_WHEELPROS_TIRES_FEED_PATH`    | required if tires enabled      | `./tireInvPriceData.csv`  | Local CSV path. |
+| `VENDOR_WHEELPROS_TIRE_FEED_PATH`     | required if tires enabled      | `./tireInvPriceData.csv`  | Local CSV path. |
 | `VENDOR_WHEELPROS_SFTP_HOST`          | reserved                       | —              | Future SFTP. Currently unread. |
 | `VENDOR_WHEELPROS_SFTP_PORT`          | reserved                       | `22`           | |
 | `VENDOR_WHEELPROS_SFTP_USER`          | reserved                       | —              | |
@@ -650,8 +652,8 @@ Subsequent in-flight work is §15.
 | ID  | Risk | Mitigation |
 |---|---|---|
 | R1  | Meilisearch plugin (`@rokmohar/medusa-plugin-meilisearch`) may not subscribe to `product.created` / `product.updated` events. | Verify post-install. If only full reindex is supported, add a debounced module-level subscriber that batches per run. |
-| R2  | Medusa 2.13.6's variant `prices[].amount` unit (decimal vs integer cents). Currently using `Math.round(msrpUsd * 100)`. | A one-shot smoke test creating a product with `amount: 100` and inspecting the displayed price catches the unit mismatch instantly. |
-| R3  | `bullmq` is still in `package.json` but unused after A4 was finalized. | Cleanup PR removes the unused dep. Listed in §15. |
+| R2  | Medusa 2.13.6's variant `prices[].amount` unit (decimal vs integer cents). Stores dollars on the Medusa variant; the Meili transformer converts to integer cents. | A one-shot smoke test creating a product with `amount: 100` and inspecting the displayed price catches the unit mismatch instantly. |
+| R3  | ~~`bullmq` is still in `package.json` but unused after A4 was finalized.~~ ~~done~~ (no longer a direct dependency) | Cleanup PR removes the unused dep. Listed in §15. |
 | R4  | First ingestion of full feeds may take ~30+ minutes inside a single Node process. | Run during low-traffic window. RunDate short-circuit guarantees a re-tick won't double-process. If pressure mounts, switch to `Promise.allSettled` across vendors and/or batch part_numbers within a vendor. |
 | R5  | `RunDate` parsing assumes US `MM/DD/YYYY hh:mm:ss AM/PM`. Locale-flip would silently break dedup. | `parseVendorDate` already asserts year is within a plausible window; a regression test on a known sample row is in `wheel-parse.test.ts` / `tire-parse.test.ts`. |
 | R6  | Brand collection / stock location / sales channel rename in Medusa admin would break name-based lookups. | Stock locations use `metadata.vendor_warehouse_code`. Brand collections use `metadata.vendor_sync_brand`. Region and sales channel still match by name (see R6b). |
@@ -705,7 +707,7 @@ The "wipe vendor-sync-managed Medusa rows" variant originally proposed here (del
   - Dry-run summary first (counts) with confirmation prompt unless `--yes`.
   - Pretty-printed errors after apply, grouping by error message.
 
-### 15.7 Remove unused `bullmq` dependency
+### 15.7 ~~Remove unused `bullmq` dependency~~ ~~done~~ (no longer a direct dependency)
 
 - Drop from `backend/package.json` (R3). `pnpm install` to refresh the lockfile.
 

@@ -8,7 +8,7 @@
 
 **Tech Stack:** MedusaJS 2.13.6 backend (`@rokmohar/medusa-plugin-meilisearch` 1.3.5, jest), Next.js 15 / React 19 storefront, Meilisearch, `meilisearch` JS client.
 
-**Spec:** [`docs/superpowers/specs/2026-05-28-fitment-ready-catalog-search-design.md`](../specs/2026-05-28-fitment-ready-catalog-search-design.md)
+**Spec:** [`docs/done/specs/2026-05-28-fitment-ready-catalog-search-design.md`](../specs/2026-05-28-fitment-ready-catalog-search-design.md)
 
 **Conventions reminder (from CLAUDE.md):**
 - `pnpm` may not be on PATH on Windows. Use `npx -y pnpm@9.10.0 <cmd>` for installs, or `backend/node_modules/.bin/medusa.CMD` for the CLI.

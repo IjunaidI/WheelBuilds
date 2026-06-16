@@ -8,7 +8,7 @@
 
 **Tech Stack:** Next.js 15 (App Router, React 19 Server Components), TypeScript, Meilisearch (via the existing server-only Discovery adapter), Vitest (`pnpm test:unit`, node env), Tailwind + the WB `.frame` design classes.
 
-**Reference:** spec `docs/superpowers/specs/2026-06-16-home-catalog-wiring-design.md`. All work is in `storefront/`. Run all commands from `storefront/`. Hrefs are passed WITHOUT `countryCode` (`LocalizedClientLink` prepends it). `next.config.js` sets `typescript.ignoreBuildErrors` + `eslint.ignoreDuringBuilds`, so type/lint errors do NOT fail the build — run `npx tsc --noEmit` separately. The storefront dev server is expected to be running on `http://localhost:8000` for render checks.
+**Reference:** spec `docs/done/specs/2026-06-16-home-catalog-wiring-design.md`. All work is in `storefront/`. Run all commands from `storefront/`. Hrefs are passed WITHOUT `countryCode` (`LocalizedClientLink` prepends it). `next.config.js` sets `typescript.ignoreBuildErrors` + `eslint.ignoreDuringBuilds`, so type/lint errors do NOT fail the build — run `npx tsc --noEmit` separately. The storefront dev server is expected to be running on `http://localhost:8000` for render checks.
 
 ---
 

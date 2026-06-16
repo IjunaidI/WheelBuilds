@@ -24,24 +24,24 @@ A fresh agent should be able to start work on Spec 2 by walking this section top
 
 | # | Path | Why |
 |---|---|---|
-| 1 | [`CLAUDE.md`](CLAUDE.md) | Repo-wide architecture, conditional module loading, vendor-sync pipeline, dollars/cents convention, gotchas. |
-| 2 | [`storefront/CLAUDE.md`](storefront/CLAUDE.md) | Storefront app + design-system contract. Discovery and PDP wiring blocks are the most recent state. |
-| 3 | [`storefront/DESIGN.md`](storefront/DESIGN.md) | Visual system rules. Read before touching the WB visual layer. |
-| 4 | [`VENDOR_SYNC_IMPLEMENTATION_SUMMARY.md`](VENDOR_SYNC_IMPLEMENTATION_SUMMARY.md) | What's in the catalog and how it got there. Background only; Spec 2 doesn't mutate it. |
-| 5 | [`docs/superpowers/specs/2026-05-28-fitment-ready-catalog-search-design.md`](docs/superpowers/specs/2026-05-28-fitment-ready-catalog-search-design.md) | Spec 1 design. Read §D7 — it defines the safe-fit window Spec 2 inherits. |
-| 6 | [`docs/superpowers/plans/2026-05-28-fitment-ready-catalog-search.md`](docs/superpowers/plans/2026-05-28-fitment-ready-catalog-search.md) | Spec 1 task plan. Useful as a template for Spec 2 plan structure. |
-| 7 | [`backend/src/modules/vendor-sync/search/build-search-document.ts`](backend/src/modules/vendor-sync/search/build-search-document.ts) | The per-product Meilisearch transformer. Exactly what the index carries — i.e. the fields Spec 2 filters against. |
-| 8 | [`backend/src/modules/vendor-sync/search/bolt-pattern-canonical.ts`](backend/src/modules/vendor-sync/search/bolt-pattern-canonical.ts) | `canonicalBoltPatterns` — the wheel-size.com join key. Spec 2's highest-risk unit. |
-| 9 | [`backend/src/modules/vendor-sync/search/normalize-finish.ts`](backend/src/modules/vendor-sync/search/normalize-finish.ts) | Has a byte-equivalent twin on the storefront PDP. Keep them in lockstep. |
-| 10 | [`backend/medusa-config.js`](backend/medusa-config.js) | Meilisearch index settings + transformer wire-up + vendor-sync module options. |
-| 11 | [`storefront/src/lib/meilisearch.ts`](storefront/src/lib/meilisearch.ts) | Server-only Meilisearch client (`import "server-only"`, on `meilisearch ^0.51.0`). |
-| 12 | [`storefront/src/modules/discovery/data/get-products.ts`](storefront/src/modules/discovery/data/get-products.ts) | Disjunctive `multiSearch` adapter. The `vehicleConstraint` seam Spec 2 fills lives in `buildFilters`. |
-| 13 | [`storefront/src/modules/discovery/data/types.ts`](storefront/src/modules/discovery/data/types.ts) | `DiscoveryQuery` (includes `vehicleConstraint?: string[]`), `DiscoveryFilters`, `FacetCounts`, `SortOption`. |
-| 14 | [`storefront/src/modules/product-detail/data/get-product.ts`](storefront/src/modules/product-detail/data/get-product.ts) | Live Medusa Store API PDP loader. `fitment: []` today — Spec 2 populates it. |
-| 15 | [`storefront/src/modules/product-detail/data/types.ts`](storefront/src/modules/product-detail/data/types.ts) | `FitmentEntry` shape and `ProductDetail` extension of `DiscoveryProduct`. |
-| 16 | [`storefront/src/lib/garage/`](storefront/src/lib/garage/) (`index.ts` + `provider.ts` + `types.ts` + `local-storage-garage.ts` + `use-garage.ts` + `vehicle-data.ts`) | The swap-ready garage abstraction. `types.ts` declares `Vehicle`/`NewVehicle` with the optional fitment fields Spec 2 will populate. Spec 2 swaps the singleton from `LocalStorageGarage` to `MedusaGarage`. |
-| 17 | [`storefront/src/modules/search/components/search-drawer/find-by-vehicle/ymm-pane.tsx`](storefront/src/modules/search/components/search-drawer/find-by-vehicle/ymm-pane.tsx) + [`garage-pane.tsx`](storefront/src/modules/search/components/search-drawer/find-by-vehicle/garage-pane.tsx) | The two panes that write vehicles into the garage and route to `/store`. |
-| 18 | [`storefront/src/modules/discovery/components/filter-rail/filter-sections.tsx`](storefront/src/modules/discovery/components/filter-rail/filter-sections.tsx) | Vehicle band lives here; the `TODO(integration)` at L138 marks the "only show wheels that fit" toggle. (L264 carries a sibling TODO for the price-range `<Slider>`.) |
+| 1 | [`CLAUDE.md`](../../../CLAUDE.md) | Repo-wide architecture, conditional module loading, vendor-sync pipeline, dollars/cents convention, gotchas. |
+| 2 | [`storefront/CLAUDE.md`](../../../storefront/CLAUDE.md) | Storefront app + design-system contract. Discovery and PDP wiring blocks are the most recent state. |
+| 3 | [`storefront/DESIGN.md`](../../../storefront/DESIGN.md) | Visual system rules. Read before touching the WB visual layer. |
+| 4 | [`vendor-sync-implementation`](../../reference/vendor-sync-implementation.md) | What's in the catalog and how it got there. Background only; Spec 2 doesn't mutate it. |
+| 5 | [`docs/done/specs/2026-05-28-fitment-ready-catalog-search-design.md`](../specs/2026-05-28-fitment-ready-catalog-search-design.md) | Spec 1 design. Read §D7 — it defines the safe-fit window Spec 2 inherits. |
+| 6 | [`docs/done/plans/2026-05-28-fitment-ready-catalog-search.md`](2026-05-28-fitment-ready-catalog-search.md) | Spec 1 task plan. Useful as a template for Spec 2 plan structure. |
+| 7 | [`backend/src/modules/vendor-sync/search/build-search-document.ts`](../../../backend/src/modules/vendor-sync/search/build-search-document.ts) | The per-product Meilisearch transformer. Exactly what the index carries — i.e. the fields Spec 2 filters against. |
+| 8 | [`backend/src/modules/vendor-sync/search/bolt-pattern-canonical.ts`](../../../backend/src/modules/vendor-sync/search/bolt-pattern-canonical.ts) | `canonicalBoltPatterns` — the wheel-size.com join key. Spec 2's highest-risk unit. |
+| 9 | [`backend/src/modules/vendor-sync/search/normalize-finish.ts`](../../../backend/src/modules/vendor-sync/search/normalize-finish.ts) | Has a byte-equivalent twin on the storefront PDP. Keep them in lockstep. |
+| 10 | [`backend/medusa-config.js`](../../../backend/medusa-config.js) | Meilisearch index settings + transformer wire-up + vendor-sync module options. |
+| 11 | [`storefront/src/lib/meilisearch.ts`](../../../storefront/src/lib/meilisearch.ts) | Server-only Meilisearch client (`import "server-only"`, on `meilisearch ^0.51.0`). |
+| 12 | [`storefront/src/modules/discovery/data/get-products.ts`](../../../storefront/src/modules/discovery/data/get-products.ts) | Disjunctive `multiSearch` adapter. The `vehicleConstraint` seam Spec 2 fills lives in `buildFilters`. |
+| 13 | [`storefront/src/modules/discovery/data/types.ts`](../../../storefront/src/modules/discovery/data/types.ts) | `DiscoveryQuery` (includes `vehicleConstraint?: string[]`), `DiscoveryFilters`, `FacetCounts`, `SortOption`. |
+| 14 | [`storefront/src/modules/product-detail/data/get-product.ts`](../../../storefront/src/modules/product-detail/data/get-product.ts) | Live Medusa Store API PDP loader. `fitment: []` today — Spec 2 populates it. |
+| 15 | [`storefront/src/modules/product-detail/data/types.ts`](../../../storefront/src/modules/product-detail/data/types.ts) | `FitmentEntry` shape and `ProductDetail` extension of `DiscoveryProduct`. |
+| 16 | [`storefront/src/lib/garage/`](../../../storefront/src/lib/garage/) (`index.ts` + `provider.ts` + `types.ts` + `local-storage-garage.ts` + `use-garage.ts` + `vehicle-data.ts`) | The swap-ready garage abstraction. `types.ts` declares `Vehicle`/`NewVehicle` with the optional fitment fields Spec 2 will populate. Spec 2 swaps the singleton from `LocalStorageGarage` to `MedusaGarage`. |
+| 17 | [`storefront/src/modules/search/components/search-drawer/find-by-vehicle/ymm-pane.tsx`](../../../storefront/src/modules/search/components/search-drawer/find-by-vehicle/ymm-pane.tsx) + [`garage-pane.tsx`](../../../storefront/src/modules/search/components/search-drawer/find-by-vehicle/garage-pane.tsx) | The two panes that write vehicles into the garage and route to `/store`. |
+| 18 | [`storefront/src/modules/discovery/components/filter-rail/filter-sections.tsx`](../../../storefront/src/modules/discovery/components/filter-rail/filter-sections.tsx) | Vehicle band lives here; the `TODO(integration)` at L138 marks the "only show wheels that fit" toggle. (L264 carries a sibling TODO for the price-range `<Slider>`.) |
 
 ### Inspection commands
 
@@ -136,7 +136,7 @@ Three named units, all already on `main`:
 
 Additionally: PDP fitment is `fitment: []` (UI degrades gracefully on empty); Discovery filter rail's Vehicle band has a `TODO(integration)` for the "only show wheels that fit" toggle.
 
-Spec 1 docs: [spec](docs/superpowers/specs/2026-05-28-fitment-ready-catalog-search-design.md) · [plan](docs/superpowers/plans/2026-05-28-fitment-ready-catalog-search.md).
+Spec 1 docs: [spec](../specs/2026-05-28-fitment-ready-catalog-search-design.md) · [plan](2026-05-28-fitment-ready-catalog-search.md).
 
 ### Verification on this commit
 

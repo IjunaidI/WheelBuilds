@@ -210,7 +210,7 @@ The base boilerplate ships a one-click Railway template that provisions Postgres
 └── storefront/CLAUDE.md + DESIGN.md   storefront architecture + visual contract
 ```
 
-For a deeper tour, read [`CLAUDE.md`](CLAUDE.md) (backend + pipeline), [`storefront/CLAUDE.md`](storefront/CLAUDE.md) (storefront), and [`VENDOR_SYNC_IMPLEMENTATION_SUMMARY.md`](VENDOR_SYNC_IMPLEMENTATION_SUMMARY.md) (the inventory pipeline in detail).
+For a deeper tour, read [`CLAUDE.md`](CLAUDE.md) (backend + pipeline), [`storefront/CLAUDE.md`](storefront/CLAUDE.md) (storefront), and [`vendor-sync-implementation`](docs/reference/vendor-sync-implementation.md) (the inventory pipeline in detail).
 
 ---
 

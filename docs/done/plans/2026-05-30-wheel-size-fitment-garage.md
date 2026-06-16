@@ -8,7 +8,7 @@
 
 **Tech Stack:** MedusaJS 2.13.6 (backend, Node 22 / pnpm 9.10, jest), Next.js 15 / React 19 (storefront, vitest added), Meilisearch (server-only, `^0.51.0`), wheel-size.com API v2 (Basic tier), MikroORM models.
 
-**Spec:** [`docs/superpowers/specs/2026-05-30-wheel-size-fitment-garage-design.md`](../specs/2026-05-30-wheel-size-fitment-garage-design.md). **Branch:** `feat/wheel-size-fitment-garage`.
+**Spec:** [`docs/done/specs/2026-05-30-wheel-size-fitment-garage-design.md`](../specs/2026-05-30-wheel-size-fitment-garage-design.md). **Branch:** `feat/wheel-size-fitment-garage`.
 
 ---
 
@@ -92,7 +92,7 @@
 **Files:**
 - Create: `backend/scripts/wheel-size-validate.mjs` (throwaway spike script — deleted at end of task)
 - Create: `backend/src/modules/wheel-size/__tests__/__fixtures__/by-model-*.json` (recorded real responses — kept as test fixtures)
-- Create: `docs/superpowers/specs/2026-05-30-wheel-size-task1-findings.md` (the decision record)
+- Create: `docs/done/specs/2026-05-30-wheel-size-task1-findings.md` (the decision record)
 
 - [ ] **Step 1: Obtain a Sandbox key.** Register at https://developer.wheel-size.com/ for a free Sandbox `user_key` (moderated, ~2–4h). Export it locally: PowerShell `$env:WHEEL_SIZE_API_KEY="..."`. Do NOT commit the key.
 
@@ -161,7 +161,7 @@ export async function GET(req: MedusaRequest, res: MedusaResponse): Promise<void
 
 Log in as a storefront customer, then call `/store/__authprobe` with that customer's auth token + the publishable key. Record whether `actor_id` is populated. **Delete this probe route at the end of the task.** If `actor_id` is null, record the required middleware registration (Medusa `defineMiddlewares` with `authenticate("customer", ...)`) — Task 10 will need it.
 
-- [ ] **Step 5: Write the findings + decision record.** In `docs/superpowers/specs/2026-05-30-wheel-size-task1-findings.md`, record all four answers plus a **GO / EXTEND-STANDARD-PCDS / BLOCK** decision:
+- [ ] **Step 5: Write the findings + decision record.** In `docs/done/specs/2026-05-30-wheel-size-task1-findings.md`, record all four answers plus a **GO / EXTEND-STANDARD-PCDS / BLOCK** decision:
   - **GO:** parity holds for standard PCDs and the non-standard trucks happen to match → no `STANDARD_PCDS` change.
   - **EXTEND-STANDARD-PCDS:** the non-standard trucks diverge → Task 2 extends `STANDARD_PCDS` (+ re-index) before any storefront fitment work.
   - **BLOCK:** standard PCDs diverge → stop; revisit `canonicalBoltPatterns`/`normalize` design before continuing.
@@ -169,7 +169,7 @@ Log in as a storefront customer, then call `/store/__authprobe` with that custom
 - [ ] **Step 6: Clean up + commit.** Delete `backend/scripts/wheel-size-validate.mjs` and the `__authprobe` route. Keep the `__fixtures__/by-model-*.json` files (sanitized — they contain no key). Commit:
 
 ```bash
-git add backend/src/modules/wheel-size/__tests__/__fixtures__ docs/superpowers/specs/2026-05-30-wheel-size-task1-findings.md
+git add backend/src/modules/wheel-size/__tests__/__fixtures__ docs/done/specs/2026-05-30-wheel-size-task1-findings.md
 git commit -m "test(wheel-size): record Task-1 by_model fixtures + validation findings"
 ```
 
@@ -1994,7 +1994,7 @@ git add -A && git commit -m "test(fitment): live verification checklist complete
 
 ## Parked work
 
-✅ **Task 1 — DONE (GO).** Validated against the live v2 API on 2026-06-01; findings + decision in [`docs/superpowers/specs/2026-05-30-wheel-size-task1-findings.md`](../specs/2026-05-30-wheel-size-task1-findings.md). Parity holds (incl. the non-standard-PCD truck `8x180`) → **no `STANDARD_PCDS` change, no re-index**. Real fixtures recorded.
+✅ **Task 1 — DONE (GO).** Validated against the live v2 API on 2026-06-01; findings + decision in [`docs/done/specs/2026-05-30-wheel-size-task1-findings.md`](../specs/2026-05-30-wheel-size-task1-findings.md). Parity holds (incl. the non-standard-PCD truck `8x180`) → **no `STANDARD_PCDS` change, no re-index**. Real fixtures recorded.
 ✅ **Provisional-code reconciliation — DONE.** `by_model` now takes `make+model+modification` (the API rejects modification alone with a 400); `centre_bore` parsed as a string; synthetic fixtures replaced with real recordings.
 
 Still open (need a **dev DB / running backend** — NOT the key):

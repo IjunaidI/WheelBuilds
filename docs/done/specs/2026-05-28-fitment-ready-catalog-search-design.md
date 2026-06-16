@@ -2,7 +2,7 @@
 
 **Date:** 2026-05-28
 **Status:** Approved (pending written-spec review)
-**Plan reference:** [`STOREFRONT_PHASE2_PLAN.md`](../../../STOREFRONT_PHASE2_PLAN.md) gaps 2.3 (search facets), and the substrate for 2.1 (fitment) / 2.2 (garage).
+**Plan reference:** [`STOREFRONT_PHASE2_PLAN.md`](../plans/2026-05-23-storefront-phase2.md) gaps 2.3 (search facets), and the substrate for 2.1 (fitment) / 2.2 (garage).
 
 This is **Spec 1 of 2**. Spec 2 (the wheel-size.com fitment layer) is scoped separately and depends on this one.
 

@@ -2,7 +2,7 @@
 
 **Date:** 2026-05-30
 **Status:** Approved (pending written-spec review)
-**Plan reference:** [`STOREFRONT_PHASE2_PLAN.md`](../../../STOREFRONT_PHASE2_PLAN.md) §"Next — closing the discovery loop" (Spec 2). Inherits the safe-fit window from Spec 1 design [§D7](2026-05-28-fitment-ready-catalog-search-design.md).
+**Plan reference:** [`STOREFRONT_PHASE2_PLAN.md`](../plans/2026-05-23-storefront-phase2.md) §"Next — closing the discovery loop" (Spec 2). Inherits the safe-fit window from Spec 1 design [§D7](2026-05-28-fitment-ready-catalog-search-design.md).
 
 This is **Spec 2 of 2**. Spec 1 ([fitment-ready catalog + faceted search](2026-05-28-fitment-ready-catalog-search-design.md)) shipped the substrate; this spec closes the discovery loop's final step — **fitment-match** — and adds a persistent, account-backed garage.
 

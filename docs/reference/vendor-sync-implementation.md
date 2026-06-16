@@ -1,6 +1,6 @@
 # Vendor Sync — Implementation Summary
 
-A short, "what shipped and how to use it" companion to [`VENDOR_SYNC_PLAN.md`](VENDOR_SYNC_PLAN.md) (design + rationale) and [`VENDOR_SYNC_OPEN_QUESTIONS.md`](VENDOR_SYNC_OPEN_QUESTIONS.md) (decisions audit). If you just need to understand the system, start here.
+A short, "what shipped and how to use it" companion to [`vendor-sync-plan`](../done/plans/2026-05-18-vendor-sync-plan.md) (design + rationale) and [`vendor-sync open-questions`](../done/specs/2026-05-18-vendor-sync-open-questions.md) (decisions audit). If you just need to understand the system, start here.
 
 Module location: [`backend/src/modules/vendor-sync/`](backend/src/modules/vendor-sync/).
 
@@ -192,7 +192,7 @@ All under `/admin/vendor-sync/`, all admin-auth-gated.
 
 ## Pointers
 
-- Design + rationale: [`VENDOR_SYNC_PLAN.md`](VENDOR_SYNC_PLAN.md)
-- Decisions audit: [`VENDOR_SYNC_OPEN_QUESTIONS.md`](VENDOR_SYNC_OPEN_QUESTIONS.md)
+- Design + rationale: [`vendor-sync-plan`](../done/plans/2026-05-18-vendor-sync-plan.md)
+- Decisions audit: [`vendor-sync open-questions`](../done/specs/2026-05-18-vendor-sync-open-questions.md)
 - Per-module recipe: [`backend/src/modules/vendor-sync/README.md`](backend/src/modules/vendor-sync/README.md)
 - Project-level conventions: [`CLAUDE.md`](CLAUDE.md)

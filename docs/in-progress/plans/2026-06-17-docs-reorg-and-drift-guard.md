@@ -259,9 +259,11 @@ In `docs/reference/vendor-sync-implementation.md` and `docs/done/plans/2026-05-2
 
 - [ ] **Step 6: Prove the banned tokens are gone**
 
-Run:
+Some docs legitimately QUOTE the banned tokens because their job is to track the drift — the reorg
+spec/plan (`*docs-reorg-and-drift-guard*`), `STATUS.md`, and `BACKLOG.md`. Exclude those meta-docs
+so the scan only flags real drift in content docs:
 ```bash
-grep -rniE "teraflex|msrpUsd \* 100|VENDOR_WHEELPROS_(WHEELS|TIRES)_FEED_PATH" docs/ ; echo "exit:$?"
+grep -rniE --exclude='*docs-reorg-and-drift-guard*' --exclude=STATUS.md --exclude=BACKLOG.md "teraflex|msrpUsd \* 100|VENDOR_WHEELPROS_(WHEELS|TIRES)_FEED_PATH" docs/ ; echo "exit:$?"
 ```
 Expected: no matches (`exit:1`), OR matches only inside a "Corrected … historical" annotated block. Inspect any hit.
 
@@ -563,8 +565,10 @@ These must not appear in committed docs except inside an explicit "Corrected …
 - `msrpUsd * 100` (Medusa stores dollars; cents only in the Meili index)
 - `VENDOR_WHEELPROS_WHEELS_FEED_PATH` / `VENDOR_WHEELPROS_TIRES_FEED_PATH` (wrong plural names)
 
-Run: `grep -rniE "teraflex|msrpUsd \* 100|VENDOR_WHEELPROS_(WHEELS|TIRES)_FEED_PATH" docs/ CLAUDE.md README.md backend/src/modules/*/README.md`
-Any hit outside an annotated historical block = DRIFT.
+Run: `grep -rniE --exclude='*docs-reorg-and-drift-guard*' --exclude=STATUS.md --exclude=BACKLOG.md "teraflex|msrpUsd \* 100|VENDOR_WHEELPROS_(WHEELS|TIRES)_FEED_PATH" docs/ CLAUDE.md README.md backend/src/modules/*/README.md`
+Drift-tracking docs legitimately QUOTE these tokens — the reorg spec/plan (`*docs-reorg-and-drift-guard*`),
+`STATUS.md`, `BACKLOG.md`, and this `SKILL.md` itself — so they are excluded above (and `.claude/` is
+out of the scan path). Any remaining hit outside an annotated historical block = DRIFT.
 
 ### 2. BACKLOG evidence freshness
 Parse each `### WB-NNN` item in `docs/future/BACKLOG.md` (status + evidence file:line).
@@ -637,9 +641,10 @@ Run each and confirm:
 cd e:/medusajs-2.0-for-railway-boilerplate
 # 1 structure + superpowers gone
 find docs -type d | sort ; test ! -d docs/superpowers && echo "AC1 ok"
-# 2/3 no stale links/tokens
-grep -rn "docs/superpowers/" docs/ CLAUDE.md README.md ; echo "AC2 grep exit:$?"
-grep -rniE "teraflex|msrpUsd \* 100|VENDOR_WHEELPROS_(WHEELS|TIRES)_FEED_PATH" docs/ ; echo "AC3 grep exit:$?"
+# 2/3 no stale links/tokens in CONTENT docs (exclude drift-tracking meta-docs that quote them by design)
+EXC="--exclude=*docs-reorg-and-drift-guard* --exclude=STATUS.md --exclude=BACKLOG.md"
+grep -rn $EXC "docs/superpowers/" docs/ CLAUDE.md README.md ; echo "AC2 grep exit:$?"
+grep -rniE $EXC "teraflex|msrpUsd \* 100|VENDOR_WHEELPROS_(WHEELS|TIRES)_FEED_PATH" docs/ ; echo "AC3 grep exit:$?"
 # 4 STATUS exists with date
 grep -n "Last verified" docs/STATUS.md && echo "AC4 ok"
 # 5 BACKLOG well-formed + blockers

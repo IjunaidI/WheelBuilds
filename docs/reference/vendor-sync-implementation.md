@@ -4,7 +4,7 @@
 
 A short, "what shipped and how to use it" companion to [`vendor-sync-plan`](../done/plans/2026-05-18-vendor-sync-plan.md) (design + rationale) and [`vendor-sync open-questions`](../done/specs/2026-05-18-vendor-sync-open-questions.md) (decisions audit). If you just need to understand the system, start here.
 
-Module location: [`backend/src/modules/vendor-sync/`](backend/src/modules/vendor-sync/).
+Module location: [`backend/src/modules/vendor-sync/`](../../backend/src/modules/vendor-sync/).
 
 Last verified end-to-end against the dev DB on 2026-05-21: 39 wheels + 11 tires across two feeds, 41 products created in Medusa (37 wheels + 4 tires after image-filter skips), inventory levels applied at the right warehouses.
 
@@ -53,7 +53,7 @@ Dry-run fetches, parses, normalizes, stages, and diffs — but stops before any 
 
 ### Automated runs
 
-Cron `0 */12 * * *` (00:00 and 12:00 UTC), defined in [`backend/src/jobs/vendor-sync-tick.ts`](backend/src/jobs/vendor-sync-tick.ts). It iterates `service.listEnabledVendors()` and calls `service.run(vendor)` for each in series. Each vendor has its own in-progress guard, so a long-running wheels apply does not skip the tires tick on the next cycle.
+Cron `0 */12 * * *` (00:00 and 12:00 UTC), defined in [`backend/src/jobs/vendor-sync-tick.ts`](../../backend/src/jobs/vendor-sync-tick.ts). It iterates `service.listEnabledVendors()` and calls `service.run(vendor)` for each in series. Each vendor has its own in-progress guard, so a long-running wheels apply does not skip the tires tick on the next cycle.
 
 ### Recovery
 
@@ -74,28 +74,28 @@ The pipeline is a Medusa business module with four MikroORM tables (`vendor_feed
 
 | Path | What |
 |---|---|
-| [`models/`](backend/src/modules/vendor-sync/models/) | MikroORM data models for the four tables |
-| [`migrations/Migration20260517220005.ts`](backend/src/modules/vendor-sync/migrations/Migration20260517220005.ts) | Creates all four tables |
-| [`migrations/Migration20260521150000.ts`](backend/src/modules/vendor-sync/migrations/Migration20260521150000.ts) | Adds `failed_part_numbers` jsonb column to `vendor_feed_run` |
-| [`adapters/types.ts`](backend/src/modules/vendor-sync/adapters/types.ts) | `VendorAdapter` interface + discriminated-union `NormalizedRecord` (`WheelNormalizedRecord` \| `TireNormalizedRecord`); both carry a `groupKey` field |
-| [`adapters/wheelpros-wheels/group-key.ts`](backend/src/modules/vendor-sync/adapters/wheelpros-wheels/group-key.ts) | Pure helper that derives a wheel `groupKey` from brand + DisplayStyleNo + Finish (per-SKU fallback when DisplayStyleNo is empty) |
-| [`pipeline/wheel-grouping.ts`](backend/src/modules/vendor-sync/pipeline/wheel-grouping.ts) | Pure helpers used by the apply path: option/variant builders, four-axis collision detector, group title/handle |
-| [`adapters/registry.ts`](backend/src/modules/vendor-sync/adapters/registry.ts) | `resolveAdapter('wheelpros-wheels' \| 'wheelpros-tires')` |
-| [`adapters/wheelpros-wheels/`](backend/src/modules/vendor-sync/adapters/wheelpros-wheels/) | Wheel adapter (parse, normalize, schema) |
-| [`adapters/wheelpros-tires/`](backend/src/modules/vendor-sync/adapters/wheelpros-tires/) | Tire adapter; reuses `parse-helpers` + `tire-parse-helpers` |
-| [`pipeline/fetch.ts`](backend/src/modules/vendor-sync/pipeline/fetch.ts) | Reads local CSV, archives a copy to `static/vendor-feeds/<vendor>/<timestamp>.csv` |
-| [`pipeline/stage.ts`](backend/src/modules/vendor-sync/pipeline/stage.ts) | Streams parsed rows into staging tables; skips rows with empty `ImageURL` |
-| [`pipeline/diff.ts`](backend/src/modules/vendor-sync/pipeline/diff.ts) | Pure-function diff; `computeGroupDiff` is the production entry point (group-aware), `computeDiff` is the part-level legacy still used by tests |
-| [`pipeline/bootstrap.ts`](backend/src/modules/vendor-sync/pipeline/bootstrap.ts) | Idempotent: US region, sales channel, `Wheels`/`Tires` categories, brand collections, shipping profile, stock locations |
-| [`pipeline/apply.ts`](backend/src/modules/vendor-sync/pipeline/apply.ts) | Group-aware sequential apply with try/catch per group, cancel-poll between groups, query.graph for `inventory_item_id`. Routes new/changed/discontinued groups to per-type handlers; tires still go one-product-one-variant |
-| [`pipeline/apply-stock.ts`](backend/src/modules/vendor-sync/pipeline/apply-stock.ts) | `batchInventoryItemLevelsWorkflow` + pure `computeStockChanges` |
-| [`pipeline/build-metadata.ts`](backend/src/modules/vendor-sync/pipeline/build-metadata.ts) | Two pure helpers: `buildProductMetadata` (group-constant fields) and `buildVariantMetadata` (per-row fields). The apply path drafts the product only when ALL variants in a group are discontinued; individual-variant departure marks the variant via metadata.discontinued + zeroed stock instead |
-| [`service.ts`](backend/src/modules/vendor-sync/service.ts) | `VendorSyncService`: orchestrator + cancel flag + `run`/`approveAndApply`/`replayRun`/`replaySku` |
-| [`jobs/vendor-sync-tick.ts`](backend/src/jobs/vendor-sync-tick.ts) | Cron entry |
-| [`api/admin/vendor-sync/`](backend/src/api/admin/vendor-sync/) | Admin endpoints (list runs, detail, approve, cancel, replay) |
-| [`scripts/vendor-sync-*.ts`](backend/src/scripts/) | dry-run, apply, mock, cleanup, backfill-inventory, dev-wipe |
-| [`__fixtures__/`](backend/src/modules/vendor-sync/__fixtures__/) | wheels-small.csv + v2, tires-small.csv + v2 |
-| [`__tests__/`](backend/src/modules/vendor-sync/__tests__/) | unit tests + integration scaffold (4 `it.todo`s gated behind `RUN_INTEGRATION=true`) (test counts: see docs/STATUS.md) |
+| [`models/`](../../backend/src/modules/vendor-sync/models/) | MikroORM data models for the four tables |
+| [`migrations/Migration20260517220005.ts`](../../backend/src/modules/vendor-sync/migrations/Migration20260517220005.ts) | Creates all four tables |
+| [`migrations/Migration20260521150000.ts`](../../backend/src/modules/vendor-sync/migrations/Migration20260521150000.ts) | Adds `failed_part_numbers` jsonb column to `vendor_feed_run` |
+| [`adapters/types.ts`](../../backend/src/modules/vendor-sync/adapters/types.ts) | `VendorAdapter` interface + discriminated-union `NormalizedRecord` (`WheelNormalizedRecord` \| `TireNormalizedRecord`); both carry a `groupKey` field |
+| [`adapters/wheelpros-wheels/group-key.ts`](../../backend/src/modules/vendor-sync/adapters/wheelpros-wheels/group-key.ts) | Pure helper that derives a wheel `groupKey` from brand + DisplayStyleNo + Finish (per-SKU fallback when DisplayStyleNo is empty) |
+| [`pipeline/wheel-grouping.ts`](../../backend/src/modules/vendor-sync/pipeline/wheel-grouping.ts) | Pure helpers used by the apply path: option/variant builders, four-axis collision detector, group title/handle |
+| [`adapters/registry.ts`](../../backend/src/modules/vendor-sync/adapters/registry.ts) | `resolveAdapter('wheelpros-wheels' \| 'wheelpros-tires')` |
+| [`adapters/wheelpros-wheels/`](../../backend/src/modules/vendor-sync/adapters/wheelpros-wheels/) | Wheel adapter (parse, normalize, schema) |
+| [`adapters/wheelpros-tires/`](../../backend/src/modules/vendor-sync/adapters/wheelpros-tires/) | Tire adapter; reuses `parse-helpers` + `tire-parse-helpers` |
+| [`pipeline/fetch.ts`](../../backend/src/modules/vendor-sync/pipeline/fetch.ts) | Reads local CSV, archives a copy to `static/vendor-feeds/<vendor>/<timestamp>.csv` |
+| [`pipeline/stage.ts`](../../backend/src/modules/vendor-sync/pipeline/stage.ts) | Streams parsed rows into staging tables; skips rows with empty `ImageURL` |
+| [`pipeline/diff.ts`](../../backend/src/modules/vendor-sync/pipeline/diff.ts) | Pure-function diff; `computeGroupDiff` is the production entry point (group-aware), `computeDiff` is the part-level legacy still used by tests |
+| [`pipeline/bootstrap.ts`](../../backend/src/modules/vendor-sync/pipeline/bootstrap.ts) | Idempotent: US region, sales channel, `Wheels`/`Tires` categories, brand collections, shipping profile, stock locations |
+| [`pipeline/apply.ts`](../../backend/src/modules/vendor-sync/pipeline/apply.ts) | Group-aware sequential apply with try/catch per group, cancel-poll between groups, query.graph for `inventory_item_id`. Routes new/changed/discontinued groups to per-type handlers; tires still go one-product-one-variant |
+| [`pipeline/apply-stock.ts`](../../backend/src/modules/vendor-sync/pipeline/apply-stock.ts) | `batchInventoryItemLevelsWorkflow` + pure `computeStockChanges` |
+| [`pipeline/build-metadata.ts`](../../backend/src/modules/vendor-sync/pipeline/build-metadata.ts) | Two pure helpers: `buildProductMetadata` (group-constant fields) and `buildVariantMetadata` (per-row fields). The apply path drafts the product only when ALL variants in a group are discontinued; individual-variant departure marks the variant via metadata.discontinued + zeroed stock instead |
+| [`service.ts`](../../backend/src/modules/vendor-sync/service.ts) | `VendorSyncService`: orchestrator + cancel flag + `run`/`approveAndApply`/`replayRun`/`replaySku` |
+| [`jobs/vendor-sync-tick.ts`](../../backend/src/jobs/vendor-sync-tick.ts) | Cron entry |
+| [`api/admin/vendor-sync/`](../../backend/src/api/admin/vendor-sync/) | Admin endpoints (list runs, detail, approve, cancel, replay) |
+| [`scripts/vendor-sync-*.ts`](../../backend/src/scripts/) | dry-run, apply, mock, cleanup, backfill-inventory, dev-wipe |
+| [`__fixtures__/`](../../backend/src/modules/vendor-sync/__fixtures__/) | wheels-small.csv + v2, tires-small.csv + v2 |
+| [`__tests__/`](../../backend/src/modules/vendor-sync/__tests__/) | unit tests + integration scaffold (4 `it.todo`s gated behind `RUN_INTEGRATION=true`) (test counts: see docs/STATUS.md) |
 
 ---
 
@@ -175,7 +175,7 @@ All under `/admin/vendor-sync/`, all admin-auth-gated.
 | Apply throughput | ~13 seconds per product, dominated by the Meilisearch plugin's synchronous indexing subscriber. At 7 workflows/sec, 1000 SKUs/tick = ~2 hours. Fine for current volume, will not scale to a full daily wheelpros feed. | Plan §15, risk R13 |
 | SFTP fetch | Phase 1 reads a local file. Real SFTP env vars are reserved (`VENDOR_WHEELPROS_SFTP_*`) but unused. | Plan §4, OQ5 |
 | Image strategy | Pass-through to vendor CDN. If vendor URLs go offline, products show broken thumbnails. No rehost to MinIO yet. | OQ2 |
-| Integration tests | 4 `it.todo` cases in [`__tests__/integration.test.ts`](backend/src/modules/vendor-sync/__tests__/integration.test.ts) document the regression scenarios but the implementation requires a CI Postgres setup. | Plan §15.8 |
+| Integration tests | 4 `it.todo` cases in [`__tests__/integration.test.ts`](../../backend/src/modules/vendor-sync/__tests__/integration.test.ts) document the regression scenarios but the implementation requires a CI Postgres setup. | Plan §15.8 |
 | Region + sales channel match by name | `ensureUsRegion` / `ensureDefaultSalesChannel` look up by display name. Renaming either in admin breaks bootstrap. Low priority — rare event. | Plan risk R6b |
 
 ---
@@ -184,8 +184,8 @@ All under `/admin/vendor-sync/`, all admin-auth-gated.
 
 | Symptom | Where |
 |---|---|
-| Run stuck "in progress" forever | Run [`vendor-sync-cleanup.ts`](backend/src/scripts/vendor-sync-cleanup.ts); see [module README](backend/src/modules/vendor-sync/README.md#vendor-sync-cleanupts--release-a-stuck-in-progress-guard) |
-| Products have no stock | Either feed has `TotalQOH=0` for those SKUs (correct), or you're hitting the pre-fix state: run [`vendor-sync-backfill-inventory.ts`](backend/src/scripts/vendor-sync-backfill-inventory.ts) |
+| Run stuck "in progress" forever | Run [`vendor-sync-cleanup.ts`](../../backend/src/scripts/vendor-sync-cleanup.ts); see [module README](../../backend/src/modules/vendor-sync/README.md#vendor-sync-cleanupts--release-a-stuck-in-progress-guard) |
+| Products have no stock | Either feed has `TotalQOH=0` for those SKUs (correct), or you're hitting the pre-fix state: run [`vendor-sync-backfill-inventory.ts`](../../backend/src/scripts/vendor-sync-backfill-inventory.ts) |
 | Run paused at `awaiting_approval` | Discontinue ratio exceeded threshold; check the diff sample, then `POST /admin/vendor-sync/runs/:id/approve` or `/cancel` |
 | Module not loaded | At least one `VENDOR_WHEELPROS_*_ENABLED` must be `true`; check `medusa-config.js` boot log JSON dump |
 | Schema drift after editing models | `rm -rf backend/.medusa/server` and re-run `pnpm dev` or `pnpm ib` |
@@ -196,5 +196,5 @@ All under `/admin/vendor-sync/`, all admin-auth-gated.
 
 - Design + rationale: [`vendor-sync-plan`](../done/plans/2026-05-18-vendor-sync-plan.md)
 - Decisions audit: [`vendor-sync open-questions`](../done/specs/2026-05-18-vendor-sync-open-questions.md)
-- Per-module recipe: [`backend/src/modules/vendor-sync/README.md`](backend/src/modules/vendor-sync/README.md)
+- Per-module recipe: [`backend/src/modules/vendor-sync/README.md`](../../backend/src/modules/vendor-sync/README.md)
 - Project-level conventions: [`CLAUDE.md`](../../CLAUDE.md)

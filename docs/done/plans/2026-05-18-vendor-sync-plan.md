@@ -20,26 +20,26 @@ This plan was originally written for a green-field implementation. Most of it ha
 
 | Component | File(s) | Status |
 |---|---|---|
-| Module shell with `MedusaService({...})` mixin | [index.ts](backend/src/modules/vendor-sync/index.ts), [service.ts](backend/src/modules/vendor-sync/service.ts) | done |
-| Data models (4) | [models/](backend/src/modules/vendor-sync/models/) | done |
-| Consolidated migration | [migrations/Migration20260517220005.ts](backend/src/modules/vendor-sync/migrations/Migration20260517220005.ts) | done (untracked in git) |
-| Discriminated-union `NormalizedRecord` (wheel \| tire) | [adapters/types.ts](backend/src/modules/vendor-sync/adapters/types.ts) | done |
-| WheelPros wheels adapter | [adapters/wheelpros-wheels/](backend/src/modules/vendor-sync/adapters/wheelpros-wheels/) | done |
-| WheelPros tires adapter | [adapters/wheelpros-tires/](backend/src/modules/vendor-sync/adapters/wheelpros-tires/) | done |
-| Adapter registry | [adapters/registry.ts](backend/src/modules/vendor-sync/adapters/registry.ts) | done |
-| Fetch (local file → MinIO archive) | [pipeline/fetch.ts](backend/src/modules/vendor-sync/pipeline/fetch.ts) | done |
-| Stage (parse, normalize, hash, **skip rows with no image**) | [pipeline/stage.ts](backend/src/modules/vendor-sync/pipeline/stage.ts) | done |
-| Diff (pure function + DB wrapper) | [pipeline/diff.ts](backend/src/modules/vendor-sync/pipeline/diff.ts) | done |
-| Bootstrap (region, sales channel, categories, brand collection, shipping profile, stock locations) | [pipeline/bootstrap.ts](backend/src/modules/vendor-sync/pipeline/bootstrap.ts) | done |
-| Apply: create + update products | [pipeline/apply.ts](backend/src/modules/vendor-sync/pipeline/apply.ts) | done (inventory_item_id bug fixed 2026-05-21) |
-| Apply: stock levels | [pipeline/apply-stock.ts](backend/src/modules/vendor-sync/pipeline/apply-stock.ts) | done |
-| Apply: discontinue | [pipeline/apply-discontinue.ts](backend/src/modules/vendor-sync/pipeline/apply-discontinue.ts) | done (idempotency hardening pending: §15) |
-| Cron job (12h) | [jobs/vendor-sync-tick.ts](backend/src/jobs/vendor-sync-tick.ts) | done |
-| Admin endpoints (list, detail, approve, cancel, replay run, replay SKU) | [api/admin/vendor-sync/](backend/src/api/admin/vendor-sync/) | done (cancel status guards pending: §15) |
-| Scripts: dry-run, apply, mock, cleanup, backfill-inventory | [scripts/vendor-sync-*.ts](backend/src/scripts/) | done (apply ergonomics pending: §15) |
-| Unit tests (parse, normalize, hash, build-metadata, diff, apply-stock) | [__tests__/](backend/src/modules/vendor-sync/__tests__/) | done |
-| Fixtures (wheels-small + v2, tires-small + v2) | [__fixtures__/](backend/src/modules/vendor-sync/__fixtures__/) | done |
-| Module README | [modules/vendor-sync/README.md](backend/src/modules/vendor-sync/README.md) | done |
+| Module shell with `MedusaService({...})` mixin | [index.ts](../../../backend/src/modules/vendor-sync/index.ts), [service.ts](../../../backend/src/modules/vendor-sync/service.ts) | done |
+| Data models (4) | [models/](../../../backend/src/modules/vendor-sync/models/) | done |
+| Consolidated migration | [migrations/Migration20260517220005.ts](../../../backend/src/modules/vendor-sync/migrations/Migration20260517220005.ts) | done (untracked in git) |
+| Discriminated-union `NormalizedRecord` (wheel \| tire) | [adapters/types.ts](../../../backend/src/modules/vendor-sync/adapters/types.ts) | done |
+| WheelPros wheels adapter | [adapters/wheelpros-wheels/](../../../backend/src/modules/vendor-sync/adapters/wheelpros-wheels/) | done |
+| WheelPros tires adapter | [adapters/wheelpros-tires/](../../../backend/src/modules/vendor-sync/adapters/wheelpros-tires/) | done |
+| Adapter registry | [adapters/registry.ts](../../../backend/src/modules/vendor-sync/adapters/registry.ts) | done |
+| Fetch (local file → MinIO archive) | [pipeline/fetch.ts](../../../backend/src/modules/vendor-sync/pipeline/fetch.ts) | done |
+| Stage (parse, normalize, hash, **skip rows with no image**) | [pipeline/stage.ts](../../../backend/src/modules/vendor-sync/pipeline/stage.ts) | done |
+| Diff (pure function + DB wrapper) | [pipeline/diff.ts](../../../backend/src/modules/vendor-sync/pipeline/diff.ts) | done |
+| Bootstrap (region, sales channel, categories, brand collection, shipping profile, stock locations) | [pipeline/bootstrap.ts](../../../backend/src/modules/vendor-sync/pipeline/bootstrap.ts) | done |
+| Apply: create + update products | [pipeline/apply.ts](../../../backend/src/modules/vendor-sync/pipeline/apply.ts) | done (inventory_item_id bug fixed 2026-05-21) |
+| Apply: stock levels | [pipeline/apply-stock.ts](../../../backend/src/modules/vendor-sync/pipeline/apply-stock.ts) | done |
+| Apply: discontinue | [pipeline/apply-discontinue.ts](../../../backend/src/modules/vendor-sync/pipeline/apply-discontinue.ts) | done (idempotency hardening pending: §15) |
+| Cron job (12h) | [jobs/vendor-sync-tick.ts](../../../backend/src/jobs/vendor-sync-tick.ts) | done |
+| Admin endpoints (list, detail, approve, cancel, replay run, replay SKU) | [api/admin/vendor-sync/](../../../backend/src/api/admin/vendor-sync/) | done (cancel status guards pending: §15) |
+| Scripts: dry-run, apply, mock, cleanup, backfill-inventory | [scripts/vendor-sync-*.ts](../../../backend/src/scripts/) | done (apply ergonomics pending: §15) |
+| Unit tests (parse, normalize, hash, build-metadata, diff, apply-stock) | [__tests__/](../../../backend/src/modules/vendor-sync/__tests__/) | done |
+| Fixtures (wheels-small + v2, tires-small + v2) | [__fixtures__/](../../../backend/src/modules/vendor-sync/__fixtures__/) | done |
+| Module README | [modules/vendor-sync/README.md](../../../backend/src/modules/vendor-sync/README.md) | done |
 
 ### Today's session (2026-05-21)
 
@@ -498,7 +498,7 @@ Before creating a new run row, `service.run` queries `vendor_feed_run` for rows 
 
 `backend/src/jobs/vendor-sync-tick.ts` schedule `0 */12 * * *`. Resolves `VENDOR_SYNC_MODULE`, calls `listEnabledVendors()`, and runs each in series.
 
-`service.run(vendorCode)` lifecycle (in [service.ts](backend/src/modules/vendor-sync/service.ts)):
+`service.run(vendorCode)` lifecycle (in [service.ts](../../../backend/src/modules/vendor-sync/service.ts)):
 
 1. **In-progress guard** — query for non-terminal statuses, exit if found.
 2. **Create run row** — `status: 'fetching'`, counts all zero, `started_at: now`.
@@ -573,10 +573,10 @@ The migrations folder is untracked in `git status` — committing it is part of 
 
 ### 11.1 Fixtures
 
-- [wheels-small.csv](backend/src/modules/vendor-sync/__fixtures__/wheels-small.csv) — 5 wheel rows, all with non-empty ImageURL.
-- [wheels-small-v2.csv](backend/src/modules/vendor-sync/__fixtures__/wheels-small-v2.csv) — 1 new, 1 price-changed, 1 stock-changed, 1 removed, 1 unchanged.
-- [tires-small.csv](backend/src/modules/vendor-sync/__fixtures__/tires-small.csv) — 5 tire rows, 4 with images and 1 without (skipped at staging).
-- [tires-small-v2.csv](backend/src/modules/vendor-sync/__fixtures__/tires-small-v2.csv) — same delta pattern as wheels-v2.
+- [wheels-small.csv](../../../backend/src/modules/vendor-sync/__fixtures__/wheels-small.csv) — 5 wheel rows, all with non-empty ImageURL.
+- [wheels-small-v2.csv](../../../backend/src/modules/vendor-sync/__fixtures__/wheels-small-v2.csv) — 1 new, 1 price-changed, 1 stock-changed, 1 removed, 1 unchanged.
+- [tires-small.csv](../../../backend/src/modules/vendor-sync/__fixtures__/tires-small.csv) — 5 tire rows, 4 with images and 1 without (skipped at staging).
+- [tires-small-v2.csv](../../../backend/src/modules/vendor-sync/__fixtures__/tires-small-v2.csv) — same delta pattern as wheels-v2.
 
 ### 11.2 Unit tests in place
 

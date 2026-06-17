@@ -17,10 +17,12 @@ These must not appear in committed docs except inside an explicit "Corrected …
 - `msrpUsd * 100` (Medusa stores dollars; cents only in the Meili index)
 - `VENDOR_WHEELPROS_WHEELS_FEED_PATH` / `VENDOR_WHEELPROS_TIRES_FEED_PATH` (wrong plural names)
 
-Run: `grep -rniE --exclude='*docs-reorg-and-drift-guard*' --exclude=STATUS.md --exclude=BACKLOG.md "teraflex|msrpUsd \* 100|VENDOR_WHEELPROS_(WHEELS|TIRES)_FEED_PATH" docs/ CLAUDE.md README.md backend/src/modules/*/README.md`
+Run: `grep -rniE --exclude='*docs-reorg-and-drift-guard*' --exclude=STATUS.md --exclude=BACKLOG.md --exclude=2026-05-28-fitment-ready-catalog-search.md "teraflex|msrpUsd \* 100|VENDOR_WHEELPROS_(WHEELS|TIRES)_FEED_PATH" docs/ CLAUDE.md README.md backend/src/modules/*/README.md`
 Drift-tracking docs legitimately QUOTE these tokens — the reorg spec/plan (`*docs-reorg-and-drift-guard*`),
 `STATUS.md`, `BACKLOG.md`, and this `SKILL.md` itself — so they are excluded above (and `.claude/` is
-out of the scan path). Any remaining hit outside an annotated historical block = DRIFT.
+out of the scan path). `2026-05-28-fitment-ready-catalog-search.md` is also excluded because its
+"Teraflex Nomad" hits are an annotated test-fixture brand (mirrors live fixtures, tracked as WB-044).
+Any remaining hit outside an annotated historical block = DRIFT.
 
 ### 2. BACKLOG evidence freshness
 Parse each `### WB-NNN` item in `docs/future/BACKLOG.md` (status + evidence file:line).
@@ -37,6 +39,20 @@ doc was updated in the same diff. Touched code + untouched related doc = flag "d
 - `docs/STATUS.md` has a "Last verified" date.
 - Every path STATUS links to exists (`test -e`).
 - If STATUS quotes test counts, optionally re-run (`cd backend && npx jest`; `cd storefront && npx vitest run`) and compare.
+
+### 5. Link resolution
+Every relative markdown link in `docs/**/*.md` must resolve from its own directory. Run:
+
+```bash
+# Link resolution: every relative markdown link must resolve from its own dir
+find docs -name '*.md' | while read -r f; do d=$(dirname "$f"); \
+  grep -oE '\]\(([^)]+)\)' "$f" | sed -E 's/^\]\(//; s/\)$//; s/#.*$//' | \
+  while read -r p; do [ -z "$p" ] && continue; case "$p" in http*|mailto:*) continue;; esac; \
+  [ -e "$d/$p" ] || echo "BROKEN $f -> $p"; done; done
+```
+
+Any `BROKEN` output = DRIFT. (HTTP/mailto links are skipped; anchor-only `#fragment` links resolve
+to empty string and are skipped by the `[ -z "$p" ]` guard.)
 
 ### Report
 Emit:

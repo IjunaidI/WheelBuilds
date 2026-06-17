@@ -33,7 +33,7 @@ This plan was originally written for a green-field implementation. Most of it ha
 | Bootstrap (region, sales channel, categories, brand collection, shipping profile, stock locations) | [pipeline/bootstrap.ts](../../../backend/src/modules/vendor-sync/pipeline/bootstrap.ts) | done |
 | Apply: create + update products | [pipeline/apply.ts](../../../backend/src/modules/vendor-sync/pipeline/apply.ts) | done (inventory_item_id bug fixed 2026-05-21) |
 | Apply: stock levels | [pipeline/apply-stock.ts](../../../backend/src/modules/vendor-sync/pipeline/apply-stock.ts) | done |
-| Apply: discontinue | [pipeline/apply-discontinue.ts](../../../backend/src/modules/vendor-sync/pipeline/apply-discontinue.ts) | done (idempotency hardening pending: §15) |
+| Apply: discontinue | `pipeline/apply-discontinue.ts` | done (idempotency hardening pending: §15) |
 | Cron job (12h) | [jobs/vendor-sync-tick.ts](../../../backend/src/jobs/vendor-sync-tick.ts) | done |
 | Admin endpoints (list, detail, approve, cancel, replay run, replay SKU) | [api/admin/vendor-sync/](../../../backend/src/api/admin/vendor-sync/) | done (cancel status guards pending: §15) |
 | Scripts: dry-run, apply, mock, cleanup, backfill-inventory | [scripts/vendor-sync-*.ts](../../../backend/src/scripts/) | done (apply ergonomics pending: §15) |

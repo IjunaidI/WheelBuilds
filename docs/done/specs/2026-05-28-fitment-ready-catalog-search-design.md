@@ -185,7 +185,7 @@ File: [`storefront/src/modules/product-detail/data/get-product.ts`](../../../sto
 
 ## 8. Search routing
 
-- Point the search drawer submit + the YMM/garage "Find My Fit" flows at **`/store?q=...`** (Discovery), wiring `q` into the Meilisearch text query. Files: [`actions.ts`](../../../storefront/src/modules/search/actions.ts), [`ymm-pane.tsx`](../../../storefront/src/modules/search/components/search-drawer/find-by-vehicle/ymm-pane.tsx), [`garage-pane.tsx`](../../../storefront/src/modules/search/components/search-drawer/find-by-vehicle/garage-pane.tsx).
+- Point the search drawer submit + the YMM/garage "Find My Fit" flows at **`/store?q=...`** (Discovery), wiring `q` into the Meilisearch text query. Files: `actions.ts`, [`ymm-pane.tsx`](../../../storefront/src/modules/search/components/search-drawer/find-by-vehicle/ymm-pane.tsx), [`garage-pane.tsx`](../../../storefront/src/modules/search/components/search-drawer/find-by-vehicle/garage-pane.tsx).
 - Retire / redirect the legacy `/results/[query]` route and its `SearchResultsTemplate`.
 - Delete the orphaned reference dirs the storefront CLAUDE.md flags as deletable post-swap: `modules/store/`, `modules/products/` (verify nothing imports them first).
 

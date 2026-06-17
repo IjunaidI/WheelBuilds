@@ -45,9 +45,11 @@ Every relative markdown link in `docs/**/*.md` must resolve from its own directo
 
 ```bash
 # Link resolution: every relative markdown link must resolve from its own dir
-find docs -name '*.md' | while read -r f; do d=$(dirname "$f"); \
+# (skips the reorg meta-docs, which carry illustrative link examples, and paths with
+#  literal parens like Next.js route groups (main)/(checkout) — verify those manually)
+find docs -name '*.md' ! -name '*docs-reorg-and-drift-guard*' | while read -r f; do d=$(dirname "$f"); \
   grep -oE '\]\(([^)]+)\)' "$f" | sed -E 's/^\]\(//; s/\)$//; s/#.*$//' | \
-  while read -r p; do [ -z "$p" ] && continue; case "$p" in http*|mailto:*) continue;; esac; \
+  while read -r p; do [ -z "$p" ] && continue; case "$p" in http*|mailto:*|*"("*) continue;; esac; \
   [ -e "$d/$p" ] || echo "BROKEN $f -> $p"; done; done
 ```
 

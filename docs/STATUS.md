@@ -22,7 +22,8 @@
 | Config / Infra | working-with-gaps | Conditional modules; silent-off when env unset; no committed deploy config. | [../CLAUDE.md](../CLAUDE.md) | WB-010, WB-039, WB-040 |
 
 ## Active work
-- In progress: [in-progress/](in-progress/) — docs reorg + drift guard (this effort).
+- None in progress. Docs reorg + drift guard shipped — see [done/plans/2026-06-17-docs-reorg-and-drift-guard.md](done/plans/2026-06-17-docs-reorg-and-drift-guard.md).
+- Next up: **WB-001** (PDP add-to-cart / buy-now wiring) — see [future/BACKLOG.md](future/BACKLOG.md).
 
 ## Map
 - Shipped: [done/](done/) · Drafts: [future/](future/) · Living refs: [reference/](reference/) · Backlog: [future/BACKLOG.md](future/BACKLOG.md)

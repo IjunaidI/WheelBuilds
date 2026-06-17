@@ -4,7 +4,7 @@
 > every session (see [CLAUDE.md → Documentation workflow](../CLAUDE.md)). Backlog: [future/BACKLOG.md](future/BACKLOG.md).
 
 ## Tests
-- Backend (Jest): 194 passing
+- Backend (Jest): 201 passing (4 skipped)
 - Storefront (Vitest): 31 passing
 
 ## Where each pillar stands

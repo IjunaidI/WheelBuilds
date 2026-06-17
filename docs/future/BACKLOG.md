@@ -278,7 +278,7 @@
 ### WB-028 · Storefront merchandising/policy copy hardcoded   [MEDIUM]
 - status: todo
 - area: storefront/home + storefront/pdp
-- evidence: storefront/src/modules/home/... (trust strips, hero "STEP 01 OF 02", shop-by-style map, `<title>` "40+ brands")
+- evidence: storefront/src/modules/home/components/trust-strip/index.tsx:5-13 ; storefront/src/modules/home/components/hero/index.tsx:27-32,61 ; storefront/src/modules/home/components/shop-by-style/style-map.ts:25-32 ; storefront/src/app/[countryCode]/(main)/page.tsx:13-17
 - problem: merchandising copy (trust strips, hero step labels, shop-by-style category map, page title brand count) is hardcoded in component files; changing copy requires code changes.
 - fix: move merchandising copy to a config object, CMS, or environment variable so it can be updated without code changes.
 - verify: changing a trust-strip message or hero label in config (not component source) updates the rendered storefront without a code deploy.
@@ -402,14 +402,7 @@
 
 ## Deferred (Plan 4+, from master roadmap — still valid)
 
-### WB-042 · Durable feed archiving to object storage   [MEDIUM]
-- status: todo
-- area: backend/vendor-sync/utils
-- evidence: backend/src/modules/vendor-sync/utils/archive.ts:12-39
-- problem: same root cause as WB-017; feed archives are ephemeral and need durable object storage. Deferred for a dedicated archiving pass (Plan 4+).
-- fix: fully implement the archiveBucket upload path to MinIO/S3 with retention policy and cleanup cron; cross-references WB-017.
-- verify: feed archives survive a Railway redeploy; old archives are cleaned up per the retention policy.
-- refs: —
+### WB-042 · Durable feed archiving to object storage — merged into WB-017. See WB-017.
 
 ### WB-043 · wheel-size live-slug verification (no test proves dropdown slugs resolve)   [LOW]
 - status: todo

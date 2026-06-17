@@ -134,3 +134,17 @@ Two distinct read surfaces, by design (Spec §7 — D5 "live price/stock contrac
 - **MikroORM emits a `.snapshot-railway.json` (~1 MB) inside any module's `migrations/` folder on `db:migrate`.** That full-DB snapshot is gitignored in `backend/.gitignore`. Module-scoped snapshots (`.snapshot-<module-name>-module.json`) ARE tracked because they belong to this repo and gate `medusa db:generate` drift detection.
 - **Vendor-sync writes to a real Medusa catalog.** It is loaded conditionally on `VENDOR_WHEELPROS_*_ENABLED` env vars, and the apply step creates products, brand collections, categories, and stock locations in whatever DB `DATABASE_URL` points at. Always verify your `.env` target before running `pnpm vendor-sync:apply`.
 - **Price-unit convention — dollars in Medusa, cents in Meilisearch.** Vendor-sync writes MSRP in MAJOR UNITS (dollars, e.g. `369.99`) onto Medusa `prices.amount` — that is what Medusa v2 + cart/checkout/order-emails expect. `buildSearchDocument` then converts to INTEGER CENTS (`Math.round(major*100)`) for the index `price_min` / `price_max` — the storefront `DiscoveryProduct.priceCents` contract. PDP reads live `calculated_amount` (dollars) and multiplies by 100 to land in the same cents space; `DiscoveryProductCard` divides `priceCents` by 100 for display. If you touch prices in `vendor-sync/pipeline/apply.ts`, `build-search-document.ts`, or the PDP loader, keep this dollars-in-Medusa / cents-in-the-index split intact or the two surfaces will disagree.
+
+## Documentation workflow
+
+Planning docs live under `docs/{done,in-progress,future}/{plans,specs}/`. [`docs/STATUS.md`](docs/STATUS.md)
+is the source-of-truth dashboard; [`docs/future/BACKLOG.md`](docs/future/BACKLOG.md) is the backlog
+(`WB-NNN` ids). [`docs/README.md`](docs/README.md) explains the layout.
+
+**After any development or session:**
+1. Flip the touched `WB-NNN` backlog item's `status` (and to `done` when verified).
+2. Update `docs/STATUS.md`'s "Last verified" date and any pillar row you changed.
+3. Move a completed spec/plan from `docs/in-progress/` → `docs/done/` when the work merges.
+4. Run `/doc-review` before committing doc-affecting changes.
+
+New specs/plans start in `docs/in-progress/specs|plans/` — **not** the retired `docs/superpowers/` path.

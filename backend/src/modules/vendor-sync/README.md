@@ -111,7 +111,7 @@ All configuration flows through `medusa-config.js` module options, which read fr
 | `VENDOR_WHEELPROS_TIRES_ENABLED` | `false` | Enable the wheelpros-tires adapter |
 | `VENDOR_WHEELPROS_TIRE_FEED_PATH` | `./tireInvPriceData.csv` | Path to tire CSV feed |
 | `VENDOR_SYNC_DISCONTINUE_THRESHOLD` | `0.05` | Max ratio of discontinued/active before requiring approval |
-| `VENDOR_SYNC_APPLY_CONCURRENCY` | `8` | Concurrency limit for apply operations |
+| `VENDOR_SYNC_APPLY_CONCURRENCY` | `8` | Reserved / currently unread — apply is sequential (decision A4). Setting this has no effect today. |
 | `VENDOR_SYNC_FEED_ARCHIVE_BUCKET` | `vendor-feeds` | Archive bucket name (reserved for future MinIO use) |
 | `VENDOR_SYNC_DRY_RUN` | `false` | If `true`, all runs are dry-runs by default |
 

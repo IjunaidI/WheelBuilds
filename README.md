@@ -39,7 +39,7 @@ The result is a build that looks like a real storefront on the surface and reads
 | **Dual read-surface design** | A deliberate **dollars-in-the-catalog / integer-cents-in-the-index** unit convention, with lockstep normalizers (finish, bolt-pattern) guarded against drift by shared golden-fixture tests. |
 | **Conditional, env-driven modules** | Storage (MinIO/local), event bus + workflow engine (Redis/in-memory), payments (Stripe), email (Resend/SendGrid), search (Meilisearch), and the vendor pipeline all register **conditionally** based on which env vars are present — one config file, many deployment shapes. |
 | **Bespoke design system** | A custom "garage / blueprint" storefront aesthetic layered on **shadcn/ui headless primitives** (Radix + Vaul + cmdk) for accessibility and motion, skinned to a scoped token palette. |
-| **Discipline** | Plan-driven development, a multi-agent pre-deploy audit, and a green test suite (**178 backend + 25 storefront** unit tests at last count) across two independent test runners. |
+| **Discipline** | Plan-driven development, a multi-agent pre-deploy audit, and a green test suite (**194 backend + 31 storefront** unit tests at last count) across two independent test runners. |
 
 ### Architecture at a glance
 
@@ -113,7 +113,7 @@ Completed work and what's still open:
 - [x] Wheels grouping (N variants per product) on Brand + Style + Finish
 - [x] 12-hour idempotent cron with per-vendor in-progress guard
 - [x] **Live SFTP feed** — pull newest remote file, delta-detect, skip unchanged *(dry-run verified)*
-- [ ] First catalog-writing `apply` against production (not yet run end-to-end)
+- [x] First catalog-writing `apply` ran end-to-end (2026-06-16, ~248 wheels)
 - [ ] Tire grouping (currently one-product-per-row)
 - [ ] Admin dashboard UI for runs (API/CLI only today)
 
@@ -132,7 +132,7 @@ Completed work and what's still open:
 - [ ] Real product photography
 
 **Quality**
-- [x] 178 backend + 25 storefront unit tests green (Jest + Vitest); Playwright e2e scaffold
+- [x] 194 backend + 31 storefront unit tests green (Jest + Vitest); Playwright e2e scaffold
 - [ ] Pre-deploy hardening pass (multi-agent audit findings) before first production deploy
 
 ---

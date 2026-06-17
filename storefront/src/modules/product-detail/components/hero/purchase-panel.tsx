@@ -11,7 +11,8 @@ import { Button } from "@/components/ui/button"
 import { Separator } from "@/components/ui/separator"
 import { useGarage } from "@lib/garage/use-garage"
 import { openSearch } from "@lib/stores/search-store"
-import { ProductDetail, SizeOption } from "../../data/types"
+import { addToCart } from "@lib/data/cart"
+import { OffsetVariant, ProductDetail, SizeOption } from "../../data/types"
 
 type PurchasePanelProps = {
   product: ProductDetail
@@ -21,6 +22,8 @@ type PurchasePanelProps = {
    * to `product.priceCents` when no override on the size.
    */
   unitPriceCents: number
+  /** The exact Medusa variant resolved from size × offset; null if unresolved. */
+  selectedVariant: OffsetVariant | null
 }
 
 const formatUsd = (cents: number) =>
@@ -30,6 +33,7 @@ const PurchasePanel = ({
   product,
   selectedSize,
   unitPriceCents,
+  selectedVariant,
 }: PurchasePanelProps) => {
   const { active } = useGarage()
   const router = useRouter()
@@ -40,28 +44,51 @@ const PurchasePanel = ({
   const stepQty = (delta: number) =>
     setQuantity((q) => Math.max(1, Math.min(99, q + delta)))
 
-  const handleAddToCart = () => {
-    // TODO(integration): replace with the cart server action
-    // (lib/data/cart.ts → addToCart). Toast the result.
-    toast.success("Added to cart", {
-      description: `${quantity} × ${product.name} (${selectedSize.diameter}×${selectedSize.width})`,
-    })
+  const canPurchase =
+    !!selectedVariant && selectedVariant.availability !== "out_of_stock"
+
+  const handleAddToCart = async () => {
+    if (!selectedVariant) return
+    setBuying(true)
+    try {
+      await addToCart({
+        variantId: selectedVariant.variantId,
+        quantity,
+        countryCode,
+      })
+      toast.success("Added to cart", {
+        description: `${quantity} × ${product.name} (${selectedSize.diameter}×${selectedSize.width})`,
+      })
+    } catch {
+      toast.error("Couldn't add to cart", {
+        description: "Please try again in a moment.",
+      })
+    } finally {
+      setBuying(false)
+    }
   }
 
   const handleBuyNow = async () => {
-    // TODO(integration): replace with addToCart() then router.push to checkout.
-    // Today this is mock — toast + route to /checkout so the user can see the
-    // full purchase flow chrome.
+    if (!selectedVariant) return
     setBuying(true)
-    toast.success("Heading to checkout", {
-      description: `${quantity} × ${product.name} (${selectedSize.diameter}×${selectedSize.width})`,
-    })
-    router.push(`/${countryCode}/checkout`)
+    try {
+      await addToCart({
+        variantId: selectedVariant.variantId,
+        quantity,
+        countryCode,
+      })
+      router.push(`/${countryCode}/checkout?step=address`)
+      // Leave `buying` true through the navigation transition.
+    } catch {
+      toast.error("Couldn't start checkout", {
+        description: "Please try again in a moment.",
+      })
+      setBuying(false)
+    }
   }
 
   const handleSave = () => {
-    // TODO(integration): wire to a wishlist Server Action when the backend
-    // exists. For now: toast confirmation.
+    // No wishlist backend yet (out of scope for WB-001). Keep the toast.
     toast(`Saved ${product.name}`, {
       description: "Find it in your account later.",
     })
@@ -150,14 +177,14 @@ const PurchasePanel = ({
 
         <Button
           onClick={handleAddToCart}
-          disabled={selectedSize.availability === "out_of_stock"}
+          disabled={!canPurchase || buying}
           className="flex-1"
           style={{ height: 56, fontSize: 14 }}
         >
-          {selectedSize.availability === "out_of_stock"
+          {!canPurchase
             ? "Out of stock"
             : `Add to cart · ${formatUsd(unitPriceCents * quantity)}`}
-          {selectedSize.availability !== "out_of_stock" && (
+          {canPurchase && (
             <Icon name="arrow-right" size={16} color="white" />
           )}
         </Button>
@@ -178,7 +205,7 @@ const PurchasePanel = ({
           for the primary slot. */}
       <Button
         onClick={handleBuyNow}
-        disabled={selectedSize.availability === "out_of_stock" || buying}
+        disabled={!canPurchase || buying}
         className="mt-3 w-full bg-[var(--ink)] text-white hover:bg-[var(--ink)]/90"
         style={{ height: 56, fontSize: 14 }}
       >

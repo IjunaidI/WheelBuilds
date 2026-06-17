@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react"
 import { Finish } from "@modules/common/components/wheel"
 import { ProductDetail, SizeOption } from "../../data/types"
+import { resolveSelectedVariant } from "../../data/resolve-variant"
 import Gallery from "./gallery"
 import VariantPicker from "./variant-picker"
 import PurchasePanel from "./purchase-panel"
@@ -56,8 +57,7 @@ const Hero = ({ product }: HeroProps) => {
   }, [selectedSize, oemOffsetMm])
 
   const isOem = selectedOffsetMm === oemOffsetMm
-  const currentOffset =
-    offsetVariants.find((o) => o.value === selectedOffsetMm) ?? null
+  const currentOffset = resolveSelectedVariant(selectedSize, selectedOffsetMm)
 
   // Price the *selected* offset, not the size's cheapest — multi-offset sizes
   // can carry different MSRPs. Falls back to the size "from" price, then product.
@@ -79,6 +79,7 @@ const Hero = ({ product }: HeroProps) => {
           product={product}
           selectedSize={selectedSize}
           unitPriceCents={unitPriceCents}
+          selectedVariant={currentOffset}
         />
         <VariantPicker
           sizes={product.sizeOptions}

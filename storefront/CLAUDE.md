@@ -27,7 +27,7 @@ Every screen from the original Wheel Builds design bundle is built. As of Spec 1
 
 **Engineering follow-up that doesn't affect the design contract** (see also DESIGN.md §10):
 - Real product photography (every photographic element is an `<ImgPlaceholder>` today).
-- Cart server-action wiring on PDP add-to-cart and wishlist (currently toast only).
+- PDP add-to-cart + Buy Now are wired to the cart server action (WB-001). Wishlist save is still toast-only (no wishlist backend yet).
 - Phase 2.1 vehicle fitment data — Spec 1 wired the substrate (`bolt_patterns_canonical` index field + `DiscoveryQuery.vehicleConstraint` seam + the canonical bolt-pattern normalizer); Spec 2 lands the wheel-size.com client + matcher + persistent garage.
 
 ## Layout
@@ -289,10 +289,10 @@ src/modules/product-detail/
 7. The finish normalization rule lives in the adapter as a byte-equivalent copy of [`backend/src/modules/vendor-sync/search/normalize-finish.ts`](../backend/src/modules/vendor-sync/search/normalize-finish.ts) — keep them in lockstep.
 8. [`lib/fitment/canonical-bolt-pattern.ts`](src/lib/fitment/canonical-bolt-pattern.ts) is a lockstep twin of the backend [`canonicalBoltPatterns`](../backend/src/modules/vendor-sync/search/bolt-pattern-canonical.ts); the shared [`fixtures/bolt-pattern-canonical-golden.json`](../fixtures/bolt-pattern-canonical-golden.json) test guards drift — keep them in sync.
 
-Three `TODO(integration)` anchors remain in the code:
-- `purchase-panel.tsx` Add-to-cart → wire `lib/data/cart.ts → addToCart`
-- `purchase-panel.tsx` Save-to-wishlist → wire when a wishlist Server Action exists
+One `TODO(integration)` anchor remains in the code (Add-to-cart + Buy Now are now wired — WB-001):
 - `fitment/index.tsx` — Spec 2 will replace the substring heuristic with a wheel-size.com fitment match
+
+Save-to-wishlist on `purchase-panel.tsx` stays a plain toast (no wishlist backend yet — not tagged `TODO(integration)`).
 
 `modules/products/` is **retained** (not deleted) because `Thumbnail` is imported by `modules/account/components/order-card`, `modules/cart/components/item`, `modules/checkout/templates/checkout-summary`, `modules/layout/components/cart-dropdown`, and `modules/order/components/item`.
 

@@ -21,13 +21,14 @@
 ## Blockers
 
 ### WB-001 · PDP cannot transact (Add to Cart is toast-only)   [BLOCKER]
-- status: todo
+- status: done
 - area: storefront/pdp
 - evidence: storefront/src/modules/product-detail/components/hero/purchase-panel.tsx:43-68
 - problem: handleAddToCart/BuyNow/Save only fire a sonner toast; no line item is created; Buy now routes to /checkout with an empty cart.
 - fix: call lib/data/cart.ts addToCart with the resolved variant id; remove the toast-only path.
 - verify: adding to cart from a PDP persists a cart line item; grep shows a real addToCart call, no toast-only branch.
-- refs: —
+- done: Add to Cart + Buy Now wired to addToCart for the size×offset variant (variantId threaded onto OffsetVariant + resolveSelectedVariant). Buy Now → checkout?step=address. Save stays toast (no wishlist backend). Verified against live backend (cart line-item persists for the resolved wheel variant) + SSR smoke + resolver unit tests.
+- refs: done/specs/2026-06-17-pdp-add-to-cart-design.md · done/plans/2026-06-17-pdp-add-to-cart.md
 
 ### WB-002 · Authed garage update/delete/activate all 404 (PK vs client_id)   [BLOCKER]
 - status: todo

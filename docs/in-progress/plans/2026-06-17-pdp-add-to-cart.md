@@ -426,13 +426,12 @@ In `storefront/CLAUDE.md`:
 
 - [ ] **Step 4: Run the doc-review fast checks**
 
-Run:
+Run `/doc-review` (fast mode) — it runs the banned-token scan + BACKLOG freshness checks. Then confirm WB-001 specifically:
 ```bash
 cd e:/medusajs-2.0-for-railway-boilerplate
-grep -rniE --exclude='*docs-reorg-and-drift-guard*' --exclude=STATUS.md --exclude=BACKLOG.md "teraflex|msrpUsd \* 100|VENDOR_WHEELPROS_(WHEELS|TIRES)_FEED_PATH" docs/ CLAUDE.md README.md ; echo "banned exit:$? (1=clean, or only annotated historical Teraflex-Nomad fixture)"
 grep -n "WB-001" docs/future/BACKLOG.md docs/STATUS.md
 ```
-Expected: banned-token scan clean except the known annotated `Teraflex Nomad` fixture mention; WB-001 shows `status: done` in BACKLOG and no longer in the STATUS PDP open-backlog cell.
+Expected: `/doc-review` reports no new drift (only the known annotated historical fixture mention); WB-001 shows `status: done` in BACKLOG and no longer in the STATUS PDP open-backlog cell.
 
 - [ ] **Step 5: Commit**
 

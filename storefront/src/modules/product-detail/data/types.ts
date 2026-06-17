@@ -24,6 +24,10 @@ export type OffsetVariant = {
   hubToLockIn?: string
   /** This offset's own price in cents. The hero shows this for the selected ET; falls back to the size-level price when absent. */
   priceCents?: number
+  /** Medusa variant id for this exact size × offset. Drives the cart line item. */
+  variantId: string
+  /** Per-offset stock state — checked before add-to-cart so an out-of-stock ET hiding under an in-stock size cell can't be purchased. */
+  availability: "in_stock" | "low_stock" | "out_of_stock"
 }
 
 /** A specific Diameter × Width combination available for this product. */

@@ -65,7 +65,13 @@ function toSizeOptions(
     if (existing) {
       existing.offsetVariants = [
         ...(existing.offsetVariants ?? []),
-        { value: offsetMm, backspaceIn: "", priceCents: priceCents > 0 ? priceCents : undefined },
+        {
+          value: offsetMm,
+          backspaceIn: "",
+          priceCents: priceCents > 0 ? priceCents : undefined,
+          variantId: v.id,
+          availability: availabilityOf(qty),
+        },
       ]
       // Best availability across sibling offsets — if ANY offset under this
       // size is in stock, the size cell shows in_stock so the picker isn't
@@ -87,7 +93,15 @@ function toSizeOptions(
         width,
         offsetMm,
         oemOffsetMm: offsetMm,
-        offsetVariants: [{ value: offsetMm, backspaceIn: "", priceCents: priceCents > 0 ? priceCents : undefined }],
+        offsetVariants: [
+          {
+            value: offsetMm,
+            backspaceIn: "",
+            priceCents: priceCents > 0 ? priceCents : undefined,
+            variantId: v.id,
+            availability: availabilityOf(qty),
+          },
+        ],
         weightLb: productWeightLb,
         availability: availabilityOf(qty),
         priceCentsOverride: priceCents > 0 ? priceCents : undefined,

@@ -145,3 +145,22 @@ describe("WheelSizeService.getFitment region fallback", () => {
     expect(eudmCall.modification).toBeUndefined()
   })
 })
+
+describe("WheelSizeService.reverseFitment", () => {
+  function makeReverseService(rows: any[]) {
+    const svc = new (WheelSizeService as any)({ logger: { warn() {}, error() {} } }, { apiKey: "k", baseUrl: "b", defaultRegion: "usdm" })
+    svc.listWheelSizeFitments = async (f: any) => rows.filter((r) => f.status === undefined || r.status === f.status)
+    return svc
+  }
+  const raw = (make: string, model: string) => ({ data: [{ make: { name: make }, model: { name: model }, start_year: 2020, end_year: 2020 }] })
+
+  it("returns cached vehicles whose bolt pattern matches the product and clears the hub", async () => {
+    const svc = makeReverseService([
+      { status: "ok", canonical_bolt_patterns: ["5x114.3"], hub_bore_mm: 64, raw: raw("Honda", "Civic") },
+      { status: "ok", canonical_bolt_patterns: ["6x139.7"], hub_bore_mm: 100, raw: raw("Ford", "F150") },
+    ])
+    const out = await svc.reverseFitment({ canonicalBoltPatterns: ["5x114.3"], wheelBoreMm: 70 })
+    expect(out).toHaveLength(1)
+    expect(out[0]).toMatchObject({ make: "Honda", model: "Civic", boltPattern: "5x114.3" })
+  })
+})

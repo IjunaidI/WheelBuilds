@@ -5,7 +5,8 @@ import WheelSizeFitment from "./models/wheel-size-fitment"
 import WheelSizeQuota from "./models/wheel-size-quota"
 import { WheelSizeClient } from "./client"
 import { normalizeByModel } from "./normalize"
-import { VehicleFitment } from "./types"
+import { VehicleFitment, ReverseFitmentVehicle } from "./types"
+import { buildReverseFitment } from "./reverse-fitment"
 
 export class QuotaOutageError extends Error {
   constructor() { super("wheel-size quota outage") ; this.name = "QuotaOutageError" }
@@ -73,6 +74,16 @@ class WheelSizeService extends MedusaService({ WheelSizeCatalog, WheelSizeFitmen
       status: fitment.status, fetched_at: new Date(),
     })
     return fitment
+  }
+
+  /**
+   * Reverse fitment: cached vehicles confirmed to fit a product (bolt pattern
+   * intersection + wheel bore clears the hub). Pure cache read — no wheel-size
+   * API calls, so no quota impact. `raw` supplies the display identity.
+   */
+  async reverseFitment(p: { canonicalBoltPatterns: string[]; wheelBoreMm?: number | null; limit?: number }): Promise<ReverseFitmentVehicle[]> {
+    const rows = await this.listWheelSizeFitments({ status: "ok" })
+    return buildReverseFitment(rows, p.canonicalBoltPatterns, p.wheelBoreMm ?? null, p.limit ?? 24)
   }
 
   // wheel-size tags fitment by market region (usdm, eudm, jdm, chdm, …). A vehicle

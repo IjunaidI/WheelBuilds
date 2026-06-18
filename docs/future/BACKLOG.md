@@ -31,13 +31,13 @@
 - refs: done/specs/2026-06-17-pdp-add-to-cart-design.md · done/plans/2026-06-17-pdp-add-to-cart.md
 
 ### WB-002 · Authed garage update/delete/activate all 404 (PK vs client_id)   [BLOCKER]
-- status: todo
+- status: in-progress
 - area: backend/customer-vehicle + storefront/garage
 - evidence: backend/src/api/store/customer/vehicles/[id]/route.ts:5,11,23 ; storefront/src/lib/garage/medusa-garage.ts:15,58,67,76
 - problem: backend [id] routes resolve by Medusa PK, but the storefront sends client_id as [id]; list/create mask it.
-- fix: resolve the [id] routes by client_id (+customer_id), or have the storefront track and send the server PK; align activate().
+- fix: resolve the [id] routes by client_id (+customer_id) — Option A; storefront unchanged. align activate().
 - verify: a logged-in user can rename/delete/activate a vehicle and the change survives reload.
-- refs: —
+- refs: in-progress/specs/2026-06-18-garage-authed-mutations-design.md
 
 ---
 

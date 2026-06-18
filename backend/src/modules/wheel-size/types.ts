@@ -17,3 +17,11 @@ export type RawWheelEntry = { is_stock: boolean; front?: RawRim | null; rear?: R
 export type RawTechnical = { bolt_pattern?: string; pcd?: number; stud_holes?: number; centre_bore?: number | string }
 export type RawByModelEntry = { technical?: RawTechnical; centre_bore?: number | string; wheels?: RawWheelEntry[] }
 export type RawByModel = { data?: RawByModelEntry[] }
+
+export type ReverseFitmentVehicle = {
+  year: string
+  make: string
+  model: string
+  trim?: string
+  boltPattern: string
+}

@@ -45,3 +45,32 @@ describe("createForCustomer enforces the invariant", () => {
     expect(again.client_id).toBe("k1")
   })
 })
+
+describe("resolveOwned scopes by customer + client_id", () => {
+  function makeResolveService() {
+    const rows: any[] = []
+    const svc = new (CustomerVehicleService as any)({})
+    svc.listCustomerVehicles = async (f: any) =>
+      rows.filter(r => r.customer_id === f.customer_id && (f.client_id === undefined || r.client_id === f.client_id))
+    return { svc, rows }
+  }
+
+  it("returns the row matching (customer_id, client_id), carrying the real PK", async () => {
+    const { svc, rows } = makeResolveService()
+    rows.push({ id: "pk_1", customer_id: "c1", client_id: "k1" })
+    const row = await svc.resolveOwned("c1", "k1")
+    expect(row?.id).toBe("pk_1")
+  })
+
+  it("returns undefined for an unknown client_id", async () => {
+    const { svc, rows } = makeResolveService()
+    rows.push({ id: "pk_1", customer_id: "c1", client_id: "k1" })
+    expect(await svc.resolveOwned("c1", "nope")).toBeUndefined()
+  })
+
+  it("returns undefined for another customer's client_id (cross-tenant isolation)", async () => {
+    const { svc, rows } = makeResolveService()
+    rows.push({ id: "pk_1", customer_id: "c2", client_id: "k1" })
+    expect(await svc.resolveOwned("c1", "k1")).toBeUndefined()
+  })
+})

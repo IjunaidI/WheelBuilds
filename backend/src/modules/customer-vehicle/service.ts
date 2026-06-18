@@ -3,6 +3,18 @@ import { MedusaService } from "@medusajs/framework/utils"
 import CustomerVehicle from "./models/customer-vehicle"
 
 class CustomerVehicleService extends MedusaService({ CustomerVehicle }) {
+  /**
+   * Resolve a customer's vehicle by its storefront `client_id`. The store
+   * `[id]` routes address rows by client_id (the stable, storefront-known id),
+   * NOT the Medusa PK. Scoped to `customer_id`, so this also enforces ownership:
+   * a foreign or unknown client_id returns undefined. The returned row carries
+   * the real PK in `row.id` for the subsequent mutation.
+   */
+  async resolveOwned(customerId: string, clientId: string): Promise<any | undefined> {
+    const [row] = await this.listCustomerVehicles({ customer_id: customerId, client_id: clientId })
+    return row
+  }
+
   async activate(id: string, customerId: string): Promise<void> {
     const active = await this.listCustomerVehicles({ customer_id: customerId, is_active: true })
     for (const v of active) {

@@ -13,6 +13,7 @@ import { notFound } from "next/navigation"
 import { HttpTypes } from "@medusajs/types"
 import { getProductByHandle, getProductsList } from "@lib/data/products"
 import { getRegion } from "@lib/data/regions"
+import { getFitmentByProduct } from "@lib/data/fitment"
 import { canonicalBoltPatterns } from "@lib/fitment/canonical-bolt-pattern"
 import { DiscoveryProduct } from "@modules/discovery/data/types"
 import { Finish } from "@modules/common/components/wheel"
@@ -100,7 +101,12 @@ export async function getProductDetail(handle: string): Promise<ProductDetail> {
   if (!region) notFound()
   const product = await getProductByHandle(handle, region.id)
   if (!product) notFound()
-  return mapToDetail(product)
+  const detail = mapToDetail(product)
+  const fitment = await getFitmentByProduct(
+    detail.boltPatternsCanonical,
+    detail.specs.centerBoreMm || undefined
+  )
+  return { ...detail, fitment }
 }
 
 export async function getRelatedProducts(

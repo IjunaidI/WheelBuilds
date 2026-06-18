@@ -45,13 +45,13 @@
 ## High
 
 ### WB-003 · PDP variant grid collapses bolt patterns   [HIGH]
-- status: todo
+- status: in-progress
 - area: storefront/pdp
 - evidence: storefront/src/modules/product-detail/data/get-product.ts:53-100 ; storefront/src/modules/product-detail/components/hero/index.tsx:45-47
-- problem: the variant grid groups by Diameter × Width only; multiple bolt patterns for the same size collapse into one cell, hiding fitment-critical variants.
-- fix: add bolt pattern as a third axis in the variant grid (or surface offsetVariants per bolt pattern so users can distinguish fitment variants).
-- verify: a product with two distinct bolt patterns at the same Diameter × Width shows separate selectable cells rather than a single merged cell.
-- refs: —
+- problem: the variant grid groups by Diameter × Width only; multiple bolt patterns for the same size collapse into one cell, hiding fitment-critical variants. With WB-001 (cart wired) this can add a wrong-fitment variant to a real cart.
+- fix: Approach A — bolt pattern gates the grid. SizeOption becomes bolt-pattern-scoped (group key gains bolt_pattern_raw); the bolt-pattern row filters the size grid; cart resolves by (pattern, size, offset). The previously-cosmetic bolt-pattern row becomes load-bearing.
+- verify: a product with two distinct bolt patterns at the same Diameter × Width shows, per selected pattern, a grid scoped to that pattern; switching reflows the grid; Add-to-Cart persists the selected pattern's variant.
+- refs: in-progress/specs/2026-06-18-pdp-bolt-pattern-axis-design.md
 
 ### WB-004 · Home FEATURED BLOCKS + BUILD GALLERY fabricated content   [HIGH]
 - status: todo

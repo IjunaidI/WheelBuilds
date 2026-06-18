@@ -455,3 +455,12 @@
 - fix: replace all Medusa boilerplate copy with Wheel Builds branded equivalents in the affected components.
 - verify: grep for "Medusa Store" and "test order" in storefront/src/modules/order/ and storefront/src/modules/checkout/ returns no matches; components show WB-branded copy.
 - refs: —
+
+### WB-048 · Placeholder bolt pattern ("BLANK"/empty) is a selectable PDP gate   [MEDIUM]
+- status: todo
+- area: storefront/pdp + backend/vendor-sync
+- evidence: storefront/src/modules/product-detail/data/get-product.ts:51-57 (boltPatternOptions) ; storefront/src/modules/product-detail/data/group-sizes.ts (group key + sizesForBoltPattern)
+- problem: some vendor rows carry `bolt_pattern_raw = "BLANK"` (or empty) as a placeholder. Since WB-003 made the bolt-pattern row load-bearing (it now gates the size grid), a literal "BLANK" value becomes its own group key, a selectable chip, and a filter target — e.g. `performance-replicas-126-gloss-black` exposes a clickable "BLANK" pattern. Pre-existing data quality, but now user-visible and functional.
+- fix: drop/normalize placeholder bolt patterns at the loader (`boltPatternOptions` in get-product.ts) so "BLANK"/"" never becomes a clickable gate; keep `sizesForBoltPattern`'s all-sizes fallback as the safety net for genuinely pattern-less products. Optionally normalize "BLANK" upstream in vendor-sync.
+- verify: a product whose variants include a "BLANK"/empty bolt_pattern_raw shows no "BLANK" chip in the PDP variant picker; its sizes still render (via fallback).
+- refs: — (discovered during WB-003; see done/specs/2026-06-18-pdp-bolt-pattern-axis-design.md)

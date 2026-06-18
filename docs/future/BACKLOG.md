@@ -100,13 +100,13 @@
 - refs: —
 
 ### WB-009 · `product.fitment = []` (reverse-fitment "N confirmed models")   [HIGH]
-- status: todo
-- area: storefront/pdp
-- evidence: storefront/src/modules/product-detail/data/get-product.ts:159
+- status: in-progress
+- area: storefront/pdp + backend/wheel-size
+- evidence: storefront/src/modules/product-detail/data/get-product.ts:173
 - problem: the PDP loader hard-returns an empty fitment array; the "N confirmed models" PDP section always shows zero/empty regardless of actual wheel-size data.
-- fix: implement the reverse-fitment lookup (query wheel-size cache by product bolt patterns/bore/offset ranges) and populate product.fitment with matching vehicle strings.
-- verify: a wheel product with known fitment data shows a non-empty "confirmed models" list on the PDP.
-- refs: —
+- fix: reverse over the local wheel_size_fitment forward-cache — match cached vehicles whose canonical_bolt_patterns intersect the product AND whose hub the wheel bore clears (same hard gates as fits-vehicle.ts); read display identity from the stored raw body (make.name/model.name/trim/start_year-end_year) — no migration. New pure reverse-fitment.ts + service.reverseFitment + GET /store/fitment/by-product, wired into the PDP loader.
+- verify: a wheel product whose bolt patterns match cached vehicles shows a non-empty "N confirmed models" list (real Year Make Model [Trim]); a cached vehicle failing the hub-bore gate is excluded.
+- refs: in-progress/specs/2026-06-18-pdp-reverse-fitment-design.md
 
 ### WB-010 · No startup warning for silently-disabled modules   [HIGH]
 - status: todo

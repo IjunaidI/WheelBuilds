@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react"
 import { Finish } from "@modules/common/components/wheel"
 import { ProductDetail, SizeOption } from "../../data/types"
 import { resolveSelectedVariant } from "../../data/resolve-variant"
+import { sizesForBoltPattern, pickDefaultSize } from "../../data/group-sizes"
 import Gallery from "./gallery"
 import VariantPicker from "./variant-picker"
 import PurchasePanel from "./purchase-panel"
@@ -34,18 +35,34 @@ const Hero = ({ product }: HeroProps) => {
     product.finishOptions[0] ?? product.finish
   )
 
-  // Default to the first in-stock size (or just the first if all are out)
-  const defaultSize = useMemo<SizeOption>(() => {
-    return (
-      product.sizeOptions.find((s) => s.availability !== "out_of_stock") ??
-      product.sizeOptions[0]
-    )
-  }, [product.sizeOptions])
-  const [selectedSize, setSelectedSize] = useState<SizeOption>(defaultSize)
-
   const [selectedBoltPattern, setSelectedBoltPattern] = useState<string>(
     product.boltPatternOptions[0] ?? product.boltPattern
   )
+
+  // Bolt pattern gates the grid: only the selected pattern's sizes are shown.
+  const visibleSizes = useMemo<SizeOption[]>(
+    () => sizesForBoltPattern(product.sizeOptions, selectedBoltPattern),
+    [product.sizeOptions, selectedBoltPattern]
+  )
+
+  // Default to the first in-stock size in the visible (pattern-scoped) set.
+  const defaultSize = useMemo<SizeOption>(
+    () => pickDefaultSize(visibleSizes),
+    [visibleSizes]
+  )
+  const [selectedSize, setSelectedSize] = useState<SizeOption>(defaultSize)
+
+  // When the bolt pattern changes, the previously-selected size belongs to the
+  // old pattern and is no longer in visibleSizes — re-snap to a valid size.
+  // visibleSizes is filtered from product.sizeOptions, so element references are
+  // preserved and includes() is a reliable membership check.
+  useEffect(() => {
+    if (!visibleSizes.includes(selectedSize)) {
+      setSelectedSize(pickDefaultSize(visibleSizes))
+    }
+    // selectedSize intentionally omitted: re-snap only when the pattern changes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [visibleSizes])
 
   const offsetVariants = selectedSize.offsetVariants ?? []
   const oemOffsetMm = selectedSize.oemOffsetMm ?? selectedSize.offsetMm
@@ -82,7 +99,7 @@ const Hero = ({ product }: HeroProps) => {
           selectedVariant={currentOffset}
         />
         <VariantPicker
-          sizes={product.sizeOptions}
+          sizes={visibleSizes}
           selectedSize={selectedSize}
           onSizeChange={setSelectedSize}
           boltPatterns={product.boltPatternOptions}

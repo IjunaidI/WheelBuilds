@@ -1,6 +1,6 @@
 # Project Status — Wheel Builds
 
-> **Last verified: 2026-06-17.** This is the source-of-truth dashboard. Keep it current after
+> **Last verified: 2026-06-18.** This is the source-of-truth dashboard. Keep it current after
 > every session (see [CLAUDE.md → Documentation workflow](../CLAUDE.md)). Backlog: [future/BACKLOG.md](future/BACKLOG.md).
 
 ## Tests
@@ -22,7 +22,7 @@
 | Config / Infra | working-with-gaps | Conditional modules; silent-off when env unset; no committed deploy config. | [../CLAUDE.md](../CLAUDE.md) | WB-010, WB-039, WB-040 |
 
 ## Active work
-- **WB-001** (PDP add-to-cart / buy-now) — complete on branch `feat/pdp-add-to-cart`, pending merge. Spec+plan in [in-progress/](in-progress/) until merged.
+- None in progress. **WB-001** (PDP add-to-cart + Buy Now) shipped to `main` — see [done/plans/2026-06-17-pdp-add-to-cart.md](done/plans/2026-06-17-pdp-add-to-cart.md).
 - Next up: **WB-002** (authed-garage update/delete/activate 404 — PK vs client_id) — see [future/BACKLOG.md](future/BACKLOG.md).
 
 ## Map

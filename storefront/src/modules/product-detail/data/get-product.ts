@@ -17,11 +17,9 @@ import { canonicalBoltPatterns } from "@lib/fitment/canonical-bolt-pattern"
 import { DiscoveryProduct } from "@modules/discovery/data/types"
 import { Finish } from "@modules/common/components/wheel"
 import { ProductDetail, SizeOption } from "./types"
+import { num, groupVariantsIntoSizes } from "./group-sizes"
 
 const DEFAULT_COUNTRY = process.env.NEXT_PUBLIC_DEFAULT_REGION || "us"
-
-const num = (v: unknown): number =>
-  typeof v === "number" && Number.isFinite(v) ? v : 0
 
 // Byte-equivalent to the backend's normalize-finish.ts (which the index uses).
 // Keep the two in lockstep so the PDP swatch matches the Discovery grid swatch.
@@ -33,84 +31,6 @@ function normalizeFinish(raw: unknown): Finish {
   if (/silver|chrome|machined|milled|polished|gunmetal|gr[ae]y|titanium|graphite/.test(s))
     return "silver"
   return "black"
-}
-
-function availabilityOf(qty: number): SizeOption["availability"] {
-  if (qty <= 0) return "out_of_stock"
-  if (qty <= 4) return "low_stock"
-  return "in_stock"
-}
-
-/**
- * Group variants into the Diameter×Width size matrix the hero expects.
- * `productWeightLb` is the single product-level weight (vendor data has no
- * per-size weight) — applied to every size.
- */
-function toSizeOptions(
-  variants: HttpTypes.StoreProductVariant[],
-  productWeightLb: number
-): SizeOption[] {
-  const byKey = new Map<string, SizeOption>()
-  for (const v of variants) {
-    const m = (v.metadata ?? {}) as Record<string, unknown>
-    const diameter = num(m.wheel_diameter_in)
-    const width = num(m.wheel_width_in)
-    const offsetMm = num(m.offset_mm)
-    const key = `${diameter}x${width}`
-    const qty = num((v as any).inventory_quantity)
-    const priceCents = Math.round(
-      num((v.calculated_price as any)?.calculated_amount) * 100
-    )
-    const existing = byKey.get(key)
-    if (existing) {
-      existing.offsetVariants = [
-        ...(existing.offsetVariants ?? []),
-        {
-          value: offsetMm,
-          backspaceIn: "",
-          priceCents: priceCents > 0 ? priceCents : undefined,
-          variantId: v.id,
-          availability: availabilityOf(qty),
-        },
-      ]
-      // Best availability across sibling offsets — if ANY offset under this
-      // size is in stock, the size cell shows in_stock so the picker isn't
-      // suppressed; the offset-level picker handles the per-variant choice.
-      const rank = { in_stock: 2, low_stock: 1, out_of_stock: 0 } as const
-      const next = availabilityOf(qty)
-      if (rank[next] > rank[existing.availability]) existing.availability = next
-      // Min non-zero price across sibling offsets for the "from" price shown
-      // at the size level.
-      if (priceCents > 0) {
-        existing.priceCentsOverride =
-          existing.priceCentsOverride && existing.priceCentsOverride > 0
-            ? Math.min(existing.priceCentsOverride, priceCents)
-            : priceCents
-      }
-    } else {
-      byKey.set(key, {
-        diameter,
-        width,
-        offsetMm,
-        oemOffsetMm: offsetMm,
-        offsetVariants: [
-          {
-            value: offsetMm,
-            backspaceIn: "",
-            priceCents: priceCents > 0 ? priceCents : undefined,
-            variantId: v.id,
-            availability: availabilityOf(qty),
-          },
-        ],
-        weightLb: productWeightLb,
-        availability: availabilityOf(qty),
-        priceCentsOverride: priceCents > 0 ? priceCents : undefined,
-      })
-    }
-  }
-  return Array.from(byKey.values()).sort(
-    (a, b) => a.diameter - b.diameter || a.width - b.width
-  )
 }
 
 function mapToDetail(product: HttpTypes.StoreProduct): ProductDetail {
@@ -165,7 +85,7 @@ function mapToDetail(product: HttpTypes.StoreProduct): ProductDetail {
       finishOptions: 1,
     },
     finishOptions: [finish],
-    sizeOptions: toSizeOptions(variants, weightLb),
+    sizeOptions: groupVariantsIntoSizes(variants, weightLb),
     boltPatternOptions: boltPatterns,
     boltPatternsCanonical: Array.from(
       new Set(boltPatterns.flatMap((raw) => canonicalBoltPatterns(raw)))

@@ -40,6 +40,8 @@ export type SizeOption = {
   offsetMm: number
   /** All ET options available under this size, with per-offset spec detail. Falls back to a single entry derived from `offsetMm`. */
   offsetVariants?: OffsetVariant[]
+  /** Raw bolt pattern (e.g. "5x114.3") this size is scoped to. Each SizeOption belongs to exactly one pattern; the picker filters sizes by the selected pattern. */
+  boltPattern: string
   /** OEM-recommended ET for this size on the active vehicle. Selecting anything else flips to a CustomFit override. */
   oemOffsetMm?: number
   /** Per-wheel weight in pounds. */

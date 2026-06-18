@@ -45,13 +45,14 @@
 ## High
 
 ### WB-003 · PDP variant grid collapses bolt patterns   [HIGH]
-- status: in-progress
+- status: done
 - area: storefront/pdp
 - evidence: storefront/src/modules/product-detail/data/get-product.ts:53-100 ; storefront/src/modules/product-detail/components/hero/index.tsx:45-47
 - problem: the variant grid groups by Diameter × Width only; multiple bolt patterns for the same size collapse into one cell, hiding fitment-critical variants. With WB-001 (cart wired) this can add a wrong-fitment variant to a real cart.
 - fix: Approach A — bolt pattern gates the grid. SizeOption becomes bolt-pattern-scoped (group key gains bolt_pattern_raw); the bolt-pattern row filters the size grid; cart resolves by (pattern, size, offset). The previously-cosmetic bolt-pattern row becomes load-bearing.
 - verify: a product with two distinct bolt patterns at the same Diameter × Width shows, per selected pattern, a grid scoped to that pattern; switching reflows the grid; Add-to-Cart persists the selected pattern's variant.
-- refs: in-progress/specs/2026-06-18-pdp-bolt-pattern-axis-design.md
+- done: SizeOption is now bolt-pattern-scoped (group key gains bolt_pattern_raw) via pure group-sizes.ts; the bolt-pattern row filters the size grid and the cart resolves by (pattern, size, offset). Verified by group-sizes unit tests (same-size-two-patterns → two SizeOptions) + a live Store-API check on a real multi-pattern product.
+- refs: done/specs/2026-06-18-pdp-bolt-pattern-axis-design.md · done/plans/2026-06-18-pdp-bolt-pattern-axis.md
 
 ### WB-004 · Home FEATURED BLOCKS + BUILD GALLERY fabricated content   [HIGH]
 - status: todo

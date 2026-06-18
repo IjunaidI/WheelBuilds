@@ -19,9 +19,9 @@ type FitmentProps = {
  * Vehicle compatibility list. Shows the active garage vehicle's status at the
  * top, then a scrollable table of confirmed fits.
  *
- * TODO(integration): when Phase 2.1 fitment data lands, replace
- * product.fitment with a per-request fitment lookup and add a YMM combobox
- * to filter the list.
+ * product.fitment is populated by the PDP loader via reverse fitment over the
+ * wheel-size cache (WB-009). A future enhancement could add a YMM combobox to
+ * filter the list.
  */
 const Fitment = ({ product }: FitmentProps) => {
   const { active } = useGarage()

@@ -5,8 +5,9 @@
  * Store API, so PDP never shows a stale Meilisearch snapshot. Maps the
  * Medusa product + its variants → ProductDetail. Types stay stable.
  *
- * fitment: [] until Spec 2 (wheel-size.com). The Fitment section degrades to
- * "no fitment confirmed yet" on an empty list.
+ * fitment is populated by getProductDetail via the reverse-fitment route
+ * (WB-009); mapToDetail returns the empty default. The Fitment section
+ * degrades to "no fitment confirmed yet" on an empty list.
  */
 
 import { notFound } from "next/navigation"
@@ -91,7 +92,7 @@ function mapToDetail(product: HttpTypes.StoreProduct): ProductDetail {
     boltPatternsCanonical: Array.from(
       new Set(boltPatterns.flatMap((raw) => canonicalBoltPatterns(raw)))
     ),
-    fitment: [], // Spec 2
+    fitment: [], // default; getProductDetail overrides via reverse fitment (WB-009)
     relatedHandles: [],
   }
 }

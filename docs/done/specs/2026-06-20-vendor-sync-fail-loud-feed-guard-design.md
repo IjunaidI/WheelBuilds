@@ -1,6 +1,6 @@
 # WB-041 · Fail-loud feed guard (no more silent sample-CSV sync) — design
 
-> Status: in-progress · Author: 2026-06-20 · Backlog: [WB-041](../../future/BACKLOG.md)
+> Status: done (2026-06-20) · Author: 2026-06-20 · Backlog: [WB-041](../../future/BACKLOG.md)
 > Part of the deploy-hardening sweep. WB-016 (bounded partial-apply retry) is split into its own
 > spec — see "Relationship to WB-016" below.
 
@@ -113,10 +113,13 @@ In [`service.ts run()`](../../../backend/src/modules/vendor-sync/service.ts#L109
 - Extend the `run()` options to `{ dryRun?: boolean; container?: MedusaContainer; allowSample?: boolean }`.
 - Compute `const allowSample = options?.allowSample ?? this.options_.allowSampleFeed ?? false`.
 - Pass `{ allowSample, vendorCode }` as the third arg to `resolveFeed(...)`.
-- After resolution, when the bundled sample is actually in use (`feed.kind === "default"`, which now
-  only survives the guard when `allowSample` is true), log a **WARN**:
+- After resolution, when the bundled sample is actually in use — `feed.kind === "default"` **or** a
+  `feedPath` that `isSampleFeedPath` recognizes (both only survive the guard when `allowSample` is
+  true) — log a **WARN**:
   > `[vendor-sync] [<runId>] USING BUNDLED SAMPLE FEED for <vendorCode> — VENDOR_ALLOW_SAMPLE_FEED is enabled; this is NOT live inventory.`
   This is defense-in-depth: even if the flag is mistakenly left on in prod, every run shouts.
+  (As-shipped: the WARN keyed off both signals — driving it off `feed.kind === "default"` alone would
+  miss the common dev config `feedPath=./wheelInvPriceData.csv`; raised by code review, fixed.)
 
 A thrown `SampleFeedNotAllowedError` is caught by the **existing** try/catch
 ([`service.ts:366-383`](../../../backend/src/modules/vendor-sync/service.ts#L366-L383)): the run is
@@ -192,7 +195,10 @@ mock `./sftp`'s `downloadNewestViaSftp` so importing the resolver pulls no `ssh2
 | real `feedPath` (e.g. `/feeds/live.csv`) | `false` | resolves `{ kind: "file" }` (no throw) |
 | `feedPath` = `./wheelInvPriceData.csv` | `false` | throws (relocated-sample gate) |
 | `feedPath` = `./tireInvPriceData.csv` | `true`  | resolves `{ kind: "file" }` (allowed) |
+| `feedPath` = `feeds\wheelInvPriceData.csv` (backslash) | `false` | throws (basename normalizes separators; raised by code review) |
 | `sftp` present | either | delegates to mocked `downloadNewestViaSftp`; `allowSample` ignored |
+
+As-shipped: **8** cases (the 7 above + the backslash-detection case).
 
 Regression coverage that the silent-sample path (which had **no** test) is now gated. `pnpm test:sync`
 must stay green (all existing tests pass explicit fixture paths; none touch `resolveFeed` or the

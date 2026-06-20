@@ -404,13 +404,14 @@
 - refs: —
 
 ### WB-041 · SFTP has no fail-loud guard → silently syncs sample CSV if env unset   [MEDIUM]
-- status: todo
+- status: done
 - area: backend/vendor-sync/feed-source
-- evidence: backend/src/modules/vendor-sync/feed-source/resolve-feed.ts ; backend/src/modules/vendor-sync/adapters/wheelpros-wheels/index.ts:19
+- evidence: backend/src/modules/vendor-sync/feed-source/resolve-feed.ts (resolveFeed guard + SampleFeedNotAllowedError)
 - problem: if SFTP env vars are unset, the feed resolver falls back to the local sample CSV silently; a production server with misconfigured SFTP env vars will silently sync stale sample data.
-- fix: add a fail-loud guard that throws (or logs a prominent warning) when SFTP is expected (e.g. NODE_ENV=production) but env vars are missing; only fall back to sample CSV in explicit dev mode.
+- fix: fail-loud guard in resolveFeed — require a live feed (SFTP or a non-sample feedPath); permit the bundled sample only when VENDOR_ALLOW_SAMPLE_FEED=true, else throw SampleFeedNotAllowedError (no NODE_ENV coupling). A feedPath pointing at a bundled sample CSV is gated too.
 - verify: starting vendor-sync in production mode without SFTP env vars throws an error or logs a prominent warning rather than silently falling back to sample data.
-- refs: —
+- done: 2026-06-20 — single guard in resolveFeed covers both adapters at the shared chokepoint; flag plumbed as a module option (medusa-config → run() → resolveFeed arg, no process.env in the resolver); a thrown guard is caught by run()'s existing try/catch → status:failed with an actionable message (in-progress guard released, no stuck run). dry-run opts into the sample + prints error_message; a prominent WARN fires whenever the sample is in use. No migration. Verified by resolve-feed.test.ts (8 cases) + a 2-reviewer adversarial pass (both "ship", traced the throw→failed path); backend vendor-sync suite 183 pass. Live boot-against-DB smoke recommended post-merge.
+- refs: done/specs/2026-06-20-vendor-sync-fail-loud-feed-guard-design.md · done/plans/2026-06-20-vendor-sync-fail-loud-feed-guard.md
 
 ---
 

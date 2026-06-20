@@ -19,6 +19,7 @@ export default async function vendorSyncDryRun({ container }: ExecArgs) {
   // Run the full pipeline in dry-run mode
   const { runId } = await (vendorSyncService as any).run(vendorCode, {
     dryRun: true,
+    allowSample: true,
     container,
   })
 
@@ -37,6 +38,9 @@ export default async function vendorSyncDryRun({ container }: ExecArgs) {
   logger.info(`Vendor:              ${vendorCode}`)
   logger.info(`Run ID:              ${runId}`)
   logger.info(`Status:              ${run.status}`)
+  if (run.error_message) {
+    logger.info(`Error message:       ${run.error_message}`)
+  }
   logger.info(`Rows parsed:         ${run.row_count}`)
   logger.info(`Skipped (no image):  ${run.skipped_no_image_count}`)
   logger.info(`New:                 ${run.new_count}`)

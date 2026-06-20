@@ -48,6 +48,16 @@ describe("resolveFeed WB-041 fail-loud guard", () => {
     ).rejects.toBeInstanceOf(SampleFeedNotAllowedError)
   })
 
+  it("detects a backslash-style sample path on a Linux host", async () => {
+    await expect(
+      resolveFeed(
+        { feedPath: "feeds\\wheelInvPriceData.csv" },
+        null,
+        { allowSample: false, vendorCode: VENDOR }
+      )
+    ).rejects.toBeInstanceOf(SampleFeedNotAllowedError)
+  })
+
   it("allows the sample feedPath when sample is allowed", async () => {
     const r = await resolveFeed(
       { feedPath: "./tireInvPriceData.csv" },

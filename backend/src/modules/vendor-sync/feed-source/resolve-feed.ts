@@ -8,9 +8,10 @@ export const SAMPLE_FEED_FILENAMES = new Set([
   "tireInvPriceData.csv",
 ])
 
-/** True when a feed path points at one of the bundled sample CSVs (by basename). */
+/** True when a feed path points at one of the bundled sample CSVs (by basename).
+ * Normalizes backslashes first so a Windows-style path is still detected on a Linux host. */
 export function isSampleFeedPath(feedPath: string): boolean {
-  return SAMPLE_FEED_FILENAMES.has(path.basename(feedPath))
+  return SAMPLE_FEED_FILENAMES.has(path.basename(feedPath.replace(/\\/g, "/")))
 }
 
 /** Thrown when vendor-sync would sync the bundled sample CSV without an explicit opt-in. */

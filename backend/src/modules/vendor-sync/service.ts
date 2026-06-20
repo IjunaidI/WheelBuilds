@@ -10,7 +10,7 @@ import { stageFeed } from "./pipeline/stage"
 import { computeGroupDiff, GroupDiffResult } from "./pipeline/diff"
 import { applyChanges } from "./pipeline/apply"
 import { resolveApplyContainer } from "./pipeline/resolve-apply-container"
-import { resolveFeed } from "./feed-source/resolve-feed"
+import { resolveFeed, isSampleFeedPath } from "./feed-source/resolve-feed"
 import { SftpConfig } from "./feed-source/types"
 
 interface Logger {
@@ -163,7 +163,10 @@ class VendorSyncService extends MedusaService({
         { allowSample, vendorCode }
       )
 
-      if (feed.kind === "default") {
+      const usingSample =
+        feed.kind === "default" ||
+        (feed.kind === "file" && isSampleFeedPath(feed.csvPath))
+      if (usingSample) {
         // Reached only when allowSample === true (the guard throws otherwise).
         this.logger_.warn(
           `[vendor-sync] [${runId}] USING BUNDLED SAMPLE FEED for ${vendorCode} — ` +

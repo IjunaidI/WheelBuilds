@@ -1,6 +1,6 @@
 # Project Status — Wheel Builds
 
-> **Last verified: 2026-06-18.** This is the source-of-truth dashboard. Keep it current after
+> **Last verified: 2026-06-20.** This is the source-of-truth dashboard. Keep it current after
 > every session (see [CLAUDE.md → Documentation workflow](../CLAUDE.md)). Backlog: [future/BACKLOG.md](future/BACKLOG.md).
 
 ## Tests
@@ -22,7 +22,9 @@
 | Config / Infra | working-with-gaps | Conditional modules; silent-off when env unset; no committed deploy config. | [../CLAUDE.md](../CLAUDE.md) | WB-010, WB-039, WB-040 |
 
 ## Active work
-- None in progress. **WB-009** (PDP reverse fitment) shipped to `main`. Next up: **WB-004** (home Featured/Gallery content) or **WB-005** (tires grouped + indexed).
+- None in progress. 2026-06-20 verification confirmed **WB-001/002/003/009 genuinely done** in code (tests green).
+- **Deploy readiness is the gating concern.** Of the four 2026-06-05 NO-GO blockers, WB-002 + WB-003 are fixed; the credential-leak blocker was just closed (**WB-049**, secrets-to-stdout, fixed 2026-06-20); **WB-016** (partial-apply marked completed → cron RunDate strands failed groups) and **WB-041** (SFTP unset → silently syncs the 38-row sample CSV as the live catalog) remain open and HIGH/deploy-critical.
+- Next up (recommended): a deploy-hardening sweep (**WB-041** fail-loud SFTP guard → **WB-016** partial-apply retry). Feature alternative: **WB-004** (home Featured/Gallery — needs a short design call). **WB-005** (tires) is XL + spec-gated; defer.
 
 ## Map
 - Shipped: [done/](done/) · Drafts: [future/](future/) · Living refs: [reference/](reference/) · Backlog: [future/BACKLOG.md](future/BACKLOG.md)

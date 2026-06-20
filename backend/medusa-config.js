@@ -276,5 +276,8 @@ const medusaConfig = {
   ]
 };
 
-console.log(JSON.stringify(medusaConfig, null, 2));
+// NOTE: do NOT log the resolved config — it embeds plaintext secrets (DATABASE_URL,
+// JWT/COOKIE secrets, Stripe + SFTP + Meilisearch keys) that Railway captures into deploy
+// logs. The upstream boilerplate's `console.log(JSON.stringify(medusaConfig, …))` was a
+// credential-disclosure bug; intentionally removed (WB-049).
 export default defineConfig(medusaConfig);

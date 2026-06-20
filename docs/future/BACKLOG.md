@@ -40,6 +40,16 @@
 - done: [id] routes resolve by client_id via resolveOwned(); mutate by real PK. Storefront unchanged. Verified by service unit tests (cross-tenant isolation) + live create→update→activate→delete smoke (bogus id 404s).
 - refs: done/specs/2026-06-18-garage-authed-mutations-design.md · done/plans/2026-06-18-garage-authed-mutations.md
 
+### WB-049 · Resolved config (all secrets) logged to stdout at startup   [BLOCKER]
+- status: done
+- area: backend/config
+- evidence: backend/medusa-config.js:279 (removed)
+- problem: an unconditional `console.log(JSON.stringify(medusaConfig, null, 2))` (inherited from the upstream Railway boilerplate) serialized the whole resolved config on every process start — leaking DATABASE_URL (incl. password), JWT_SECRET, COOKIE_SECRET, Stripe apiKey + webhookSecret, SFTP password + privateKey, Meilisearch admin key, Resend/Sendgrid keys, MinIO secret — into Railway deploy/runtime logs. One of the original four NO-GO blockers (2026-06-05 pre-deploy review).
+- fix: delete the log statement (do not log resolved config); leave a comment so it is not reintroduced.
+- verify: grep for `console.log(JSON.stringify(medusaConfig` returns no matches; backend starts without printing any secret-bearing config to stdout.
+- done: 2026-06-20 — removed the statement at medusa-config.js:279, replaced with a do-not-reintroduce comment. No code references its output, so removal is behavior-neutral.
+- refs: —
+
 ---
 
 ## High
@@ -102,7 +112,7 @@
 ### WB-009 · `product.fitment = []` (reverse-fitment "N confirmed models")   [HIGH]
 - status: done
 - area: storefront/pdp + backend/wheel-size
-- evidence: storefront/src/modules/product-detail/data/get-product.ts:173
+- evidence: storefront/src/modules/product-detail/data/get-product.ts:95 (mapToDetail default), wired live at :106-110
 - problem: the PDP loader hard-returns an empty fitment array; the "N confirmed models" PDP section always shows zero/empty regardless of actual wheel-size data.
 - fix: reverse over the local wheel_size_fitment forward-cache — match cached vehicles whose canonical_bolt_patterns intersect the product AND whose hub the wheel bore clears (same hard gates as fits-vehicle.ts); read display identity from the stored raw body (make.name/model.name/trim/start_year-end_year) — no migration. New pure reverse-fitment.ts + service.reverseFitment + GET /store/fitment/by-product, wired into the PDP loader.
 - verify: a wheel product whose bolt patterns match cached vehicles shows a non-empty "N confirmed models" list (real Year Make Model [Trim]); a cached vehicle failing the hub-bore gate is excluded.

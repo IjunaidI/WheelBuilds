@@ -44,6 +44,7 @@ import {
   VENDOR_SYNC_DISCONTINUE_THRESHOLD,
   VENDOR_SYNC_APPLY_CONCURRENCY,
   VENDOR_SYNC_DRY_RUN,
+  VENDOR_ALLOW_SAMPLE_FEED,
   WHEEL_SIZE_API_KEY,
   WHEEL_SIZE_BASE_URL,
   WHEEL_SIZE_REGION,
@@ -196,6 +197,7 @@ const medusaConfig = {
         applyConcurrency: parseInt(VENDOR_SYNC_APPLY_CONCURRENCY ?? '8', 10),
         archiveBucket: VENDOR_SYNC_FEED_ARCHIVE_BUCKET ?? 'vendor-feeds',
         dryRun: VENDOR_SYNC_DRY_RUN === 'true',
+        allowSampleFeed: VENDOR_ALLOW_SAMPLE_FEED === 'true',
         devMaxRows,
         vendors: {
           'wheelpros-wheels': {

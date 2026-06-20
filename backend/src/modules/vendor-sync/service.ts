@@ -30,6 +30,8 @@ export interface VendorSyncModuleOptions {
    * Undefined in production => full feed is staged.
    */
   devMaxRows?: number
+  /** WB-041: permit the bundled sample CSV when no live feed is configured (dev/CI only). */
+  allowSampleFeed?: boolean
   vendors?: Record<
     string,
     { enabled?: boolean; feedPath?: string; sftp?: SftpConfig }
@@ -108,9 +110,11 @@ class VendorSyncService extends MedusaService({
    */
   async run(
     vendorCode: string,
-    options?: { dryRun?: boolean; container?: MedusaContainer }
+    options?: { dryRun?: boolean; container?: MedusaContainer; allowSample?: boolean }
   ): Promise<{ runId: string }> {
     const isDryRun = options?.dryRun ?? this.options_.dryRun ?? false
+    const allowSample =
+      options?.allowSample ?? this.options_.allowSampleFeed ?? false
     const threshold = this.options_.discontinueThreshold ?? 0.05
 
     // 1. In-progress guard
@@ -155,8 +159,17 @@ class VendorSyncService extends MedusaService({
 
       const feed = await resolveFeed(
         { feedPath: vendorOpts.feedPath, sftp: vendorOpts.sftp },
-        lastSeen
+        lastSeen,
+        { allowSample, vendorCode }
       )
+
+      if (feed.kind === "default") {
+        // Reached only when allowSample === true (the guard throws otherwise).
+        this.logger_.warn(
+          `[vendor-sync] [${runId}] USING BUNDLED SAMPLE FEED for ${vendorCode} — ` +
+            `VENDOR_ALLOW_SAMPLE_FEED is enabled; this is NOT live inventory.`
+        )
+      }
 
       if (feed.kind === "empty") {
         this.logger_.warn(`[vendor-sync] [${runId}] no feed file found for ${vendorCode}`)

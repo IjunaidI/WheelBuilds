@@ -51,6 +51,7 @@ import {
 } from 'lib/constants';
 import { buildSearchDocument } from 'modules/vendor-sync/search/build-search-document';
 import { resolveDevMaxRows } from 'lib/dev-max-rows';
+import { buildModuleStatusReport, formatModuleStatusReport } from 'lib/module-status';
 
 loadEnv(process.env.NODE_ENV, process.cwd());
 
@@ -279,4 +280,9 @@ const medusaConfig = {
 // JWT/COOKIE secrets, Stripe + SFTP + Meilisearch keys) that Railway captures into deploy
 // logs. The upstream boilerplate's `console.log(JSON.stringify(medusaConfig, …))` was a
 // credential-disclosure bug; intentionally removed (WB-049).
+
+// WB-010: log which optional modules are enabled/disabled (names + booleans ONLY — never
+// values, per WB-049) so a silently-missing module is diagnosable from deploy logs.
+console.log(formatModuleStatusReport(buildModuleStatusReport(process.env)));
+
 export default defineConfig(medusaConfig);

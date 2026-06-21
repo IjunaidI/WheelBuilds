@@ -481,3 +481,17 @@
 - fix: drop/normalize placeholder bolt patterns at the loader (`boltPatternOptions` in get-product.ts) so "BLANK"/"" never becomes a clickable gate; keep `sizesForBoltPattern`'s all-sizes fallback as the safety net for genuinely pattern-less products. Optionally normalize "BLANK" upstream in vendor-sync.
 - verify: a product whose variants include a "BLANK"/empty bolt_pattern_raw shows no "BLANK" chip in the PDP variant picker; its sizes still render (via fallback).
 - refs: — (discovered during WB-003; see done/specs/2026-06-18-pdp-bolt-pattern-axis-design.md)
+
+---
+
+## Deploy build
+
+### WB-050 · `medusa build` fails on pre-existing TypeScript errors (every deploy broken)   [BLOCKER]
+- status: done
+- area: backend (api routes + wheel-size + vendor-sync) + infra
+- evidence: backend/src/api/store/{fitment,vehicle-catalog,customer}/**/route.ts ; backend/src/modules/wheel-size/service.ts ; backend/src/modules/vendor-sync/pipeline/{bootstrap,stage}.ts
+- problem: `medusa build` runs a tsc typecheck and exits 1 on type errors (unlike the storefront, which sets `typescript.ignoreBuildErrors`). 16 pre-existing type errors (svc resolved as `unknown` in the fitment/vehicle-catalog/customer routes; `model.json()` columns vs typed shapes in wheel-size; metadata-filter + Object.entries inference in vendor-sync) failed every Railway deploy. Confirmed pre-existing via A/B against pre-Session-1 commit 786ac54 (fails identically). Surfaced from a Railpack deploy log; the Nixpacks builder failed even earlier at config-load (`null.admin`).
+- fix: type the 16 sites properly — `resolveOptional<WheelSizeService>` at the 6 wheel-size routes; `in`-narrowing for the customer/vehicles parse result; typed boundary reads/writes for wheel-size `model.json()` columns; typed stock entries + metadata-filter cast in vendor-sync. Switch `railway.json` builder NIXPACKS→RAILPACK (Railpack loads the config; Nixpacks did not).
+- verify: `cd backend && npx tsc --noEmit` returns 0 errors; full backend suite green (253 pass / 4 skipped); a Railway deploy compiles the backend without errors.
+- done: 2026-06-21 — all 16 errors resolved (tsc clean, no behavior change — type-only edits + one route control-flow restructure); railway.json switched to Railpack for both apps. Live Railway deploy still to be re-run by the user to confirm a green build end-to-end.
+- refs: —

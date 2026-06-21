@@ -45,6 +45,7 @@ import {
   slugify,
 } from "./wheel-grouping"
 import VendorSyncService from "../service"
+import { indexVariantsBySku } from "./adopt"
 
 interface Logger {
   info(message: string, ...args: any[]): void
@@ -245,6 +246,22 @@ async function applyNewGroup(
   }
 
   const first = records[0]
+
+  // Idempotency (WB-016): a prior failed attempt may have created the product
+  // (createProductsWorkflow succeeded) but never persisted vendor_product_current
+  // rows, so the re-diff still classifies this group as "new". Adopt the existing
+  // product by external_id instead of creating a duplicate.
+  const externalId =
+    first.productType === "wheel" ? group.group_key : first.partNumber
+  const existing = await findProductByExternalId(ctx, externalId)
+  if (existing) {
+    ctx.logger.warn(
+      `[vendor-sync] [${ctx.runId}] adopting existing product ${existing.id} for group ${group.group_key} (external_id=${externalId}); prior partial apply`
+    )
+    await persistAdoptedGroup(ctx, group, records, existing)
+    return { variantCount: records.length }
+  }
+
   if (first.productType === "wheel") {
     return applyNewWheelGroup(ctx, group, records as WheelNormalizedRecord[])
   }
@@ -683,6 +700,74 @@ async function listCurrentRowsForGroup(
     { vendor_code: ctx.vendorCode, group_key: groupKey },
     { take: null }
   )
+}
+
+async function findProductByExternalId(
+  ctx: ApplyContext,
+  externalId: string
+): Promise<any | null> {
+  const query = ctx.container.resolve(ContainerRegistrationKeys.QUERY)
+  const { data } = await query.graph({
+    entity: "product",
+    fields: [
+      "id",
+      "variants.id",
+      "variants.sku",
+      "variants.inventory_items.inventory_item_id",
+    ],
+    filters: { external_id: [externalId] },
+  })
+  return data?.[0] ?? null
+}
+
+/**
+ * Persist vendor_product_current rows for a group whose Medusa product already
+ * exists (adopted on retry). Upsert by (vendor_code, part_number) so a partial
+ * re-adopt is itself idempotent.
+ */
+async function persistAdoptedGroup(
+  ctx: ApplyContext,
+  group: NewGroup,
+  records: NormalizedRecord[],
+  existingProduct: any
+): Promise<void> {
+  const skuIndex = indexVariantsBySku(existingProduct.variants ?? [])
+  for (const r of records) {
+    const stagingRow = await readStagingRow(ctx, r.partNumber)
+    const info = skuIndex.get(r.partNumber)
+    if (!info?.inventoryItemId) {
+      ctx.logger.warn(
+        `[vendor-sync] [${ctx.runId}] adopted variant ${r.partNumber} missing inventory_item_id`
+      )
+    }
+    const fields = {
+      group_key: r.groupKey,
+      content_hash: stagingRow.content_hash,
+      medusa_product_id: existingProduct.id,
+      medusa_variant_id: info?.variantId ?? null,
+      inventory_item_id: info?.inventoryItemId ?? null,
+      normalized: r,
+      last_seen_run_id: ctx.runId,
+      applied_at: new Date(),
+      discontinued_at: null,
+    }
+    const [existingRow] = await (ctx.service as any).listVendorProductCurrents(
+      { vendor_code: ctx.vendorCode, part_number: r.partNumber },
+      { take: 1 }
+    )
+    if (existingRow) {
+      await (ctx.service as any).updateVendorProductCurrents({
+        id: existingRow.id,
+        ...fields,
+      })
+    } else {
+      await (ctx.service as any).createVendorProductCurrents({
+        vendor_code: ctx.vendorCode,
+        part_number: r.partNumber,
+        ...fields,
+      })
+    }
+  }
 }
 
 function wheelVariantWeight(

@@ -1,12 +1,13 @@
 import { MedusaRequest, MedusaResponse } from "@medusajs/framework"
 import { WHEEL_SIZE_MODULE } from "../../../../modules/wheel-size"
+import type WheelSizeService from "../../../../modules/wheel-size/service"
 import { resolveOptional } from "../../../../lib/resolve-optional"
 
 // Reverse fitment: which CACHED vehicles fit this product (bolt + bore). Pure
 // DB read — no wheel-size API calls, so no quota impact. Degrades to an empty
 // list (never 503) because the PDP "confirmed models" section is an enhancement.
 export async function GET(req: MedusaRequest, res: MedusaResponse): Promise<void> {
-  const svc = resolveOptional(req.scope, WHEEL_SIZE_MODULE)
+  const svc = resolveOptional<WheelSizeService>(req.scope, WHEEL_SIZE_MODULE)
   const { boltPatterns, boreMm, limit } = req.query as Record<string, string>
   const patterns = (boltPatterns ?? "").split(",").map((s) => s.trim()).filter(Boolean)
   if (!svc || patterns.length === 0) { res.json({ vehicles: [] }); return }

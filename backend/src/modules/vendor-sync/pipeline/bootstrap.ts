@@ -180,9 +180,11 @@ export async function ensureStockLocation(
   if (cached) return cached
 
   const stockLocationService = container.resolve(Modules.STOCK_LOCATION)
+  // Medusa's FilterableStockLocationProps type omits `metadata`, but the service
+  // accepts a metadata filter at runtime — cast to satisfy the type.
   const existing = await stockLocationService.listStockLocations({
     metadata: { vendor_warehouse_code: warehouseCode },
-  })
+  } as any)
 
   if (existing.length > 0) {
     cache.set(warehouseCode, existing[0].id)

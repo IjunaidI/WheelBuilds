@@ -90,7 +90,8 @@ export async function stageFeed(
     })
 
     // Insert stock rows for each warehouse with qoh > 0
-    for (const [warehouseCode, qoh] of Object.entries(normalized.stockByWarehouse)) {
+    const stockEntries = Object.entries(normalized.stockByWarehouse) as [string, number][]
+    for (const [warehouseCode, qoh] of stockEntries) {
       if (qoh > 0) {
         stockStagingBatch.push({
           run_id: runId,

@@ -1,10 +1,10 @@
 import { MedusaRequest, MedusaResponse } from "@medusajs/framework"
 import { WHEEL_SIZE_MODULE } from "../../../../modules/wheel-size"
-import { QuotaOutageError } from "../../../../modules/wheel-size/service"
+import WheelSizeService, { QuotaOutageError } from "../../../../modules/wheel-size/service"
 import { resolveOptional } from "../../../../lib/resolve-optional"
 
 export async function GET(req: MedusaRequest, res: MedusaResponse): Promise<void> {
-  const svc = resolveOptional(req.scope, WHEEL_SIZE_MODULE)
+  const svc = resolveOptional<WheelSizeService>(req.scope, WHEEL_SIZE_MODULE)
   const { make, model, modification, year, region } = req.query as Record<string, string>
 
   if (!svc) { res.status(503).json({ error: "fitment unavailable" }); return }

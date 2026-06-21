@@ -5,7 +5,7 @@ import WheelSizeFitment from "./models/wheel-size-fitment"
 import WheelSizeQuota from "./models/wheel-size-quota"
 import { WheelSizeClient } from "./client"
 import { normalizeByModel } from "./normalize"
-import { VehicleFitment, ReverseFitmentVehicle } from "./types"
+import { VehicleFitment, ReverseFitmentVehicle, Window } from "./types"
 import { buildReverseFitment } from "./reverse-fitment"
 
 export class QuotaOutageError extends Error {
@@ -53,10 +53,17 @@ class WheelSizeService extends MedusaService({ WheelSizeCatalog, WheelSizeFitmen
     const cached = await this.listWheelSizeFitments({ cache_key })
     if (cached[0]) {
       const c = cached[0]
-      return { status: c.status, canonicalBoltPatterns: c.canonical_bolt_patterns ?? [],
-        hubBoreMm: c.hub_bore_mm ?? null, diameterWindow: c.diameter_window ?? null,
-        widthWindow: c.width_window ?? null, offsetWindow: c.offset_window ?? null,
-        source: { modificationSlug: p.modificationSlug ?? "", region: c.region ?? region } }
+      // model.json() columns are typed Record<string, unknown>; assert the
+      // domain shapes we persisted (string[] / Window / status enum).
+      return {
+        status: c.status as VehicleFitment["status"],
+        canonicalBoltPatterns: (c.canonical_bolt_patterns as unknown as string[]) ?? [],
+        hubBoreMm: c.hub_bore_mm ?? null,
+        diameterWindow: (c.diameter_window as unknown as Window) ?? null,
+        widthWindow: (c.width_window as unknown as Window) ?? null,
+        offsetWindow: (c.offset_window as unknown as Window) ?? null,
+        source: { modificationSlug: p.modificationSlug ?? "", region: c.region ?? region },
+      }
     }
 
     const { body, regionUsed } = await this.resolveByModel({
@@ -68,7 +75,9 @@ class WheelSizeService extends MedusaService({ WheelSizeCatalog, WheelSizeFitmen
     // the same usdm vehicle is served instantly — but record the region the data
     // actually came from, for transparency.
     await this.createWheelSizeFitments({
-      cache_key, region: regionUsed, raw: body, canonical_bolt_patterns: fitment.canonicalBoltPatterns,
+      cache_key, region: regionUsed, raw: body,
+      // string[] into a model.json() column (typed Record<string, unknown>)
+      canonical_bolt_patterns: fitment.canonicalBoltPatterns as unknown as Record<string, unknown>,
       hub_bore_mm: fitment.hubBoreMm, diameter_window: fitment.diameterWindow,
       width_window: fitment.widthWindow, offset_window: fitment.offsetWindow,
       status: fitment.status, fetched_at: new Date(),
@@ -83,7 +92,14 @@ class WheelSizeService extends MedusaService({ WheelSizeCatalog, WheelSizeFitmen
    */
   async reverseFitment(p: { canonicalBoltPatterns: string[]; wheelBoreMm?: number | null; limit?: number }): Promise<ReverseFitmentVehicle[]> {
     const rows = await this.listWheelSizeFitments({ status: "ok" })
-    return buildReverseFitment(rows, p.canonicalBoltPatterns, p.wheelBoreMm ?? null, p.limit ?? 24)
+    // model.json() columns are Record<string, unknown>; buildReverseFitment reads
+    // canonical_bolt_patterns as the string[] we persisted.
+    return buildReverseFitment(
+      rows as unknown as Parameters<typeof buildReverseFitment>[0],
+      p.canonicalBoltPatterns,
+      p.wheelBoreMm ?? null,
+      p.limit ?? 24
+    )
   }
 
   // wheel-size tags fitment by market region (usdm, eudm, jdm, chdm, …). A vehicle

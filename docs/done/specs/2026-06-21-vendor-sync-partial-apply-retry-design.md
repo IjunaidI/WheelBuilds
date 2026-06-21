@@ -1,6 +1,6 @@
 # Vendor-Sync Partial-Apply Retry — Design (WB-016)
 
-> Status: in-progress · Created 2026-06-21 · Backlog: WB-016 (merges WB-038)
+> Status: done (shipped 2026-06-21) · Created 2026-06-21 · Backlog: WB-016 (merges WB-038)
 > The final 2026-06-05 NO-GO deploy blocker. Closing it makes the backend deploy-ready.
 
 ## Context — the bug

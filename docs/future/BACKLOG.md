@@ -179,13 +179,14 @@
 - refs: —
 
 ### WB-016 · Failed parts never auto-retried (cron RunDate then skips feed)   [MEDIUM]
-- status: todo
+- status: done
 - area: backend/vendor-sync/service
-- evidence: backend/src/modules/vendor-sync/service.ts:354-362,219-242
+- evidence: backend/src/modules/vendor-sync/pipeline/finalize-apply.ts ; backend/src/modules/vendor-sync/pipeline/retry-policy.ts ; backend/src/modules/vendor-sync/pipeline/apply.ts (adopt-by-external_id/SKU) ; backend/src/modules/vendor-sync/service.ts (RunDate short-circuit)
 - problem: when some product groups fail during apply, the run still transitions to completed; the next cron cycle sees the same RunDate and short-circuits without retrying the failed parts.
 - fix: track per-group failure; mark a run with partial failures as partially-failed (not completed); have the cron re-run failed groups on the next cycle rather than skipping the feed.
 - verify: a run with one failed group is not marked completed; the next cron cycle retries the failed group; a fully-successful retry transitions the run to completed.
-- refs: —
+- done: 2026-06-21 — partial apply now sets `partially_failed` (not `completed`); the RunDate short-circuit (`shouldShortCircuitFeed`) only fires for `completed`/`exhausted`, so the next cron run re-stages + re-diffs + re-applies the failed groups (succeeded groups are hash-skipped by the diff). Bounded by `apply_attempt_count` + `applyMaxAttempts` (default 3) → `exhausted` stops infinite churn. Retry is idempotent: adopt-by-`external_id` (new groups) + adopt-by-SKU (added variants) so no duplicate products/variants. Shared `finalizeApply` fixes run/approveAndApply/replayRun. Migration adds `apply_attempt_count` + `failed_group_keys`. Verified by retry-policy (8) + adopt (4) + finalize-apply (4) unit tests + full backend suite (253 pass / 4 skipped). Live boot-against-DB smoke recommended post-merge.
+- refs: done/specs/2026-06-21-vendor-sync-partial-apply-retry-design.md · done/plans/2026-06-21-vendor-sync-partial-apply-retry.md
 
 ### WB-017 · Feed archives → ephemeral disk; `archiveBucket` unused   [MEDIUM]
 - status: todo

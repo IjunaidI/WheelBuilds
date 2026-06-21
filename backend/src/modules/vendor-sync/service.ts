@@ -22,6 +22,8 @@ interface Logger {
 export interface VendorSyncModuleOptions {
   discontinueThreshold?: number
   applyConcurrency?: number
+  /** WB-016: max apply attempts per feed before a partial failure becomes `exhausted` (default 3). */
+  applyMaxAttempts?: number
   archiveBucket?: string
   dryRun?: boolean
   /**

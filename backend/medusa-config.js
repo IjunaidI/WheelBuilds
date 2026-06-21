@@ -50,6 +50,7 @@ import {
   WHEEL_SIZE_REGION,
 } from 'lib/constants';
 import { buildSearchDocument } from 'modules/vendor-sync/search/build-search-document';
+import { resolveDevMaxRows } from 'lib/dev-max-rows';
 
 loadEnv(process.env.NODE_ENV, process.cwd());
 
@@ -73,15 +74,11 @@ const tireSftp = buildSftp(
   VENDOR_WHEELPROS_TIRE_SFTP_PASSWORD, VENDOR_WHEELPROS_TIRE_SFTP_PRIVATE_KEY,
   VENDOR_WHEELPROS_TIRE_SFTP_DIR, VENDOR_WHEELPROS_TIRE_SFTP_PATTERN)
 
-// Dev/test-only feed truncation. Outside production we cap how many CSV rows
-// vendor-sync stages so local "first import" runs finish fast instead of
-// staging + diffing + applying the entire feed. Override the row count with
-// VENDOR_SYNC_DEV_MAX_ROWS; in production NODE_ENV==='production' => undefined
-// => full feed. (medusa develop sets NODE_ENV=development before .env loads,
-// so this triggers for local dev even if .env says NODE_ENV=Local.)
-const devMaxRows = process.env.NODE_ENV !== 'production'
-  ? parseInt(process.env.VENDOR_SYNC_DEV_MAX_ROWS ?? '1000', 10)
-  : undefined
+// Vendor-sync feed-truncation cap (WB-027). Explicit opt-in: active ONLY when
+// VENDOR_SYNC_DEV_MAX_ROWS is set to a positive integer — no NODE_ENV coupling, so a
+// NODE_ENV=staging box never silently truncates the feed. Local dev opts in via
+// .env.template (VENDOR_SYNC_DEV_MAX_ROWS=1000) to keep first-import fast.
+const devMaxRows = resolveDevMaxRows(process.env.VENDOR_SYNC_DEV_MAX_ROWS)
 
 const medusaConfig = {
   projectConfig: {

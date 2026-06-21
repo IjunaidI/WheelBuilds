@@ -45,7 +45,7 @@ import {
   slugify,
 } from "./wheel-grouping"
 import VendorSyncService from "../service"
-import { indexVariantsBySku } from "./adopt"
+import { indexVariantsBySku, partitionRecordsBySku } from "./adopt"
 
 interface Logger {
   info(message: string, ...args: any[]): void
@@ -469,27 +469,49 @@ async function applyChangedGroup(
     if (productType === "wheel") {
       const wheelAdds = addedRecords as WheelNormalizedRecord[]
 
-      // Extend product options with any new values introduced by the new
-      // variants. Medusa's createProductVariantsWorkflow expects the
-      // variant.options keys to reference existing option values.
-      await extendWheelOptions(ctx, productId, wheelAdds)
-
-      const variants = wheelAdds.map((r) => ({
-        product_id: productId,
-        ...buildWheelVariantInput(r),
-      }))
-
-      const { result: createdVariants } = await createProductVariantsWorkflow(
-        ctx.container
-      ).run({
-        input: { product_variants: variants },
+      // Idempotency (WB-016): a prior failed attempt may have already created
+      // some of these variants. Only create the SKUs not already on the product;
+      // adopt the rest.
+      const query = ctx.container.resolve(ContainerRegistrationKeys.QUERY)
+      const { data: existingVariants } = await query.graph({
+        entity: "variant",
+        fields: ["id", "sku", "inventory_items.inventory_item_id"],
+        filters: { product_id: [productId] },
       })
+      const existingSkus = new Set<string>(
+        (existingVariants ?? []).map((v: any) => v.sku).filter(Boolean)
+      )
+      const { toCreate } = partitionRecordsBySku(wheelAdds, existingSkus)
 
+      let createdVariants: any[] = []
+      if (toCreate.length > 0) {
+        // Extend product options with any new values introduced by the new
+        // variants. Medusa's createProductVariantsWorkflow expects the
+        // variant.options keys to reference existing option values.
+        await extendWheelOptions(ctx, productId, toCreate)
+
+        const variants = toCreate.map((r) => ({
+          product_id: productId,
+          ...buildWheelVariantInput(r),
+        }))
+
+        const created = await createProductVariantsWorkflow(ctx.container).run({
+          input: { product_variants: variants },
+        })
+        createdVariants = created.result
+      }
+
+      // Persist current rows for ALL added parts, sourcing variant ids from the
+      // existing + freshly-created variants.
+      const skuIndex = indexVariantsBySku([
+        ...(existingVariants ?? []),
+        ...createdVariants,
+      ])
       await persistAddedVariants(
         ctx,
         group.group_key,
         wheelAdds,
-        createdVariants,
+        skuIndex,
         productId
       )
       variantCount += wheelAdds.length
@@ -863,39 +885,27 @@ async function persistAddedVariants(
   ctx: ApplyContext,
   groupKey: string,
   records: NormalizedRecord[],
-  createdVariants: any[],
+  skuIndex: Map<string, { variantId: string; inventoryItemId: string | null }>,
   productId: string
 ): Promise<void> {
-  const variantIds: string[] = createdVariants.map((v) => v.id).filter(Boolean)
-
-  const query = ctx.container.resolve(ContainerRegistrationKeys.QUERY)
-  const { data: variantsWithInv } = await query.graph({
-    entity: "variant",
-    fields: ["id", "sku", "inventory_items.inventory_item_id"],
-    filters: { id: variantIds },
-  })
-
-  const invItemBySku = new Map<string, string | null>()
-  const variantIdBySku = new Map<string, string>()
-  for (const v of variantsWithInv ?? []) {
-    const sku = (v as any).sku
-    if (!sku) continue
-    variantIdBySku.set(sku, (v as any).id)
-    invItemBySku.set(
-      sku,
-      (v as any).inventory_items?.[0]?.inventory_item_id ?? null
-    )
-  }
-
   for (const r of records) {
     const stagingRow = await readStagingRow(ctx, r.partNumber)
-    const inventoryItemId = invItemBySku.get(r.partNumber) ?? null
-    const variantId = variantIdBySku.get(r.partNumber) ?? null
+    const info = skuIndex.get(r.partNumber)
 
-    // If the part was previously in a different group its
-    // vendor_product_current row already exists; UPSERT semantics via
-    // the unique (vendor_code, part_number) constraint mean we should
-    // update rather than insert. Check first.
+    const fields = {
+      group_key: groupKey,
+      content_hash: stagingRow.content_hash,
+      medusa_product_id: productId,
+      medusa_variant_id: info?.variantId ?? null,
+      inventory_item_id: info?.inventoryItemId ?? null,
+      normalized: r,
+      last_seen_run_id: ctx.runId,
+      applied_at: new Date(),
+      discontinued_at: null,
+    }
+
+    // UPSERT by (vendor_code, part_number): the part may already have a current
+    // row (moved from another group, or a prior partial attempt).
     const [existing] = await (ctx.service as any).listVendorProductCurrents(
       { vendor_code: ctx.vendorCode, part_number: r.partNumber },
       { take: 1 }
@@ -903,29 +913,13 @@ async function persistAddedVariants(
     if (existing) {
       await (ctx.service as any).updateVendorProductCurrents({
         id: existing.id,
-        group_key: groupKey,
-        content_hash: stagingRow.content_hash,
-        medusa_product_id: productId,
-        medusa_variant_id: variantId,
-        inventory_item_id: inventoryItemId,
-        normalized: r,
-        last_seen_run_id: ctx.runId,
-        applied_at: new Date(),
-        discontinued_at: null,
+        ...fields,
       })
     } else {
       await (ctx.service as any).createVendorProductCurrents({
         vendor_code: ctx.vendorCode,
         part_number: r.partNumber,
-        group_key: groupKey,
-        content_hash: stagingRow.content_hash,
-        medusa_product_id: productId,
-        medusa_variant_id: variantId,
-        inventory_item_id: inventoryItemId,
-        normalized: r,
-        last_seen_run_id: ctx.runId,
-        applied_at: new Date(),
-        discontinued_at: null,
+        ...fields,
       })
     }
   }

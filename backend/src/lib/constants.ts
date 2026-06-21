@@ -1,6 +1,7 @@
 import { loadEnv } from '@medusajs/framework/utils'
 
 import { assertValue } from 'utils/assert-value'
+import { resolveCors } from 'lib/cors'
 
 loadEnv(process.env.NODE_ENV || 'development', process.cwd())
 
@@ -8,6 +9,11 @@ loadEnv(process.env.NODE_ENV || 'development', process.cwd())
  * Is development environment
  */
 export const IS_DEV = process.env.NODE_ENV === 'development'
+
+/**
+ * Is production environment
+ */
+export const IS_PRODUCTION = process.env.NODE_ENV === 'production'
 
 /**
  * Public URL for the backend
@@ -28,19 +34,31 @@ export const DATABASE_URL = assertValue(
 export const REDIS_URL = process.env.REDIS_URL;
 
 /**
- * Admin CORS origins
+ * Admin CORS origins. Required in production; dev falls back to localhost (WB-039).
  */
-export const ADMIN_CORS = process.env.ADMIN_CORS;
+export const ADMIN_CORS = resolveCors(process.env.ADMIN_CORS, {
+  isProduction: IS_PRODUCTION,
+  devDefault: 'http://localhost:7000,http://localhost:7001',
+  name: 'ADMIN_CORS',
+});
 
 /**
- * Auth CORS origins
+ * Auth CORS origins. Required in production; dev falls back to localhost (WB-039).
  */
-export const AUTH_CORS = process.env.AUTH_CORS;
+export const AUTH_CORS = resolveCors(process.env.AUTH_CORS, {
+  isProduction: IS_PRODUCTION,
+  devDefault: 'http://localhost:7000,http://localhost:7001',
+  name: 'AUTH_CORS',
+});
 
 /**
- * Store/frontend CORS origins
+ * Store/frontend CORS origins. Required in production; dev falls back to localhost (WB-039).
  */
-export const STORE_CORS = process.env.STORE_CORS;
+export const STORE_CORS = resolveCors(process.env.STORE_CORS, {
+  isProduction: IS_PRODUCTION,
+  devDefault: 'http://localhost:8000',
+  name: 'STORE_CORS',
+});
 
 /**
  * JWT Secret used for signing JWT tokens

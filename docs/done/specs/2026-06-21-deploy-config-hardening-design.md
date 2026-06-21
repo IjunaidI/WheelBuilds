@@ -1,6 +1,6 @@
 # Deploy & Config Hardening — Design (Session 1)
 
-> Status: in-progress · Created 2026-06-21 · Backlog: WB-010, WB-027, WB-039, WB-040
+> Status: done (shipped 2026-06-21) · Created 2026-06-21 · Backlog: WB-010, WB-027, WB-039, WB-040
 > Theme: get the backend to a deployable, non-silent, reproducible state.
 
 ## Context

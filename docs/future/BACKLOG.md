@@ -120,13 +120,14 @@
 - refs: done/specs/2026-06-18-pdp-reverse-fitment-design.md · done/plans/2026-06-18-pdp-reverse-fitment.md
 
 ### WB-010 · No startup warning for silently-disabled modules   [HIGH]
-- status: todo
+- status: done
 - area: backend/config
-- evidence: backend/medusa-config.js:114-275
+- evidence: backend/src/lib/module-status.ts ; backend/medusa-config.js (log before export default)
 - problem: optional modules (Redis, Stripe, Resend, MinIO, Meilisearch, vendor-sync) are conditionally registered; when env vars are missing the module silently does not load with no log output — hard to diagnose in production.
 - fix: add a startup log for each optional module indicating whether it is enabled or disabled and which env var controls it.
 - verify: starting the backend without optional env vars prints a clear per-module enabled/disabled log line; no module is silently absent without a log.
-- refs: —
+- done: 2026-06-21 — pure buildModuleStatusReport(env)/formatModuleStatusReport() in backend/src/lib/module-status.ts mirror the medusa-config conditions for all 8 optional modules; medusa-config logs one ENABLED/DISABLED line each with its controlling env var(s). Booleans + var NAMES only — no secret values (WB-049-safe). Verified by module-status.test.ts (4 cases incl. a no-secret-leak assertion).
+- refs: done/specs/2026-06-21-deploy-config-hardening-design.md · done/plans/2026-06-21-deploy-config-hardening.md
 
 ---
 
@@ -281,13 +282,14 @@
 - refs: —
 
 ### WB-027 · `devMaxRows` truncation keyed off `NODE_ENV` (staging trap)   [MEDIUM]
-- status: todo
+- status: done
 - area: backend/config
-- evidence: backend/medusa-config.js:81-83
+- evidence: backend/src/lib/dev-max-rows.ts ; backend/medusa-config.js (devMaxRows assignment)
 - problem: devMaxRows feed truncation is active whenever NODE_ENV !== 'production'; a staging environment running with NODE_ENV=staging silently gets truncated feeds and reduced catalog.
 - fix: key devMaxRows off a dedicated env var (e.g. DEV_MAX_ROWS) rather than NODE_ENV so staging environments can run full feeds explicitly.
 - verify: a server running NODE_ENV=staging with DEV_MAX_ROWS unset processes the full feed; devMaxRows only truncates when DEV_MAX_ROWS is explicitly set.
-- refs: —
+- done: 2026-06-21 — resolveDevMaxRows(raw) in backend/src/lib/dev-max-rows.ts; truncation is explicit opt-in (active only when VENDOR_SYNC_DEV_MAX_ROWS parses to a positive int), no NODE_ENV coupling. .env.template ships VENDOR_SYNC_DEV_MAX_ROWS=1000 so local dev keeps fast first-imports. Verified by dev-max-rows.test.ts (4 cases).
+- refs: done/specs/2026-06-21-deploy-config-hardening-design.md · done/plans/2026-06-21-deploy-config-hardening.md
 
 ### WB-028 · Storefront merchandising/policy copy hardcoded   [MEDIUM]
 - status: todo
@@ -386,22 +388,24 @@
 ### WB-038 · Partial-apply marked completed → cron skips feed — merged into WB-016. See WB-016.
 
 ### WB-039 · CORS undefined if env unset (no safe default)   [MEDIUM]
-- status: todo
+- status: done
 - area: backend/config
-- evidence: backend/src/lib/constants.ts:33-43
+- evidence: backend/src/lib/cors.ts ; backend/src/lib/constants.ts (ADMIN/AUTH/STORE_CORS exports)
 - problem: if BACKEND_CORS env var is unset, the CORS allowed-origins list is undefined; this may silently allow all origins or reject all origins depending on Medusa's fallback behavior.
 - fix: add a safe default (e.g. localhost origins for dev, fail-loudly if unset in production) so CORS behavior is always explicit.
 - verify: starting the backend without BACKEND_CORS set either logs a clear warning with the applied default or fails with an actionable error; CORS does not silently allow all origins in production.
-- refs: —
+- done: 2026-06-21 — resolveCors(value, {isProduction, devDefault, name}) in backend/src/lib/cors.ts; ADMIN/AUTH/STORE_CORS now resolve through it. Unset in production throws an actionable startup error (consistent with assertValue + WB-041 fail-loud); non-prod falls back to a localhost default + a console.warn. .env.template notes CORS is required in prod. Verified by cors.test.ts (4 cases).
+- refs: done/specs/2026-06-21-deploy-config-hardening-design.md · done/plans/2026-06-21-deploy-config-hardening.md
 
 ### WB-040 · No committed deploy config (railway.json/Dockerfile/Procfile)   [MEDIUM]
-- status: todo
+- status: done
 - area: backend/infra + storefront/infra
-- evidence: repo root
+- evidence: backend/railway.json ; storefront/railway.json
 - problem: there is no committed railway.json, Dockerfile, or Procfile; Railway deployment configuration lives only in the Railway dashboard and is not reproducible from the repo.
 - fix: commit railway.json (or Dockerfile/Procfile) for both backend and storefront services so deployment config is version-controlled and reproducible.
 - verify: a fresh Railway project can be configured entirely from the committed deploy config without manual dashboard steps.
-- refs: —
+- done: 2026-06-21 — per-app railway.json (Nixpacks builder, `pnpm start`, ON_FAILURE restart policy; backend adds healthcheckPath /health, storefront omits it because Next / 307-redirects through the country-code middleware). Assumes each Railway service root = its app dir (backend/, storefront/). Scope is dashboard-independent settings only — no env vars / service wiring encoded. Both files validated as JSON.
+- refs: done/specs/2026-06-21-deploy-config-hardening-design.md · done/plans/2026-06-21-deploy-config-hardening.md
 
 ### WB-041 · SFTP has no fail-loud guard → silently syncs sample CSV if env unset   [MEDIUM]
 - status: done

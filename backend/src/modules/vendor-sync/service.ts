@@ -12,6 +12,8 @@ import { applyChanges } from "./pipeline/apply"
 import { resolveApplyContainer } from "./pipeline/resolve-apply-container"
 import { resolveFeed, isSampleFeedPath } from "./feed-source/resolve-feed"
 import { SftpConfig } from "./feed-source/types"
+import { finalizeApply } from "./pipeline/finalize-apply"
+import { shouldShortCircuitFeed } from "./pipeline/retry-policy"
 
 interface Logger {
   info(message: string, ...args: any[]): void
@@ -235,19 +237,24 @@ class VendorSyncService extends MedusaService({
       }
 
       if (runDateVendor) {
-        // Check the most recent completed run for this vendor
-        const [lastCompleted] = await (this as any).listVendorFeedRuns(
-          { vendor_code: vendorCode, status: "completed" },
-          { order: { started_at: "DESC" }, take: 1 }
+        // Short-circuit only when this feed has already reached a "done" state
+        // (completed or exhausted). A partially_failed latest run for the same
+        // feed must fall through so this cycle retries the failed groups (WB-016).
+        const recentRuns = await (this as any).listVendorFeedRuns(
+          { vendor_code: vendorCode },
+          { order: { started_at: "DESC" }, take: 25 }
         )
-        if (
-          lastCompleted?.run_date_vendor &&
-          new Date(lastCompleted.run_date_vendor).getTime() ===
-            new Date(runDateVendor).getTime()
-        ) {
+        const latestSameFeed = recentRuns.find(
+          (r: any) =>
+            r.id !== runId &&
+            r.run_date_vendor != null &&
+            new Date(r.run_date_vendor).getTime() ===
+              new Date(runDateVendor).getTime()
+        )
+        if (shouldShortCircuitFeed(latestSameFeed?.status)) {
           const durationMs = Date.now() - startTime
           this.logger_.info(
-            `[vendor-sync] [${runId}] stage=short-circuited vendor=${vendorCode} feedDate=${runDateVendor.toISOString()} durationMs=${durationMs}`
+            `[vendor-sync] [${runId}] stage=short-circuited vendor=${vendorCode} feedDate=${runDateVendor.toISOString()} priorStatus=${latestSameFeed?.status} durationMs=${durationMs}`
           )
           await (this as any).updateVendorFeedRuns({
             id: runId,
@@ -360,24 +367,13 @@ class VendorSyncService extends MedusaService({
         `[vendor-sync] [${runId}] stage=${applyResult.cancelled ? "cancelled" : "completed"} vendor=${vendorCode} processed=${applyResult.processedCount} errors=${applyResult.errorCount} durationMs=${durationMs}`
       )
 
-      if (applyResult.cancelled) {
-        // The cancel route already set status=cancelled and finished_at.
-        // Only enrich with the partial-progress failed_part_numbers.
-        if (applyResult.errors.length > 0) {
-          await (this as any).updateVendorFeedRuns({
-            id: runId,
-            failed_part_numbers: applyResult.errors,
-          })
-        }
-      } else {
-        await (this as any).updateVendorFeedRuns({
-          id: runId,
-          status: "completed",
-          finished_at: new Date(),
-          failed_part_numbers:
-            applyResult.errors.length > 0 ? applyResult.errors : null,
-        })
-      }
+      await finalizeApply(this as any, {
+        runId,
+        vendorCode,
+        feedDate: runDateVendor,
+        result: applyResult,
+        maxAttempts: this.options_.applyMaxAttempts ?? 3,
+      })
 
       this.clearCancelled_(runId)
       return { runId }
@@ -445,21 +441,13 @@ class VendorSyncService extends MedusaService({
         `[vendor-sync] [${runId}] Apply ${result.cancelled ? "cancelled" : "complete"}: ${result.processedCount} processed, ${result.errorCount} errors`
       )
 
-      if (result.cancelled) {
-        if (result.errors.length > 0) {
-          await (this as any).updateVendorFeedRuns({
-            id: runId,
-            failed_part_numbers: result.errors,
-          })
-        }
-      } else {
-        await (this as any).updateVendorFeedRuns({
-          id: runId,
-          status: "completed",
-          finished_at: new Date(),
-          failed_part_numbers: result.errors.length > 0 ? result.errors : null,
-        })
-      }
+      await finalizeApply(this as any, {
+        runId,
+        vendorCode,
+        feedDate: run.run_date_vendor ? new Date(run.run_date_vendor) : null,
+        result,
+        maxAttempts: this.options_.applyMaxAttempts ?? 3,
+      })
       this.clearCancelled_(runId)
     } catch (err: any) {
       this.logger_.error(
@@ -515,21 +503,13 @@ class VendorSyncService extends MedusaService({
         `[vendor-sync] [${runId}] Replay ${result.cancelled ? "cancelled" : "complete"}: ${result.processedCount} processed, ${result.errorCount} errors`
       )
 
-      if (result.cancelled) {
-        if (result.errors.length > 0) {
-          await (this as any).updateVendorFeedRuns({
-            id: runId,
-            failed_part_numbers: result.errors,
-          })
-        }
-      } else {
-        await (this as any).updateVendorFeedRuns({
-          id: runId,
-          status: "completed",
-          finished_at: new Date(),
-          failed_part_numbers: result.errors.length > 0 ? result.errors : null,
-        })
-      }
+      await finalizeApply(this as any, {
+        runId,
+        vendorCode,
+        feedDate: run.run_date_vendor ? new Date(run.run_date_vendor) : null,
+        result,
+        maxAttempts: this.options_.applyMaxAttempts ?? 3,
+      })
       this.clearCancelled_(runId)
     } catch (err: any) {
       this.logger_.error(

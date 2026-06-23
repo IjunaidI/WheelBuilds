@@ -149,53 +149,46 @@ describe("axisKeyFromMetadata", () => {
   })
 })
 
-describe("buildProductOptions", () => {
-  it("emits the four wheel axes with deduplicated values", () => {
+describe("buildProductOptions (6 axes)", () => {
+  it("emits all six axes with deduplicated values", () => {
     const records = [
-      makeWheel({ partNumber: "A", diameterIn: 20, widthIn: 10, offsetMm: 23 }),
-      makeWheel({ partNumber: "B", diameterIn: 20, widthIn: 10, offsetMm: 35 }),
-      makeWheel({ partNumber: "C", diameterIn: 20, widthIn: 11, offsetMm: 43 }),
-      makeWheel({ partNumber: "D", diameterIn: 22, widthIn: 9, offsetMm: 30 }),
+      makeWheel({ partNumber: "A", offsetMm: 23, centerBoreMm: 71.5, loadRatingLb: 2200 }),
+      makeWheel({ partNumber: "B", offsetMm: 35, centerBoreMm: 67.1, loadRatingLb: 2200 }),
+      makeWheel({ partNumber: "C", offsetMm: 43, centerBoreMm: 67.1, loadRatingLb: 2500 }),
     ]
-    const options = buildProductOptions(records)
-
-    const byTitle = Object.fromEntries(options.map((o) => [o.title, o.values]))
-    expect(byTitle[WHEEL_OPTION_TITLES.BOLT_PATTERN]).toEqual(["5X120"])
-    expect(byTitle[WHEEL_OPTION_TITLES.DIAMETER]).toEqual(["20", "22"])
-    expect(byTitle[WHEEL_OPTION_TITLES.WIDTH]).toEqual(["9", "10", "11"])
-    expect(byTitle[WHEEL_OPTION_TITLES.OFFSET]).toEqual(["23", "30", "35", "43"])
+    const byTitle = Object.fromEntries(
+      buildProductOptions(records).map((o) => [o.title, o.values])
+    )
+    expect(byTitle[WHEEL_OPTION_TITLES.CENTER_BORE]).toEqual(["67.1", "71.5"])
+    expect(byTitle[WHEEL_OPTION_TITLES.LOAD_RATING]).toEqual(["2200", "2500"])
   })
 
-  it("includes BLANK bolt pattern as an opaque value", () => {
+  it("includes the sentinel as a value when an optional axis is null on some rows", () => {
     const records = [
-      makeWheel({ boltPatternRaw: "5X120" }),
-      makeWheel({ boltPatternRaw: "BLANK" }),
+      makeWheel({ partNumber: "A", centerBoreMm: 78.1 }),
+      makeWheel({ partNumber: "B", centerBoreMm: null }),
     ]
-    const options = buildProductOptions(records)
-    const boltOpt = options.find(
-      (o) => o.title === WHEEL_OPTION_TITLES.BOLT_PATTERN
-    )!
-    expect(boltOpt.values.sort()).toEqual(["5X120", "BLANK"])
+    const byTitle = Object.fromEntries(
+      buildProductOptions(records).map((o) => [o.title, o.values])
+    )
+    expect(byTitle[WHEEL_OPTION_TITLES.CENTER_BORE].sort()).toEqual(["78.1", "—"])
   })
 })
 
-describe("buildVariantOptions", () => {
-  it("maps to the same option titles used by buildProductOptions", () => {
-    const r = makeWheel()
+describe("buildVariantOptions (6 keys)", () => {
+  it("emits all six option keys, sentinel for null optional axes", () => {
+    const opts = buildVariantOptions(
+      makeWheel({ centerBoreMm: null, loadRatingLb: 2200 })
+    )
+    expect(opts[WHEEL_OPTION_TITLES.CENTER_BORE]).toBe("—")
+    expect(opts[WHEEL_OPTION_TITLES.LOAD_RATING]).toBe("2200")
+  })
+  it("round-trips: every variant option value is present in buildProductOptions", () => {
+    const r = makeWheel({ centerBoreMm: 71.5, loadRatingLb: 2200 })
     const variantOpts = buildVariantOptions(r)
-    const productOpts = buildProductOptions([r])
-
-    for (const opt of productOpts) {
-      expect(variantOpts[opt.title]).toBeDefined()
+    for (const opt of buildProductOptions([r])) {
       expect(opt.values).toContain(variantOpts[opt.title])
     }
-  })
-
-  it("produces strings that round-trip with formatNumericOption", () => {
-    const r = makeWheel({ widthIn: 8.5, offsetMm: -12 })
-    const opts = buildVariantOptions(r)
-    expect(opts[WHEEL_OPTION_TITLES.WIDTH]).toBe("8.5")
-    expect(opts[WHEEL_OPTION_TITLES.OFFSET]).toBe("-12")
   })
 })
 

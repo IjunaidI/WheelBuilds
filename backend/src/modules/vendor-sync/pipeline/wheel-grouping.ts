@@ -84,7 +84,7 @@ export function axisKeyFromMetadata(m: Record<string, unknown>): string {
 }
 
 /**
- * Build the four Medusa product options for a wheel group. Each option
+ * Build the six Medusa product options for a wheel group. Each option
  * lists the UNION of distinct values across the variants in the group;
  * Medusa creates the option-value rows from this.
  */
@@ -95,34 +95,26 @@ export function buildProductOptions(
   const diameters = new Set<string>()
   const widths = new Set<string>()
   const offsets = new Set<string>()
+  const centerBores = new Set<string>()
+  const loadRatings = new Set<string>()
 
   for (const r of records) {
     boltPatterns.add(r.boltPatternRaw)
     diameters.add(formatNumericOption(r.diameterIn))
     widths.add(formatNumericOption(r.widthIn))
     offsets.add(formatNumericOption(r.offsetMm))
+    centerBores.add(formatOptionalAxis(r.centerBoreMm))
+    loadRatings.add(formatOptionalAxis(r.loadRatingLb))
   }
 
+  const numericSort = (a: string, b: string) => parseFloat(a) - parseFloat(b)
   return [
     { title: WHEEL_OPTION_TITLES.BOLT_PATTERN, values: [...boltPatterns].sort() },
-    {
-      title: WHEEL_OPTION_TITLES.DIAMETER,
-      values: [...diameters].sort(
-        (a, b) => parseFloat(a) - parseFloat(b)
-      ),
-    },
-    {
-      title: WHEEL_OPTION_TITLES.WIDTH,
-      values: [...widths].sort(
-        (a, b) => parseFloat(a) - parseFloat(b)
-      ),
-    },
-    {
-      title: WHEEL_OPTION_TITLES.OFFSET,
-      values: [...offsets].sort(
-        (a, b) => parseFloat(a) - parseFloat(b)
-      ),
-    },
+    { title: WHEEL_OPTION_TITLES.DIAMETER, values: [...diameters].sort(numericSort) },
+    { title: WHEEL_OPTION_TITLES.WIDTH, values: [...widths].sort(numericSort) },
+    { title: WHEEL_OPTION_TITLES.OFFSET, values: [...offsets].sort(numericSort) },
+    { title: WHEEL_OPTION_TITLES.CENTER_BORE, values: [...centerBores].sort(numericSort) },
+    { title: WHEEL_OPTION_TITLES.LOAD_RATING, values: [...loadRatings].sort(numericSort) },
   ]
 }
 
@@ -139,6 +131,8 @@ export function buildVariantOptions(
     [WHEEL_OPTION_TITLES.DIAMETER]: formatNumericOption(record.diameterIn),
     [WHEEL_OPTION_TITLES.WIDTH]: formatNumericOption(record.widthIn),
     [WHEEL_OPTION_TITLES.OFFSET]: formatNumericOption(record.offsetMm),
+    [WHEEL_OPTION_TITLES.CENTER_BORE]: formatOptionalAxis(record.centerBoreMm),
+    [WHEEL_OPTION_TITLES.LOAD_RATING]: formatOptionalAxis(record.loadRatingLb),
   }
 }
 

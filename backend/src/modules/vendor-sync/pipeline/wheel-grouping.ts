@@ -55,8 +55,18 @@ export function variantAxisKey(record: WheelNormalizedRecord): string {
   ].join("|")
 }
 
-const toOptionalNumber = (v: unknown): number | null =>
-  typeof v === "number" && Number.isFinite(v) ? v : null
+// Coerce a metadata value to a finite number or null. Accepts numeric
+// strings too, mirroring the Number() coercion the mandatory axes use, so
+// axisKeyFromMetadata stays byte-identical to variantAxisKey even if a
+// metadata round-trip ever yields stringified numbers.
+const toOptionalNumber = (v: unknown): number | null => {
+  if (typeof v === "number") return Number.isFinite(v) ? v : null
+  if (typeof v === "string" && v.trim() !== "") {
+    const n = Number(v)
+    return Number.isFinite(n) ? n : null
+  }
+  return null
+}
 
 /**
  * Reproduce variantAxisKey from a Medusa variant's metadata bag (used to

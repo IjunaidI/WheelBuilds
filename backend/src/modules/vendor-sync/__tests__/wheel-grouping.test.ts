@@ -135,6 +135,18 @@ describe("axisKeyFromMetadata", () => {
     }
     expect(axisKeyFromMetadata(meta)).toBe("5X120|20|10|23|—|—")
   })
+  it("coerces string-typed optional metadata values like the numeric path", () => {
+    const numericMeta = {
+      bolt_pattern_raw: "5X120", wheel_diameter_in: 20, wheel_width_in: 10,
+      offset_mm: 23, center_bore_mm: 67.1, load_rating_lb: 2500,
+    }
+    const stringMeta = {
+      bolt_pattern_raw: "5X120", wheel_diameter_in: "20", wheel_width_in: "10",
+      offset_mm: "23", center_bore_mm: "67.1", load_rating_lb: "2500",
+    }
+    expect(axisKeyFromMetadata(stringMeta)).toBe(axisKeyFromMetadata(numericMeta))
+    expect(axisKeyFromMetadata(stringMeta)).toBe("5X120|20|10|23|67.1|2500")
+  })
 })
 
 describe("buildProductOptions", () => {

@@ -3,13 +3,13 @@
 import { useEffect, useMemo, useState } from "react"
 import { Finish } from "@modules/common/components/wheel"
 import { ProductDetail, SizeOption } from "../../data/types"
-import { resolveSelectedVariant } from "../../data/resolve-variant"
-import { sizesForBoltPattern, pickDefaultSize } from "../../data/group-sizes"
+import { sizesForBoltPattern, pickDefaultSize, boresFor, loadsFor, resolveLeafVariant } from "../../data/group-sizes"
 import Gallery from "./gallery"
 import VariantPicker from "./variant-picker"
 import PurchasePanel from "./purchase-panel"
 import AutoFitmentCard from "./auto-fitment-card"
 import AdvancedFitmentPanel from "./advanced-fitment-panel"
+import SpecSelector from "./spec-selector"
 
 type HeroProps = {
   product: ProductDetail
@@ -64,7 +64,6 @@ const Hero = ({ product }: HeroProps) => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [visibleSizes])
 
-  const offsetVariants = selectedSize.offsetVariants ?? []
   const oemOffsetMm = selectedSize.oemOffsetMm ?? selectedSize.offsetMm
   const [selectedOffsetMm, setSelectedOffsetMm] = useState<number>(oemOffsetMm)
 
@@ -74,7 +73,38 @@ const Hero = ({ product }: HeroProps) => {
   }, [selectedSize, oemOffsetMm])
 
   const isOem = selectedOffsetMm === oemOffsetMm
-  const currentOffset = resolveSelectedVariant(selectedSize, selectedOffsetMm)
+
+  const offsetVariants = useMemo(
+    () => selectedSize.offsetVariants ?? [],
+    [selectedSize]
+  )
+
+  // Progressive disclosure: branch axes for the current (size, offset).
+  const availableBores = useMemo(
+    () => boresFor(offsetVariants, selectedOffsetMm),
+    [offsetVariants, selectedOffsetMm]
+  )
+  const availableLoads = useMemo(
+    () => loadsFor(offsetVariants, selectedOffsetMm),
+    [offsetVariants, selectedOffsetMm]
+  )
+  const [selectedBore, setSelectedBore] = useState<number | null>(null)
+  const [selectedLoad, setSelectedLoad] = useState<number | null>(null)
+
+  // Snap bore/load to the resolved leaf whenever the (size, offset) changes,
+  // so the selection always points at a real variant (in-stock-preferred).
+  useEffect(() => {
+    const leaf = resolveLeafVariant(selectedSize, selectedOffsetMm)
+    setSelectedBore(leaf?.centerBoreMm ?? null)
+    setSelectedLoad(leaf?.loadRatingLb ?? null)
+  }, [selectedSize, selectedOffsetMm])
+
+  const currentOffset = resolveLeafVariant(
+    selectedSize,
+    selectedOffsetMm,
+    selectedBore,
+    selectedLoad
+  )
 
   // Price the *selected* offset, not the size's cheapest — multi-offset sizes
   // can carry different MSRPs. Falls back to the size "from" price, then product.
@@ -106,6 +136,24 @@ const Hero = ({ product }: HeroProps) => {
           selectedBoltPattern={selectedBoltPattern}
           onBoltPatternChange={setSelectedBoltPattern}
         />
+        {availableBores.length > 1 && (
+          <SpecSelector
+            label="Center bore"
+            values={availableBores}
+            selected={selectedBore}
+            onSelect={setSelectedBore}
+            unit="mm"
+          />
+        )}
+        {availableLoads.length > 1 && (
+          <SpecSelector
+            label="Load rating"
+            values={availableLoads}
+            selected={selectedLoad}
+            onSelect={setSelectedLoad}
+            unit="lb"
+          />
+        )}
         <AutoFitmentCard
           sizeLabel={`${selectedSize.diameter}×${selectedSize.width}`}
           offsetMm={selectedOffsetMm}

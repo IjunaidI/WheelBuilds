@@ -115,19 +115,39 @@ The index already carries `center_bores` in `displayedAttributes` and `filterabl
 **No code change.** Load rating is *not* added as a Discovery facet (it is a variant spec, not a browse
 filter). The storefront filter rail is unchanged.
 
-## Migration / rollout — full re-import
+## Migration / rollout — full re-import (executed 2026-06-23)
 
-The existing [`vendor-sync-dev-wipe.ts`](../../../backend/src/scripts/vendor-sync-dev-wipe.ts) already
-ships a `--purge-products` flag that deletes every Medusa product whose `metadata.vendor_code` names a
-wheelpros vendor (via `deleteProductsWorkflow`, which cleans up variants + inventory items). No new
-script is needed — it is already scoped to vendor-owned products and never touches admin-created ones.
+A clean re-import requires deleting the vendor Medusa products **and** clearing the four vendor-sync
+state tables, **in that order**: products first so `applyNewWheelGroup` recreates them (never *adopts*
+a stale 4-option product by `external_id`), state second so the diff treats every row as new. Leaving
+`vendor_product_current` populated is fatal — the diff then skips groups as "unchanged" (so deleted
+products are never recreated) or routes them to the changed-group path, which tries to update
+now-deleted variants (`Cannot update non-existing variants` / `Product has 0 option values`).
 
-1. `pnpm exec medusa exec ./src/scripts/vendor-sync-dev-wipe.ts -- --confirm-host=<DATABASE_URL host> --purge-products`
-   — clears `vendor_feed_run` / `vendor_feed_staging` / `vendor_stock_staging` / `vendor_product_current`
-   **and** deletes the vendor-owned products so no 4-option stragglers remain. (The awkward
-   `--confirm-host` guard must match the `DATABASE_URL` host — always verify the target DB first.)
-2. `pnpm vendor-sync:dry-run wheelpros-wheels` → `pnpm vendor-sync:apply <run-id>`. The whole catalog
-   rebuilds on the uniform 6-option model; the previously-failing ~300 groups now import.
+`vendor-sync-dev-wipe.ts --purge-products` does both in principle but **does not work at production
+scale**: the product cascade runs one `deleteProductsWorkflow` per chunk over the network (hours from a
+local machine against the Railway proxy), and its state-table delete collects every id into one
+`WHERE id IN (...)`, overflowing knex's compiler on the 372k-row `vendor_stock_staging`
+(`Maximum call stack size exceeded`). Two purpose-built tools were added:
+
+1. **Purge products** — `POST /admin/vendor-sync/purge-products`
+   ([route](../../../backend/src/api/admin/vendor-sync/purge-products/route.ts)), looped until
+   `remaining: 0`. Runs *inside* the backend (internal DB latency) and is wall-clock-budgeted so the
+   HTTP call can't time out. Selects only products whose `metadata.vendor_code` is a vendor.
+2. **Clear state** — `pnpm exec medusa exec ./src/scripts/vendor-sync-truncate-state.ts -- --confirm-host=<host>`
+   ([script](../../../backend/src/scripts/vendor-sync-truncate-state.ts)). A single `TRUNCATE` of the
+   four state tables — instant regardless of row count.
+3. **Re-import** — `POST /admin/vendor-sync/runs {vendor_code:"wheelpros-wheels", dry_run:false}` (or the
+   `pnpm vendor-sync:*` CLI). Every group is new → fresh 6-option products against an empty catalog.
+
+Both tools are `--confirm-host`-guarded against the wrong DB. (Follow-up: harden/retire `dev-wipe`'s
+ORM bulk-delete in favor of the truncate path — tracked in BACKLOG.)
+
+## Outcome (2026-06-23)
+
+Re-import completed clean: **`Apply complete: groups=2670 variants=29435 errors=0`** (16,092 stock
+levels applied). The previously-failing ~300 collision groups now import; the catalog grew from ~2,383
+to 2,670 groups. All variants on the uniform 6-axis model. WB-051 closed.
 
 ## Testing
 

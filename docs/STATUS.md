@@ -1,17 +1,17 @@
 # Project Status — Wheel Builds
 
-> **Last verified: 2026-06-21.** This is the source-of-truth dashboard. Keep it current after
+> **Last verified: 2026-06-23.** This is the source-of-truth dashboard. Keep it current after
 > every session (see [CLAUDE.md → Documentation workflow](../CLAUDE.md)). Backlog: [future/BACKLOG.md](future/BACKLOG.md).
 
 ## Tests
-- Backend (Jest): 253 passing (4 skipped)
-- Storefront (Vitest): 42 passing
+- Backend (Jest, `pnpm test:sync`): 208 passing (6 skipped — incl. 2 new WB-051 integration `it.todo` stubs)
+- Storefront (Vitest): 48 passing
 
 ## Where each pillar stands
 
 | Pillar | Maturity | State (one line) | Governing doc | Open backlog |
 |---|---|---|---|---|
-| Vendor import | working-with-gaps | Full fetch→stage→diff→apply; live SFTP wired; missing feed fails loud (WB-041); feed truncation explicit opt-in (WB-027); partial apply now retries safely + bounded (WB-016: partially_failed/exhausted + idempotent adopt); ~248 wheels applied. Tires not grouped/indexed. | [done/plans/2026-05-18-vendor-sync-plan.md](done/plans/2026-05-18-vendor-sync-plan.md) · [reference/vendor-sync-implementation.md](reference/vendor-sync-implementation.md) | WB-005, WB-011..WB-015, WB-017, WB-018, WB-024..WB-026 |
+| Vendor import | working-with-gaps | Full fetch→stage→diff→apply; live SFTP wired; missing feed fails loud (WB-041); feed truncation explicit opt-in (WB-027); partial apply now retries safely + bounded (WB-016: partially_failed/exhausted + idempotent adopt); 6-axis wheel variant model (WB-051: center bore + load rating axes, dedupe exact dups, no collision throw) — full prod re-import live: **2,670 groups / 29,435 variants / 0 errors**. Tires not grouped/indexed. | [done/plans/2026-05-18-vendor-sync-plan.md](done/plans/2026-05-18-vendor-sync-plan.md) · [reference/vendor-sync-implementation.md](reference/vendor-sync-implementation.md) | WB-005, WB-011..WB-015, WB-017, WB-018, WB-024..WB-026 |
 | Fitment (wheel-size) | working-with-gaps | Live by_model lookups durably DB-cached + quota guard; reverse-fitment confirmed-models list live (WB-009 done); no TTL/expiry, no warm cron. | [done/plans/2026-05-30-wheel-size-fitment-garage.md](done/plans/2026-05-30-wheel-size-fitment-garage.md) | WB-007, WB-008, WB-019, WB-020 |
 | Garage | working-with-gaps | Guest+authed garage, single-active index, merge. Authed mutations resolve by client_id (WB-002 done). | [done/plans/2026-06-01-plan-2-garage-hardening.md](done/plans/2026-06-01-plan-2-garage-hardening.md) | WB-022, WB-032 |
 | Discovery (Meili) | production-ready | Faceted search, `?fit=` filter, FITS badges. Category facet dead; no result cache. | [done/specs/2026-05-28-fitment-ready-catalog-search-design.md](done/specs/2026-05-28-fitment-ready-catalog-search-design.md) | WB-021, WB-046 |
@@ -22,6 +22,7 @@
 | Config / Infra | working-with-gaps | `medusa build` now compiles clean — 16 pre-existing TS errors that broke every deploy fixed (WB-050); railway.json builder switched to Railpack. Module status logging (WB-010); CORS fail-loud-in-prod (WB-039); per-app railway.json (WB-040); secret dump removed (WB-049). | [../CLAUDE.md](../CLAUDE.md) | — |
 
 ## Active work
+- **WB-051 — six-axis wheel variant model: DONE + live on prod.** Center bore + load rating became real variant axes so SKUs differing only on those import as distinct variants instead of failing the whole group on an axis collision. Apply now dedupes exact duplicates (in-stock-first) instead of throwing; PDP gained progressive-disclosure bore/load selectors (load cascades off bore, fallback chain prevents unresolvable picks). Full prod wipe + re-import: **groups=2670 variants=29435 errors=0**. Merged to `main` (unpushed); 10 feature commits + 2 migration ops tools (`purge-products` admin route, `vendor-sync-truncate-state.ts`). Built via subagent-driven dev (per-task reviews + final opus whole-branch review).
 - On branch `fix/deploy-build-typescript-errors` (unmerged): **WB-050 — deploy build fixed.** `medusa build` was failing on 16 pre-existing TypeScript errors (the backend typechecks at build, unlike the storefront) — this, not the deploy-config work, is what broke every Railway deploy for ~a month (proven by A/B vs commit 786ac54). Fixed all 16 (tsc 0 errors, 253 tests still pass) + switched railway.json to Railpack (Nixpacks hit a config-load `null.admin` before compile). User to re-run the Railway deploy to confirm green.
 - Merged to `main`: **Session 2 — WB-016 bounded partial-apply retry** shipped — `partially_failed`/`exhausted` statuses, RunDate short-circuit honors them, `apply_attempt_count` + `applyMaxAttempts` bound, idempotent adopt-by-`external_id`/SKU, shared `finalizeApply`, migration. 4 new pure/seam helpers + 16 Jest cases; full backend suite 253 pass / 4 skipped.
 - Merged to `main`: **Session 1 — Deploy & config hardening** — **WB-027** (devMaxRows opt-in), **WB-039** (CORS fail-loud-in-prod), **WB-010** (startup module status), **WB-040** (per-app railway.json). Earlier: **WB-049** (secrets-to-stdout removed), **WB-041** (fail-loud feed guard); **WB-001/002/003/009** verified done.

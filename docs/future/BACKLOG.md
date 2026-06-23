@@ -501,10 +501,22 @@
 ## Catalog completeness
 
 ### WB-051 · Wheel grouping fails ~300 groups on center-bore axis collisions (4-axis variant key)   [HIGH]
-- status: in-progress
+- status: done
 - area: backend/vendor-sync/pipeline
-- evidence: backend/src/modules/vendor-sync/pipeline/wheel-grouping.ts (`variantAxisKey`, `findAxisCollision`) ; backend/src/modules/vendor-sync/pipeline/apply.ts:262-270 (`applyNewWheelGroup` throws on collision)
+- evidence: backend/src/modules/vendor-sync/pipeline/wheel-grouping.ts (`variantAxisKey` 6-axis, `formatOptionalAxis`, `axisKeyFromMetadata`, `findExactDuplicates`, `dedupeExactDuplicates`, `dedupeAddedAgainstExisting`) ; apply.ts (`applyNewWheelGroup` + changed-group add path dedupe, no throw) ; storefront group-sizes.ts (`boresFor`/`loadsForBore`/`resolveLeafVariant`) + hero `spec-selector.tsx`
 - problem: variants inside a wheel product are keyed by a 4-axis tuple — bolt pattern × diameter × width × offset (`variantAxisKey`). When two SKUs in the same Brand+DisplayStyleNo+Finish group share all four but differ on **center bore** (e.g. XD845: same `8X6.5|22|8.25|105`, different `centerBoreMm`), they map to the same variant cell. `findAxisCollision` detects this and `applyNewWheelGroup` THROWS — failing the WHOLE group rather than silently merging two physically-different wheels into one variant (deliberate fail-loud-don't-corrupt). On the 2026-06-23 production import this failed **~300 groups (~12.8k of ~33k variants)** — large groups, so a big slice of the catalog is missing.
 - fix: (a) **dedupe true duplicates** — a collision with NO hidden distinction (identical centerBoreMm + loadRatingLb) is the same wheel listed twice; keep one. (b) **add center bore as a 5th variant axis** (and/or load rating) so genuinely-distinct wheels become separate variants instead of failing. Thread the new axis through `variantAxisKey`, `buildProductOptions`, `buildVariantOptions`, the Meili transformer, and the PDP variant grid.
 - verify: a product whose SKUs differ only by center bore imports as ONE product carrying both variants (distinct center-bore options) with no axis-collision failure; re-running the feed applies the previously-failing ~300 groups (apply `errors` drops to ~0).
-- refs: design [docs/in-progress/specs/2026-06-23-wheel-axis-collision-design.md](../in-progress/specs/2026-06-23-wheel-axis-collision-design.md) ; branch `fix/wheel-axis-collision-center-bore` (discovered during the 2026-06-23 production import)
+- done: 2026-06-23 — 6-axis variant model (center bore + load rating); apply dedupes exact duplicates instead of throwing (new-group AND changed-group add paths); PDP progressive-disclosure bore/load selectors with load cascading off bore. Full prod wipe + re-import: **groups=2670 variants=29435 errors=0** (16,092 stock levels applied) — the previously-failing ~300 collision groups now import; catalog was ~2,383 groups, now 2,670. Migrated via the new `purge-products` admin route + `vendor-sync-truncate-state.ts` (dev-wipe's ORM bulk-delete overflows knex on prod-scale state tables: 372k stock-staging rows). Merged to `main` (10 feature commits + 2 ops tools); reviewed per-task + final opus whole-branch review.
+- refs: design [docs/done/specs/2026-06-23-wheel-axis-collision-design.md](../done/specs/2026-06-23-wheel-axis-collision-design.md) ; plan [docs/done/plans/2026-06-23-wheel-axis-collision.md](../done/plans/2026-06-23-wheel-axis-collision.md)
+
+---
+
+### WB-052 · `vendor-sync-dev-wipe` doesn't scale to production-size state tables   [LOW]
+- status: todo
+- area: backend/vendor-sync/scripts
+- evidence: backend/src/scripts/vendor-sync-dev-wipe.ts (collects every id into one `delete(ids)` → `WHERE id IN (...)`) ; superseded for state resets by backend/src/scripts/vendor-sync-truncate-state.ts ; product purge superseded by the `POST /admin/vendor-sync/purge-products` route
+- problem: dev-wipe deletes each state table by collecting all row ids into one array and issuing `WHERE id IN (...)`. At prod scale (372k `vendor_stock_staging` rows) this overflows knex's query compiler (`Maximum call stack size exceeded`). `--purge-products` also deletes products one `deleteProductsWorkflow` chunk at a time over the network — hours from a local machine via the Railway proxy. Both surfaced during the WB-051 migration; workarounds (truncate script + admin route) already exist.
+- fix: for state resets, delegate to `vendor-sync-truncate-state.ts` (single TRUNCATE) or chunk the id deletes; for product purge, point operators at the server-side `purge-products` route. Consider folding both into dev-wipe or deprecating its bulk paths.
+- verify: a wipe + purge against a prod-size DB completes in seconds (state) / minutes (products, server-side) without stack overflow.
+- refs: discovered during WB-051 (2026-06-23)

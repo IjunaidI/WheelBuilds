@@ -1121,6 +1121,8 @@ git commit -m "feat(pdp): progressive-disclosure center-bore / load-rating selec
 
 > Steps 1-2 are an **operator action against the real database** — run them only against the intended `DATABASE_URL`, after the code above is merged/deployed. They are not unit-testable; they are the rollout.
 
+> **Executed 2026-06-23 — outcome: `Apply complete: groups=2670 variants=29435 errors=0`** (16,092 stock levels applied; catalog ~2,383 → 2,670 groups). The `dev-wipe --purge-products` recipe below was **superseded in practice**: dev-wipe does not scale to prod — the product cascade is hours over the Railway proxy, and its state-table delete overflows knex's compiler on the 372k-row `vendor_stock_staging` (`Maximum call stack size exceeded`). The real migration used, in order: (1) `POST /admin/vendor-sync/purge-products` looped to `remaining:0` (server-side cascade), (2) `vendor-sync-truncate-state.ts` (single `TRUNCATE`), (3) `POST /admin/vendor-sync/runs {dry_run:false}`. Order matters: products before state, or the diff skips/old-variant-updates. See the design doc's updated **Migration / rollout** + **Outcome** sections.
+
 - [ ] **Step 1: Wipe + purge the old 4-option catalog.** Confirm the target DB, then:
 
 ```bash

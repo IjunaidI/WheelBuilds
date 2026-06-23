@@ -501,10 +501,10 @@
 ## Catalog completeness
 
 ### WB-051 · Wheel grouping fails ~300 groups on center-bore axis collisions (4-axis variant key)   [HIGH]
-- status: todo
+- status: in-progress
 - area: backend/vendor-sync/pipeline
 - evidence: backend/src/modules/vendor-sync/pipeline/wheel-grouping.ts (`variantAxisKey`, `findAxisCollision`) ; backend/src/modules/vendor-sync/pipeline/apply.ts:262-270 (`applyNewWheelGroup` throws on collision)
 - problem: variants inside a wheel product are keyed by a 4-axis tuple — bolt pattern × diameter × width × offset (`variantAxisKey`). When two SKUs in the same Brand+DisplayStyleNo+Finish group share all four but differ on **center bore** (e.g. XD845: same `8X6.5|22|8.25|105`, different `centerBoreMm`), they map to the same variant cell. `findAxisCollision` detects this and `applyNewWheelGroup` THROWS — failing the WHOLE group rather than silently merging two physically-different wheels into one variant (deliberate fail-loud-don't-corrupt). On the 2026-06-23 production import this failed **~300 groups (~12.8k of ~33k variants)** — large groups, so a big slice of the catalog is missing.
 - fix: (a) **dedupe true duplicates** — a collision with NO hidden distinction (identical centerBoreMm + loadRatingLb) is the same wheel listed twice; keep one. (b) **add center bore as a 5th variant axis** (and/or load rating) so genuinely-distinct wheels become separate variants instead of failing. Thread the new axis through `variantAxisKey`, `buildProductOptions`, `buildVariantOptions`, the Meili transformer, and the PDP variant grid.
 - verify: a product whose SKUs differ only by center bore imports as ONE product carrying both variants (distinct center-bore options) with no axis-collision failure; re-running the feed applies the previously-failing ~300 groups (apply `errors` drops to ~0).
-- refs: — (discovered during the 2026-06-23 production import)
+- refs: design [docs/in-progress/specs/2026-06-23-wheel-axis-collision-design.md](../in-progress/specs/2026-06-23-wheel-axis-collision-design.md) ; branch `fix/wheel-axis-collision-center-bore` (discovered during the 2026-06-23 production import)

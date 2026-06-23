@@ -100,4 +100,16 @@ describeIntegration("vendor-sync end-to-end pipeline", () => {
   //   - Second run's status: completed.
   //   - Either the RunDate short-circuit hit OR hash_match_count equals
   //     the row count.
+
+  it.todo("imports a center-bore-distinct group as ONE product with N distinct variants (WB-051)")
+  // Setup: stage a group whose SKUs share bolt/diameter/width/offset but
+  //        differ on center_bore_mm; apply.
+  // Assertions: exactly one product (external_id = group_key); one variant
+  //        per distinct 6-tuple; each variant's Center Bore option matches its
+  //        center_bore_mm; apply errors = 0.
+
+  it.todo("dedupes an exact-duplicate group to one variant and logs the dropped SKU (WB-051)")
+  // Setup: stage two SKUs identical on all six axes (one in-stock, one not).
+  // Assertions: one variant created (the in-stock SKU); a "deduped exact
+  //        duplicate" warning names the dropped SKU; no current row for it.
 })

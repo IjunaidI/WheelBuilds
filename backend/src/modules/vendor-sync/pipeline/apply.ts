@@ -40,7 +40,9 @@ import {
   buildGroupTitle,
   buildProductOptions,
   buildVariantOptions,
-  findAxisCollision,
+  dedupeExactDuplicates,
+  findExactDuplicates,
+  formatNumericOption,
   pickGroupRepresentative,
   slugify,
 } from "./wheel-grouping"
@@ -273,32 +275,36 @@ async function applyNewWheelGroup(
   group: NewGroup,
   records: WheelNormalizedRecord[]
 ): Promise<{ variantCount: number }> {
-  // Axis-collision sanity check. Group-fail per decision 6 with a
-  // diagnostic that hints when colliding SKUs differ on centerBoreMm
-  // or loadRatingLb (which would mean we need a fifth axis).
-  const collision = findAxisCollision(records)
-  if (collision) {
-    const hint = collision.hasHiddenDistinction
-      ? ` (hidden distinction on ${collision.hiddenFieldsDiffering.join(", ")} - a fifth variant axis may be needed)`
-      : ""
+  // Dedupe exact duplicates (identical 6-tuple, e.g. the same wheel listed
+  // twice). Center-bore- / load-rating-distinct rows are NOT duplicates and
+  // survive as separate variants (WB-051).
+  const { survivors, dropped } = dedupeExactDuplicates(records)
+  for (const d of dropped) {
+    ctx.logger.warn(
+      `[vendor-sync] [${ctx.runId}] deduped exact duplicate, dropped ${d.partNumber} (group ${group.group_key})`
+    )
+  }
+  // Defensive guard: dedupe must leave a collision-free survivor set. If not,
+  // fail loud rather than create two variants with the same option tuple.
+  const residual = findExactDuplicates(survivors)
+  if (residual.length > 0) {
     throw new Error(
-      `axis collision on (${collision.axisKey}) for SKUs ${collision.partNumbers.join(", ")}${hint}`
+      `unexpected residual 6-axis collision after dedupe in group ${group.group_key}: ${residual[0]
+        .map((r) => r.partNumber)
+        .join(", ")}`
     )
   }
 
-  const rep = pickGroupRepresentative(records)
-  const productOptions = buildProductOptions(records)
+  const rep = pickGroupRepresentative(survivors)
+  const productOptions = buildProductOptions(survivors)
   const brandCollectionId = await getBrandCollectionId(ctx, rep.brand)
   const categoryId = ctx.categories.wheelsCategoryId
 
-  // Wheels report ShippingWeight in lb at the per-row level. Use the
-  // representative's weight as the product-level fallback; per-variant
-  // weight is set on each variant input below.
   const productWeight = rep.shippingWeightLb
     ? Math.round(rep.shippingWeightLb * 453.592)
     : undefined
 
-  const variants = records.map((r) => buildWheelVariantInput(r))
+  const variants = survivors.map((r) => buildWheelVariantInput(r))
 
   const { result } = await createProductsWorkflow(ctx.container).run({
     input: {
@@ -324,8 +330,8 @@ async function applyNewWheelGroup(
   })
 
   const createdProduct = result[0]
-  await persistGroupAfterCreate(ctx, group, records, createdProduct)
-  return { variantCount: records.length }
+  await persistGroupAfterCreate(ctx, group, survivors, createdProduct)
+  return { variantCount: survivors.length }
 }
 
 async function applyNewTireGroup(
@@ -804,7 +810,11 @@ function buildWheelVariantInput(r: WheelNormalizedRecord) {
     r.boltPatternRaw,
     `${r.diameterIn}x${r.widthIn}`,
     `ET${r.offsetMm}`,
-  ].join(" ")
+    r.centerBoreMm != null ? `CB${formatNumericOption(r.centerBoreMm)}` : null,
+    r.loadRatingLb != null ? `LR${formatNumericOption(r.loadRatingLb)}` : null,
+  ]
+    .filter(Boolean)
+    .join(" ")
   return {
     title: variantTitle,
     sku: r.partNumber,
@@ -812,12 +822,7 @@ function buildWheelVariantInput(r: WheelNormalizedRecord) {
     manage_inventory: true,
     allow_backorder: false,
     metadata: buildVariantMetadata(r),
-    prices: [
-      {
-        amount: r.msrpUsd,
-        currency_code: "usd",
-      },
-    ],
+    prices: [{ amount: r.msrpUsd, currency_code: "usd" }],
     ...wheelVariantWeight(r),
   }
 }

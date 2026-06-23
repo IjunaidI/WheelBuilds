@@ -117,13 +117,16 @@ filter). The storefront filter rail is unchanged.
 
 ## Migration / rollout — full re-import
 
-1. `pnpm exec medusa exec ./src/scripts/vendor-sync-dev-wipe.ts -- --confirm-host=<DATABASE_URL host>`
-   — clears `vendor_feed_run` / `vendor_feed_staging` / `vendor_stock_staging` / `vendor_product_current`.
-   (Does **not** delete Medusa products — see step 2.)
-2. Delete vendor-created wheel products by `external_id` (= `group_key`) so no 4-option stragglers
-   remain. The plan defines a scoped one-shot script that touches **only** products whose `external_id`
-   matches a vendor group_key — never admin-created products.
-3. `pnpm vendor-sync:dry-run wheelpros-wheels` → `pnpm vendor-sync:apply <run-id>`. The whole catalog
+The existing [`vendor-sync-dev-wipe.ts`](../../../backend/src/scripts/vendor-sync-dev-wipe.ts) already
+ships a `--purge-products` flag that deletes every Medusa product whose `metadata.vendor_code` names a
+wheelpros vendor (via `deleteProductsWorkflow`, which cleans up variants + inventory items). No new
+script is needed — it is already scoped to vendor-owned products and never touches admin-created ones.
+
+1. `pnpm exec medusa exec ./src/scripts/vendor-sync-dev-wipe.ts -- --confirm-host=<DATABASE_URL host> --purge-products`
+   — clears `vendor_feed_run` / `vendor_feed_staging` / `vendor_stock_staging` / `vendor_product_current`
+   **and** deletes the vendor-owned products so no 4-option stragglers remain. (The awkward
+   `--confirm-host` guard must match the `DATABASE_URL` host — always verify the target DB first.)
+2. `pnpm vendor-sync:dry-run wheelpros-wheels` → `pnpm vendor-sync:apply <run-id>`. The whole catalog
    rebuilds on the uniform 6-option model; the previously-failing ~300 groups now import.
 
 ## Testing

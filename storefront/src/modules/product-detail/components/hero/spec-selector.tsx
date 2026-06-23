@@ -38,7 +38,7 @@ const SpecSelector = ({ label, values, selected, onSelect, unit }: SpecSelectorP
             )}
           >
             {v}
-            {unit ? unit : ""}
+            {unit ?? ""}
           </button>
         )
       })}

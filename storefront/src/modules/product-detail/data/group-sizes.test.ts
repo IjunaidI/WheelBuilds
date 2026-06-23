@@ -5,6 +5,7 @@ import {
   pickDefaultSize,
   boresFor,
   loadsFor,
+  loadsForBore,
   resolveLeafVariant,
 } from "./group-sizes"
 
@@ -162,5 +163,23 @@ describe("center-bore / load-rating leaf resolution (WB-051)", () => {
     )[0]
     expect(boresFor(single.offsetVariants!, 18)).toEqual([73.1])
     expect(loadsFor(single.offsetVariants!, 18)).toEqual([2000])
+  })
+})
+
+describe("loadsForBore (cascade off bore) — WB-051", () => {
+  const size = groupVariantsIntoSizes(
+    [
+      variantCB("v_a", 22, 8.25, 105, "8x6.5", 5, 360, 78.1, 2200),
+      variantCB("v_b", 22, 8.25, 105, "8x6.5", 5, 360, 78.1, 2500),
+      variantCB("v_c", 22, 8.25, 105, "8x6.5", 5, 360, 87.1, 3000),
+    ],
+    40
+  )[0]
+  it("returns only loads available for the selected bore", () => {
+    expect(loadsForBore(size.offsetVariants!, 105, 78.1)).toEqual([2200, 2500])
+    expect(loadsForBore(size.offsetVariants!, 105, 87.1)).toEqual([3000])
+  })
+  it("returns all loads at the offset when bore is unspecified (wildcard)", () => {
+    expect(loadsForBore(size.offsetVariants!, 105, null)).toEqual([2200, 2500, 3000])
   })
 })

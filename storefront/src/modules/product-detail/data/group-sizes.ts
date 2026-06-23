@@ -115,7 +115,22 @@ export function loadsFor(variants: OffsetVariant[], offsetMm: number): number[] 
   return sortedDistinct(candidatesFor(variants, offsetMm).map((o) => o.loadRatingLb))
 }
 
-const availRank = { in_stock: 2, low_stock: 1, out_of_stock: 0 } as const
+/**
+ * Distinct non-null load ratings available at a given offset AND center bore.
+ * Cascades the Load Rating selector off the chosen Center Bore so an invalid
+ * (bore, load) pair — one that maps to no variant — can never be offered.
+ * A null centerBoreMm is a wildcard (all loads at the offset).
+ */
+export function loadsForBore(
+  variants: OffsetVariant[],
+  offsetMm: number,
+  centerBoreMm: number | null
+): number[] {
+  const cands = candidatesFor(variants, offsetMm).filter(
+    (o) => centerBoreMm == null || o.centerBoreMm === centerBoreMm
+  )
+  return sortedDistinct(cands.map((o) => o.loadRatingLb))
+}
 
 /**
  * Narrow a size's offset variants to one leaf by (offset, [bore], [load]).
@@ -128,12 +143,11 @@ export function resolveLeafVariant(
   centerBoreMm?: number | null,
   loadRatingLb?: number | null
 ): OffsetVariant | null {
-  const matches = (size.offsetVariants ?? [])
-    .filter((o) => o.value === offsetMm)
+  const matches = candidatesFor(size.offsetVariants ?? [], offsetMm)
     .filter((o) => centerBoreMm == null || o.centerBoreMm === centerBoreMm)
     .filter((o) => loadRatingLb == null || o.loadRatingLb === loadRatingLb)
   if (matches.length === 0) return null
   return matches.sort(
-    (a, b) => availRank[b.availability] - availRank[a.availability]
+    (a, b) => rank[b.availability] - rank[a.availability]
   )[0]
 }

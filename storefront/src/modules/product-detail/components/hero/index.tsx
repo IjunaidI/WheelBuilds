@@ -2,8 +2,8 @@
 
 import { useEffect, useMemo, useState } from "react"
 import { Finish } from "@modules/common/components/wheel"
-import { ProductDetail, SizeOption } from "../../data/types"
-import { sizesForBoltPattern, pickDefaultSize, boresFor, loadsFor, resolveLeafVariant } from "../../data/group-sizes"
+import { OffsetVariant, ProductDetail, SizeOption } from "../../data/types"
+import { sizesForBoltPattern, pickDefaultSize, boresFor, loadsForBore, resolveLeafVariant } from "../../data/group-sizes"
 import Gallery from "./gallery"
 import VariantPicker from "./variant-picker"
 import PurchasePanel from "./purchase-panel"
@@ -74,37 +74,47 @@ const Hero = ({ product }: HeroProps) => {
 
   const isOem = selectedOffsetMm === oemOffsetMm
 
-  const offsetVariants = useMemo(
+  const offsetVariants = useMemo<OffsetVariant[]>(
     () => selectedSize.offsetVariants ?? [],
     [selectedSize]
   )
 
-  // Progressive disclosure: branch axes for the current (size, offset).
+  const [selectedBore, setSelectedBore] = useState<number | null>(null)
+  const [selectedLoad, setSelectedLoad] = useState<number | null>(null)
+
+  // Progressive disclosure: bore branches at the offset level; load CASCADES
+  // off the selected bore so an invalid (bore, load) pair is never offered.
   const availableBores = useMemo(
     () => boresFor(offsetVariants, selectedOffsetMm),
     [offsetVariants, selectedOffsetMm]
   )
   const availableLoads = useMemo(
-    () => loadsFor(offsetVariants, selectedOffsetMm),
-    [offsetVariants, selectedOffsetMm]
+    () => loadsForBore(offsetVariants, selectedOffsetMm, selectedBore),
+    [offsetVariants, selectedOffsetMm, selectedBore]
   )
-  const [selectedBore, setSelectedBore] = useState<number | null>(null)
-  const [selectedLoad, setSelectedLoad] = useState<number | null>(null)
 
-  // Snap bore/load to the resolved leaf whenever the (size, offset) changes,
-  // so the selection always points at a real variant (in-stock-preferred).
+  // Snap bore to the best-availability leaf whenever (size, offset) changes.
   useEffect(() => {
-    const leaf = resolveLeafVariant(selectedSize, selectedOffsetMm)
-    setSelectedBore(leaf?.centerBoreMm ?? null)
-    setSelectedLoad(leaf?.loadRatingLb ?? null)
+    setSelectedBore(
+      resolveLeafVariant(selectedSize, selectedOffsetMm)?.centerBoreMm ?? null
+    )
   }, [selectedSize, selectedOffsetMm])
 
-  const currentOffset = resolveLeafVariant(
-    selectedSize,
-    selectedOffsetMm,
-    selectedBore,
-    selectedLoad
-  )
+  // Snap load to a valid value for the current (size, offset, bore); cascades
+  // when bore changes so the selection always points at a real variant.
+  useEffect(() => {
+    setSelectedLoad(
+      resolveLeafVariant(selectedSize, selectedOffsetMm, selectedBore)
+        ?.loadRatingLb ?? null
+    )
+  }, [selectedSize, selectedOffsetMm, selectedBore])
+
+  // Fallback chain: never leave currentOffset null when the (size, offset) has
+  // any variant — drop the load constraint, then the bore constraint, in turn.
+  const currentOffset =
+    resolveLeafVariant(selectedSize, selectedOffsetMm, selectedBore, selectedLoad) ??
+    resolveLeafVariant(selectedSize, selectedOffsetMm, selectedBore) ??
+    resolveLeafVariant(selectedSize, selectedOffsetMm)
 
   // Price the *selected* offset, not the size's cheapest — multi-offset sizes
   // can carry different MSRPs. Falls back to the size "from" price, then product.

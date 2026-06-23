@@ -5,6 +5,10 @@ import { OffsetVariant, SizeOption } from "./types"
 export const num = (v: unknown): number =>
   typeof v === "number" && Number.isFinite(v) ? v : 0
 
+/** Coerce to a finite number or null (distinct from num()'s 0 default). */
+const numOrNull = (v: unknown): number | null =>
+  typeof v === "number" && Number.isFinite(v) ? v : null
+
 function availabilityOf(qty: number): SizeOption["availability"] {
   if (qty <= 0) return "out_of_stock"
   if (qty <= 4) return "low_stock"
@@ -43,6 +47,8 @@ export function groupVariantsIntoSizes(
       priceCents: priceCents > 0 ? priceCents : undefined,
       variantId: v.id,
       availability: avail,
+      centerBoreMm: numOrNull(m.center_bore_mm),
+      loadRatingLb: numOrNull(m.load_rating_lb),
     }
     const existing = byKey.get(key)
     if (existing) {
@@ -91,4 +97,43 @@ export function sizesForBoltPattern(
 /** Default size pick: first in-stock, else the first. */
 export function pickDefaultSize(sizes: SizeOption[]): SizeOption {
   return sizes.find((s) => s.availability !== "out_of_stock") ?? sizes[0]
+}
+
+const candidatesFor = (variants: OffsetVariant[], offsetMm: number) =>
+  variants.filter((o) => o.value === offsetMm)
+
+const sortedDistinct = (xs: (number | null)[]): number[] =>
+  Array.from(new Set(xs.filter((x): x is number => x != null))).sort((a, b) => a - b)
+
+/** Distinct non-null center bores available at a given offset. */
+export function boresFor(variants: OffsetVariant[], offsetMm: number): number[] {
+  return sortedDistinct(candidatesFor(variants, offsetMm).map((o) => o.centerBoreMm))
+}
+
+/** Distinct non-null load ratings available at a given offset. */
+export function loadsFor(variants: OffsetVariant[], offsetMm: number): number[] {
+  return sortedDistinct(candidatesFor(variants, offsetMm).map((o) => o.loadRatingLb))
+}
+
+const availRank = { in_stock: 2, low_stock: 1, out_of_stock: 0 } as const
+
+/**
+ * Narrow a size's offset variants to one leaf by (offset, [bore], [load]).
+ * Unspecified bore/load are wildcards; ties resolve to the best-availability
+ * candidate, so an unspecified pick lands on an in-stock variant when possible.
+ */
+export function resolveLeafVariant(
+  size: SizeOption,
+  offsetMm: number,
+  centerBoreMm?: number | null,
+  loadRatingLb?: number | null
+): OffsetVariant | null {
+  const matches = (size.offsetVariants ?? [])
+    .filter((o) => o.value === offsetMm)
+    .filter((o) => centerBoreMm == null || o.centerBoreMm === centerBoreMm)
+    .filter((o) => loadRatingLb == null || o.loadRatingLb === loadRatingLb)
+  if (matches.length === 0) return null
+  return matches.sort(
+    (a, b) => availRank[b.availability] - availRank[a.availability]
+  )[0]
 }

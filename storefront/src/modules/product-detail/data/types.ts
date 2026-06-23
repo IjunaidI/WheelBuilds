@@ -28,6 +28,10 @@ export type OffsetVariant = {
   variantId: string
   /** Per-offset stock state — checked before add-to-cart so an out-of-stock ET hiding under an in-stock size cell can't be purchased. */
   availability: "in_stock" | "low_stock" | "out_of_stock"
+  /** Center bore (mm) for this exact variant; null when the vendor omits it. */
+  centerBoreMm: number | null
+  /** Load rating (lb) for this exact variant; null when the vendor omits it. */
+  loadRatingLb: number | null
 }
 
 /** A specific Diameter × Width combination available for this product. */

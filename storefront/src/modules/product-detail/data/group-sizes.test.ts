@@ -3,6 +3,9 @@ import {
   groupVariantsIntoSizes,
   sizesForBoltPattern,
   pickDefaultSize,
+  boresFor,
+  loadsFor,
+  resolveLeafVariant,
 } from "./group-sizes"
 
 // Minimal variant factory mirroring the Medusa Store API shape the loader reads.
@@ -112,5 +115,52 @@ describe("pickDefaultSize", () => {
       28
     )
     expect(pickDefaultSize(sizes).width).toBe(9)
+  })
+})
+
+// Optional bore/load extension of the factory (defaults keep existing tests valid).
+function variantCB(
+  id: string, diameter: number, width: number, offset: number, bolt: string,
+  qty: number, priceMajor: number, centerBore: number | null, load: number | null
+) {
+  return {
+    id,
+    metadata: {
+      wheel_diameter_in: diameter, wheel_width_in: width, offset_mm: offset,
+      bolt_pattern_raw: bolt, center_bore_mm: centerBore, load_rating_lb: load,
+    },
+    inventory_quantity: qty,
+    calculated_price: { calculated_amount: priceMajor },
+  } as any
+}
+
+describe("center-bore / load-rating leaf resolution (WB-051)", () => {
+  const sizes = groupVariantsIntoSizes(
+    [
+      variantCB("v_a", 22, 8.25, 105, "8x6.5", 0, 360, 78.1, 2500),
+      variantCB("v_b", 22, 8.25, 105, "8x6.5", 8, 360, 87.1, 2500),
+    ],
+    40
+  )
+  const size = sizes[0]
+
+  it("keeps both center-bore variants under one (size, offset)", () => {
+    expect(size.offsetVariants).toHaveLength(2)
+    expect(boresFor(size.offsetVariants!, 105)).toEqual([78.1, 87.1])
+  })
+  it("resolves the exact variant by (offset, centerBore)", () => {
+    expect(resolveLeafVariant(size, 105, 87.1)?.variantId).toBe("v_b")
+    expect(resolveLeafVariant(size, 105, 78.1)?.variantId).toBe("v_a")
+  })
+  it("prefers an in-stock candidate when bore is unspecified", () => {
+    expect(resolveLeafVariant(size, 105)?.variantId).toBe("v_b") // v_b has stock
+  })
+  it("a single-bore (size, offset) reports no branch", () => {
+    const single = groupVariantsIntoSizes(
+      [variantCB("v_x", 20, 9, 18, "5x114.3", 5, 300, 73.1, 2000)],
+      28
+    )[0]
+    expect(boresFor(single.offsetVariants!, 18)).toEqual([73.1])
+    expect(loadsFor(single.offsetVariants!, 18)).toEqual([2000])
   })
 })

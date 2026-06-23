@@ -184,3 +184,79 @@ export function pickGroupRepresentative(
   )
   return sorted[0]
 }
+
+function groupByAxisKey(
+  records: WheelNormalizedRecord[]
+): Map<string, WheelNormalizedRecord[]> {
+  const byKey = new Map<string, WheelNormalizedRecord[]>()
+  for (const r of records) {
+    const k = variantAxisKey(r)
+    const list = byKey.get(k) ?? []
+    list.push(r)
+    byKey.set(k, list)
+  }
+  return byKey
+}
+
+/** Sets of records that share a 6-tuple (i.e. exact duplicates). */
+export function findExactDuplicates(
+  records: WheelNormalizedRecord[]
+): WheelNormalizedRecord[][] {
+  return [...groupByAxisKey(records).values()].filter((g) => g.length > 1)
+}
+
+/** The one survivor of an exact-duplicate set: in-stock first, then lowest part number. */
+function pickSurvivor(dupes: WheelNormalizedRecord[]): WheelNormalizedRecord {
+  return [...dupes].sort((a, b) => {
+    const aStock = a.totalQoh > 0 ? 0 : 1
+    const bStock = b.totalQoh > 0 ? 0 : 1
+    if (aStock !== bStock) return aStock - bStock
+    return a.partNumber.localeCompare(b.partNumber)
+  })[0]
+}
+
+/**
+ * Collapse exact duplicates (identical 6-tuple) to one survivor each.
+ * Center-bore- / load-rating-distinct rows are NOT duplicates and pass through.
+ */
+export function dedupeExactDuplicates(records: WheelNormalizedRecord[]): {
+  survivors: WheelNormalizedRecord[]
+  dropped: WheelNormalizedRecord[]
+} {
+  const survivors: WheelNormalizedRecord[] = []
+  const dropped: WheelNormalizedRecord[] = []
+  for (const group of groupByAxisKey(records).values()) {
+    if (group.length === 1) {
+      survivors.push(group[0])
+      continue
+    }
+    const keep = pickSurvivor(group)
+    survivors.push(keep)
+    for (const r of group) if (r !== keep) dropped.push(r)
+  }
+  return { survivors, dropped }
+}
+
+/**
+ * Filter newly-added records against the 6-tuples already on a product
+ * (and against each other), so an exact duplicate is never created as a
+ * second variant with the same option tuple.
+ */
+export function dedupeAddedAgainstExisting(
+  records: WheelNormalizedRecord[],
+  existingAxisKeys: Set<string>
+): { toCreate: WheelNormalizedRecord[]; dropped: WheelNormalizedRecord[] } {
+  const seen = new Set(existingAxisKeys)
+  const toCreate: WheelNormalizedRecord[] = []
+  const dropped: WheelNormalizedRecord[] = []
+  for (const r of records) {
+    const k = variantAxisKey(r)
+    if (seen.has(k)) {
+      dropped.push(r)
+      continue
+    }
+    seen.add(k)
+    toCreate.push(r)
+  }
+  return { toCreate, dropped }
+}

@@ -10,6 +10,9 @@ import {
   pickGroupRepresentative,
   slugify,
   variantAxisKey,
+  findExactDuplicates,
+  dedupeExactDuplicates,
+  dedupeAddedAgainstExisting,
 } from "../pipeline/wheel-grouping"
 import { WheelNormalizedRecord } from "../adapters/types"
 
@@ -280,5 +283,74 @@ describe("pickGroupRepresentative", () => {
   it("returns the only record when the group has one member", () => {
     const r = makeWheel({ partNumber: "ONLY-ONE" })
     expect(pickGroupRepresentative([r]).partNumber).toBe("ONLY-ONE")
+  })
+})
+
+describe("findExactDuplicates", () => {
+  it("returns nothing when every 6-tuple is distinct", () => {
+    const records = [
+      makeWheel({ partNumber: "A", centerBoreMm: 71.5 }),
+      makeWheel({ partNumber: "B", centerBoreMm: 67.1 }),
+    ]
+    expect(findExactDuplicates(records)).toEqual([])
+  })
+  it("groups rows that share a 6-tuple", () => {
+    const records = [
+      makeWheel({ partNumber: "A" }),
+      makeWheel({ partNumber: "B" }),
+      makeWheel({ partNumber: "C", offsetMm: 35 }),
+    ]
+    const dups = findExactDuplicates(records)
+    expect(dups).toHaveLength(1)
+    expect(dups[0].map((r) => r.partNumber).sort()).toEqual(["A", "B"])
+  })
+})
+
+describe("dedupeExactDuplicates", () => {
+  it("does NOT dedupe center-bore- or load-rating-distinct rows", () => {
+    const records = [
+      makeWheel({ partNumber: "A", centerBoreMm: 78.1 }),
+      makeWheel({ partNumber: "B", centerBoreMm: 87.1 }),
+    ]
+    const { survivors, dropped } = dedupeExactDuplicates(records)
+    expect(survivors).toHaveLength(2)
+    expect(dropped).toHaveLength(0)
+  })
+  it("keeps the in-stock SKU over an out-of-stock duplicate", () => {
+    const records = [
+      makeWheel({ partNumber: "ZZZ", totalQoh: 12 }),
+      makeWheel({ partNumber: "AAA", totalQoh: 0 }),
+    ]
+    const { survivors, dropped } = dedupeExactDuplicates(records)
+    expect(survivors.map((r) => r.partNumber)).toEqual(["ZZZ"])
+    expect(dropped.map((r) => r.partNumber)).toEqual(["AAA"])
+  })
+  it("breaks ties by lowest part number when both in stock", () => {
+    const records = [
+      makeWheel({ partNumber: "BBB", totalQoh: 5 }),
+      makeWheel({ partNumber: "AAA", totalQoh: 5 }),
+    ]
+    const { survivors } = dedupeExactDuplicates(records)
+    expect(survivors.map((r) => r.partNumber)).toEqual(["AAA"])
+  })
+})
+
+describe("dedupeAddedAgainstExisting", () => {
+  it("drops a record whose 6-tuple already exists on the product", () => {
+    const existing = new Set([variantAxisKey(makeWheel({ partNumber: "X" }))])
+    const { toCreate, dropped } = dedupeAddedAgainstExisting(
+      [makeWheel({ partNumber: "DUP" }), makeWheel({ partNumber: "NEW", offsetMm: 35 })],
+      existing
+    )
+    expect(toCreate.map((r) => r.partNumber)).toEqual(["NEW"])
+    expect(dropped.map((r) => r.partNumber)).toEqual(["DUP"])
+  })
+  it("dedupes within the batch as well", () => {
+    const { toCreate, dropped } = dedupeAddedAgainstExisting(
+      [makeWheel({ partNumber: "A" }), makeWheel({ partNumber: "B" })],
+      new Set()
+    )
+    expect(toCreate.map((r) => r.partNumber)).toEqual(["A"])
+    expect(dropped.map((r) => r.partNumber)).toEqual(["B"])
   })
 })

@@ -36,10 +36,12 @@ import {
 import { applyStockLevels } from "./apply-stock"
 import {
   WHEEL_OPTION_TITLES,
+  axisKeyFromMetadata,
   buildGroupHandle,
   buildGroupTitle,
   buildProductOptions,
   buildVariantOptions,
+  dedupeAddedAgainstExisting,
   dedupeExactDuplicates,
   findExactDuplicates,
   formatNumericOption,
@@ -475,25 +477,37 @@ async function applyChangedGroup(
     if (productType === "wheel") {
       const wheelAdds = addedRecords as WheelNormalizedRecord[]
 
-      // Idempotency (WB-016): a prior failed attempt may have already created
-      // some of these variants. Only create the SKUs not already on the product;
-      // adopt the rest.
       const query = ctx.container.resolve(ContainerRegistrationKeys.QUERY)
       const { data: existingVariants } = await query.graph({
         entity: "variant",
-        fields: ["id", "sku", "inventory_items.inventory_item_id"],
+        fields: ["id", "sku", "metadata", "inventory_items.inventory_item_id"],
         filters: { product_id: [productId] },
       })
       const existingSkus = new Set<string>(
         (existingVariants ?? []).map((v: any) => v.sku).filter(Boolean)
       )
-      const { toCreate } = partitionRecordsBySku(wheelAdds, existingSkus)
+      const { toCreate: skuNew } = partitionRecordsBySku(wheelAdds, existingSkus)
+
+      // Drop any added SKU whose 6-tuple already exists on the product
+      // (exact duplicate of a current variant) or repeats within this batch.
+      const existingAxisKeys = new Set<string>(
+        (existingVariants ?? []).map((v: any) =>
+          axisKeyFromMetadata((v.metadata ?? {}) as Record<string, unknown>)
+        )
+      )
+      const { toCreate, dropped } = dedupeAddedAgainstExisting(
+        skuNew,
+        existingAxisKeys
+      )
+      for (const d of dropped) {
+        ctx.logger.warn(
+          `[vendor-sync] [${ctx.runId}] deduped exact duplicate on add, dropped ${d.partNumber} (group ${group.group_key})`
+        )
+      }
+      const droppedSkus = new Set(dropped.map((r) => r.partNumber))
 
       let createdVariants: any[] = []
       if (toCreate.length > 0) {
-        // Extend product options with any new values introduced by the new
-        // variants. Medusa's createProductVariantsWorkflow expects the
-        // variant.options keys to reference existing option values.
         await extendWheelOptions(ctx, productId, toCreate)
 
         const variants = toCreate.map((r) => ({
@@ -507,20 +521,21 @@ async function applyChangedGroup(
         createdVariants = created.result
       }
 
-      // Persist current rows for ALL added parts, sourcing variant ids from the
-      // existing + freshly-created variants.
+      // Persist current rows for every added part EXCEPT the dropped duplicates
+      // (which have no variant of their own).
       const skuIndex = indexVariantsBySku([
         ...(existingVariants ?? []),
         ...createdVariants,
       ])
+      const toPersist = wheelAdds.filter((r) => !droppedSkus.has(r.partNumber))
       await persistAddedVariants(
         ctx,
         group.group_key,
-        wheelAdds,
+        toPersist,
         skuIndex,
         productId
       )
-      variantCount += wheelAdds.length
+      variantCount += toPersist.length
     } else {
       // Tires: each row is its own group, so added_part_numbers on a
       // tire changedGroup should never happen. Defensive log + skip.

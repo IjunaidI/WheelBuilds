@@ -5,17 +5,12 @@ export const WHEEL_OPTION_TITLES = {
   DIAMETER: "Diameter",
   WIDTH: "Width",
   OFFSET: "Offset",
+  CENTER_BORE: "Center Bore",
+  LOAD_RATING: "Load Rating",
 } as const
 
-export interface AxisCollision {
-  axisKey: string
-  partNumbers: string[]
-  // True when colliding SKUs differ on centerBore or loadRating. That
-  // is the "you are missing an axis" signal: the rows ARE distinct in
-  // reality, the current four-axis model just cannot tell them apart.
-  hasHiddenDistinction: boolean
-  hiddenFieldsDiffering: Array<"centerBoreMm" | "loadRatingLb">
-}
+/** Sentinel option value / axis-key segment for a null optional axis. */
+export const OPTIONAL_AXIS_NONE = "—"
 
 /**
  * Slugify into a URL-safe handle.
@@ -39,9 +34,15 @@ export function formatNumericOption(value: number): string {
   return value.toFixed(2).replace(/\.?0+$/, "")
 }
 
+/** Format an optional numeric axis (center bore / load rating). */
+export function formatOptionalAxis(value: number | null): string {
+  return value == null ? OPTIONAL_AXIS_NONE : formatNumericOption(value)
+}
+
 /**
- * The 4-tuple that uniquely identifies a variant inside a group under
- * the current variant-axis model.
+ * The 6-tuple that uniquely identifies a variant inside a group. Any
+ * pairwise difference in any axis yields distinct variants; the only
+ * residual collision is an exact duplicate (deduped in apply).
  */
 export function variantAxisKey(record: WheelNormalizedRecord): string {
   return [
@@ -49,45 +50,27 @@ export function variantAxisKey(record: WheelNormalizedRecord): string {
     formatNumericOption(record.diameterIn),
     formatNumericOption(record.widthIn),
     formatNumericOption(record.offsetMm),
+    formatOptionalAxis(record.centerBoreMm),
+    formatOptionalAxis(record.loadRatingLb),
   ].join("|")
 }
 
+const toOptionalNumber = (v: unknown): number | null =>
+  typeof v === "number" && Number.isFinite(v) ? v : null
+
 /**
- * Detect two or more variants whose four-axis tuple is identical.
- * Returns null when the group is collision-free; otherwise returns
- * info on the first collision found, including whether the colliding
- * SKUs differ on centerBoreMm or loadRatingLb (which would mean the
- * collision is real product diversity that needs a 5th axis).
+ * Reproduce variantAxisKey from a Medusa variant's metadata bag (used to
+ * dedupe newly-added SKUs against variants already on a product).
  */
-export function findAxisCollision(
-  records: WheelNormalizedRecord[]
-): AxisCollision | null {
-  const byKey = new Map<string, WheelNormalizedRecord[]>()
-  for (const r of records) {
-    const k = variantAxisKey(r)
-    const list = byKey.get(k) ?? []
-    list.push(r)
-    byKey.set(k, list)
-  }
-
-  for (const [axisKey, group] of byKey) {
-    if (group.length < 2) continue
-
-    const hiddenFieldsDiffering: AxisCollision["hiddenFieldsDiffering"] = []
-    const centerBores = new Set(group.map((r) => r.centerBoreMm))
-    if (centerBores.size > 1) hiddenFieldsDiffering.push("centerBoreMm")
-    const loads = new Set(group.map((r) => r.loadRatingLb))
-    if (loads.size > 1) hiddenFieldsDiffering.push("loadRatingLb")
-
-    return {
-      axisKey,
-      partNumbers: group.map((r) => r.partNumber).sort(),
-      hasHiddenDistinction: hiddenFieldsDiffering.length > 0,
-      hiddenFieldsDiffering,
-    }
-  }
-
-  return null
+export function axisKeyFromMetadata(m: Record<string, unknown>): string {
+  return [
+    String(m.bolt_pattern_raw ?? ""),
+    formatNumericOption(Number(m.wheel_diameter_in)),
+    formatNumericOption(Number(m.wheel_width_in)),
+    formatNumericOption(Number(m.offset_mm)),
+    formatOptionalAxis(toOptionalNumber(m.center_bore_mm)),
+    formatOptionalAxis(toOptionalNumber(m.load_rating_lb)),
+  ].join("|")
 }
 
 /**

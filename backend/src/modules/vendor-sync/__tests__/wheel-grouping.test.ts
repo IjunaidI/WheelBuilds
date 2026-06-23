@@ -4,8 +4,9 @@ import {
   buildGroupTitle,
   buildProductOptions,
   buildVariantOptions,
-  findAxisCollision,
   formatNumericOption,
+  formatOptionalAxis,
+  axisKeyFromMetadata,
   pickGroupRepresentative,
   slugify,
   variantAxisKey,
@@ -79,77 +80,60 @@ describe("formatNumericOption", () => {
   })
 })
 
-describe("variantAxisKey", () => {
-  it("combines all four axes into a stable key", () => {
-    const r = makeWheel()
-    expect(variantAxisKey(r)).toBe("5X120|20|10|23")
+describe("formatOptionalAxis", () => {
+  it("formats a present number like formatNumericOption", () => {
+    expect(formatOptionalAxis(71.5)).toBe("71.5")
+    expect(formatOptionalAxis(2200)).toBe("2200")
   })
+  it("returns the em-dash sentinel for null", () => {
+    expect(formatOptionalAxis(null)).toBe("—")
+  })
+})
 
-  it("yields different keys when any axis differs", () => {
-    const base = makeWheel()
-    expect(variantAxisKey(base)).not.toBe(
-      variantAxisKey(makeWheel({ offsetMm: 35 }))
+describe("variantAxisKey (6-axis)", () => {
+  it("combines all six axes into a stable key", () => {
+    const r = makeWheel() // centerBoreMm 71.5, loadRatingLb 2200
+    expect(variantAxisKey(r)).toBe("5X120|20|10|23|71.5|2200")
+  })
+  it("uses the sentinel when center bore / load rating are null", () => {
+    const r = makeWheel({ centerBoreMm: null, loadRatingLb: null })
+    expect(variantAxisKey(r)).toBe("5X120|20|10|23|—|—")
+  })
+  it("yields different keys when ONLY center bore differs", () => {
+    expect(variantAxisKey(makeWheel({ centerBoreMm: 71.5 }))).not.toBe(
+      variantAxisKey(makeWheel({ centerBoreMm: 67.1 }))
     )
-    expect(variantAxisKey(base)).not.toBe(
-      variantAxisKey(makeWheel({ diameterIn: 22 }))
-    )
-    expect(variantAxisKey(base)).not.toBe(
-      variantAxisKey(makeWheel({ widthIn: 11 }))
-    )
-    expect(variantAxisKey(base)).not.toBe(
-      variantAxisKey(makeWheel({ boltPatternRaw: "6X5.5" }))
+  })
+  it("yields different keys when ONLY load rating differs", () => {
+    expect(variantAxisKey(makeWheel({ loadRatingLb: 2200 }))).not.toBe(
+      variantAxisKey(makeWheel({ loadRatingLb: 2500 }))
     )
   })
 })
 
-describe("findAxisCollision", () => {
-  it("returns null for a group with all-distinct axis tuples", () => {
-    const records = [
-      makeWheel({ partNumber: "A", offsetMm: 23 }),
-      makeWheel({ partNumber: "B", offsetMm: 35 }),
-      makeWheel({ partNumber: "C", diameterIn: 22, offsetMm: 23 }),
-    ]
-    expect(findAxisCollision(records)).toBeNull()
+describe("axisKeyFromMetadata", () => {
+  it("reproduces variantAxisKey from a variant metadata bag", () => {
+    const r = makeWheel({ centerBoreMm: 67.1, loadRatingLb: 2500 })
+    const meta = {
+      bolt_pattern_raw: r.boltPatternRaw,
+      wheel_diameter_in: r.diameterIn,
+      wheel_width_in: r.widthIn,
+      offset_mm: r.offsetMm,
+      center_bore_mm: r.centerBoreMm,
+      load_rating_lb: r.loadRatingLb,
+    }
+    expect(axisKeyFromMetadata(meta)).toBe(variantAxisKey(r))
   })
-
-  it("reports a collision and includes both colliding SKUs", () => {
-    const records = [
-      makeWheel({ partNumber: "A" }),
-      makeWheel({ partNumber: "B" }),
-    ]
-    const result = findAxisCollision(records)
-    expect(result).not.toBeNull()
-    expect(result?.partNumbers).toEqual(["A", "B"])
-    expect(result?.axisKey).toBe("5X120|20|10|23")
-  })
-
-  it("flags hidden distinction when colliding SKUs differ on centerBore", () => {
-    const records = [
-      makeWheel({ partNumber: "A", centerBoreMm: 71.5 }),
-      makeWheel({ partNumber: "B", centerBoreMm: 67.1 }),
-    ]
-    const result = findAxisCollision(records)
-    expect(result?.hasHiddenDistinction).toBe(true)
-    expect(result?.hiddenFieldsDiffering).toEqual(["centerBoreMm"])
-  })
-
-  it("flags hidden distinction when colliding SKUs differ on loadRating", () => {
-    const records = [
-      makeWheel({ partNumber: "A", loadRatingLb: 2200 }),
-      makeWheel({ partNumber: "B", loadRatingLb: 2500 }),
-    ]
-    const result = findAxisCollision(records)
-    expect(result?.hasHiddenDistinction).toBe(true)
-    expect(result?.hiddenFieldsDiffering).toEqual(["loadRatingLb"])
-  })
-
-  it("does not flag hidden distinction when only nullable hidden fields are null on all sides", () => {
-    const records = [
-      makeWheel({ partNumber: "A", centerBoreMm: null, loadRatingLb: null }),
-      makeWheel({ partNumber: "B", centerBoreMm: null, loadRatingLb: null }),
-    ]
-    const result = findAxisCollision(records)
-    expect(result?.hasHiddenDistinction).toBe(false)
+  it("maps null/absent optional fields to the sentinel", () => {
+    const meta = {
+      bolt_pattern_raw: "5X120",
+      wheel_diameter_in: 20,
+      wheel_width_in: 10,
+      offset_mm: 23,
+      center_bore_mm: null,
+      // load_rating_lb absent
+    }
+    expect(axisKeyFromMetadata(meta)).toBe("5X120|20|10|23|—|—")
   })
 })
 

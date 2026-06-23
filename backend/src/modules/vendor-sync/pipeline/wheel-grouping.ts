@@ -1,5 +1,13 @@
 import { WheelNormalizedRecord } from "../adapters/types"
 
+/**
+ * The six wheel variant axes. ALL six options are emitted on every wheel
+ * product, even single-value ones — Medusa cannot add a new option to an
+ * existing product (only new values), so always-6 keeps the incremental
+ * add path safe. Single-value Center Bore / Load Rating options are
+ * admin-only noise; the PDP hides single-value selectors. See WB-051 /
+ * docs/reference/vendor-sync-implementation.md.
+ */
 export const WHEEL_OPTION_TITLES = {
   BOLT_PATTERN: "Bolt Pattern",
   DIAMETER: "Diameter",

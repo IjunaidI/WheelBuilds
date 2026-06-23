@@ -99,6 +99,30 @@ The pipeline is a Medusa business module with four MikroORM tables (`vendor_feed
 
 ---
 
+### Wheel variant axes (6) and the always-emit trade-off (WB-051)
+
+Wheel variants are identified by a **6-axis** tuple: bolt pattern × diameter × width × offset ×
+center bore × load rating (`variantAxisKey`). Center bore and load rating became axes so SKUs that
+differ only on those fields import as distinct variants instead of failing the whole group on an
+axis collision.
+
+**Every wheel product emits all six options, even when center bore or load rating has a single value
+across the group.** This is deliberate:
+
+- Medusa can only *add values* to an existing option (`extendWheelOptions`), never add a new option to
+  a product. Conditional axes would break the 12h-cron add path the day a previously-constant axis
+  starts varying. Always-6 is incremental-safe.
+- **Cost — admin-side noise:** most products carry a single-value "Center Bore"/"Load Rating" option,
+  and a null optional axis shows the sentinel `—`. This is *admin-only*: the storefront PDP hides any
+  single-value selector (progressive disclosure), so shoppers never see it.
+
+Only **exact duplicates** (identical on all six axes, different part number) are deduped — kept by
+tie-break (in-stock first, then lowest part number), with a logged warning naming the dropped SKU.
+Dropped duplicates get no `vendor_product_current` row, so a feed that keeps listing them re-emits a
+harmless "deduped exact duplicate" warning each run.
+
+---
+
 ## Data model
 
 ```

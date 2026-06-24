@@ -92,22 +92,24 @@
 - refs: —
 
 ### WB-007 · `hub_bore_mm` INTEGER truncates fractional bore on cached reads   [HIGH]
-- status: in-progress
+- status: done
 - area: backend/wheel-size
 - evidence: backend/src/modules/wheel-size/migrations/Migration20260601111311.ts:13
 - problem: hub_bore_mm is stored as INTEGER in the wheel-size cache table; fractional bore values (e.g. 60.1, 67.1) are truncated on insert and returned as wrong integers.
 - fix: store the fractional value as a scaled integer (`hub_bore_mm_x100`, ×100) — keeps `model.number()`→integer so there is NO module-snapshot drift (a `numeric`/`float` ALTER would leave model+DB mismatched). Rename + data-preserving migration; the warm cron self-corrects old truncated values. (Chose scaled-int over decimal/float in brainstorming.)
 - verify: a wheel-size lookup for a vehicle with a fractional hub bore returns the correct decimal value from the cache; the migration runs without errors.
-- refs: design [2026-06-23-wheel-size-fitment-hardening](../in-progress/specs/2026-06-23-wheel-size-fitment-hardening-design.md) ; branch `feat/wheel-size-fitment-hardening`
+- done: 2026-06-23 — bore stored as scaled integer `hub_bore_mm_x100` (read /100, write `Math.round(×100)`); `model.number()` kept → no snapshot drift; reverse-fitment bore gate now reads the accurate value. Hand-authored reversible migration `Migration20260623120000` (rename + ×100) applies on next deploy; warm cron self-corrects old approximate values.
+- refs: design [spec](../done/specs/2026-06-23-wheel-size-fitment-hardening-design.md) ; plan [plan](../done/plans/2026-06-23-wheel-size-fitment-hardening.md)
 
 ### WB-008 · No fitment cache TTL + no warm/refresh cron   [HIGH]
-- status: in-progress
+- status: done
 - area: backend/wheel-size
 - evidence: backend/src/modules/wheel-size/service.ts:52-83
 - problem: wheel-size lookup results are cached indefinitely; there is no TTL, no staleness check, and no background job to refresh the cache — stale fitment data persists forever.
 - fix: add a configurable TTL (default 90d, computed off the existing `fetched_at` — no new column) + a staleness check; serve stale-while-revalidate on read, plus a nightly warm cron that re-fetches stale entries oldest-first, quota-bounded.
 - verify: a cache entry older than the TTL is refreshed on next read (or by cron); entries within TTL are served from cache without an API call.
-- refs: design [2026-06-23-wheel-size-fitment-hardening](../in-progress/specs/2026-06-23-wheel-size-fitment-hardening-design.md) ; branch `feat/wheel-size-fitment-hardening`
+- done: 2026-06-23 — TTL (default 90d, `WHEEL_SIZE_TTL_DAYS`) computed off `fetched_at` via pure `staleness.ts`; `getFitment` serves stale-while-revalidate (cached value now + background `refreshFitment` upsert); nightly warm cron `wheel-size-warm` (`0 3 * * *`) refreshes oldest-stale entries, quota-bounded. Cron activates on next deploy.
+- refs: design [spec](../done/specs/2026-06-23-wheel-size-fitment-hardening-design.md) ; plan [plan](../done/plans/2026-06-23-wheel-size-fitment-hardening.md)
 
 ### WB-009 · `product.fitment = []` (reverse-fitment "N confirmed models")   [HIGH]
 - status: done
@@ -207,22 +209,24 @@
 - refs: —
 
 ### WB-019 · wheel-size lookup synchronous on first miss   [MEDIUM]
-- status: in-progress
+- status: done
 - area: backend/wheel-size
 - evidence: backend/src/modules/wheel-size/service.ts:64
 - problem: on a cache miss the wheel-size API call blocks the request synchronously; slow or unavailable wheel-size API stalls fitment-dependent requests.
 - fix (chosen: bounded-block, not fully-async): add an `AbortController` timeout (~5s) to the wheel-size client so a slow/down API returns 503 instead of hanging; serve stale entries instantly + refresh in the background. (Fully-async-on-miss rejected — needs a pending contract + queue/worker.)
 - verify: a slow/unreachable wheel-size API returns 503 within the timeout instead of hanging the request; stale cache entries serve instantly and refresh in the background.
-- refs: design [2026-06-23-wheel-size-fitment-hardening](../in-progress/specs/2026-06-23-wheel-size-fitment-hardening-design.md) ; branch `feat/wheel-size-fitment-hardening`
+- done: 2026-06-23 — `AbortController` client timeout (default 5s, `WHEEL_SIZE_TIMEOUT_MS`) → 408 → existing `resolveByModel` outage path → route 503; orphaned-fetch abort rejection swallowed (no unhandled rejection); stale entries refresh in background (non-blocking). Bounded-block design (true miss still blocks, timeout-bounded), not fully-async.
+- refs: design [spec](../done/specs/2026-06-23-wheel-size-fitment-hardening-design.md) ; plan [plan](../done/plans/2026-06-23-wheel-size-fitment-hardening.md)
 
 ### WB-020 · Quota counter non-atomic read-modify-write   [MEDIUM]
-- status: in-progress
+- status: done
 - area: backend/wheel-size
 - evidence: backend/src/modules/wheel-size/service.ts:38-46
 - problem: the API quota counter is implemented as a read-then-write in application code; concurrent requests can race and exceed the quota limit.
 - fix: use a database-level atomic increment (UPDATE ... SET count = count + 1 RETURNING count) or a Redis counter for the quota check.
 - verify: under simulated concurrency, the quota counter does not exceed the configured limit; no over-counting race is possible.
-- refs: design [2026-06-23-wheel-size-fitment-hardening](../in-progress/specs/2026-06-23-wheel-size-fitment-hardening-design.md) ; branch `feat/wheel-size-fitment-hardening`
+- done: 2026-06-23 — single atomic upsert-increment (`INSERT … ON CONFLICT ("day") WHERE deleted_at IS NULL DO UPDATE SET count = count + 1 RETURNING count`) via the module's knex connection, parameterized bindings, fail-closed on empty rows. Accessor + partial-index `ON CONFLICT` runtime-verified against the live DB.
+- refs: design [spec](../done/specs/2026-06-23-wheel-size-fitment-hardening-design.md) ; plan [plan](../done/plans/2026-06-23-wheel-size-fitment-hardening.md)
 
 ### WB-021 · Discovery + home Meili queries uncached (no TTL/revalidate)   [MEDIUM]
 - status: todo
@@ -425,13 +429,14 @@
 ### WB-042 · Durable feed archiving to object storage — merged into WB-017. See WB-017.
 
 ### WB-043 · wheel-size live-slug verification (no test proves dropdown slugs resolve)   [LOW]
-- status: in-progress
+- status: done
 - area: backend/wheel-size + storefront/fitment
 - evidence: backend/src/modules/wheel-size/service.ts:52-83
 - problem: there is no test that proves the YMM dropdown slug values used in the storefront resolve correctly against the live wheel-size `by_model` API endpoint; slug format could be wrong without detection.
 - fix: add an integration test (or a manual verification doc) that confirms at least one make/model/year slug round-trips through the live API and returns fitment data.
 - verify: a test or documented manual step confirms that a real YMM slug fetched from the dropdown resolves to wheel fitment data from wheel-size.com `by_model`.
-- refs: design [2026-06-23-wheel-size-fitment-hardening](../in-progress/specs/2026-06-23-wheel-size-fitment-hardening-design.md) ; branch `feat/wheel-size-fitment-hardening`
+- done: 2026-06-23 — gated `__tests__/live-slug.test.ts` (`describe.skip` unless `RUN_WHEEL_SIZE_LIVE=true` + `WHEEL_SIZE_API_KEY`) asserts a real honda/accord/2021 `by_model` resolves to 200 with numeric `stud_holes`+`pcd`. Offline by default. Run: `RUN_WHEEL_SIZE_LIVE=true WHEEL_SIZE_API_KEY=<key> pnpm test:fitment -- live-slug`.
+- refs: design [spec](../done/specs/2026-06-23-wheel-size-fitment-hardening-design.md) ; plan [plan](../done/plans/2026-06-23-wheel-size-fitment-hardening.md)
 
 ### WB-044 · Rename `teraflex` test fixtures/handles   [LOW]
 - status: todo

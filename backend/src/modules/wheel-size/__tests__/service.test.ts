@@ -201,3 +201,21 @@ describe("WheelSizeService.getFitment TTL / stale-while-revalidate (WB-008)", ()
     expect(refreshed).toBe(true)
   })
 })
+
+describe("WheelSizeService.incrementAndCheckQuota (WB-020)", () => {
+  function makeQuotaService(returnedCount: number, ceiling = 5000) {
+    const svc = new (WheelSizeService as any)({ logger: { warn() {}, error() {} } }, { apiKey: "k", baseUrl: "b", dailyCeiling: ceiling })
+    const calls: string[] = []
+    svc.knex_ = { raw: async (sql: string) => { calls.push(sql); return { rows: [{ count: returnedCount }] } } }
+    return { svc, calls }
+  }
+  it("returns true when the atomic count is at/under the ceiling", async () => {
+    const { svc, calls } = makeQuotaService(4999, 5000)
+    expect(await svc.incrementAndCheckQuota()).toBe(true)
+    expect(calls[0]).toMatch(/insert into "wheel_size_quota"[\s\S]*on conflict[\s\S]*count = "wheel_size_quota"\."count" \+ 1[\s\S]*returning "count"/i)
+  })
+  it("returns false when the atomic count exceeds the ceiling", async () => {
+    const { svc } = makeQuotaService(5001, 5000)
+    expect(await svc.incrementAndCheckQuota()).toBe(false)
+  })
+})

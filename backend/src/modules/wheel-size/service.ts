@@ -1,5 +1,5 @@
 // backend/src/modules/wheel-size/service.ts
-import { MedusaService } from "@medusajs/framework/utils"
+import { MedusaService, ContainerRegistrationKeys } from "@medusajs/framework/utils"
 import WheelSizeCatalog from "./models/wheel-size-catalog"
 import WheelSizeFitment from "./models/wheel-size-fitment"
 import WheelSizeQuota from "./models/wheel-size-quota"
@@ -21,6 +21,7 @@ class WheelSizeService extends MedusaService({ WheelSizeCatalog, WheelSizeFitmen
   protected client_: WheelSizeClient
   protected ceiling_: number
   protected ttlDays_: number
+  protected knex_: any
 
   constructor(container: any, options: Options) {
     super(...arguments as any)
@@ -28,6 +29,7 @@ class WheelSizeService extends MedusaService({ WheelSizeCatalog, WheelSizeFitmen
     this.options_ = options ?? ({} as Options)
     this.ceiling_ = options?.dailyCeiling ?? 5000
     this.ttlDays_ = options?.ttlDays ?? 90
+    this.knex_ = container?.[ContainerRegistrationKeys.PG_CONNECTION]
     this.client_ = new WheelSizeClient({
       apiKey: options.apiKey,
       baseUrl: options.baseUrl ?? "https://api.wheel-size.com/v2",
@@ -42,12 +44,18 @@ class WheelSizeService extends MedusaService({ WheelSizeCatalog, WheelSizeFitmen
 
   async incrementAndCheckQuota(): Promise<boolean> {
     const day = this.gmtDay()
-    const rows = await this.listWheelSizeQuotas({ day })
-    const current = rows[0]
-    if (!current) { await this.createWheelSizeQuotas({ day, count: 1 }); return 1 <= this.ceiling_ }
-    const next = (current.count ?? 0) + 1
-    await this.updateWheelSizeQuotas({ id: current.id, count: next })
-    return next <= this.ceiling_
+    const id = `wsq_${day.replace(/-/g, "")}`
+    // Atomic upsert-increment against the partial unique index (day) WHERE deleted_at IS NULL.
+    const result = await this.knex_.raw(
+      `insert into "wheel_size_quota" ("id", "day", "count", "created_at", "updated_at")
+       values (?, ?, 1, now(), now())
+       on conflict ("day") where deleted_at is null
+       do update set count = "wheel_size_quota"."count" + 1, "updated_at" = now()
+       returning "count"`,
+      [id, day]
+    )
+    const count = Number(result?.rows?.[0]?.count ?? Number.MAX_SAFE_INTEGER)
+    return count <= this.ceiling_
   }
 
   async getFitment(p: { make: string; model: string; modificationSlug?: string; year?: string; region?: string }): Promise<VehicleFitment> {

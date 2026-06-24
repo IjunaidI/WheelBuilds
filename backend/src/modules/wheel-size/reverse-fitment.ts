@@ -3,7 +3,7 @@ import { ReverseFitmentVehicle } from "./types"
 type FitmentRow = {
   raw?: any
   canonical_bolt_patterns?: string[] | null
-  hub_bore_mm?: number | null
+  hub_bore_mm_x100?: number | null
   status?: string
 }
 
@@ -43,7 +43,7 @@ export function matchedPattern(
   const rowPats = Array.isArray(row.canonical_bolt_patterns) ? row.canonical_bolt_patterns : []
   const hit = productPatterns.find((p) => rowPats.includes(p))
   if (!hit) return null
-  const hub = typeof row.hub_bore_mm === "number" ? row.hub_bore_mm : null
+  const hub = typeof row.hub_bore_mm_x100 === "number" ? row.hub_bore_mm_x100 / 100 : null
   const boreOk = hub == null || wheelBoreMm == null ? true : wheelBoreMm >= hub
   return boreOk ? hit : null
 }

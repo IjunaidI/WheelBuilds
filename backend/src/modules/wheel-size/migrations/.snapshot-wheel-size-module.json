@@ -253,8 +253,8 @@
           "enumItems": [],
           "mappedType": "json"
         },
-        "hub_bore_mm": {
-          "name": "hub_bore_mm",
+        "hub_bore_mm_x100": {
+          "name": "hub_bore_mm_x100",
           "type": "integer",
           "unsigned": false,
           "autoincrement": false,

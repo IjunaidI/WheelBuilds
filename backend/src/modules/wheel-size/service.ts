@@ -58,7 +58,7 @@ class WheelSizeService extends MedusaService({ WheelSizeCatalog, WheelSizeFitmen
       return {
         status: c.status as VehicleFitment["status"],
         canonicalBoltPatterns: (c.canonical_bolt_patterns as unknown as string[]) ?? [],
-        hubBoreMm: c.hub_bore_mm ?? null,
+        hubBoreMm: c.hub_bore_mm_x100 == null ? null : (c.hub_bore_mm_x100 as number) / 100,
         diameterWindow: (c.diameter_window as unknown as Window) ?? null,
         widthWindow: (c.width_window as unknown as Window) ?? null,
         offsetWindow: (c.offset_window as unknown as Window) ?? null,
@@ -78,7 +78,7 @@ class WheelSizeService extends MedusaService({ WheelSizeCatalog, WheelSizeFitmen
       cache_key, region: regionUsed, raw: body,
       // string[] into a model.json() column (typed Record<string, unknown>)
       canonical_bolt_patterns: fitment.canonicalBoltPatterns as unknown as Record<string, unknown>,
-      hub_bore_mm: fitment.hubBoreMm, diameter_window: fitment.diameterWindow,
+      hub_bore_mm_x100: fitment.hubBoreMm == null ? null : Math.round(fitment.hubBoreMm * 100), diameter_window: fitment.diameterWindow,
       width_window: fitment.widthWindow, offset_window: fitment.offsetWindow,
       status: fitment.status, fetched_at: new Date(),
     })

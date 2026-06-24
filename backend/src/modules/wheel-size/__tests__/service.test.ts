@@ -156,11 +156,24 @@ describe("WheelSizeService.reverseFitment", () => {
 
   it("returns cached vehicles whose bolt pattern matches the product and clears the hub", async () => {
     const svc = makeReverseService([
-      { status: "ok", canonical_bolt_patterns: ["5x114.3"], hub_bore_mm: 64, raw: raw("Honda", "Civic") },
-      { status: "ok", canonical_bolt_patterns: ["6x139.7"], hub_bore_mm: 100, raw: raw("Ford", "F150") },
+      { status: "ok", canonical_bolt_patterns: ["5x114.3"], hub_bore_mm_x100: 6400, raw: raw("Honda", "Civic") },
+      { status: "ok", canonical_bolt_patterns: ["6x139.7"], hub_bore_mm_x100: 10000, raw: raw("Ford", "F150") },
     ])
     const out = await svc.reverseFitment({ canonicalBoltPatterns: ["5x114.3"], wheelBoreMm: 70 })
     expect(out).toHaveLength(1)
     expect(out[0]).toMatchObject({ make: "Honda", model: "Civic", boltPattern: "5x114.3" })
+  })
+})
+
+describe("WheelSizeService.getFitment hub bore scaling (WB-007)", () => {
+  it("stores fractional bore ×100 and reads it back as the exact decimal", async () => {
+    const { svc, store } = makeService([
+      { status: 200, empty: false, body: { data: [{ technical: { stud_holes: 5, pcd: 114.3, centre_bore: 67.1 }, wheels: [] } ] } },
+    ])
+    const f = await svc.getFitment({ make: "honda", model: "accord", modificationSlug: "m", region: "usdm" })
+    expect(f.hubBoreMm).toBe(67.1)
+    expect(store.fitment.get("honda|accord|m|usdm").hub_bore_mm_x100).toBe(6710)
+    const again = await svc.getFitment({ make: "honda", model: "accord", modificationSlug: "m", region: "usdm" })
+    expect(again.hubBoreMm).toBe(67.1) // served from cache, exact
   })
 })

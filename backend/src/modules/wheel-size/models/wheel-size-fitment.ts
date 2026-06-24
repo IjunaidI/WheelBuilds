@@ -5,7 +5,7 @@ const WheelSizeFitment = model.define("wheel_size_fitment", {
   region: model.text(),
   raw: model.json().nullable(),
   canonical_bolt_patterns: model.json(),
-  hub_bore_mm: model.number().nullable(),
+  hub_bore_mm_x100: model.number().nullable(),
   diameter_window: model.json().nullable(),
   width_window: model.json().nullable(),
   offset_window: model.json().nullable(),

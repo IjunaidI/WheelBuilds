@@ -33,7 +33,7 @@ describe("extractVehicleIdentity", () => {
 })
 
 describe("matchedPattern", () => {
-  const row = { canonical_bolt_patterns: ["5x114.3"], hub_bore_mm: 67.1 }
+  const row = { canonical_bolt_patterns: ["5x114.3"], hub_bore_mm_x100: 6710 }
   it("returns the intersecting pattern when bolt + bore both pass", () => {
     expect(matchedPattern(row, ["5x120", "5x114.3"], 70)).toBe("5x114.3")
   })
@@ -44,14 +44,14 @@ describe("matchedPattern", () => {
     expect(matchedPattern(row, ["5x114.3"], 60)).toBeNull()
   })
   it("passes the bore gate when either value is unknown", () => {
-    expect(matchedPattern({ canonical_bolt_patterns: ["5x114.3"], hub_bore_mm: null }, ["5x114.3"], 60)).toBe("5x114.3")
+    expect(matchedPattern({ canonical_bolt_patterns: ["5x114.3"], hub_bore_mm_x100: null }, ["5x114.3"], 60)).toBe("5x114.3")
     expect(matchedPattern(row, ["5x114.3"], null)).toBe("5x114.3")
   })
 })
 
 describe("buildReverseFitment", () => {
   const ok = (make: string, model: string, trim: string | undefined, start: number, end: number, pats: string[], hub: number | null) =>
-    ({ status: "ok", canonical_bolt_patterns: pats, hub_bore_mm: hub, raw: rawOf(make, model, trim, start, end) })
+    ({ status: "ok", canonical_bolt_patterns: pats, hub_bore_mm_x100: hub == null ? null : Math.round(hub * 100), raw: rawOf(make, model, trim, start, end) })
 
   it("returns deduped, sorted, capped matches", () => {
     const rows = [
@@ -65,7 +65,7 @@ describe("buildReverseFitment", () => {
   })
   it("skips non-ok rows and bore failures", () => {
     const rows = [
-      { status: "not_found", canonical_bolt_patterns: ["5x114.3"], hub_bore_mm: 64, raw: rawOf("A", "B", undefined, 2020, 2020) },
+      { status: "not_found", canonical_bolt_patterns: ["5x114.3"], hub_bore_mm_x100: 6400, raw: rawOf("A", "B", undefined, 2020, 2020) },
       ok("C", "D", undefined, 2020, 2020, ["5x114.3"], 80), // hub 80 > wheel bore 70 → bore fail
     ]
     expect(buildReverseFitment(rows, ["5x114.3"], 70, 24)).toEqual([])

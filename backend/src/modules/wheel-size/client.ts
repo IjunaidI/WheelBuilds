@@ -1,19 +1,35 @@
 // backend/src/modules/wheel-size/client.ts
-type FetchImpl = (url: string) => Promise<{ status: number; text: () => Promise<string> }>
+type FetchImpl = (url: string, init?: { signal?: AbortSignal }) => Promise<{ status: number; text: () => Promise<string> }>
 export type ClientResult = { status: number; empty: boolean; body: any | null }
 
 export class WheelSizeClient {
   private apiKey: string
   private baseUrl: string
   private fetchImpl: FetchImpl
-  constructor(opts: { apiKey: string; baseUrl: string; fetchImpl?: FetchImpl }) {
+  private timeoutMs: number
+  constructor(opts: { apiKey: string; baseUrl: string; fetchImpl?: FetchImpl; timeoutMs?: number }) {
     this.apiKey = opts.apiKey
     this.baseUrl = opts.baseUrl.replace(/\/$/, "")
-    this.fetchImpl = opts.fetchImpl ?? ((url) => fetch(url) as any)
+    this.fetchImpl = opts.fetchImpl ?? ((url, init) => fetch(url, init) as any)
+    this.timeoutMs = opts.timeoutMs ?? 5000
   }
   private async get(path: string, params: Record<string, string>): Promise<ClientResult> {
     const qs = new URLSearchParams({ ...params, user_key: this.apiKey }).toString()
-    const res = await this.fetchImpl(`${this.baseUrl}${path}?${qs}`)
+    const controller = new AbortController()
+    let timer: any
+    const timeoutP = new Promise<{ __timeout: true }>((resolve) => {
+      timer = setTimeout(() => { controller.abort(); resolve({ __timeout: true }) }, this.timeoutMs)
+    })
+    let res: any
+    try {
+      res = await Promise.race([this.fetchImpl(`${this.baseUrl}${path}?${qs}`, { signal: controller.signal }), timeoutP])
+    } catch {
+      // network error or abort that rejected — treat as a transient outage
+      clearTimeout(timer)
+      return { status: 408, empty: true, body: null }
+    }
+    clearTimeout(timer)
+    if (res && res.__timeout) return { status: 408, empty: true, body: null }
     const text = await res.text()
     const empty = text.length === 0
     let body: any = null

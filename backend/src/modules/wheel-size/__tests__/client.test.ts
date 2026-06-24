@@ -38,4 +38,13 @@ describe("WheelSizeClient", () => {
     expect(qs.get("make")).toBe("abarth")
     expect(qs.get("model")).toBe("500")
   })
+
+  it("returns 408 when the fetch exceeds the timeout", async () => {
+    const neverResolves = () => new Promise<any>(() => {}) // hangs
+    const c = new WheelSizeClient({ apiKey: "k", baseUrl: "https://api.wheel-size.com/v2", fetchImpl: neverResolves, timeoutMs: 20 })
+    const r = await c.byModel({ make: "x", model: "y", year: "2020", region: "usdm" })
+    expect(r.status).toBe(408)
+    expect(r.empty).toBe(true)
+    expect(r.body).toBeNull()
+  })
 })

@@ -12,7 +12,7 @@ export class QuotaOutageError extends Error {
   constructor() { super("wheel-size quota outage") ; this.name = "QuotaOutageError" }
 }
 
-type Options = { apiKey: string; baseUrl?: string; defaultRegion?: string; dailyCeiling?: number }
+type Options = { apiKey: string; baseUrl?: string; defaultRegion?: string; dailyCeiling?: number; requestTimeoutMs?: number; ttlDays?: number; warmBatchSize?: number }
 
 class WheelSizeService extends MedusaService({ WheelSizeCatalog, WheelSizeFitment, WheelSizeQuota }) {
   protected logger_: any
@@ -28,6 +28,7 @@ class WheelSizeService extends MedusaService({ WheelSizeCatalog, WheelSizeFitmen
     this.client_ = new WheelSizeClient({
       apiKey: options.apiKey,
       baseUrl: options.baseUrl ?? "https://api.wheel-size.com/v2",
+      timeoutMs: options.requestTimeoutMs ?? 5000,
     })
   }
 

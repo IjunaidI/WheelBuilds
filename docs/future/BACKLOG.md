@@ -520,3 +520,14 @@
 - fix: for state resets, delegate to `vendor-sync-truncate-state.ts` (single TRUNCATE) or chunk the id deletes; for product purge, point operators at the server-side `purge-products` route. Consider folding both into dev-wipe or deprecating its bulk paths.
 - verify: a wipe + purge against a prod-size DB completes in seconds (state) / minutes (products, server-side) without stack overflow.
 - refs: discovered during WB-051 (2026-06-23)
+
+---
+
+### WB-053 · Discovery `/store` browse capped at Meilisearch default `maxTotalHits=1000`   [LOW]
+- status: todo
+- area: backend/search + storefront/discovery
+- evidence: backend/medusa-config.js (meili `indexSettings` sets no `pagination.maxTotalHits`) ; storefront/src/modules/discovery
+- problem: the unfiltered `/store` browse paginates at most 1,000 results (~84 pages × 12) because the products index uses Meilisearch's default `maxTotalHits=1000`; the "N results" header reflects the cap, not the real catalog (2,670 wheels). Surfaced during the WB-051 re-import — the page count looked unchanged because the catalog already exceeded 1,000 before. Filtered/searched result sets under 1,000 are unaffected, so it does not hide products from users who narrow by vehicle/brand/size.
+- fix: set `pagination: { maxTotalHits: <N> }` in the products `indexSettings` (medusa-config.js) and redeploy so the plugin pushes it; weigh the deep-pagination perf cost. Optionally show a "1,000+" affordance instead of an exact count.
+- verify: with `maxTotalHits` raised, the unfiltered `/store` paginates past 84 pages and the header count tracks the Meili doc count.
+- refs: discovered during WB-051 (2026-06-23)

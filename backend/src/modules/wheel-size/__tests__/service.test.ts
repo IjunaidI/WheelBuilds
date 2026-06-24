@@ -206,16 +206,24 @@ describe("WheelSizeService.incrementAndCheckQuota (WB-020)", () => {
   function makeQuotaService(returnedCount: number, ceiling = 5000) {
     const svc = new (WheelSizeService as any)({ logger: { warn() {}, error() {} } }, { apiKey: "k", baseUrl: "b", dailyCeiling: ceiling })
     const calls: string[] = []
-    svc.knex_ = { raw: async (sql: string) => { calls.push(sql); return { rows: [{ count: returnedCount }] } } }
-    return { svc, calls }
+    const bindings: any[][] = []
+    svc.knex_ = { raw: async (sql: string, binds?: any[]) => { calls.push(sql); bindings.push(binds ?? []); return { rows: [{ count: returnedCount }] } } }
+    return { svc, calls, bindings }
   }
   it("returns true when the atomic count is at/under the ceiling", async () => {
-    const { svc, calls } = makeQuotaService(4999, 5000)
+    const { svc, calls, bindings } = makeQuotaService(4999, 5000)
     expect(await svc.incrementAndCheckQuota()).toBe(true)
     expect(calls[0]).toMatch(/insert into "wheel_size_quota"[\s\S]*on conflict[\s\S]*count = "wheel_size_quota"\."count" \+ 1[\s\S]*returning "count"/i)
+    expect(bindings[0]).toHaveLength(2)
+    expect(bindings[0][0]).toMatch(/^wsq_\d{8}$/) // id = wsq_ + YYYYMMDD
+    expect(bindings[0][1]).toMatch(/^\d{4}-\d{2}-\d{2}$/) // day = GMT YYYY-MM-DD
   })
   it("returns false when the atomic count exceeds the ceiling", async () => {
     const { svc } = makeQuotaService(5001, 5000)
     expect(await svc.incrementAndCheckQuota()).toBe(false)
+  })
+  it("returns true when the atomic count exactly equals the ceiling", async () => {
+    const { svc } = makeQuotaService(5000, 5000)
+    expect(await svc.incrementAndCheckQuota()).toBe(true)
   })
 })

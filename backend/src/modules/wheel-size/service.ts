@@ -54,6 +54,7 @@ class WheelSizeService extends MedusaService({ WheelSizeCatalog, WheelSizeFitmen
        returning "count"`,
       [id, day]
     )
+    // fail-closed: an empty RETURNING is treated as over-quota (deny) rather than allow
     const count = Number(result?.rows?.[0]?.count ?? Number.MAX_SAFE_INTEGER)
     return count <= this.ceiling_
   }

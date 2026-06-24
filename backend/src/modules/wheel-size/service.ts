@@ -7,6 +7,7 @@ import { WheelSizeClient } from "./client"
 import { normalizeByModel } from "./normalize"
 import { VehicleFitment, ReverseFitmentVehicle, Window } from "./types"
 import { buildReverseFitment } from "./reverse-fitment"
+import { isStale } from "./staleness"
 
 export class QuotaOutageError extends Error {
   constructor() { super("wheel-size quota outage") ; this.name = "QuotaOutageError" }
@@ -19,12 +20,14 @@ class WheelSizeService extends MedusaService({ WheelSizeCatalog, WheelSizeFitmen
   protected options_: Options
   protected client_: WheelSizeClient
   protected ceiling_: number
+  protected ttlDays_: number
 
   constructor(container: any, options: Options) {
     super(...arguments as any)
     this.logger_ = container?.logger ?? console
     this.options_ = options ?? ({} as Options)
     this.ceiling_ = options?.dailyCeiling ?? 5000
+    this.ttlDays_ = options?.ttlDays ?? 90
     this.client_ = new WheelSizeClient({
       apiKey: options.apiKey,
       baseUrl: options.baseUrl ?? "https://api.wheel-size.com/v2",
@@ -54,35 +57,46 @@ class WheelSizeService extends MedusaService({ WheelSizeCatalog, WheelSizeFitmen
     const cached = await this.listWheelSizeFitments({ cache_key })
     if (cached[0]) {
       const c = cached[0]
-      // model.json() columns are typed Record<string, unknown>; assert the
-      // domain shapes we persisted (string[] / Window / status enum).
-      return {
-        status: c.status as VehicleFitment["status"],
-        canonicalBoltPatterns: (c.canonical_bolt_patterns as unknown as string[]) ?? [],
-        hubBoreMm: c.hub_bore_mm_x100 == null ? null : (c.hub_bore_mm_x100 as number) / 100,
-        diameterWindow: (c.diameter_window as unknown as Window) ?? null,
-        widthWindow: (c.width_window as unknown as Window) ?? null,
-        offsetWindow: (c.offset_window as unknown as Window) ?? null,
-        source: { modificationSlug: p.modificationSlug ?? "", region: c.region ?? region },
+      if (isStale(c.fetched_at as any, this.ttlDays_, new Date())) {
+        // serve stale immediately; refresh in the background (never awaited)
+        void this.refreshFitment({ ...p, region }).catch((e) =>
+          this.logger_.warn(`[wheel-size] background refresh failed for ${cache_key}: ${e?.message ?? e}`)
+        )
       }
+      return this.toFitment(c, region, p.modificationSlug)
     }
 
-    const { body, regionUsed } = await this.resolveByModel({
-      make: p.make, model: p.model, modificationSlug: p.modificationSlug, year: p.year, region,
-    })
+    return this.refreshFitment({ ...p, region })
+  }
 
+  /** Map a cache row to the VehicleFitment read contract. */
+  private toFitment(c: any, region: string, modificationSlug?: string): VehicleFitment {
+    return {
+      status: c.status as VehicleFitment["status"],
+      canonicalBoltPatterns: (c.canonical_bolt_patterns as unknown as string[]) ?? [],
+      hubBoreMm: c.hub_bore_mm_x100 == null ? null : (c.hub_bore_mm_x100 as number) / 100,
+      diameterWindow: (c.diameter_window as unknown as Window) ?? null,
+      widthWindow: (c.width_window as unknown as Window) ?? null,
+      offsetWindow: (c.offset_window as unknown as Window) ?? null,
+      source: { modificationSlug: modificationSlug ?? "", region: c.region ?? region },
+    }
+  }
+
+  /** Fetch live + upsert the cache row by cache_key. Returns the fresh fitment. */
+  async refreshFitment(p: { make: string; model: string; modificationSlug?: string; year?: string; region: string }): Promise<VehicleFitment> {
+    const cache_key = [p.make, p.model, (p.modificationSlug ?? p.year ?? ""), p.region].join("|")
+    const { body, regionUsed } = await this.resolveByModel(p)
     const fitment = normalizeByModel(body, { modificationSlug: p.modificationSlug ?? "", region: regionUsed })
-    // Cache under the REQUESTED region (the cache_key above) so the next lookup for
-    // the same usdm vehicle is served instantly — but record the region the data
-    // actually came from, for transparency.
-    await this.createWheelSizeFitments({
+    const row = {
       cache_key, region: regionUsed, raw: body,
-      // string[] into a model.json() column (typed Record<string, unknown>)
       canonical_bolt_patterns: fitment.canonicalBoltPatterns as unknown as Record<string, unknown>,
-      hub_bore_mm_x100: fitment.hubBoreMm == null ? null : Math.round(fitment.hubBoreMm * 100), diameter_window: fitment.diameterWindow,
-      width_window: fitment.widthWindow, offset_window: fitment.offsetWindow,
+      hub_bore_mm_x100: fitment.hubBoreMm == null ? null : Math.round(fitment.hubBoreMm * 100),
+      diameter_window: fitment.diameterWindow, width_window: fitment.widthWindow, offset_window: fitment.offsetWindow,
       status: fitment.status, fetched_at: new Date(),
-    })
+    }
+    const existing = await this.listWheelSizeFitments({ cache_key })
+    if (existing[0]) await this.updateWheelSizeFitments({ id: existing[0].id, ...row })
+    else await this.createWheelSizeFitments(row)
     return fitment
   }
 

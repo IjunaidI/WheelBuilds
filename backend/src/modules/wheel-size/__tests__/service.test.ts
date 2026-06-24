@@ -10,6 +10,7 @@ function makeService(clientResults: any[], opts: any = {}) {
   // stub the MedusaService-generated methods used by getFitment
   svc.listWheelSizeFitments = async ({ cache_key }: any) => { const v = store.fitment.get(cache_key); return v ? [v] : [] }
   svc.createWheelSizeFitments = async (row: any) => { store.fitment.set(row.cache_key, row); return row }
+  svc.updateWheelSizeFitments = async (row: any) => { store.fitment.set(row.cache_key, row); return row }
   svc._quotaCount = 0
   svc.incrementAndCheckQuota = async () => { svc._quotaCount++; return svc._quotaCount <= (opts.ceiling ?? 5000) }
   return { svc, store }
@@ -175,5 +176,28 @@ describe("WheelSizeService.getFitment hub bore scaling (WB-007)", () => {
     expect(store.fitment.get("honda|accord|m|usdm").hub_bore_mm_x100).toBe(6710)
     const again = await svc.getFitment({ make: "honda", model: "accord", modificationSlug: "m", region: "usdm" })
     expect(again.hubBoreMm).toBe(67.1) // served from cache, exact
+  })
+})
+
+describe("WheelSizeService.getFitment TTL / stale-while-revalidate (WB-008)", () => {
+  it("serves a fresh cached row without calling the client", async () => {
+    const { svc } = makeService([]) // client throws if called (no results)
+    const fresh = { cache_key: "honda|accord|m|usdm", status: "ok", canonical_bolt_patterns: ["5x114.3"], hub_bore_mm_x100: 6410, region: "usdm", fetched_at: new Date(), diameter_window: null, width_window: null, offset_window: null, raw: {} }
+    ;(svc as any).listWheelSizeFitments = async () => [fresh]
+    const f = await svc.getFitment({ make: "honda", model: "accord", modificationSlug: "m", region: "usdm" })
+    expect(f.canonicalBoltPatterns).toEqual(["5x114.3"])
+  })
+
+  it("serves a STALE cached row immediately AND fires a background refresh", async () => {
+    const old = new Date(Date.now() - 200 * 86_400_000)
+    const stale = { cache_key: "honda|accord|m|usdm", status: "ok", canonical_bolt_patterns: ["5x114.3"], hub_bore_mm_x100: 6410, region: "usdm", fetched_at: old, diameter_window: null, width_window: null, offset_window: null, raw: {} }
+    const { svc } = makeService([{ status: 200, empty: false, body: { data: [{ technical: { stud_holes: 5, pcd: 120, centre_bore: 72.6 }, wheels: [] } ] } }], { ttlDays: 90 })
+    ;(svc as any).listWheelSizeFitments = async () => [stale]
+    let refreshed = false
+    ;(svc as any).refreshFitment = async () => { refreshed = true }
+    const f = await svc.getFitment({ make: "honda", model: "accord", modificationSlug: "m", region: "usdm" })
+    expect(f.canonicalBoltPatterns).toEqual(["5x114.3"]) // stale value served immediately
+    await new Promise((r) => setTimeout(r, 0)) // let the fire-and-forget run
+    expect(refreshed).toBe(true)
   })
 })

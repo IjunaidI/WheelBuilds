@@ -49,6 +49,9 @@ import {
   WHEEL_SIZE_API_KEY,
   WHEEL_SIZE_BASE_URL,
   WHEEL_SIZE_REGION,
+  WHEEL_SIZE_TTL_DAYS,
+  WHEEL_SIZE_TIMEOUT_MS,
+  WHEEL_SIZE_WARM_BATCH,
 } from 'lib/constants';
 import { buildSearchDocument } from 'modules/vendor-sync/search/build-search-document';
 import { resolveDevMaxRows } from 'lib/dev-max-rows';
@@ -220,6 +223,9 @@ const medusaConfig = {
         baseUrl: WHEEL_SIZE_BASE_URL ?? 'https://api.wheel-size.com/v2',
         defaultRegion: WHEEL_SIZE_REGION ?? 'usdm',
         dailyCeiling: 5000,
+        ttlDays: WHEEL_SIZE_TTL_DAYS ? Number(WHEEL_SIZE_TTL_DAYS) : 90,
+        requestTimeoutMs: WHEEL_SIZE_TIMEOUT_MS ? Number(WHEEL_SIZE_TIMEOUT_MS) : 5000,
+        warmBatchSize: WHEEL_SIZE_WARM_BATCH ? Number(WHEEL_SIZE_WARM_BATCH) : 200,
       },
     }] : []),
     { resolve: './src/modules/customer-vehicle' },

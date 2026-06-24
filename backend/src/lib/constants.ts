@@ -155,3 +155,6 @@ export const VENDOR_WHEELPROS_TIRE_SFTP_PATTERN = process.env.VENDOR_WHEELPROS_T
 export const WHEEL_SIZE_API_KEY = process.env.WHEEL_SIZE_API_KEY
 export const WHEEL_SIZE_BASE_URL = process.env.WHEEL_SIZE_BASE_URL
 export const WHEEL_SIZE_REGION = process.env.WHEEL_SIZE_REGION
+export const WHEEL_SIZE_TTL_DAYS = process.env.WHEEL_SIZE_TTL_DAYS
+export const WHEEL_SIZE_TIMEOUT_MS = process.env.WHEEL_SIZE_TIMEOUT_MS
+export const WHEEL_SIZE_WARM_BATCH = process.env.WHEEL_SIZE_WARM_BATCH

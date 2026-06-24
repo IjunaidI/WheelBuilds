@@ -16,13 +16,15 @@ export class WheelSizeClient {
   private async get(path: string, params: Record<string, string>): Promise<ClientResult> {
     const qs = new URLSearchParams({ ...params, user_key: this.apiKey }).toString()
     const controller = new AbortController()
-    let timer: any
+    let timer: ReturnType<typeof setTimeout> | undefined
     const timeoutP = new Promise<{ __timeout: true }>((resolve) => {
       timer = setTimeout(() => { controller.abort(); resolve({ __timeout: true }) }, this.timeoutMs)
     })
+    const fetchP = this.fetchImpl(`${this.baseUrl}${path}?${qs}`, { signal: controller.signal })
+    fetchP.catch(() => {}) // if the timeout wins the race, swallow the orphaned fetch's later AbortError
     let res: any
     try {
-      res = await Promise.race([this.fetchImpl(`${this.baseUrl}${path}?${qs}`, { signal: controller.signal }), timeoutP])
+      res = await Promise.race([fetchP, timeoutP])
     } catch {
       // network error or abort that rejected — treat as a transient outage
       clearTimeout(timer)

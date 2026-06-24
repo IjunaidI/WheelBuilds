@@ -47,4 +47,17 @@ describe("WheelSizeClient", () => {
     expect(r.empty).toBe(true)
     expect(r.body).toBeNull()
   })
+
+  it("returns 408 and swallows the orphaned fetch's abort rejection when the timeout wins", async () => {
+    // A fetch that hangs until its signal aborts, then REJECTS (like Node's real fetch).
+    const abortRejectingFetch = (_url: string, init?: { signal?: AbortSignal }) =>
+      new Promise<any>((_, reject) => {
+        init?.signal?.addEventListener("abort", () => reject(new Error("AbortError")))
+      })
+    const c = new WheelSizeClient({ apiKey: "k", baseUrl: "https://api.wheel-size.com/v2", fetchImpl: abortRejectingFetch as any, timeoutMs: 20 })
+    const r = await c.byModel({ make: "x", model: "y", year: "2020", region: "usdm" })
+    expect(r.status).toBe(408)
+    // let the orphaned rejection settle on the microtask queue — must not crash the run
+    await new Promise((res) => setTimeout(res, 5))
+  })
 })

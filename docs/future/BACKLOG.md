@@ -18,6 +18,25 @@
 
 ---
 
+## Work groups (epics)
+
+> Thematic groupings of the open items below, each sized for roughly one session
+> (brainstorm → spec → plan → execute one group at a time). Members list the **open**
+> `WB-NNN` as of 2026-06-23; the per-item `status` further down is the source of truth — when an
+> item flips to `done`, drop it from its group here. **Completed groups (2026-06-23):**
+> *Six-axis wheel variant model* (WB-051) and *Wheel-size fitment hardening* (WB-007/008/019/020/043).
+
+- **G1 · Vendor-sync productionization (async + scale)** `[L · needs Redis worker]` — move sync triggers off the HTTP request, parallelize/stream the apply, make cancel + feed archiving worker-safe. → WB-011, WB-012, WB-013, WB-014, WB-015, WB-017, WB-018, WB-037
+- **G2 · Checkout & cart (make it transactable)** `[M–L · partly payment-gated]` — fix the checkout stall, live-stock quantity cap, express-pay/Affirm, gift-card/discount, stale copy. → WB-033, WB-034, WB-035, WB-036, WB-047
+- **G3 · PDP correctness & polish** `[S–M]` — BLANK bolt-pattern selectable gate, PDP placeholders, de-dupe the finish-normalizer twin. → WB-048, WB-029, WB-030
+- **G4 · Home & merchandising** `[M]` — real Featured Blocks / Build Gallery, newsletter persistence, hardcoded merchandising copy. → WB-004, WB-023, WB-028
+- **G5 · Discovery & search** `[S–M]` — Meili result cache, dead category facet, browse `maxTotalHits` cap. → WB-021, WB-046, WB-053
+- **G6 · Catalog breadth & pricing** `[L–XL · WB-005 is a big spec alone]` — tires grouping+indexing, markup/MAP/margin pricing, de-hardcode bootstrap identity + vendor roster. → WB-005, WB-024, WB-025, WB-026
+- **G7 · Account & garage** `[S–M]` — account Garage tab/route, robust guest→login garage merge, license-plate lookup. → WB-032, WB-022, WB-045
+- **G8 · Admin & ops tooling** `[S]` — vendor-sync admin UI, seed shipping options + reply-to, rename `teraflex` fixtures, scale-safe dev-wipe. → WB-006, WB-031, WB-044, WB-052
+
+---
+
 ## Blockers
 
 ### WB-001 · PDP cannot transact (Add to Cart is toast-only)   [BLOCKER]

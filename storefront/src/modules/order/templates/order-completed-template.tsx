@@ -1,5 +1,3 @@
-import { cookies } from "next/headers"
-
 import CartTotals from "@modules/common/components/cart-totals"
 import Display from "@modules/common/components/display"
 import Icon from "@modules/common/components/icon"
@@ -9,7 +7,6 @@ import Wheel from "@modules/common/components/wheel"
 import FitmentVerifiedCard from "@modules/checkout/components/fitment-verified-card"
 import Help from "@modules/order/components/help"
 import Items from "@modules/order/components/items"
-import OnboardingCta from "@modules/order/components/onboarding-cta"
 import ShippingDetails from "@modules/order/components/shipping-details"
 import PaymentDetails from "@modules/order/components/payment-details"
 import { HttpTypes } from "@medusajs/types"
@@ -29,20 +26,12 @@ type OrderCompletedTemplateProps = {
 export default function OrderCompletedTemplate({
   order,
 }: OrderCompletedTemplateProps) {
-  const isOnboarding = cookies().get("_medusa_onboarding")?.value === "true"
-
   const firstName = order.shipping_address?.first_name ?? "there"
   const etaStart = addBusinessDays(new Date(), 3)
   const etaEnd = addBusinessDays(new Date(), 5)
 
   return (
     <div className="bg-white">
-      {isOnboarding && (
-        <div className="px-5 small:px-10 pt-6">
-          <OnboardingCta orderId={order.id} />
-        </div>
-      )}
-
       {/* Dark hero */}
       <div
         className="relative overflow-hidden text-white px-5 small:px-10 py-12 small:py-16"

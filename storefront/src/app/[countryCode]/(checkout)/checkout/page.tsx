@@ -1,4 +1,5 @@
 import { Metadata } from "next"
+import { redirect } from "next/navigation"
 
 import Wrapper from "@modules/checkout/components/payment-wrapper"
 import CheckoutForm from "@modules/checkout/templates/checkout-form"
@@ -26,7 +27,19 @@ const fetchCart = async () => {
   return cart
 }
 
-export default async function Checkout() {
+export default async function Checkout({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ countryCode: string }>
+  searchParams: Promise<{ step?: string }>
+}) {
+  const { countryCode } = await params
+  const { step } = await searchParams
+  if (!step) {
+    redirect(`/${countryCode}/checkout?step=address`)
+  }
+
   const cart = await fetchCart()
   const customer = await getCustomer()
 

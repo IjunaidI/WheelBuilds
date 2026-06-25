@@ -264,6 +264,7 @@ const medusaConfig = {
                 'price_min', 'price_max', 'product_type',
               ],
               sortableAttributes: ['price_min', 'created_at', 'title'],
+              pagination: { maxTotalHits: 10000 },
             },
             primaryKey: 'id',
             // The plugin falls back to its DEFAULT transformer when ours returns a

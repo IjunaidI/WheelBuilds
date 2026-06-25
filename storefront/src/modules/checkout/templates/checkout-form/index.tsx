@@ -3,6 +3,7 @@ import { listCartPaymentMethods } from "@lib/data/payment"
 import { HttpTypes } from "@medusajs/types"
 import Addresses from "@modules/checkout/components/addresses"
 import ExpressPay from "@modules/checkout/components/express-pay"
+import { isExpressPayEnabled } from "@modules/checkout/components/express-pay/config"
 import Payment from "@modules/checkout/components/payment"
 import Review from "@modules/checkout/components/review"
 import SectionShell from "@modules/checkout/components/section-shell"
@@ -28,7 +29,7 @@ export default async function CheckoutForm({
 
   return (
     <div className="flex flex-col gap-6">
-      <ExpressPay />
+      {isExpressPayEnabled() && <ExpressPay />}
       <div className="w-full flex flex-col gap-4">
         <SectionShell num={1} title="Shipping address">
           <Addresses cart={cart} customer={customer} />

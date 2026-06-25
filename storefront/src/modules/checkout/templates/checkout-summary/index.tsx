@@ -6,6 +6,7 @@ import LocalizedClientLink from "@modules/common/components/localized-client-lin
 import Label from "@modules/common/components/label"
 import { convertToLocale } from "@lib/util/money"
 import { HttpTypes } from "@medusajs/types"
+import { isAffirmEnabled } from "@modules/checkout/components/express-pay/config"
 
 type CheckoutSummaryProps = {
   cart: HttpTypes.StoreCart & { promotions?: HttpTypes.StorePromotion[] }
@@ -180,7 +181,7 @@ const Totals = ({ cart }: { cart: HttpTypes.StoreCart }) => {
             {Math.round(total).toLocaleString(undefined, { minimumFractionDigits: 2 })}
           </span>
         </div>
-        {total > 0 && (
+        {isAffirmEnabled() && total > 0 && (
           <div
             className="text-right mt-1.5 font-[var(--mono)] text-[11px] tracking-[0.03em] text-[var(--ink-soft)]"
           >

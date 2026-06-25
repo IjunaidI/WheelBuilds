@@ -5,6 +5,7 @@ import React from "react"
 import { useFormState } from "react-dom"
 
 import { applyPromotions, submitPromotionForm } from "@lib/data/cart"
+import { retainedPromoCodes } from "./promo-codes"
 import { convertToLocale } from "@lib/util/money"
 import { InformationCircleSolid } from "@medusajs/icons"
 import { HttpTypes } from "@medusajs/types"
@@ -23,13 +24,7 @@ const DiscountCode: React.FC<DiscountCodeProps> = ({ cart }) => {
 
   const { items = [], promotions = [] } = cart
   const removePromotionCode = async (code: string) => {
-    const validPromotions = promotions.filter(
-      (promotion) => promotion.code !== code
-    )
-
-    await applyPromotions(
-      validPromotions.filter((p) => p.code === undefined).map((p) => p.code!)
-    )
+    await applyPromotions(retainedPromoCodes(promotions, code))
   }
 
   const addPromotionCode = async (formData: FormData) => {
@@ -38,12 +33,7 @@ const DiscountCode: React.FC<DiscountCodeProps> = ({ cart }) => {
       return
     }
     const input = document.getElementById("promotion-input") as HTMLInputElement
-    const codes = promotions
-      .filter((p) => p.code === undefined)
-      .map((p) => p.code!)
-    codes.push(code.toString())
-
-    await applyPromotions(codes)
+    await applyPromotions([...retainedPromoCodes(promotions), code.toString()])
 
     if (input) {
       input.value = ""

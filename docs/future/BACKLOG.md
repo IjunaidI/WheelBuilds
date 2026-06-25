@@ -23,12 +23,13 @@
 > Thematic groupings of the open items below, each sized for roughly one session
 > (brainstorm → spec → plan → execute one group at a time). Members list the **open**
 > `WB-NNN` as of 2026-06-23; the per-item `status` further down is the source of truth — when an
-> item flips to `done`, drop it from its group here. **Completed groups (2026-06-23):**
-> *Six-axis wheel variant model* (WB-051) and *Wheel-size fitment hardening* (WB-007/008/019/020/043).
+> item flips to `done`, drop it from its group here. **Completed groups:** *Six-axis wheel variant
+> model* (WB-051) and *Wheel-size fitment hardening* (WB-007/008/019/020/043) — 2026-06-23;
+> *G3 · PDP correctness & polish* (WB-048/029/030) — 2026-06-25.
 
 - **G1 · Vendor-sync productionization (async + scale)** `[L · needs Redis worker]` — move sync triggers off the HTTP request, parallelize/stream the apply, make cancel + feed archiving worker-safe. → WB-011, WB-012, WB-013, WB-014, WB-015, WB-017, WB-018, WB-037
 - **G2 · Checkout & cart (make it transactable)** `[M–L · partly payment-gated]` — fix the checkout stall, live-stock quantity cap, express-pay/Affirm, gift-card/discount, stale copy. → WB-033, WB-034, WB-035, WB-036, WB-047
-- **G3 · PDP correctness & polish** `[S–M]` — BLANK bolt-pattern selectable gate, PDP placeholders, de-dupe the finish-normalizer twin. → WB-048, WB-029, WB-030
+- **G3 · PDP correctness & polish** `[S–M]` — ✅ **DONE 2026-06-25** (WB-048 BLANK gate, WB-029 placeholders, WB-030 finish-normalizer twin).
 - **G4 · Home & merchandising** `[M]` — real Featured Blocks / Build Gallery, newsletter persistence, hardcoded merchandising copy. → WB-004, WB-023, WB-028
 - **G5 · Discovery & search** `[S–M]` — Meili result cache, dead category facet, browse `maxTotalHits` cap. → WB-021, WB-046, WB-053
 - **G6 · Catalog breadth & pricing** `[L–XL · WB-005 is a big spec alone]` — tires grouping+indexing, markup/MAP/margin pricing, de-hardcode bootstrap identity + vendor roster. → WB-005, WB-024, WB-025, WB-026
@@ -325,22 +326,24 @@
 - refs: —
 
 ### WB-029 · PDP placeholders (qty default, construction/origin/warranty, low-stock threshold, ship copy)   [MEDIUM]
-- status: todo
+- status: done
 - area: storefront/pdp
-- evidence: storefront/src/modules/product-detail/data/get-product.ts ; storefront/src/modules/product-detail/components/hero/purchase-panel.tsx
+- evidence: storefront/src/modules/product-detail/data/pdp-config.ts ; storefront/src/modules/product-detail/data/group-sizes.ts (`availabilityOf(qty, threshold)`) ; storefront/src/modules/product-detail/components/specs/index.tsx (null-row guards)
 - problem: PDP displays hardcoded placeholder values: quantity defaults to 4, construction/origin/warranty fields show "—", low-stock threshold is hardcoded at ≤4, shipping copy is placeholder text.
 - fix: source qty default and low-stock threshold from config; populate construction/origin/warranty from product metadata (vendor feed or admin); replace ship copy with real content.
 - verify: a product with construction metadata in its Medusa record shows that value on the PDP instead of "—"; qty default and low-stock threshold come from config.
-- refs: —
+- done: 2026-06-25 — new `pdp-config.ts` (env-overridable `DEFAULT_WHEEL_QTY`, `LOW_STOCK_THRESHOLD`, `FREE_SHIP_THRESHOLD_USD`, `SHIP_LEAD_TIME`, `TRUST_STRIP`; `intEnv` truncates + falls back safely); `availabilityOf` threshold now config-driven (default-4 behavior unchanged). Construction/origin/warranty: the wheel feed has NO source for these — so the specs grid reads admin-set product metadata if present, else HIDES the row (no fabricated "—"). Built subagent-driven (final opus review: ready to merge).
+- refs: design [docs/done/specs/2026-06-25-pdp-correctness-polish-design.md](../done/specs/2026-06-25-pdp-correctness-polish-design.md) ; plan [docs/done/plans/2026-06-25-pdp-correctness-polish.md](../done/plans/2026-06-25-pdp-correctness-polish.md)
 
 ### WB-030 · `normalizeFinish` hand-synced twin across apps   [MEDIUM]
-- status: todo
+- status: done
 - area: backend/vendor-sync/search + storefront/pdp
-- evidence: storefront/src/modules/product-detail/data/get-product.ts:29-36 + backend/src/modules/vendor-sync/search/normalize-finish.ts
+- evidence: fixtures/finish-normalize-golden.json ; backend/src/modules/vendor-sync/__tests__/normalize-finish-golden.test.ts ; storefront/src/lib/fitment/normalize-finish.ts + storefront/src/lib/fitment/__tests__/normalize-finish.test.ts
 - problem: normalizeFinish is duplicated verbatim between the backend search transformer and the storefront PDP loader; the two copies must be kept in lockstep manually — any divergence silently mismatches finish labels between discovery and PDP.
 - fix: extract normalizeFinish into a shared package or a backend API response field so there is a single source of truth; the storefront reads the normalized value rather than re-computing it.
 - verify: changing the normalizeFinish logic in one place propagates to both discovery and PDP; there is no second copy to update.
-- refs: —
+- done: 2026-06-25 — chosen approach: golden-fixture lockstep (mirrors the existing `bolt-pattern-canonical-golden.json` precedent; the single-stored-value alternative was rejected to avoid a catalog backfill right after the WB-051 re-import). The storefront's inline copy is extracted to `@lib/fitment/normalize-finish.ts`; a shared `fixtures/finish-normalize-golden.json` (22 vectors incl. precedence-collision cases) is asserted by a test in EACH app, so a future edit that breaks keyword precedence in either copy fails CI instead of silently shipping. Two implementations remain (backend keyword-arrays, storefront regex) but cannot drift. Built subagent-driven (final opus review: ready to merge).
+- refs: design [docs/done/specs/2026-06-25-pdp-correctness-polish-design.md](../done/specs/2026-06-25-pdp-correctness-polish-design.md) ; plan [docs/done/plans/2026-06-25-pdp-correctness-polish.md](../done/plans/2026-06-25-pdp-correctness-polish.md)
 
 ### WB-031 · Seeded shipping options + placeholder `replyTo info@example.com`   [MEDIUM]
 - status: todo
@@ -498,13 +501,14 @@
 - refs: —
 
 ### WB-048 · Placeholder bolt pattern ("BLANK"/empty) is a selectable PDP gate   [MEDIUM]
-- status: todo
+- status: done
 - area: storefront/pdp + backend/vendor-sync
-- evidence: storefront/src/modules/product-detail/data/get-product.ts:51-57 (boltPatternOptions) ; storefront/src/modules/product-detail/data/group-sizes.ts (group key + sizesForBoltPattern)
+- evidence: storefront/src/modules/product-detail/data/group-sizes.ts (`isRealBoltPattern` + placeholder size-keying) ; storefront/src/modules/product-detail/data/get-product.ts (`.filter(isRealBoltPattern)`) ; storefront/src/modules/product-detail/components/hero/variant-picker.tsx (row hidden when ≤1 pattern)
 - problem: some vendor rows carry `bolt_pattern_raw = "BLANK"` (or empty) as a placeholder. Since WB-003 made the bolt-pattern row load-bearing (it now gates the size grid), a literal "BLANK" value becomes its own group key, a selectable chip, and a filter target — e.g. `performance-replicas-126-gloss-black` exposes a clickable "BLANK" pattern. Pre-existing data quality, but now user-visible and functional.
 - fix: drop/normalize placeholder bolt patterns at the loader (`boltPatternOptions` in get-product.ts) so "BLANK"/"" never becomes a clickable gate; keep `sizesForBoltPattern`'s all-sizes fallback as the safety net for genuinely pattern-less products. Optionally normalize "BLANK" upstream in vendor-sync.
 - verify: a product whose variants include a "BLANK"/empty bolt_pattern_raw shows no "BLANK" chip in the PDP variant picker; its sizes still render (via fallback).
-- refs: — (discovered during WB-003; see done/specs/2026-06-18-pdp-bolt-pattern-axis-design.md)
+- done: 2026-06-25 — pure `isRealBoltPattern(raw)` rejects ""/whitespace/"BLANK"/"N/A"; loader filters `boltPatterns` through it (transitively cleans `boltPatternOptions` + `boltPatternsCanonical` + lead `boltPattern`); placeholder variants keyed `""` so they surface ONLY via the all-sizes fallback; variant-picker hides the bolt-pattern row when ≤1 real pattern. Unit-tested (isRealBoltPattern + placeholder-keying roundtrip). Live-backend BLANK-chip smoke deferred to pre-deploy. Built subagent-driven (final opus review: ready to merge).
+- refs: design [docs/done/specs/2026-06-25-pdp-correctness-polish-design.md](../done/specs/2026-06-25-pdp-correctness-polish-design.md) ; plan [docs/done/plans/2026-06-25-pdp-correctness-polish.md](../done/plans/2026-06-25-pdp-correctness-polish.md) (discovered during WB-003)
 
 ---
 

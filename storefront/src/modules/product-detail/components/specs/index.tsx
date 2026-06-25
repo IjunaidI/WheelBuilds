@@ -2,6 +2,7 @@ import Display from "@modules/common/components/display"
 import Label from "@modules/common/components/label"
 import SectionHeader from "@modules/common/components/section-header"
 import { ProductDetail } from "../../data/types"
+import { buildSpecRows } from "./spec-rows"
 
 type SpecsProps = {
   product: ProductDetail
@@ -13,24 +14,7 @@ type SpecsProps = {
  * — see the @media override there for the column-count switch.
  */
 const Specs = ({ product }: SpecsProps) => {
-  const rows: { label: string; value: string }[] = [
-    ...(product.specs.construction
-      ? [{ label: "Construction", value: product.specs.construction }]
-      : []),
-    { label: "Per-wheel weight", value: `${product.specs.weightLb} lb` },
-    { label: "Load rating", value: `${product.specs.loadRatingLb.toLocaleString()} lb` },
-    { label: "Center bore", value: `${product.specs.centerBoreMm} mm` },
-    ...(product.specs.hubBoreMm
-      ? [{ label: "Hub bore", value: `${product.specs.hubBoreMm} mm` }]
-      : []),
-    ...(product.specs.countryOfOrigin
-      ? [{ label: "Country of origin", value: product.specs.countryOfOrigin }]
-      : []),
-    ...(product.specs.warranty
-      ? [{ label: "Warranty", value: product.specs.warranty }]
-      : []),
-    { label: "Finish options", value: `${product.specs.finishOptions}` },
-  ]
+  const rows = buildSpecRows(product.specs)
 
   return (
     <section className="border-t border-[var(--hairline)] py-16 small:py-20">

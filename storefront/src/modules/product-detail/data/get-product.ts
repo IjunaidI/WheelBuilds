@@ -47,7 +47,9 @@ function mapToDetail(product: HttpTypes.StoreProduct): ProductDetail {
     )
   )
 
-  const weightLb = num((product as any).weight) / 453.592
+  // Round to 1 decimal — the importer's grams round-trip otherwise yields ugly
+  // values like 31.9997 lb. Single source: specs grid + variant-picker both read this.
+  const weightLb = Math.round((num((product as any).weight) / 453.592) * 10) / 10
 
   return {
     // DiscoveryProduct base

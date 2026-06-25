@@ -72,14 +72,14 @@ const Gallery = ({ finishes, activeFinish, onFinishChange, thumbnail }: GalleryP
               onClick={() => onFinishChange(f)}
               aria-label={`Show ${FINISH_LABELS[f]} finish`}
               aria-pressed={f === activeFinish}
-              className={`flex-1 aspect-square rounded-[var(--radius)] border-2 flex items-center justify-center transition-colors ${
+              className={`w-24 h-24 shrink-0 rounded-[var(--radius)] border-2 flex items-center justify-center transition-colors ${
                 f === activeFinish
                   ? "border-[var(--orange)]"
                   : "border-[var(--hairline)] hover:border-[var(--ink-soft)]"
               }`}
               style={{ background: "var(--soft)" }}
             >
-              <Wheel size={72} finish={f} />
+              <Wheel size={80} finish={f} />
             </button>
           ))}
         </div>

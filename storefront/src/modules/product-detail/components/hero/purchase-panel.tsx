@@ -10,6 +10,7 @@ import Icon from "@modules/common/components/icon"
 import { Button } from "@/components/ui/button"
 import { Separator } from "@/components/ui/separator"
 import { useGarage } from "@lib/garage/use-garage"
+import { fitsVehicle } from "@lib/fitment/fits-vehicle"
 import { openSearch } from "@lib/stores/search-store"
 import { addToCart } from "@lib/data/cart"
 import { OffsetVariant, ProductDetail, SizeOption } from "../../data/types"
@@ -37,6 +38,7 @@ const PurchasePanel = ({
   selectedVariant,
 }: PurchasePanelProps) => {
   const { active } = useGarage()
+  const fits = active ? fitsVehicle(product, active).fits : false
   const router = useRouter()
   const { countryCode } = useParams() as { countryCode: string }
   const [quantity, setQuantity] = useState(DEFAULT_WHEEL_QTY)
@@ -131,13 +133,20 @@ const PurchasePanel = ({
         {product.description}
       </p>
 
-      {/* Fitment chip */}
+      {/* Fitment chip — real fitsVehicle verdict, never a blanket "confirmed". */}
       <div className="mt-5">
         {active ? (
-          <Chip variant="accent" dot>
-            CONFIRMED FIT · {active.year} {active.make.toUpperCase()}{" "}
-            {active.model.toUpperCase()}
-          </Chip>
+          fits ? (
+            <Chip variant="accent" dot>
+              CONFIRMED FIT · {active.year} {active.make.toUpperCase()}{" "}
+              {active.model.toUpperCase()}
+            </Chip>
+          ) : (
+            <Chip variant="outline">
+              MAY NOT FIT · {active.year} {active.make.toUpperCase()}{" "}
+              {active.model.toUpperCase()}
+            </Chip>
+          )
         ) : (
           <Chip variant="outline" onClick={openSearch}>
             <Icon name="garage" size={12} strokeWidth={1.6} />

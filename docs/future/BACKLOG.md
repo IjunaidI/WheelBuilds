@@ -25,13 +25,15 @@
 > `WB-NNN` as of 2026-06-23; the per-item `status` further down is the source of truth — when an
 > item flips to `done`, drop it from its group here. **Completed groups:** *Six-axis wheel variant
 > model* (WB-051) and *Wheel-size fitment hardening* (WB-007/008/019/020/043) — 2026-06-23;
-> *G3 · PDP correctness & polish* (WB-048/029/030) — 2026-06-25.
+> *G3 · PDP correctness & polish* (WB-048/029/030) — 2026-06-25;
+> *G2 · Checkout & cart transactable* (WB-033/034/035/036/047 + WB-053) — 2026-06-26
+> (gift cards split to WB-054; remaining brand copy to WB-055).
 
 - **G1 · Vendor-sync productionization (async + scale)** `[L · needs Redis worker]` — move sync triggers off the HTTP request, parallelize/stream the apply, make cancel + feed archiving worker-safe. → WB-011, WB-012, WB-013, WB-014, WB-015, WB-017, WB-018, WB-037
-- **G2 · Checkout & cart (make it transactable)** `[M–L · partly payment-gated]` — fix the checkout stall, live-stock quantity cap, express-pay/Affirm, gift-card/discount, stale copy. → WB-033, WB-034, WB-035, WB-036, WB-047
+- **G2 · Checkout & cart (make it transactable)** `[M–L]` — ✅ **DONE 2026-06-26** (WB-033 stall, WB-034 stock cap, WB-035 express-pay/Affirm env-gated, WB-036 discount fix, WB-047 copy + WB-053 browse cap). Follow-ups: WB-054 (gift cards v2), WB-055 (brand-copy sweep).
 - **G3 · PDP correctness & polish** `[S–M]` — ✅ **DONE 2026-06-25** (WB-048 BLANK gate, WB-029 placeholders, WB-030 finish-normalizer twin).
 - **G4 · Home & merchandising** `[M]` — real Featured Blocks / Build Gallery, newsletter persistence, hardcoded merchandising copy. → WB-004, WB-023, WB-028
-- **G5 · Discovery & search** `[S–M]` — Meili result cache, dead category facet, browse `maxTotalHits` cap. → WB-021, WB-046, WB-053
+- **G5 · Discovery & search** `[S]` — Meili result cache, dead category facet. (browse `maxTotalHits` cap WB-053 ✅ done 2026-06-26 via G2.) → WB-021, WB-046
 - **G6 · Catalog breadth & pricing** `[L–XL · WB-005 is a big spec alone]` — tires grouping+indexing, markup/MAP/margin pricing, de-hardcode bootstrap identity + vendor roster. → WB-005, WB-024, WB-025, WB-026
 - **G7 · Account & garage** `[S–M]` — account Garage tab/route, robust guest→login garage merge, license-plate lookup. → WB-032, WB-022, WB-045
 - **G8 · Admin & ops tooling** `[S]` — vendor-sync admin UI, seed shipping options + reply-to, rename `teraflex` fixtures, scale-safe dev-wipe. → WB-006, WB-031, WB-044, WB-052
@@ -368,40 +370,44 @@
 - refs: —
 
 ### WB-033 · Direct nav to `/checkout` stalls (no default `?step=`)   [MEDIUM]
-- status: todo
+- status: done
 - area: storefront/checkout
-- evidence: storefront/src/app/[countryCode]/(checkout)/checkout/page.tsx:43-68
+- evidence: storefront/src/app/[countryCode]/(checkout)/checkout/page.tsx (awaits searchParams; redirect when no step)
 - problem: navigating directly to /checkout without a ?step= query param causes the checkout page to stall or render in an indeterminate state rather than redirecting to the first step.
 - fix: add a redirect from /checkout (no step param) to /checkout?step=address (or the appropriate first step) so direct navigation works correctly.
 - verify: navigating to /<countryCode>/checkout without ?step= redirects to the address step and renders the checkout form correctly.
-- refs: —
+- done: 2026-06-26 — the checkout RSC now awaits Next-15 `params`/`searchParams` and `redirect()`s to `?step=address` (before any cart fetch) when `step` is absent; the four client step components are unchanged. Always lands on address (first-incomplete-step computation deliberately out of scope). Live smoke deferred to pre-deploy.
+- refs: design [docs/done/specs/2026-06-26-checkout-cart-transactable-design.md](../done/specs/2026-06-26-checkout-cart-transactable-design.md) ; plan [docs/done/plans/2026-06-26-checkout-cart-transactable.md](../done/plans/2026-06-26-checkout-cart-transactable.md)
 
 ### WB-034 · Cart qty capped at hardcoded 10, ignores live stock   [MEDIUM]
-- status: todo
+- status: done
 - area: storefront/cart
-- evidence: storefront/src/modules/cart/components/item/index.tsx:45-47
+- evidence: storefront/src/modules/cart/components/item/max-qty.ts ; storefront/src/modules/cart/components/item/index.tsx (uses maxSelectableQty)
 - problem: the cart item quantity selector is capped at 10 regardless of actual inventory; a product with 2 in stock allows qty 10; a product with 50 in stock caps at 10.
 - fix: fetch live inventory quantity for each cart item variant and use it as the max qty; fall back to a configurable cap if inventory is unavailable.
 - verify: the cart qty selector cap matches the actual inventory level for the variant; a variant with 3 in stock caps at 3, not 10.
-- refs: —
+- done: 2026-06-26 — pure `maxSelectableQty(variant, currentQty)` caps at live `inventory_quantity` when the variant manages stock AND disallows backorder, else a FALLBACK_MAX (10); never returns below the qty already in cart (a post-add stock drop can't make the current selection unpickable). Cart page already enriches `inventory_quantity`. Unit-tested (6 boundary cases).
+- refs: design [docs/done/specs/2026-06-26-checkout-cart-transactable-design.md](../done/specs/2026-06-26-checkout-cart-transactable-design.md) ; plan [docs/done/plans/2026-06-26-checkout-cart-transactable.md](../done/plans/2026-06-26-checkout-cart-transactable.md)
 
 ### WB-035 · Express Pay / Affirm are non-functional chrome   [MEDIUM]
-- status: todo
+- status: done
 - area: storefront/checkout
-- evidence: storefront/src/modules/checkout/components/express-pay/index.tsx ; storefront/src/modules/checkout/components/checkout-summary/index.tsx:183-189
+- evidence: storefront/src/modules/checkout/components/express-pay/config.ts ; checkout-form/index.tsx (gated mount) ; checkout-summary/index.tsx (gated Affirm)
 - problem: Express Pay and Affirm buttons are rendered as UI chrome with no real payment provider integration; clicking them does nothing or shows a stub.
 - fix: either integrate real Express Pay (Stripe Link, Apple Pay, Google Pay) and Affirm providers, or remove the buttons until providers are available.
 - verify: Express Pay and Affirm buttons either complete a real payment flow, or are entirely absent from the UI (no non-functional chrome).
-- refs: —
+- done: 2026-06-26 — env-gated (chosen over hard-remove to preserve the built UI + seam). `isExpressPayEnabled()`/`isAffirmEnabled()` read two default-OFF flags (`NEXT_PUBLIC_EXPRESS_PAY_ENABLED`/`NEXT_PUBLIC_AFFIRM_ENABLED`); the ExpressPay mount + the Affirm line (still `&& total > 0`) render only when on. Hidden by default → no misleading chrome. Deliberately NOT gated on the Stripe key (so enabling Stripe CARD payments won't surface non-functional WALLET buttons). **Flags are `NEXT_PUBLIC_*` → changing them needs a storefront REBUILD.** Real wallet/Affirm wiring is still future work.
+- refs: design [docs/done/specs/2026-06-26-checkout-cart-transactable-design.md](../done/specs/2026-06-26-checkout-cart-transactable-design.md) ; plan [docs/done/plans/2026-06-26-checkout-cart-transactable.md](../done/plans/2026-06-26-checkout-cart-transactable.md)
 
 ### WB-036 · Gift card / discount-remove stubbed or buggy   [MEDIUM]
-- status: todo
+- status: done
 - area: storefront/cart + storefront/checkout
-- evidence: storefront/src/lib/data/cart.ts:244-285 ; storefront/src/modules/checkout/components/discount-code/index.tsx:26-33
+- evidence: storefront/src/modules/checkout/components/discount-code/promo-codes.ts ; discount-code/index.tsx (rewired) ; storefront/src/lib/data/cart.ts (dead stubs removed)
 - problem: gift card redemption and discount code removal are either stubbed out or have bugs; the discount-code UI component does not correctly remove applied codes.
 - fix: implement working gift card apply/remove and discount code remove using the Medusa cart API; test the full apply→remove flow.
 - verify: applying and then removing a discount code from the cart correctly removes the discount; gift card redemption applies the credit to the order total.
-- refs: —
+- done: 2026-06-26 — discount fixed: the remove/add filter was inverted (`p.code === undefined`), so removing one code wiped ALL (and adding dropped existing). Pure `retainedPromoCodes(promotions, removeCode?)` keeps the OTHER manual codes (`!is_automatic && code != null`, matching the UI's remove gate); both call sites rewired. Unit-tested (5 cases). The three dead commented-out gift-card no-op stubs (`applyGiftCard`/`removeGiftCard`/`removeDiscount`, v1 shape, zero importers) were deleted. **Gift cards deferred** — real Medusa-v2 gift-card support is [[WB-054]].
+- refs: design [docs/done/specs/2026-06-26-checkout-cart-transactable-design.md](../done/specs/2026-06-26-checkout-cart-transactable-design.md) ; plan [docs/done/plans/2026-06-26-checkout-cart-transactable.md](../done/plans/2026-06-26-checkout-cart-transactable.md)
 
 ### WB-037 · Cancel flag is per-process in-memory (worker-mode split)   [MEDIUM]
 - status: todo
@@ -492,13 +498,14 @@
 ## Low (doc/cosmetic)
 
 ### WB-047 · Stale "Medusa Store" / "test order" copy   [LOW]
-- status: todo
+- status: done
 - area: storefront/order + storefront/checkout
-- evidence: storefront/src/modules/order/components/onboarding-cta/index.tsx:11-23 ; storefront/src/modules/checkout/components/review/index.tsx:42-45
+- evidence: storefront/src/modules/checkout/components/review/index.tsx (brand copy) ; storefront/src/modules/order/templates/order-completed-template.tsx (onboarding CTA removed)
 - problem: order confirmation and checkout review components still show Medusa boilerplate copy ("Medusa Store", "test order", etc.) instead of Wheel Builds branded text.
 - fix: replace all Medusa boilerplate copy with Wheel Builds branded equivalents in the affected components.
 - verify: grep for "Medusa Store" and "test order" in storefront/src/modules/order/ and storefront/src/modules/checkout/ returns no matches; components show WB-branded copy.
-- refs: —
+- done: 2026-06-26 — review copy → "Wheel Builds' Privacy Policy"; the dead `_medusa_onboarding`-cookie-gated "test order" onboarding CTA was removed and its orphaned component deleted (also cleared a pre-existing unawaited-`cookies()` tsc error). `modules/order` + `modules/checkout` are now clean of "Medusa Store"/"test order". Remaining "Medusa Store" copy in OTHER modules (account/register, collections/categories metadata, side-menu © footer) was out of this item's scope → [[WB-055]].
+- refs: design [docs/done/specs/2026-06-26-checkout-cart-transactable-design.md](../done/specs/2026-06-26-checkout-cart-transactable-design.md) ; plan [docs/done/plans/2026-06-26-checkout-cart-transactable.md](../done/plans/2026-06-26-checkout-cart-transactable.md)
 
 ### WB-048 · Placeholder bolt pattern ("BLANK"/empty) is a selectable PDP gate   [MEDIUM]
 - status: done
@@ -552,10 +559,33 @@
 ---
 
 ### WB-053 · Discovery `/store` browse capped at Meilisearch default `maxTotalHits=1000`   [LOW]
-- status: todo
+- status: done
 - area: backend/search + storefront/discovery
-- evidence: backend/medusa-config.js (meili `indexSettings` sets no `pagination.maxTotalHits`) ; storefront/src/modules/discovery
+- evidence: backend/medusa-config.js (products `indexSettings.pagination.maxTotalHits = 10000`)
 - problem: the unfiltered `/store` browse paginates at most 1,000 results (~84 pages × 12) because the products index uses Meilisearch's default `maxTotalHits=1000`; the "N results" header reflects the cap, not the real catalog (2,670 wheels). Surfaced during the WB-051 re-import — the page count looked unchanged because the catalog already exceeded 1,000 before. Filtered/searched result sets under 1,000 are unaffected, so it does not hide products from users who narrow by vehicle/brand/size.
 - fix: set `pagination: { maxTotalHits: <N> }` in the products `indexSettings` (medusa-config.js) and redeploy so the plugin pushes it; weigh the deep-pagination perf cost. Optionally show a "1,000+" affordance instead of an exact count.
 - verify: with `maxTotalHits` raised, the unfiltered `/store` paginates past 84 pages and the header count tracks the Meili doc count.
-- refs: discovered during WB-051 (2026-06-23)
+- done: 2026-06-26 — `pagination: { maxTotalHits: 10000 }` added to the products `indexSettings` (folded into G2). **Activates on next deploy / Meili settings re-sync** (the plugin pushes index settings on boot) — not yet live until then. `node --check` validated.
+- refs: discovered during WB-051 (2026-06-23) ; shipped with [docs/done/plans/2026-06-26-checkout-cart-transactable.md](../done/plans/2026-06-26-checkout-cart-transactable.md)
+
+---
+
+### WB-054 · Medusa v2 gift-card apply/remove (backend workflow + storefront UI)   [MEDIUM]
+- status: todo
+- area: backend/cart + storefront/checkout
+- evidence: storefront/src/lib/data/cart.ts (dead v1 stubs removed in WB-036) ; storefront/src/modules/checkout/components/discount-code/
+- problem: the storefront had commented-out v1 gift-card stubs (`gift_cards: [{ code }]` on cart update) that no longer match the Medusa v2 API and were wired to no UI. They were removed in WB-036. There is currently NO working gift-card redemption path.
+- fix: implement gift-card apply/remove with the Medusa v2 approach (gift-card module + the correct cart line/promotion mechanism), plus a storefront UI entry point (likely alongside the discount-code component) and a server action in `lib/data/cart.ts`.
+- verify: a customer can redeem a valid gift card at checkout, see the credit applied to the order total, and remove it; the credit persists through order placement.
+- refs: split out of [[WB-036]] (2026-06-26)
+
+---
+
+### WB-055 · Remaining "Medusa Store" boilerplate copy outside order/checkout   [LOW]
+- status: todo
+- area: storefront/account + storefront/layout + storefront/collections + storefront/categories
+- evidence: storefront/src/modules/account/.../register ; collections/categories metadata ; modules/layout side-menu footer (`© Medusa Store`)
+- problem: WB-047 rebranded `modules/order` + `modules/checkout` but left "Medusa Store" boilerplate copy elsewhere — the account register blurb, collections/categories page metadata, and the side-menu `© Medusa Store` footer.
+- fix: sweep the remaining "Medusa Store" occurrences and replace with "Wheel Builds" (or the appropriate brand string / metadata).
+- verify: `grep -rn "Medusa Store" storefront/src` returns only API references ("Medusa Store API"), no brand copy.
+- refs: flagged in the WB-047 / G2 final review (2026-06-26)

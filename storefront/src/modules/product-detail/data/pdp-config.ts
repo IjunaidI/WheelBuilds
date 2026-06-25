@@ -8,7 +8,7 @@
 
 const intEnv = (v: string | undefined, fallback: number): number => {
   const n = Number(v)
-  return Number.isFinite(n) && n > 0 ? n : fallback
+  return Number.isFinite(n) && n > 0 ? Math.trunc(n) : fallback
 }
 
 /** Default quantity selected on the PDP — wheels sell in sets of 4. */

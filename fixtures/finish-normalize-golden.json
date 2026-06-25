@@ -17,5 +17,8 @@
   { "input": "Gray",                 "output": "silver" },
   { "input": "Grey",                 "output": "silver" },
   { "input": "",                     "output": "black" },
-  { "input": "Brushed Olive",        "output": "black" }
+  { "input": "Brushed Olive",        "output": "black" },
+  { "input": "Bronze Black",         "output": "bronze" },
+  { "input": "Silver Bronze",        "output": "bronze" },
+  { "input": "Black Chrome",         "output": "black" }
 ]

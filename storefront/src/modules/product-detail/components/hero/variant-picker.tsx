@@ -93,7 +93,8 @@ const VariantPicker = ({
                     {s.offsetMm}mm
                   </div>
                   <div className="text-[10px] opacity-80">
-                    {s.weightLb} lb · {AVAILABILITY_LABEL[s.availability]}
+                    {s.weightLb > 0 ? `${s.weightLb} lb · ` : ""}
+                    {AVAILABILITY_LABEL[s.availability]}
                   </div>
                 </TooltipContent>
               </Tooltip>
@@ -134,7 +135,9 @@ const VariantPicker = ({
 
       {/* Weight + stock readout. Offset moved to the AutoFitmentCard below. */}
       <div className="grid grid-cols-2 gap-3 pt-4 border-t border-[var(--hairline)]">
-        <Stat label="Weight" value={`${selectedSize.weightLb} lb`} />
+        {selectedSize.weightLb > 0 && (
+          <Stat label="Weight" value={`${selectedSize.weightLb} lb`} />
+        )}
         <Stat
           label="Status"
           value={

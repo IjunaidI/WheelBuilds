@@ -13,6 +13,11 @@ describe("retainedPromoCodes", () => {
   it("drops automatic promotions (code null/undefined) — Medusa re-derives them", () => {
     expect(retainedPromoCodes([promo("A"), promo(undefined)])).toEqual(["A"])
   })
+  it("drops automatic promotions even when they carry a code", () => {
+    expect(
+      retainedPromoCodes([promo("A"), { code: "AUTO", is_automatic: true } as any])
+    ).toEqual(["A"])
+  })
   it("empty list → empty", () => {
     expect(retainedPromoCodes([])).toEqual([])
   })

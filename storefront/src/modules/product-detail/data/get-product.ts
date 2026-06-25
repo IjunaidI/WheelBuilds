@@ -16,24 +16,13 @@ import { getProductByHandle, getProductsList } from "@lib/data/products"
 import { getRegion } from "@lib/data/regions"
 import { getFitmentByProduct } from "@lib/data/fitment"
 import { canonicalBoltPatterns } from "@lib/fitment/canonical-bolt-pattern"
+import { normalizeFinish } from "@lib/fitment/normalize-finish"
 import { DiscoveryProduct } from "@modules/discovery/data/types"
 import { Finish } from "@modules/common/components/wheel"
 import { ProductDetail, SizeOption } from "./types"
-import { num, groupVariantsIntoSizes } from "./group-sizes"
+import { num, groupVariantsIntoSizes, isRealBoltPattern } from "./group-sizes"
 
 const DEFAULT_COUNTRY = process.env.NEXT_PUBLIC_DEFAULT_REGION || "us"
-
-// Byte-equivalent to the backend's normalize-finish.ts (which the index uses).
-// Keep the two in lockstep so the PDP swatch matches the Discovery grid swatch.
-// Precedence: bronze → explicit "black" (dominates a silver accent) → silver → black.
-function normalizeFinish(raw: unknown): Finish {
-  const s = String(raw ?? "").toLowerCase()
-  if (/bronze|gold|copper|brass/.test(s)) return "bronze"
-  if (s.includes("black")) return "black"
-  if (/silver|chrome|machined|milled|polished|gunmetal|gr[ae]y|titanium|graphite/.test(s))
-    return "silver"
-  return "black"
-}
 
 function mapToDetail(product: HttpTypes.StoreProduct): ProductDetail {
   const pmeta = (product.metadata ?? {}) as Record<string, unknown>
@@ -54,7 +43,7 @@ function mapToDetail(product: HttpTypes.StoreProduct): ProductDetail {
     new Set(
       variants
         .map((v) => String((v.metadata as any)?.bolt_pattern_raw ?? ""))
-        .filter(Boolean)
+        .filter(isRealBoltPattern)
     )
   )
 
@@ -78,12 +67,14 @@ function mapToDetail(product: HttpTypes.StoreProduct): ProductDetail {
     // ProductDetail extras
     description: product.description ?? "",
     specs: {
-      construction: "—", // Spec §5: not in vendor data (plan gap 4.1).
+      // No vendor source for wheels — surface admin-set metadata if present, else hide (WB-029).
+      construction: (typeof pmeta.construction === "string" && pmeta.construction) || null,
       weightLb,
       loadRatingLb: num(rep.load_rating_lb),
       centerBoreMm: num(rep.center_bore_mm),
-      countryOfOrigin: "—",
-      warranty: "—",
+      countryOfOrigin:
+        (typeof pmeta.country_of_origin === "string" && pmeta.country_of_origin) || null,
+      warranty: (typeof pmeta.warranty === "string" && pmeta.warranty) || null,
       finishOptions: 1,
     },
     finishOptions: [finish],

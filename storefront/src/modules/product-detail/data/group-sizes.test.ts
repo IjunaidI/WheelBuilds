@@ -7,6 +7,8 @@ import {
   loadsFor,
   loadsForBore,
   resolveLeafVariant,
+  isRealBoltPattern,
+  availabilityOf,
 } from "./group-sizes"
 
 // Minimal variant factory mirroring the Medusa Store API shape the loader reads.
@@ -181,5 +183,43 @@ describe("loadsForBore (cascade off bore) — WB-051", () => {
   })
   it("returns all loads at the offset when bore is unspecified (wildcard)", () => {
     expect(loadsForBore(size.offsetVariants!, 105, null)).toEqual([2200, 2500, 3000])
+  })
+})
+
+describe("isRealBoltPattern", () => {
+  it("rejects placeholders (empty, whitespace, BLANK, N/A — any case)", () => {
+    for (const raw of ["", "   ", "BLANK", "blank", "Blank", "N/A", "n/a", null, undefined]) {
+      expect(isRealBoltPattern(raw)).toBe(false)
+    }
+  })
+  it("accepts real patterns", () => {
+    for (const raw of ["5x114.3", "5X114.3", "6x139.7", "6X135/5.5"]) {
+      expect(isRealBoltPattern(raw)).toBe(true)
+    }
+  })
+})
+
+describe("groupVariantsIntoSizes — placeholder bolt patterns", () => {
+  it("keys a BLANK-pattern variant under '' so it stays reachable via the all-sizes fallback", () => {
+    const sizes = groupVariantsIntoSizes(
+      [variant("v_blank", 20, 9, 18, "BLANK", 10, 300)],
+      28
+    )
+    expect(sizes).toHaveLength(1)
+    expect(sizes[0].boltPattern).toBe("")
+    // The fallback surfaces it when no real pattern is selected.
+    expect(sizesForBoltPattern(sizes, "")).toHaveLength(1)
+  })
+})
+
+describe("availabilityOf — configurable low-stock threshold", () => {
+  it("uses the default threshold (4) when none is passed", () => {
+    expect(availabilityOf(0)).toBe("out_of_stock")
+    expect(availabilityOf(4)).toBe("low_stock")
+    expect(availabilityOf(5)).toBe("in_stock")
+  })
+  it("honors an explicit threshold", () => {
+    expect(availabilityOf(2, 2)).toBe("low_stock")
+    expect(availabilityOf(3, 2)).toBe("in_stock")
   })
 })

@@ -8,6 +8,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip"
 import { SizeOption } from "../../data/types"
+import { SHIP_LEAD_TIME } from "../../data/pdp-config"
 
 type VariantPickerProps = {
   sizes: SizeOption[]
@@ -20,7 +21,7 @@ type VariantPickerProps = {
 }
 
 const AVAILABILITY_LABEL: Record<SizeOption["availability"], string> = {
-  in_stock: "In stock — ships 2–3 days",
+  in_stock: `In stock — ${SHIP_LEAD_TIME}`,
   low_stock: "Low stock — last few sets",
   out_of_stock: "Out of stock",
 }
@@ -101,32 +102,35 @@ const VariantPicker = ({
         </div>
       </div>
 
-      {/* Bolt pattern row */}
-      <div>
-        <Label tone="muted" style={{ display: "block", marginBottom: 8 }}>
-          Bolt pattern
-        </Label>
-        <div className="flex flex-wrap gap-1.5">
-          {boltPatterns.map((bp) => {
-            const active = bp === selectedBoltPattern
-            return (
-              <button
-                key={bp}
-                type="button"
-                onClick={() => onBoltPatternChange(bp)}
-                className={cn(
-                  "h-10 px-4 rounded-[var(--radius)] border text-[13px] font-semibold transition-colors",
-                  active
-                    ? "border-[var(--ink)] bg-[var(--ink)] text-white"
-                    : "border-[var(--hairline)] bg-white text-[var(--ink)] hover:border-[var(--ink)]"
-                )}
-              >
-                {bp}
-              </button>
-            )
-          })}
+      {/* Bolt pattern row — hidden when there's nothing meaningful to choose
+          (≤1 real pattern). Placeholder patterns are already filtered upstream. */}
+      {boltPatterns.length > 1 && (
+        <div>
+          <Label tone="muted" style={{ display: "block", marginBottom: 8 }}>
+            Bolt pattern
+          </Label>
+          <div className="flex flex-wrap gap-1.5">
+            {boltPatterns.map((bp) => {
+              const active = bp === selectedBoltPattern
+              return (
+                <button
+                  key={bp}
+                  type="button"
+                  onClick={() => onBoltPatternChange(bp)}
+                  className={cn(
+                    "h-10 px-4 rounded-[var(--radius)] border text-[13px] font-semibold transition-colors",
+                    active
+                      ? "border-[var(--ink)] bg-[var(--ink)] text-white"
+                      : "border-[var(--hairline)] bg-white text-[var(--ink)] hover:border-[var(--ink)]"
+                  )}
+                >
+                  {bp}
+                </button>
+              )
+            })}
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Weight + stock readout. Offset moved to the AutoFitmentCard below. */}
       <div className="grid grid-cols-2 gap-3 pt-4 border-t border-[var(--hairline)]">

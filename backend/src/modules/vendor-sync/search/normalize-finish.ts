@@ -13,9 +13,12 @@
  * both → black (they used to split silver vs black because only "machined" was a
  * keyword). A bare "Machined"/"Milled" with no black face → silver.
  *
- * NOTE: the storefront PDP carries a byte-equivalent copy of this rule
- * (modules/product-detail/data/get-product.ts). Keep the two in lockstep so the
- * Discovery grid swatch matches the PDP swatch.
+ * LOCKSTEP: the storefront PDP carries a twin
+ * (storefront/src/lib/fitment/normalize-finish.ts). Both are guarded against drift
+ * by fixtures/finish-normalize-golden.json — a test in EACH app asserts its copy
+ * matches the shared vectors (see __tests__/normalize-finish-golden.test.ts here and
+ * lib/fitment/__tests__/normalize-finish.test.ts in the storefront). Update the golden
+ * and both copies together.
  */
 
 export type Finish = "black" | "bronze" | "silver"

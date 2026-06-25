@@ -13,6 +13,7 @@ import { useGarage } from "@lib/garage/use-garage"
 import { openSearch } from "@lib/stores/search-store"
 import { addToCart } from "@lib/data/cart"
 import { OffsetVariant, ProductDetail, SizeOption } from "../../data/types"
+import { DEFAULT_WHEEL_QTY, TRUST_STRIP } from "../../data/pdp-config"
 
 type PurchasePanelProps = {
   product: ProductDetail
@@ -38,7 +39,7 @@ const PurchasePanel = ({
   const { active } = useGarage()
   const router = useRouter()
   const { countryCode } = useParams() as { countryCode: string }
-  const [quantity, setQuantity] = useState(4) // wheels sell in sets of 4 by default
+  const [quantity, setQuantity] = useState(DEFAULT_WHEEL_QTY)
   const [buying, setBuying] = useState(false)
 
   const stepQty = (delta: number) =>
@@ -215,19 +216,15 @@ const PurchasePanel = ({
 
       {/* Trust strip — compressed for the purchase panel */}
       <div className="grid grid-cols-3 gap-4 pt-6 mt-2">
-        {[
-          { i: "shipping" as const, h: "Free shipping", s: "Orders $199+" },
-          { i: "shield" as const, h: "Fitment guarantee", s: "Or money back" },
-          { i: "return" as const, h: "30-day returns", s: "Unmounted" },
-        ].map((t) => (
-          <div key={t.h} className="flex items-start gap-2.5">
-            <Icon name={t.i} size={20} strokeWidth={1.4} />
+        {TRUST_STRIP.map((t) => (
+          <div key={t.heading} className="flex items-start gap-2.5">
+            <Icon name={t.icon} size={20} strokeWidth={1.4} />
             <div>
               <div className="text-[12px] font-semibold text-[var(--ink)]">
-                {t.h}
+                {t.heading}
               </div>
               <div className="text-[10px] text-[var(--ink-soft)] mt-0.5">
-                {t.s}
+                {t.sub}
               </div>
             </div>
           </div>

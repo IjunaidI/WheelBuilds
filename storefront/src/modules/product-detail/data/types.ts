@@ -77,13 +77,16 @@ export type ProductDetail = DiscoveryProduct & {
 
   /** Per-spec values for the Specs grid. */
   specs: {
-    construction: string // "Forged 6061-T6", "Cast aluminum", "Flow-formed"
+    /** Admin-set product metadata; null when absent (no vendor source for wheels). */
+    construction: string | null
     weightLb: number
     loadRatingLb: number
     centerBoreMm: number
     hubBoreMm?: number
-    countryOfOrigin: string
-    warranty: string
+    /** Admin-set product metadata; null when absent. */
+    countryOfOrigin: string | null
+    /** Admin-set product metadata; null when absent. */
+    warranty: string | null
     finishOptions: number
   }
 

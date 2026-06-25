@@ -67,12 +67,14 @@ function mapToDetail(product: HttpTypes.StoreProduct): ProductDetail {
     // ProductDetail extras
     description: product.description ?? "",
     specs: {
-      construction: "—", // Spec §5: not in vendor data (plan gap 4.1).
+      // No vendor source for wheels — surface admin-set metadata if present, else hide (WB-029).
+      construction: (typeof pmeta.construction === "string" && pmeta.construction) || null,
       weightLb,
       loadRatingLb: num(rep.load_rating_lb),
       centerBoreMm: num(rep.center_bore_mm),
-      countryOfOrigin: "—",
-      warranty: "—",
+      countryOfOrigin:
+        (typeof pmeta.country_of_origin === "string" && pmeta.country_of_origin) || null,
+      warranty: (typeof pmeta.warranty === "string" && pmeta.warranty) || null,
       finishOptions: 1,
     },
     finishOptions: [finish],

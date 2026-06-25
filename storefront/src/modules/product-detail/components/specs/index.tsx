@@ -14,15 +14,21 @@ type SpecsProps = {
  */
 const Specs = ({ product }: SpecsProps) => {
   const rows: { label: string; value: string }[] = [
-    { label: "Construction", value: product.specs.construction },
+    ...(product.specs.construction
+      ? [{ label: "Construction", value: product.specs.construction }]
+      : []),
     { label: "Per-wheel weight", value: `${product.specs.weightLb} lb` },
     { label: "Load rating", value: `${product.specs.loadRatingLb.toLocaleString()} lb` },
     { label: "Center bore", value: `${product.specs.centerBoreMm} mm` },
     ...(product.specs.hubBoreMm
       ? [{ label: "Hub bore", value: `${product.specs.hubBoreMm} mm` }]
       : []),
-    { label: "Country of origin", value: product.specs.countryOfOrigin },
-    { label: "Warranty", value: product.specs.warranty },
+    ...(product.specs.countryOfOrigin
+      ? [{ label: "Country of origin", value: product.specs.countryOfOrigin }]
+      : []),
+    ...(product.specs.warranty
+      ? [{ label: "Warranty", value: product.specs.warranty }]
+      : []),
     { label: "Finish options", value: `${product.specs.finishOptions}` },
   ]
 

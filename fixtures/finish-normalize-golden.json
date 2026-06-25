@@ -1,0 +1,21 @@
+[
+  { "input": "Bronze",               "output": "bronze" },
+  { "input": "Satin Gold",           "output": "bronze" },
+  { "input": "Copper",               "output": "bronze" },
+  { "input": "Brushed Brass",        "output": "bronze" },
+  { "input": "BRONZE",               "output": "bronze" },
+  { "input": "Gloss Black Machined", "output": "black" },
+  { "input": "Gloss Black Milled",   "output": "black" },
+  { "input": "Matte Black",          "output": "black" },
+  { "input": "BLACK",                "output": "black" },
+  { "input": "Machined",             "output": "silver" },
+  { "input": "Gunmetal",             "output": "silver" },
+  { "input": "Titanium",             "output": "silver" },
+  { "input": "Graphite",             "output": "silver" },
+  { "input": "Polished",             "output": "silver" },
+  { "input": "Chrome",               "output": "silver" },
+  { "input": "Gray",                 "output": "silver" },
+  { "input": "Grey",                 "output": "silver" },
+  { "input": "",                     "output": "black" },
+  { "input": "Brushed Olive",        "output": "black" }
+]

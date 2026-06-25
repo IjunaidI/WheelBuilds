@@ -8,6 +8,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip"
 import { SizeOption } from "../../data/types"
+import { SHIP_LEAD_TIME } from "../../data/pdp-config"
 
 type VariantPickerProps = {
   sizes: SizeOption[]
@@ -20,7 +21,7 @@ type VariantPickerProps = {
 }
 
 const AVAILABILITY_LABEL: Record<SizeOption["availability"], string> = {
-  in_stock: "In stock — ships 2–3 days",
+  in_stock: `In stock — ${SHIP_LEAD_TIME}`,
   low_stock: "Low stock — last few sets",
   out_of_stock: "Out of stock",
 }

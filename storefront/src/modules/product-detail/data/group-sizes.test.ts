@@ -8,6 +8,7 @@ import {
   loadsForBore,
   resolveLeafVariant,
   isRealBoltPattern,
+  availabilityOf,
 } from "./group-sizes"
 
 // Minimal variant factory mirroring the Medusa Store API shape the loader reads.
@@ -208,5 +209,17 @@ describe("groupVariantsIntoSizes — placeholder bolt patterns", () => {
     expect(sizes[0].boltPattern).toBe("")
     // The fallback surfaces it when no real pattern is selected.
     expect(sizesForBoltPattern(sizes, "")).toHaveLength(1)
+  })
+})
+
+describe("availabilityOf — configurable low-stock threshold", () => {
+  it("uses the default threshold (4) when none is passed", () => {
+    expect(availabilityOf(0)).toBe("out_of_stock")
+    expect(availabilityOf(4)).toBe("low_stock")
+    expect(availabilityOf(5)).toBe("in_stock")
+  })
+  it("honors an explicit threshold", () => {
+    expect(availabilityOf(2, 2)).toBe("low_stock")
+    expect(availabilityOf(3, 2)).toBe("in_stock")
   })
 })

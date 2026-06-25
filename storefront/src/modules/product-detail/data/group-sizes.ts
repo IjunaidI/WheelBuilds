@@ -1,5 +1,6 @@
 import { HttpTypes } from "@medusajs/types"
 import { OffsetVariant, SizeOption } from "./types"
+import { LOW_STOCK_THRESHOLD } from "./pdp-config"
 
 /** Coerce an unknown to a finite number, else 0. Shared by the PDP loader. */
 export const num = (v: unknown): number =>
@@ -22,9 +23,12 @@ export function isRealBoltPattern(raw: unknown): boolean {
   return !PLACEHOLDER_BOLT_PATTERNS.has(String(raw ?? "").trim().toLowerCase())
 }
 
-function availabilityOf(qty: number): SizeOption["availability"] {
+export function availabilityOf(
+  qty: number,
+  threshold: number = LOW_STOCK_THRESHOLD
+): SizeOption["availability"] {
   if (qty <= 0) return "out_of_stock"
-  if (qty <= 4) return "low_stock"
+  if (qty <= threshold) return "low_stock"
   return "in_stock"
 }
 

@@ -20,7 +20,7 @@ import { normalizeFinish } from "@lib/fitment/normalize-finish"
 import { DiscoveryProduct } from "@modules/discovery/data/types"
 import { Finish } from "@modules/common/components/wheel"
 import { ProductDetail, SizeOption } from "./types"
-import { num, groupVariantsIntoSizes } from "./group-sizes"
+import { num, groupVariantsIntoSizes, isRealBoltPattern } from "./group-sizes"
 
 const DEFAULT_COUNTRY = process.env.NEXT_PUBLIC_DEFAULT_REGION || "us"
 
@@ -43,7 +43,7 @@ function mapToDetail(product: HttpTypes.StoreProduct): ProductDetail {
     new Set(
       variants
         .map((v) => String((v.metadata as any)?.bolt_pattern_raw ?? ""))
-        .filter(Boolean)
+        .filter(isRealBoltPattern)
     )
   )
 

@@ -9,6 +9,19 @@ export const num = (v: unknown): number =>
 const numOrNull = (v: unknown): number | null =>
   typeof v === "number" && Number.isFinite(v) ? v : null
 
+/** Vendor placeholders that must never become a selectable bolt-pattern gate. */
+const PLACEHOLDER_BOLT_PATTERNS = new Set(["", "blank", "n/a"])
+
+/**
+ * True when a vendor `bolt_pattern_raw` is a real, selectable pattern (not a
+ * placeholder like "" / "BLANK" / "N/A"). Used to keep placeholder values out of
+ * the PDP bolt-pattern picker (WB-048) — they would otherwise become a clickable
+ * grid-gating chip once WB-003 made the bolt-pattern row load-bearing.
+ */
+export function isRealBoltPattern(raw: unknown): boolean {
+  return !PLACEHOLDER_BOLT_PATTERNS.has(String(raw ?? "").trim().toLowerCase())
+}
+
 function availabilityOf(qty: number): SizeOption["availability"] {
   if (qty <= 0) return "out_of_stock"
   if (qty <= 4) return "low_stock"
@@ -34,7 +47,8 @@ export function groupVariantsIntoSizes(
     const diameter = num(m.wheel_diameter_in)
     const width = num(m.wheel_width_in)
     const offsetMm = num(m.offset_mm)
-    const boltPattern = String(m.bolt_pattern_raw ?? "")
+    const rawBp = String(m.bolt_pattern_raw ?? "")
+    const boltPattern = isRealBoltPattern(rawBp) ? rawBp : ""
     const key = `${diameter}x${width}|${boltPattern}`
     const qty = num((v as any).inventory_quantity)
     const priceCents = Math.round(

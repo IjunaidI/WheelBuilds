@@ -13,16 +13,16 @@ User-reported problems on the individual wheel page (`/products/[handle]`):
 3. The finish swatch image is a **tiny 72px drawn wheel** floating in a large empty square.
 
 Investigation findings (this is what makes the fixes cheap and storefront-only):
-- The Fitment section ([fitment/index.tsx](../../storefront/src/modules/product-detail/components/fitment/index.tsx))
+- The Fitment section ([fitment/index.tsx](../../../storefront/src/modules/product-detail/components/fitment/index.tsx))
   ALREADY computes a real verdict via the pure `fitsVehicle(product, vehicle)` — the purchase-panel chip
-  ([purchase-panel.tsx:134-145](../../storefront/src/modules/product-detail/components/hero/purchase-panel.tsx))
+  ([purchase-panel.tsx:134-145](../../../storefront/src/modules/product-detail/components/hero/purchase-panel.tsx))
   just doesn't use it; it gates only on "is there an active vehicle."
 - Weight is **already persisted** by the importer: `apply.ts:305-320` sets Medusa `product.weight` (grams)
   from the feed's `ShippingWeight` (`rep.shippingWeightLb × 453.592`). But the PDP product query
-  ([products.ts:36](../../storefront/src/lib/data/products.ts)) requests
+  ([products.ts:36](../../../storefront/src/lib/data/products.ts)) requests
   `"*variants.calculated_price,+variants.inventory_quantity,+collection_id"` — **`weight` is not requested**,
   so `product.weight` returns empty → `mapToDetail`'s `num(product.weight)/453.592` = 0 → "0 lb".
-- The finish swatch ([gallery.tsx:67-85](../../storefront/src/modules/product-detail/components/hero/gallery.tsx))
+- The finish swatch ([gallery.tsx:67-85](../../../storefront/src/modules/product-detail/components/hero/gallery.tsx))
   uses `flex-1 aspect-square` buttons (so a single finish becomes a full-width square) holding a fixed
   `<Wheel size={72}>` — a tiny wheel in a big box. Wheel products are grouped one-per-finish, so there is
   usually exactly one finish.

@@ -589,3 +589,15 @@
 - fix: sweep the remaining "Medusa Store" occurrences and replace with "Wheel Builds" (or the appropriate brand string / metadata).
 - verify: `grep -rn "Medusa Store" storefront/src` returns only API references ("Medusa Store API"), no brand copy.
 - refs: flagged in the WB-047 / G2 final review (2026-06-26)
+
+---
+
+### WB-056 · PDP data honesty & fitment polish   [MEDIUM]
+- status: done
+- area: storefront/pdp
+- evidence: storefront/src/modules/product-detail/components/specs/spec-rows.ts ; storefront/src/lib/data/products.ts (+weight) ; storefront/src/modules/product-detail/components/hero/purchase-panel.tsx (fitsVehicle) ; gallery.tsx (swatch)
+- problem: the wheel PDP (1) showed "CONFIRMED FIT · {vehicle}" for ANY wheel whenever a garage vehicle existed (the purchase-panel chip never checked fitment — only the Fitment section did); (2) showed static placeholders, notably "Per-wheel weight: 0 lb" — the weight IS persisted on `product.weight` but the PDP query didn't fetch it, and several specs rendered "0 lb"/"0 mm"/"1" when the real value was missing; (3) rendered the finish swatch as a 72px drawn wheel floating in a full-width empty box.
+- fix: chip reuses the pure `fitsVehicle`; fetch `+weight` + round it; hide zero/missing numerics via pure `buildSpecRows`; size the swatch.
+- verify: a garage vehicle that doesn't fit shows "MAY NOT FIT" (not green); a wheel with feed weight shows real lb, one without hides the row (no "0 lb"); the swatch is a tidy proportionate square.
+- done: 2026-06-26 — Fix A: purchase-panel chip uses `fitsVehicle(product, active).fits` (same fn as the Fitment section → they can't disagree): fits → "CONFIRMED FIT", in-garage-no-fit → "MAY NOT FIT", none → pick-a-vehicle. Fix C: `+weight` added to `getProductByHandle`; `weightLb` rounded to 1 decimal at the loader source (kills the grams round-trip's 31.9997); pure unit-tested `buildSpecRows` omits any 0/missing numeric (weight/load/bore) + finishOptions=1 instead of a fake placeholder; variant-picker weight stat + tooltip gated too. Fix B: finish swatch → fixed 96px square with an 80px wheel (was 72px in a full-width box). Storefront-only — no backend/migration/re-import (weight was already saved, just unfetched). Subagent-driven (3 tasks + reviews + opus final "ready to merge"). storefront 95 tests. Live PDP smokes deferred to pre-deploy.
+- refs: design [docs/done/specs/2026-06-26-pdp-data-fitment-polish-design.md](../done/specs/2026-06-26-pdp-data-fitment-polish-design.md) ; plan [docs/done/plans/2026-06-26-pdp-data-fitment-polish.md](../done/plans/2026-06-26-pdp-data-fitment-polish.md)

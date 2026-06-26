@@ -5,7 +5,6 @@ import { useParams, useRouter } from "next/navigation"
 import { toast } from "sonner"
 import Icon from "@modules/common/components/icon"
 import Spinner from "@modules/common/icons/spinner"
-import Label from "@modules/common/components/label"
 import Field from "@modules/common/components/field"
 import Select from "@modules/common/components/select"
 import { Button } from "@/components/ui/button"
@@ -341,29 +340,6 @@ const YmmPane = ({ onClose }: YmmPaneProps) => {
           </>
         )}
       </Button>
-      <Label
-        tone="muted"
-        style={{
-          marginTop: 10,
-          display: "block",
-          textAlign: "center",
-          letterSpacing: "0.06em",
-        }}
-      >
-        OR{" "}
-        <span
-          aria-disabled
-          title="License-plate lookup coming soon"
-          style={{
-            color: "var(--orange)",
-            fontWeight: 600,
-            opacity: 0.6,
-            cursor: "not-allowed",
-          }}
-        >
-          SEARCH BY LICENSE PLATE →
-        </span>
-      </Label>
     </form>
   )
 }

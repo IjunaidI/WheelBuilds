@@ -49,5 +49,17 @@ class CustomerVehicleService extends MedusaService({ CustomerVehicle }) {
       notes: input.notes ?? null,
     })
   }
+
+  /**
+   * Idempotently merge a batch of vehicles into a customer's garage in one call.
+   * Each is upserted via createForCustomer (idempotent on (customer_id, client_id)),
+   * so re-merging the same batch adds no duplicates. Returns the customer's full list.
+   */
+  async mergeForCustomer(customerId: string, vehicles: any[]): Promise<any[]> {
+    for (const v of vehicles) {
+      await this.createForCustomer(customerId, v)
+    }
+    return this.listCustomerVehicles({ customer_id: customerId })
+  }
 }
 export default CustomerVehicleService

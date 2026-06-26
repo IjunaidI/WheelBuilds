@@ -24,8 +24,7 @@ class RoutingGarage implements GarageProvider {
       if (!this.remote) this.remote = new MedusaGarage()
       await this.remote.ready()                       // wait for the account to load before merging
       if (!this.merged && this.remote.isLoaded()) {
-        await this.mergeLocalIntoRemote()
-        this.merged = true
+        this.merged = await this.mergeLocalIntoRemote() // retry on a later syncAuth if the merge failed
       }
       this.current = this.remote
     } else {
@@ -35,11 +34,12 @@ class RoutingGarage implements GarageProvider {
     this.emit()
   }
 
-  private async mergeLocalIntoRemote() {
-    if (!this.remote) return
+  private async mergeLocalIntoRemote(): Promise<boolean> {
+    if (!this.remote) return false
     const toAdd = planMerge(this.local.list(), this.remote.list(), this.remote.isLoaded())
-    for (const nv of toAdd) this.remote.add(nv) // re-add through remote (mints client_id; idempotent server-side)
-    if (this.remote.isLoaded()) this.local.clear() // only drop local once we know the account state
+    const ok = await this.remote.mergeFrom(toAdd) // ONE idempotent request; false on failure
+    if (ok) this.local.clear()                    // drop local ONLY after the merge persisted
+    return ok
   }
 
   list() { return this.current.list() }

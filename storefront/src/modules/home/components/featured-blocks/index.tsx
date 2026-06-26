@@ -1,108 +1,86 @@
+import Image from "next/image"
 import LocalizedClientLink from "@modules/common/components/localized-client-link"
 import Icon from "@modules/common/components/icon"
-import ImgPlaceholder from "@modules/common/components/img-placeholder"
+import Wheel from "@modules/common/components/wheel"
 import Display from "@modules/common/components/display"
 import Label from "@modules/common/components/label"
 import { Button } from "@/components/ui/button"
+import { getFeaturedProducts } from "@modules/home/data/get-featured"
+import type { DiscoveryProduct } from "@modules/discovery/data/types"
 
-type Block = {
-  idx: string
-  name: string
-  brand: string
-  blurb: string
-  price: string
-  flip?: boolean
-}
+const money = (cents: number) => Math.round(cents / 100).toLocaleString()
 
-const BLOCKS: Block[] = [
-  {
-    idx: "1",
-    name: "MERIDIAN GT MONOBLOCK",
-    brand: "MERIDIAN FORGED",
-    blurb:
-      "One-piece forged. 22-inch. Built for the long haul on the kind of streets you want to be seen on.",
-    price: "1,389",
-  },
-  {
-    idx: "2",
-    name: "ATLAS AT-9 BEADLOCK",
-    brand: "ATLAS OFFROAD",
-    blurb:
-      "Triple-step bead retention, hardcoat anodized lip. The trail wheel that doesn't look like a trail wheel.",
-    price: "789",
-    flip: true,
-  },
-  {
-    idx: "3",
-    name: "RONIN R1 MOTORSPORT",
-    brand: "RONIN MOTORSPORT",
-    blurb:
-      "Magnesium-alloy track weapon. 14.7 lbs at 18×9.5. Built in Japan, cut in Long Beach.",
-    price: "1,899",
-  },
-]
+const Stat = ({ l, v }: { l: string; v: React.ReactNode }) => (
+  <div>
+    <Label tone="muted" style={{ fontSize: 10, display: "block" }}>
+      {l}
+    </Label>
+    <Display size={20} as="div" className="small:!text-[22px]" style={{ marginTop: 4 }}>
+      {v}
+    </Display>
+  </div>
+)
 
-type Stat = { l: string; v: React.ReactNode }
-
-const STATS_FOR = (price: string): Stat[] => [
-  { l: "DIAMETER", v: "22\"" },
-  { l: "WIDTH", v: "10\"" },
-  { l: "FINISHES", v: "4" },
-  {
-    l: "FROM",
-    v: (
-      <span>
-        <span style={{ color: "var(--orange)" }}>$</span>
-        {price}
-      </span>
-    ),
-  },
-]
-
-const EditorialBlock = ({ idx, name, brand, blurb, price, flip }: Block) => (
+const EditorialBlock = ({
+  product,
+  idx,
+  total,
+  flip,
+}: {
+  product: DiscoveryProduct
+  idx: number
+  total: number
+  flip: boolean
+}) => (
   <div
     className={`grid grid-cols-1 small:grid-cols-2 gap-10 small:gap-16 items-center px-5 py-12 xsmall:px-8 small:px-20 small:py-20 ${
       flip ? "small:[direction:rtl]" : ""
     }`}
   >
     <div className="relative" style={{ direction: "ltr" }}>
-      <ImgPlaceholder
-        label="VEHICLE PHOTO · 3/4 ANGLE"
-        dark
-        radius={16}
-        style={{ width: "100%", aspectRatio: "4/3" }}
-      />
       <div
-        className="counter"
-        style={{ position: "absolute", top: 20, left: 20 }}
+        className="relative w-full overflow-hidden rounded-2xl bg-[var(--soft)]"
+        style={{ aspectRatio: "4/3" }}
       >
-        FT.0{idx} / 06
+        {product.thumbnail ? (
+          <Image
+            src={product.thumbnail}
+            alt={`${product.brand} ${product.name}`}
+            fill
+            sizes="(min-width: 1024px) 50vw, 100vw"
+            className="object-contain p-8"
+          />
+        ) : (
+          <div className="absolute inset-0 flex items-center justify-center">
+            <Wheel size={220} finish={product.finish} />
+          </div>
+        )}
+      </div>
+      <div className="counter" style={{ position: "absolute", top: 20, left: 20 }}>
+        FT.0{idx} / 0{total}
       </div>
     </div>
     <div style={{ direction: "ltr" }}>
-      <Label style={{ marginBottom: 14, display: "block" }}>
-        FEATURED · {brand}
-      </Label>
+      <Label style={{ marginBottom: 14, display: "block" }}>FEATURED · {product.brand}</Label>
       <Display size={36} as="h3" className="small:!text-[56px]">
-        {name}
+        {product.name}
       </Display>
-      <p className="text-[15px] small:text-[16px] text-[var(--graphite)] mt-5 mb-7 max-w-[480px] leading-[1.55]">
-        {blurb}
-      </p>
-      <div className="grid grid-cols-2 small:grid-cols-4 gap-5 mb-7 border-y border-[var(--hairline)] py-5">
-        {STATS_FOR(price).map((s) => (
-          <div key={s.l}>
-            <Label tone="muted" style={{ fontSize: 10, display: "block" }}>
-              {s.l}
-            </Label>
-            <Display size={20} as="div" className="small:!text-[22px]" style={{ marginTop: 4 }}>
-              {s.v}
-            </Display>
-          </div>
-        ))}
+      <div className="grid grid-cols-2 small:grid-cols-4 gap-5 mt-7 mb-7 border-y border-[var(--hairline)] py-5">
+        {product.diameter > 0 && <Stat l="DIAMETER" v={`${product.diameter}"`} />}
+        {product.width > 0 && <Stat l="WIDTH" v={`${product.width}"`} />}
+        {product.boltPattern && <Stat l="BOLT" v={product.boltPattern} />}
+        <Stat
+          l="FROM"
+          v={
+            <span>
+              <span style={{ color: "var(--orange)" }}>$</span>
+              {money(product.priceCents)}
+            </span>
+          }
+        />
       </div>
       <Button asChild className="w-full small:w-auto">
-        <LocalizedClientLink href="/store">
+        <LocalizedClientLink href={`/products/${product.handle}`}>
           Shop This Wheel <Icon name="arrow-right" size={16} color="white" />
         </LocalizedClientLink>
       </Button>
@@ -110,19 +88,19 @@ const EditorialBlock = ({ idx, name, brand, blurb, price, flip }: Block) => (
   </div>
 )
 
-const FeaturedBlocks = () => (
-  <section style={{ borderTop: "1px solid var(--hairline)" }}>
-    {BLOCKS.map((b, i) => (
-      <div
-        key={b.idx}
-        style={{
-          borderTop: i === 0 ? "none" : "1px solid var(--hairline)",
-        }}
-      >
-        <EditorialBlock {...b} />
-      </div>
-    ))}
-  </section>
-)
+const FeaturedBlocks = async () => {
+  const products = await getFeaturedProducts(3)
+  if (products.length === 0) return null
+
+  return (
+    <section style={{ borderTop: "1px solid var(--hairline)" }}>
+      {products.map((p, i) => (
+        <div key={p.id} style={{ borderTop: i === 0 ? "none" : "1px solid var(--hairline)" }}>
+          <EditorialBlock product={p} idx={i + 1} total={products.length} flip={i % 2 === 1} />
+        </div>
+      ))}
+    </section>
+  )
+}
 
 export default FeaturedBlocks

@@ -50,6 +50,27 @@ export class MedusaGarage implements GarageProvider {
   list(): Vehicle[] { return this.vehicles }
   getActive(): Vehicle | null { return this.vehicles.find((v) => v.id === this.activeId) ?? null }
 
+  /**
+   * Merge a batch of local vehicles into the account in ONE request. Mints a
+   * client_id per vehicle, posts the batch, and only adopts the result on
+   * success. Returns false (leaving state untouched) on failure so the caller
+   * keeps the local garage and retries on the next auth sync. Empty input → true.
+   */
+  async mergeFrom(newVehicles: NewVehicle[]): Promise<boolean> {
+    if (!newVehicles.length) return true
+    const wire = newVehicles.map((nv) => toWire({ ...nv, id: genId(), savedAt: new Date().toISOString() }))
+    try {
+      const { vehicles } = await api.mergeVehicles(wire)
+      this.vehicles = vehicles.map(fromWire)
+      const active = vehicles.find((v: any) => v.is_active)
+      this.activeId = active ? (active.client_id ?? active.id) : (this.vehicles[0]?.id ?? null)
+      this.emit()
+      return true
+    } catch {
+      return false
+    }
+  }
+
   add(v: NewVehicle): Vehicle {
     const vehicle: Vehicle = { ...v, id: genId(), savedAt: new Date().toISOString() }
     this.vehicles = [...this.vehicles, vehicle]

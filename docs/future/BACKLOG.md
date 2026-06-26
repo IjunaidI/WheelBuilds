@@ -29,7 +29,9 @@
 > *G2 · Checkout & cart transactable* (WB-033/034/035/036/047 + WB-053) — 2026-06-26
 > (gift cards split to WB-054; remaining brand copy to WB-055);
 > *G4 · Home & merchandising real content* (WB-004/023/028) — 2026-06-26
-> (newsletter hardening split to WB-057).
+> (newsletter hardening split to WB-057);
+> *G7 · Account & garage* (WB-032/022/045) — 2026-06-26
+> (license-plate provider split to WB-058).
 
 - **G1 · Vendor-sync productionization (async + scale)** `[L · needs Redis worker]` — move sync triggers off the HTTP request, parallelize/stream the apply, make cancel + feed archiving worker-safe. → WB-011, WB-012, WB-013, WB-014, WB-015, WB-017, WB-018, WB-037
 - **G2 · Checkout & cart (make it transactable)** `[M–L]` — ✅ **DONE 2026-06-26** (WB-033 stall, WB-034 stock cap, WB-035 express-pay/Affirm env-gated, WB-036 discount fix, WB-047 copy + WB-053 browse cap). Follow-ups: WB-054 (gift cards v2), WB-055 (brand-copy sweep).
@@ -37,7 +39,7 @@
 - **G4 · Home & merchandising** `[M]` — ✅ **DONE 2026-06-26** (WB-004 Featured Blocks real curated products + Build Gallery → catalog-wall, WB-023 newsletter persistence, WB-028 merchandising copy → config + live brand count). Follow-up: WB-057 (newsletter hardening — unsubscribe/rate-limit/double-opt-in).
 - **G5 · Discovery & search** `[S]` — Meili result cache, dead category facet. (browse `maxTotalHits` cap WB-053 ✅ done 2026-06-26 via G2.) → WB-021, WB-046
 - **G6 · Catalog breadth & pricing** `[L–XL · WB-005 is a big spec alone]` — tires grouping+indexing, markup/MAP/margin pricing, de-hardcode bootstrap identity + vendor roster. → WB-005, WB-024, WB-025, WB-026
-- **G7 · Account & garage** `[S–M]` — account Garage tab/route, robust guest→login garage merge, license-plate lookup. → WB-032, WB-022, WB-045
+- **G7 · Account & garage** `[S–M]` — ✅ **DONE 2026-06-26** (WB-032 account Garage tab/route + GarageManager, WB-022 atomic guest→login merge w/ stable idempotent client_ids, WB-045 removed license-plate stub). Follow-up: WB-058 (real plate→YMM provider).
 - **G8 · Admin & ops tooling** `[S]` — vendor-sync admin UI, seed shipping options + reply-to, rename `teraflex` fixtures, scale-safe dev-wipe. → WB-006, WB-031, WB-044, WB-052
 
 ---
@@ -263,12 +265,14 @@
 - refs: —
 
 ### WB-022 · Guest→login garage merge = N best-effort client POSTs   [MEDIUM]
-- status: todo
-- area: storefront/garage
-- evidence: storefront/src/lib/garage/index.ts:38-43
+- status: done
+- area: storefront/garage + backend/customer-vehicle
+- evidence: backend/src/api/store/customer/vehicles/merge/route.ts ; backend/src/modules/customer-vehicle/service.ts (`mergeForCustomer`) ; storefront/src/lib/garage/medusa-garage.ts (`mergeFrom`) ; storefront/src/lib/garage/index.ts (`mergeLocalIntoRemote` clear-on-success) ; storefront/src/lib/garage/merge.ts (`planMerge` returns Vehicle[])
 - problem: when a guest logs in, the garage merge sends N individual POST requests from the client for each local vehicle; any failure silently drops vehicles and the merge is not atomic.
 - fix: implement a server-side merge endpoint that accepts the full local garage state and merges it atomically, or use a Medusa workflow to ensure all-or-nothing persistence.
 - verify: a guest with 3 local vehicles who logs in ends up with all 3 vehicles in their authed garage; a network failure during merge is retried or clearly surfaced.
+- done: 2026-06-26 — replaced the N fire-and-forget POSTs with ONE idempotent request: `CustomerVehicleService.mergeForCustomer` loops the existing idempotent `createForCustomer` behind a public `POST /store/customer/vehicles/merge` (auth'd, returns only the caller's list). Storefront `MedusaGarage.mergeFrom` sends the batch and adopts the result; `RoutingGarage.mergeLocalIntoRemote` clears the local garage ONLY on success (failure keeps local + retries on the next auth sync). **Final-review fix:** `planMerge`/`vehiclesToMerge` now return full `Vehicle[]` so the guest vehicle's STABLE local id flows through as the `client_id` — making the merge idempotent across PARTIAL-write retries (a re-sent already-persisted row hits the `(customer_id, client_id)` guard instead of duplicating). Pure `planMerge` + backend `mergeForCustomer` unit-tested (storefront 102 / backend customer-vehicle 9). Subagent-driven (opus final review). Live merge smoke DEFERRED → pre-deploy.
+- refs: design [docs/done/specs/2026-06-26-account-garage-design.md](../done/specs/2026-06-26-account-garage-design.md) ; plan [docs/done/plans/2026-06-26-account-garage.md](../done/plans/2026-06-26-account-garage.md)
 - refs: —
 
 ### WB-023 · Newsletter signup is a fake `setTimeout`, nothing persisted   [MEDIUM]
@@ -366,13 +370,14 @@
 ## Medium (other remaining)
 
 ### WB-032 · Account has no Garage tab/route   [MEDIUM]
-- status: todo
+- status: done
 - area: storefront/account
-- evidence: storefront/src/modules/account/components/account-nav/index.tsx:117-152
+- evidence: storefront/src/app/[countryCode]/(main)/account/@dashboard/garage/page.tsx ; storefront/src/modules/account/components/garage/index.tsx ; storefront/src/modules/account/components/account-nav/index.tsx (Garage link) ; storefront/src/modules/common/icons/car.tsx
 - problem: the account navigation has no Garage entry; there is no /account/garage route where a logged-in user can view or manage their saved vehicles.
 - fix: add a Garage tab to the account nav and implement /account/garage as a route that renders the authed garage component.
 - verify: a logged-in user can navigate to /account/garage and see their saved vehicles; the Garage tab appears in the account sidebar.
-- refs: —
+- done: 2026-06-26 — new auth-guarded `@dashboard/garage/page.tsx` parallel route renders `GarageManager` (a client component over the existing `useGarage()` hook, in legacy account Medusa-UI styling): lists saved vehicles, set-active, remove, empty state; "Add a vehicle" reuses the YMM search drawer (`openSearch`) — the one canonical add flow that also runs the wheel-size fitment lookup. A "Garage" link (new Car icon) was added to the account nav (desktop + mobile) between Addresses and Orders. Subagent-driven (opus final review: ready to merge). Live nav/route smoke DEFERRED → pre-deploy.
+- refs: design [docs/done/specs/2026-06-26-account-garage-design.md](../done/specs/2026-06-26-account-garage-design.md) ; plan [docs/done/plans/2026-06-26-account-garage.md](../done/plans/2026-06-26-account-garage.md)
 
 ### WB-033 · Direct nav to `/checkout` stalls (no default `?step=`)   [MEDIUM]
 - status: done
@@ -481,13 +486,14 @@
 - refs: —
 
 ### WB-045 · License-plate lookup is a disabled stub   [LOW]
-- status: todo
+- status: done
 - area: storefront/fitment
-- evidence: storefront/src/modules/search/components/search-drawer/find-by-vehicle/ymm-pane.tsx:353-365
+- evidence: storefront/src/modules/search/components/search-drawer/find-by-vehicle/ymm-pane.tsx (stub removed)
 - problem: the license-plate lookup tab in the YMM pane is rendered but disabled/stubbed; no real lookup provider is wired up.
 - fix: either integrate a license-plate-to-YMM lookup API (NHTSA or similar) or remove the tab until a provider is chosen.
 - verify: the license-plate lookup either returns a real vehicle match for a valid plate+state, or the tab is entirely absent from the UI (no disabled stub).
-- refs: —
+- done: 2026-06-26 — chose REMOVE (honest, no non-functional "coming soon" chrome; same stance as WB-035's hidden express-pay buttons). Deleted the disabled "SEARCH BY LICENSE PLATE →" `<Label>` block (+ its now-unused `Label` import) from `ymm-pane.tsx`; grep storefront-wide for "SEARCH BY LICENSE PLATE" is clean. A real plate→YMM provider needs a paid commercial API + state → deferred to [[WB-058]].
+- refs: split out of G7 (2026-06-26)
 
 ### WB-046 · Category facet is dead in discovery (no backend source)   [LOW]
 - status: todo
@@ -617,3 +623,14 @@
 - fix: add rate-limiting (per-IP / per-window) on the route; an unsubscribe endpoint + tokenized link; optional double-opt-in confirmation email (reuses the Resend notification module).
 - verify: rapid repeated POSTs from one source are throttled; a subscriber can unsubscribe via a link and the row is soft-deleted (the unique email index is already partial on `deleted_at IS NULL`, so re-subscribe works); a confirmation email is sent before the subscription is marked confirmed.
 - refs: split out of [[WB-023]] / G4 final review (2026-06-26)
+
+---
+
+### WB-058 · Real license-plate → YMM lookup provider   [LOW]
+- status: todo
+- area: storefront/fitment
+- evidence: storefront/src/modules/search/components/search-drawer/find-by-vehicle/ymm-pane.tsx (the disabled stub was removed in WB-045)
+- problem: WB-045 removed the non-functional "search by license plate" stub. There is currently no way to resolve a plate (+ state) to a Year/Make/Model so the garage can be populated from a plate.
+- fix: integrate a commercial plate-decode API (plate+state → VIN → YMM; NHTSA vPIC is VIN-only, so a paid plate→VIN provider is needed) behind a backend route, then re-add a license-plate entry point in the YMM pane wired to it (or a dedicated tab).
+- verify: entering a valid plate + state returns a real vehicle match that can be saved to the garage; invalid input surfaces a clear error; the entry point is only shown when the provider is configured.
+- refs: split out of [[WB-045]] / G7 (2026-06-26)

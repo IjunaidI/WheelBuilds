@@ -1,6 +1,6 @@
 # Account & garage (G7) — Design
 
-> Date: 2026-06-26. Status: in-progress. Pillar: Account/Garage. Work-group **G7**.
+> Date: 2026-06-26. Status: done (merged to `main` 2026-06-26). Pillar: Account/Garage. Work-group **G7**.
 > Three changes to the authenticated account + garage surfaces. Backlog: **WB-032** (account
 > Garage tab/route), **WB-022** (atomic guest→login garage merge), **WB-045** (remove the
 > license-plate stub).

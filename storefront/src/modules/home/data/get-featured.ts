@@ -18,7 +18,13 @@ function parseHandles(raw: string | undefined): string[] {
     .filter(Boolean)
 }
 
-/** Medusa Store API product → DiscoveryProduct (from-price = min non-zero across variants). */
+/**
+ * Medusa Store API product → DiscoveryProduct (from-price = min non-zero across variants).
+ * Reads brand/finish + per-variant axes (bolt_pattern_raw/wheel_diameter_in/wheel_width_in) from
+ * `metadata`, which the Store API returns by default (same fetch the PDP's mapToDetail relies on).
+ * If `getProductByHandle`'s `fields` is ever tightened to drop `metadata`, these stats go blank —
+ * keep `metadata` in that fetch.
+ */
 function toFeatured(p: HttpTypes.StoreProduct): DiscoveryProduct {
   const variants = p.variants ?? []
   const pmeta = (p.metadata ?? {}) as Record<string, unknown>

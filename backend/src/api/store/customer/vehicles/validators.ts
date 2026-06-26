@@ -32,3 +32,19 @@ export function parseVehicleCreate(body: unknown): ParseResult {
   if (!r.success) return { ok: false, error: r.error.issues.map((i) => `${i.path.join(".")}: ${i.message}`).join("; ") }
   return { ok: true, data: r.data }
 }
+
+export const VehicleMergeSchema = z.object({
+  vehicles: z.array(VehicleCreateSchema),
+})
+
+export type VehicleMergeInput = z.infer<typeof VehicleMergeSchema>
+
+export type MergeParseResult =
+  | { ok: true; data: VehicleMergeInput }
+  | { ok: false; error: string }
+
+export function parseVehicleMerge(body: unknown): MergeParseResult {
+  const r = VehicleMergeSchema.safeParse(body)
+  if (!r.success) return { ok: false, error: r.error.issues.map((i) => `${i.path.join(".")}: ${i.message}`).join("; ") }
+  return { ok: true, data: r.data }
+}

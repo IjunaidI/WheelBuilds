@@ -74,3 +74,40 @@ describe("resolveOwned scopes by customer + client_id", () => {
     expect(await svc.resolveOwned("c1", "k1")).toBeUndefined()
   })
 })
+
+describe("mergeForCustomer batches idempotently", () => {
+  function makeMergeService() {
+    const rows: any[] = []
+    const svc = new (CustomerVehicleService as any)({})
+    svc.listCustomerVehicles = async (f: any) =>
+      rows.filter(r => r.customer_id === f.customer_id && (f.client_id === undefined || r.client_id === f.client_id))
+    svc.createCustomerVehicles = async (data: any) => { const row = { id: `id_${rows.length}`, ...data }; rows.push(row); return row }
+    return { svc, rows }
+  }
+
+  it("creates all missing vehicles and returns the customer's full list", async () => {
+    const { svc, rows } = makeMergeService()
+    const out = await svc.mergeForCustomer("c1", [
+      { client_id: "k1", year: 2021, make: "Ford", model: "F-150" },
+      { client_id: "k2", year: 2020, make: "Honda", model: "Civic" },
+    ])
+    expect(rows.length).toBe(2)
+    expect(out.length).toBe(2)
+  })
+
+  it("is idempotent — re-merging the same batch adds no duplicate rows", async () => {
+    const { svc, rows } = makeMergeService()
+    const batch = [{ client_id: "k1", year: 2021, make: "Ford", model: "F-150" }]
+    await svc.mergeForCustomer("c1", batch)
+    await svc.mergeForCustomer("c1", batch)
+    expect(rows.length).toBe(1)
+  })
+
+  it("returns only the target customer's vehicles (cross-tenant isolation)", async () => {
+    const { svc, rows } = makeMergeService()
+    rows.push({ id: "x", customer_id: "c2", client_id: "z1" })
+    const out = await svc.mergeForCustomer("c1", [{ client_id: "k1", year: 2021, make: "Ford", model: "F-150" }])
+    expect(out.every((v: any) => v.customer_id === "c1")).toBe(true)
+    expect(out.length).toBe(1)
+  })
+})

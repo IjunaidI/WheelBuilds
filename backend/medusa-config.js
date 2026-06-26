@@ -229,6 +229,7 @@ const medusaConfig = {
       },
     }] : []),
     { resolve: './src/modules/customer-vehicle' },
+    { resolve: './src/modules/newsletter' },
   ],
   plugins: [
   ...(MEILISEARCH_HOST && MEILISEARCH_ADMIN_KEY ? [{

@@ -2,6 +2,7 @@
 
 import LocalizedClientLink from "@modules/common/components/localized-client-link"
 import Icon from "@modules/common/components/icon"
+import { HERO_COPY } from "@modules/home/data/merchandising"
 import Wheel from "@modules/common/components/wheel"
 import Label from "@modules/common/components/label"
 import Display from "@modules/common/components/display"
@@ -25,9 +26,7 @@ const Hero = ({ brandCount }: { brandCount?: number }) => {
     : "Find My Fit · Start with your vehicle"
 
   const TRUST_POINTS = [
-    { l: "Fitment guaranteed", s: "Or your money back" },
-    { l: "Free returns", s: "30 days, unmounted" },
-    { l: "Free ship $199+", s: "2–3 day delivery" },
+    ...HERO_COPY.trustPoints,
     { l: "Authorized dealer", s: brandCount ? `${brandCount} brands` : "Premium brands" },
   ]
 
@@ -58,21 +57,19 @@ const Hero = ({ brandCount }: { brandCount?: number }) => {
 
       <div className="relative z-10 max-w-[1280px]">
         <Label bar className="mb-5 small:mb-7">
-          FITMENT FIRST · STEP 01 OF 02
+          {HERO_COPY.eyebrow}
         </Label>
         <Display
           size={64}
           as="h1"
           className="small:!text-[132px]"
         >
-          What do
+          {HERO_COPY.headlineTop}
           <br />
-          you drive?
+          {HERO_COPY.headlineBottom}
         </Display>
         <p className="text-[16px] small:text-[18px] text-[var(--graphite)] max-w-[580px] mt-5 mb-8 small:mt-7 small:mb-10 leading-[1.5]">
-          Tell us once. We&apos;ll show you only the wheels confirmed to fit,
-          ship them in 2–3 days, and back every fitment with our money-back
-          guarantee.
+          {HERO_COPY.subcopy}
         </p>
 
         {/* Mega vehicle selector — 2×2 on mobile, 4-in-a-row on small+ */}

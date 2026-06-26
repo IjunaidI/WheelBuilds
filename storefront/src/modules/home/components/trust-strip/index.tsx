@@ -1,16 +1,12 @@
-import Icon, { IconName } from "@modules/common/components/icon"
+import Icon from "@modules/common/components/icon"
+import { TRUST_STRIP_ITEMS } from "@modules/home/data/merchandising"
 
 const TrustStrip = ({ brandCount }: { brandCount?: number }) => {
-  const ITEMS: { icon: IconName; h: string; s: string }[] = [
-    { icon: "shipping", h: "Free shipping $199+", s: "Lower 48, ground" },
-    { icon: "shield", h: "Fitment guarantee", s: "Or your money back" },
-    {
-      icon: "badge",
-      h: "Authorized dealer",
-      s: brandCount ? `${brandCount} premium brands` : "Premium brands",
-    },
-    { icon: "return", h: "30-day returns", s: "Unmounted wheels" },
-  ]
+  const ITEMS = TRUST_STRIP_ITEMS.map((it) =>
+    it.icon === "badge" && brandCount
+      ? { ...it, s: `${brandCount} premium brands` }
+      : it
+  )
 
   return (
     <div

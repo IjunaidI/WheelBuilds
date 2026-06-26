@@ -22,6 +22,7 @@
     "test:sync": "jest --passWithNoTests src/modules/vendor-sync",
     "test:fitment": "jest src/modules/wheel-size src/modules/customer-vehicle src/jobs/__tests__/wheel-size-warm.test.ts",
     "test:config": "jest src/lib",
+    "test:newsletter": "jest src/modules/newsletter",
     "vendor-sync:dry-run": "medusa exec ./src/scripts/vendor-sync-dry-run.ts",
     "vendor-sync:apply": "medusa exec ./src/scripts/vendor-sync-apply.ts"
   },

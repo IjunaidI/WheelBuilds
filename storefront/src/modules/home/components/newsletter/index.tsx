@@ -6,23 +6,28 @@ import Display from "@modules/common/components/display"
 import Label from "@modules/common/components/label"
 import TextInput from "@modules/common/components/text-input"
 import { Button } from "@/components/ui/button"
+import { newsletterSubscribe } from "@modules/home/actions"
 
 const Newsletter = () => {
   const [email, setEmail] = useState("")
   const [submitting, setSubmitting] = useState(false)
 
-  const submit = (e: FormEvent) => {
+  const submit = async (e: FormEvent) => {
     e.preventDefault()
     if (!email.trim()) return
     setSubmitting(true)
-    // No backend wired yet — fake success after a tick.
-    setTimeout(() => {
-      setSubmitting(false)
+    const res = await newsletterSubscribe(email)
+    setSubmitting(false)
+    if (res.ok) {
       setEmail("")
       toast.success("Subscribed", {
         description: "You're on the list. Watch for the next drop.",
       })
-    }, 300)
+    } else {
+      toast.error("Subscription failed", {
+        description: res.error ?? "Try again in a moment.",
+      })
+    }
   }
 
   return (

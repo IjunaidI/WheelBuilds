@@ -56,7 +56,7 @@ export async function getFeaturedProducts(limit = 3): Promise<DiscoveryProduct[]
 
   let curated: DiscoveryProduct[] = []
   if (handles.length) {
-    const region = await getRegion(DEFAULT_COUNTRY)
+    const region = await getRegion(DEFAULT_COUNTRY).catch(() => null)
     if (region) {
       const fetched = await Promise.all(
         handles.map((h) => getProductByHandle(h, region.id).catch(() => undefined))

@@ -1,6 +1,6 @@
 # Home & merchandising — real content (G4) — Design
 
-> Date: 2026-06-26. Status: in-progress. Pillar: Home. Work-group **G4**.
+> Date: 2026-06-26. Status: done (merged to `main` 2026-06-26). Pillar: Home. Work-group **G4**.
 > Replaces the three fabricated/placeholder home surfaces with real, honest content.
 > Backlog: **WB-004** (Featured Blocks + Build Gallery), **WB-023** (newsletter persistence),
 > **WB-028** (hardcoded merchandising copy).

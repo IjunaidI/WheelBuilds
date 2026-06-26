@@ -27,12 +27,14 @@
 > model* (WB-051) and *Wheel-size fitment hardening* (WB-007/008/019/020/043) — 2026-06-23;
 > *G3 · PDP correctness & polish* (WB-048/029/030) — 2026-06-25;
 > *G2 · Checkout & cart transactable* (WB-033/034/035/036/047 + WB-053) — 2026-06-26
-> (gift cards split to WB-054; remaining brand copy to WB-055).
+> (gift cards split to WB-054; remaining brand copy to WB-055);
+> *G4 · Home & merchandising real content* (WB-004/023/028) — 2026-06-26
+> (newsletter hardening split to WB-057).
 
 - **G1 · Vendor-sync productionization (async + scale)** `[L · needs Redis worker]` — move sync triggers off the HTTP request, parallelize/stream the apply, make cancel + feed archiving worker-safe. → WB-011, WB-012, WB-013, WB-014, WB-015, WB-017, WB-018, WB-037
 - **G2 · Checkout & cart (make it transactable)** `[M–L]` — ✅ **DONE 2026-06-26** (WB-033 stall, WB-034 stock cap, WB-035 express-pay/Affirm env-gated, WB-036 discount fix, WB-047 copy + WB-053 browse cap). Follow-ups: WB-054 (gift cards v2), WB-055 (brand-copy sweep).
 - **G3 · PDP correctness & polish** `[S–M]` — ✅ **DONE 2026-06-25** (WB-048 BLANK gate, WB-029 placeholders, WB-030 finish-normalizer twin).
-- **G4 · Home & merchandising** `[M]` — real Featured Blocks / Build Gallery, newsletter persistence, hardcoded merchandising copy. → WB-004, WB-023, WB-028
+- **G4 · Home & merchandising** `[M]` — ✅ **DONE 2026-06-26** (WB-004 Featured Blocks real curated products + Build Gallery → catalog-wall, WB-023 newsletter persistence, WB-028 merchandising copy → config + live brand count). Follow-up: WB-057 (newsletter hardening — unsubscribe/rate-limit/double-opt-in).
 - **G5 · Discovery & search** `[S]` — Meili result cache, dead category facet. (browse `maxTotalHits` cap WB-053 ✅ done 2026-06-26 via G2.) → WB-021, WB-046
 - **G6 · Catalog breadth & pricing** `[L–XL · WB-005 is a big spec alone]` — tires grouping+indexing, markup/MAP/margin pricing, de-hardcode bootstrap identity + vendor roster. → WB-005, WB-024, WB-025, WB-026
 - **G7 · Account & garage** `[S–M]` — account Garage tab/route, robust guest→login garage merge, license-plate lookup. → WB-032, WB-022, WB-045
@@ -87,13 +89,14 @@
 - refs: done/specs/2026-06-18-pdp-bolt-pattern-axis-design.md · done/plans/2026-06-18-pdp-bolt-pattern-axis.md
 
 ### WB-004 · Home FEATURED BLOCKS + BUILD GALLERY fabricated content   [HIGH]
-- status: todo
+- status: done
 - area: storefront/home
-- evidence: storefront/src/modules/home/components/featured-blocks/index.tsx:17-60 ; storefront/src/modules/home/components/build-gallery/index.tsx:6-15
+- evidence: storefront/src/modules/home/data/get-featured.ts + select-featured.ts ; storefront/src/modules/home/components/featured-blocks/index.tsx ; storefront/src/modules/home/components/catalog-wall/index.tsx (renamed from build-gallery)
 - problem: Featured Blocks and Build Gallery render hardcoded placeholder images/text; no real content source exists.
 - fix: replace with real CMS-driven or Medusa-collection-backed content, or remove sections entirely until content is available.
 - verify: Featured Blocks and Build Gallery render real content (or are removed); no hardcoded placeholder images remain.
-- refs: —
+- done: 2026-06-26 — Featured Blocks now render real products: `getFeaturedProducts` pulls a curated `NEXT_PUBLIC_FEATURED_HANDLES` (CSV) list exact via the Medusa Store API, falling back to top-priced wheels from Meili; pure unit-tested `selectFeatured` (merge/order/dedup/cap); real thumbnail + brand/name/price/diameter/width/bolt-pattern, CTA → real PDP. Build Gallery's fictional "14.2K community posts" mosaic became `catalog-wall` — a real product mosaic from the already-fetched home catalog (real thumbnails, PDP links, honest "LATEST ARRIVALS" copy). All throw-safe (degrade to null/empty); no fabricated content remains. Storefront-only. Subagent-driven (final opus review: ready to merge).
+- refs: design [docs/done/specs/2026-06-26-home-merchandising-real-content-design.md](../done/specs/2026-06-26-home-merchandising-real-content-design.md) ; plan [docs/done/plans/2026-06-26-home-merchandising-real-content.md](../done/plans/2026-06-26-home-merchandising-real-content.md)
 
 ### WB-005 · Tires never grouped + never indexed in Meili   [HIGH]
 - status: todo
@@ -269,13 +272,14 @@
 - refs: —
 
 ### WB-023 · Newsletter signup is a fake `setTimeout`, nothing persisted   [MEDIUM]
-- status: todo
-- area: storefront/home
-- evidence: storefront/src/modules/home/components/newsletter/index.tsx:14-26
+- status: done
+- area: storefront/home + backend/newsletter
+- evidence: backend/src/modules/newsletter/ (module) ; backend/src/api/store/newsletter/route.ts ; storefront/src/lib/data/newsletter.ts ; storefront/src/modules/home/actions.ts ; storefront/src/modules/home/components/newsletter/index.tsx
 - problem: the newsletter signup handler uses a setTimeout to fake a loading state; no email is captured, no API is called, nothing is persisted.
 - fix: wire the newsletter signup to a real email-capture backend (Resend audience, Sendgrid list, or a Medusa custom table); remove the fake setTimeout.
 - verify: submitting the newsletter form stores the email address in a persistent store; the email is retrievable after a server restart.
-- refs: —
+- done: 2026-06-26 — chosen approach: a new Medusa `newsletter` module (mirrors `customer-vehicle`) with a `newsletter_subscription` table (unique email index, partial on `deleted_at IS NULL`) + idempotent `subscribe(email, meta)` + pure jest-tested `normalizeEmail`/`isValidEmail`. Public `POST /store/newsletter` validates → subscribes → always `201 { subscribed: true }` (created OR existing, so membership isn't leaked). Storefront: `lib/data/newsletter.ts` (sdk.client.fetch) + `home/actions.ts` server action replaces the fake setTimeout, with success/error toasts. Hand-authored migration `Migration20260626120000` applies on deploy. Subagent-driven (final opus review: ready to merge). Newsletter hardening (unsubscribe/rate-limit/double-opt-in) deferred → [[WB-057]]. Live POST-persists+idempotent smoke DEFERRED → pre-deploy.
+- refs: design [docs/done/specs/2026-06-26-home-merchandising-real-content-design.md](../done/specs/2026-06-26-home-merchandising-real-content-design.md) ; plan [docs/done/plans/2026-06-26-home-merchandising-real-content.md](../done/plans/2026-06-26-home-merchandising-real-content.md)
 
 ---
 
@@ -319,13 +323,14 @@
 - refs: done/specs/2026-06-21-deploy-config-hardening-design.md · done/plans/2026-06-21-deploy-config-hardening.md
 
 ### WB-028 · Storefront merchandising/policy copy hardcoded   [MEDIUM]
-- status: todo
+- status: done
 - area: storefront/home + storefront/pdp
-- evidence: storefront/src/modules/home/components/trust-strip/index.tsx:5-13 ; storefront/src/modules/home/components/hero/index.tsx:27-32,61 ; storefront/src/modules/home/components/shop-by-style/style-map.ts:25-32 ; storefront/src/app/[countryCode]/(main)/page.tsx:13-17
+- evidence: storefront/src/modules/home/data/merchandising.ts ; storefront/src/modules/home/components/trust-strip/index.tsx ; storefront/src/modules/home/components/hero/index.tsx ; storefront/src/app/[countryCode]/(main)/page.tsx (generateMetadata)
 - problem: merchandising copy (trust strips, hero step labels, shop-by-style category map, page title brand count) is hardcoded in component files; changing copy requires code changes.
 - fix: move merchandising copy to a config object, CMS, or environment variable so it can be updated without code changes.
 - verify: changing a trust-strip message or hero label in config (not component source) updates the rendered storefront without a code deploy.
-- refs: —
+- done: 2026-06-26 — trust-strip items + hero eyebrow/headline/subcopy/trust-points extracted to `home/data/merchandising.ts` (`TRUST_STRIP_ITEMS`, `HERO_COPY`); components import them and keep ONLY the brand-count-dependent values computed. The home page `metadata` became `generateMetadata()` reading the live brand count from `getHomeCatalog()` (react.cache'd → free), removing the fabricated "40+". `STYLE_DEFS` (shop-by-style) was already an isolated config array with its own test → left as-is. PDP placeholder copy was already de-hardcoded in WB-029 (`pdp-config.ts`). Subagent-driven (final opus review: ready to merge).
+- refs: design [docs/done/specs/2026-06-26-home-merchandising-real-content-design.md](../done/specs/2026-06-26-home-merchandising-real-content-design.md) ; plan [docs/done/plans/2026-06-26-home-merchandising-real-content.md](../done/plans/2026-06-26-home-merchandising-real-content.md)
 
 ### WB-029 · PDP placeholders (qty default, construction/origin/warranty, low-stock threshold, ship copy)   [MEDIUM]
 - status: done
@@ -601,3 +606,14 @@
 - verify: a garage vehicle that doesn't fit shows "MAY NOT FIT" (not green); a wheel with feed weight shows real lb, one without hides the row (no "0 lb"); the swatch is a tidy proportionate square.
 - done: 2026-06-26 — Fix A: purchase-panel chip uses `fitsVehicle(product, active).fits` (same fn as the Fitment section → they can't disagree): fits → "CONFIRMED FIT", in-garage-no-fit → "MAY NOT FIT", none → pick-a-vehicle. Fix C: `+weight` added to `getProductByHandle`; `weightLb` rounded to 1 decimal at the loader source (kills the grams round-trip's 31.9997); pure unit-tested `buildSpecRows` omits any 0/missing numeric (weight/load/bore) + finishOptions=1 instead of a fake placeholder; variant-picker weight stat + tooltip gated too. Fix B: finish swatch → fixed 96px square with an 80px wheel (was 72px in a full-width box). Storefront-only — no backend/migration/re-import (weight was already saved, just unfetched). Subagent-driven (3 tasks + reviews + opus final "ready to merge"). storefront 95 tests. Live PDP smokes deferred to pre-deploy.
 - refs: design [docs/done/specs/2026-06-26-pdp-data-fitment-polish-design.md](../done/specs/2026-06-26-pdp-data-fitment-polish-design.md) ; plan [docs/done/plans/2026-06-26-pdp-data-fitment-polish.md](../done/plans/2026-06-26-pdp-data-fitment-polish.md)
+
+---
+
+### WB-057 · Newsletter hardening (unsubscribe + rate-limit + double-opt-in)   [LOW]
+- status: todo
+- area: backend/newsletter + storefront/home
+- evidence: backend/src/api/store/newsletter/route.ts (public, unauthenticated, no abuse guard) ; backend/src/modules/newsletter/service.ts (subscribe only)
+- problem: the launch newsletter (WB-023) persists subscriptions but has no abuse protection beyond the publishable-key header, no unsubscribe path, and no double-opt-in confirmation. Fine for launch, but the public `POST /store/newsletter` is a spam target and there's no way to honor an unsubscribe request.
+- fix: add rate-limiting (per-IP / per-window) on the route; an unsubscribe endpoint + tokenized link; optional double-opt-in confirmation email (reuses the Resend notification module).
+- verify: rapid repeated POSTs from one source are throttled; a subscriber can unsubscribe via a link and the row is soft-deleted (the unique email index is already partial on `deleted_at IS NULL`, so re-subscribe works); a confirmation email is sent before the subscription is marked confirmed.
+- refs: split out of [[WB-023]] / G4 final review (2026-06-26)

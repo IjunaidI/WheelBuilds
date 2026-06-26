@@ -5,7 +5,7 @@ import NewDropsRow from "@modules/home/components/new-drops-row"
 import ShopByStyle from "@modules/home/components/shop-by-style"
 import FeaturedBlocks from "@modules/home/components/featured-blocks"
 import ShopByBrand from "@modules/home/components/shop-by-brand"
-import BuildGallery from "@modules/home/components/build-gallery"
+import CatalogWall from "@modules/home/components/catalog-wall"
 import TrustStrip from "@modules/home/components/trust-strip"
 import Newsletter from "@modules/home/components/newsletter"
 import { getHomeCatalog } from "@modules/home/data/get-home-catalog"
@@ -27,7 +27,7 @@ export default async function Home() {
       <ShopByStyle />
       <FeaturedBlocks />
       <ShopByBrand />
-      <BuildGallery />
+      <CatalogWall />
       <TrustStrip brandCount={brandCount} />
       <Newsletter />
     </>

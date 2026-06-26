@@ -239,7 +239,7 @@ Default stroke is 1.5px. Use 2.5 for the orange "✓" check on trust points and 
 
 ### `<ImgPlaceholder label="…" dark? radius? style? />`
 
-[`src/modules/common/components/img-placeholder/index.tsx`](src/modules/common/components/img-placeholder/index.tsx). The striped stand-in for "real photo coming later." Use `dark` for vehicle 3/4 angles and build-gallery tiles. The `label` is a small mono caption inside.
+[`src/modules/common/components/img-placeholder/index.tsx`](src/modules/common/components/img-placeholder/index.tsx). The striped stand-in for "real photo coming later." Use `dark` for vehicle 3/4 angles. The `label` is a small mono caption inside.
 
 When real imagery lands, swap `<ImgPlaceholder>` for `next/image` directly, matching the parent's aspect ratio.
 
@@ -341,7 +341,7 @@ These don't change the design contract above, but they're tracked so the next it
 
 Every screen from the Wheel Builds design handoff is built. Visual + interaction layer is production-grade.
 
-- ✅ **Home** — hero + 7 sections (NewDrops, ShopByStyle, FeaturedBlocks ×3, ShopByBrand, BuildGallery, TrustStrip, Newsletter), fully responsive
+- ✅ **Home** — hero + 7 sections (NewDrops, ShopByStyle, FeaturedBlocks ×3, ShopByBrand, CatalogWall, TrustStrip, Newsletter), fully responsive
 - ✅ **Nav + Footer** — desktop primary nav + mobile hamburger drawer; 5-col footer that collapses cleanly
 - ✅ **Search drawer** — Vaul `direction="right"`, Cmd/Ctrl+K, garage / YMM / popular / recent / trending sections
 - ✅ **Discovery (catalog)** — filter rail (Vehicle / Category / Brand / Diameter / Bolt Pattern / Finish / Price), sort dropdown, active filter chips, 4-up product grid, pagination, empty state. Mobile rail collapses to a bottom Vaul drawer.

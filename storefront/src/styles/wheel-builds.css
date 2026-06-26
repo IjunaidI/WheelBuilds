@@ -462,12 +462,12 @@
  *
  * Most responsive work happens via Tailwind classes (`small:px-20` etc.) on
  * the section components. These CSS-side helpers exist for cases where
- * Tailwind can't reach — namely the build-gallery's mixed-span grid tiles
+ * Tailwind can't reach — namely the catalog-wall's mixed-span grid tiles
  * (inline `style={{ gridColumn: span N }}` can't be media-queried out from
  * the call site).
  * ------------------------------------------------------------------------- */
 
-/* BuildGallery tile: spans set via inline style apply only on small+ —
+/* CatalogWall tile: spans set via inline style apply only on small+ —
  * below that, the tile sits in a simple 2-col aspect-square grid. */
 @media (max-width: 1023px) {
   .frame .build-tile {

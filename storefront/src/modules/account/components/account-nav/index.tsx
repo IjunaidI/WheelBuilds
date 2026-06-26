@@ -8,6 +8,7 @@ import ChevronDown from "@modules/common/icons/chevron-down"
 import User from "@modules/common/icons/user"
 import MapPin from "@modules/common/icons/map-pin"
 import Package from "@modules/common/icons/package"
+import Car from "@modules/common/icons/car"
 import LocalizedClientLink from "@modules/common/components/localized-client-link"
 import { HttpTypes } from "@medusajs/types"
 import { signout } from "@lib/data/customer"
@@ -77,6 +78,21 @@ const AccountNav = ({
                 </li>
                 <li>
                   <LocalizedClientLink
+                    href="/account/garage"
+                    className="flex items-center justify-between py-4 border-b border-gray-200 px-8"
+                    data-testid="garage-link"
+                  >
+                    <>
+                      <div className="flex items-center gap-x-2">
+                        <Car size={20} />
+                        <span>Garage</span>
+                      </div>
+                      <ChevronDown className="transform -rotate-90" />
+                    </>
+                  </LocalizedClientLink>
+                </li>
+                <li>
+                  <LocalizedClientLink
                     href="/account/orders"
                     className="flex items-center justify-between py-4 border-b border-gray-200 px-8"
                     data-testid="orders-link"
@@ -139,6 +155,15 @@ const AccountNav = ({
                   data-testid="addresses-link"
                 >
                   Addresses
+                </AccountNavLink>
+              </li>
+              <li>
+                <AccountNavLink
+                  href="/account/garage"
+                  route={route!}
+                  data-testid="garage-link"
+                >
+                  Garage
                 </AccountNavLink>
               </li>
               <li>

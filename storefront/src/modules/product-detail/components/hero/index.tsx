@@ -1,7 +1,6 @@
 "use client"
 
 import { useEffect, useMemo, useState } from "react"
-import { Finish } from "@modules/common/components/wheel"
 import { OffsetVariant, ProductDetail, SizeOption } from "../../data/types"
 import { sizesForBoltPattern, pickDefaultSize, boresFor, loadsForBore, resolveLeafVariant } from "../../data/group-sizes"
 import Gallery from "./gallery"
@@ -31,9 +30,15 @@ type HeroProps = {
  *   mobile: stacked — Gallery first, then purchase+picker
  */
 const Hero = ({ product }: HeroProps) => {
-  const [activeFinish, setActiveFinish] = useState<Finish>(
-    product.finishOptions[0] ?? product.finish
+  const finishOptions = product.finishOptions
+  const [activeFinishRaw, setActiveFinishRaw] = useState<string>(
+    finishOptions[0]?.raw ?? "—"
   )
+  const activeFinish = useMemo(
+    () => finishOptions.find((f) => f.raw === activeFinishRaw) ?? finishOptions[0],
+    [finishOptions, activeFinishRaw]
+  )
+  const finishSizeOptions = activeFinish?.sizeOptions ?? product.sizeOptions
 
   const [selectedBoltPattern, setSelectedBoltPattern] = useState<string>(
     product.boltPatternOptions[0] ?? product.boltPattern
@@ -41,8 +46,8 @@ const Hero = ({ product }: HeroProps) => {
 
   // Bolt pattern gates the grid: only the selected pattern's sizes are shown.
   const visibleSizes = useMemo<SizeOption[]>(
-    () => sizesForBoltPattern(product.sizeOptions, selectedBoltPattern),
-    [product.sizeOptions, selectedBoltPattern]
+    () => sizesForBoltPattern(finishSizeOptions, selectedBoltPattern),
+    [finishSizeOptions, selectedBoltPattern]
   )
 
   // Default to the first in-stock size in the visible (pattern-scoped) set.
@@ -126,10 +131,9 @@ const Hero = ({ product }: HeroProps) => {
   return (
     <section className="grid grid-cols-1 small:grid-cols-2 gap-10 small:gap-16 items-start">
       <Gallery
-        finishes={product.finishOptions}
-        activeFinish={activeFinish}
-        onFinishChange={setActiveFinish}
-        thumbnail={product.thumbnail}
+        finishes={finishOptions}
+        activeFinishRaw={activeFinishRaw}
+        onFinishChange={setActiveFinishRaw}
       />
       <div className="flex flex-col gap-8">
         <PurchasePanel

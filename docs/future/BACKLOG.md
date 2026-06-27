@@ -634,3 +634,15 @@
 - fix: integrate a commercial plate-decode API (plate+state → VIN → YMM; NHTSA vPIC is VIN-only, so a paid plate→VIN provider is needed) behind a backend route, then re-add a license-plate entry point in the YMM pane wired to it (or a dedicated tab).
 - verify: entering a valid plate + state returns a real vehicle match that can be saved to the garage; invalid input surfaces a clear error; the entry point is only shown when the provider is configured.
 - refs: split out of [[WB-045]] / G7 (2026-06-26)
+
+---
+
+### WB-059 · Finish as a variant axis (collapse colors into one product)   [HIGH]
+- status: in-progress
+- area: backend/vendor-sync + backend/search + storefront/discovery + storefront/pdp
+- evidence: backend/src/modules/vendor-sync/adapters/wheelpros-wheels/group-key.ts ; backend/src/modules/vendor-sync/pipeline/wheel-grouping.ts (7-axis) ; backend/src/modules/vendor-sync/pipeline/build-metadata.ts ; backend/src/modules/vendor-sync/search/build-search-document.ts (finishes[]) ; storefront/src/modules/product-detail/data/finish-options.ts ; storefront/src/modules/product-detail/components/hero/{index,gallery}.tsx
+- problem: wheels identical except color/finish imported as N separate products (e.g. `petrol-p3b-matte-black` + `petrol-p3b-gloss-silver`) instead of ONE product with selectable finish variants.
+- fix: drop finish from the wheel group key (`Brand|DisplayStyleNo`); make finish the 7th variant axis (raw label, blank→`—`); move finish + per-finish `image_url` to variant metadata; product `images` = union of finish images; Meili emits multi-valued normalized `finishes`; Discovery + PDP read it (PDP finish selector swaps image + per-finish size matrix). Old per-finish URLs 404.
+- verify: a known multi-color model imports as ONE `/products/<brand>-<style>` with a working finish selector (image + price + sizes change per finish); Discovery shows it under each normalized bucket; old `…-<finish>` URL 404s; apply errors ≈ 0; product count drops / variant count rises.
+- done: 2026-06-27 — **CODE merged to `main` (Phases 1-4, commits e6455c9..10cebfb, merge 77c10df); the feature is NOT yet live on prod.** Subagent-driven (10 tasks + per-task reviews + opus final review "Ready to merge: Yes"). Backend vendor-sync 242 tests / storefront 105. **Phase 5 — the destructive prod re-import cutover — is GATED and NOT run:** purge-products → `vendor-sync-truncate-state.ts` → re-run feed → **restart/redeploy backend so the plugin pushes the new `finishes` index settings** before Discovery filters on it. Until that runs, prod stays on the per-finish catalog. Axis-key integrity (variantAxisKey↔axisKeyFromMetadata 7-tuple) verified so the incremental add path dedupes after re-import.
+- refs: design [docs/in-progress/specs/2026-06-27-finish-as-variant-design.md](../in-progress/specs/2026-06-27-finish-as-variant-design.md) ; plan [docs/in-progress/plans/2026-06-27-finish-as-variant.md](../in-progress/plans/2026-06-27-finish-as-variant.md) (Phase 5 = the cutover runbook)

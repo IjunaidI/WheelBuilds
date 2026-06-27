@@ -133,9 +133,9 @@ describe('normalizeWheelRow', () => {
     expect(result.partNumber).toBe('000000000001058059')
   })
 
-  it('emits groupKey from brand + displayStyleNo + finish', () => {
+  it('emits groupKey from brand + displayStyleNo (finish is a variant axis, not in the key — WB-059)', () => {
     const result = normalizeWheelRow(makeRow())
-    expect(result.groupKey).toBe('Teraflex|058|Matte Black')
+    expect(result.groupKey).toBe('Teraflex|058')
   })
 
   it('emits per-SKU groupKey when displayStyleNo is empty', () => {

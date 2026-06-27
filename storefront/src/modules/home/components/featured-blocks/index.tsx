@@ -52,7 +52,7 @@ const EditorialBlock = ({
           />
         ) : (
           <div className="absolute inset-0 flex items-center justify-center">
-            <Wheel size={220} finish={product.finish} />
+            <Wheel size={220} finish={product.finishes[0] ?? "black"} />
           </div>
         )}
       </div>

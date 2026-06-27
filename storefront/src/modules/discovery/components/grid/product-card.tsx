@@ -43,7 +43,7 @@ const DiscoveryProductCard = ({ product }: DiscoveryProductCardProps) => (
           className="object-contain p-4"
         />
       ) : (
-        <Wheel size={180} finish={product.finish} />
+        <Wheel size={180} finish={product.finishes[0] ?? "black"} />
       )}
       {product.isNew && (
         <div className="absolute top-2.5 left-2.5">
@@ -64,7 +64,7 @@ const DiscoveryProductCard = ({ product }: DiscoveryProductCardProps) => (
       </Display>
 
       <div className="flex items-center gap-1.5 mt-2">
-        {[product.finish, "black", "silver"].slice(0, 3).map((f, i) => (
+        {(product.finishes.length ? product.finishes : ["black"]).slice(0, 3).map((f, i) => (
           <span
             key={`${f}-${i}`}
             aria-hidden

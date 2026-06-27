@@ -26,7 +26,8 @@ export type DiscoveryProduct = {
   originalPriceCents?: number
   /** Cover image URL (vendor CDN). Null when the product has no image. */
   thumbnail: string | null
-  finish: Finish
+  /** Normalized finish buckets this product is offered in (multi-valued). */
+  finishes: Finish[]
   diameter: number
   width: number
   boltPattern: string

@@ -15,6 +15,7 @@ export const WHEEL_OPTION_TITLES = {
   OFFSET: "Offset",
   CENTER_BORE: "Center Bore",
   LOAD_RATING: "Load Rating",
+  FINISH: "Finish",
 } as const
 
 /** Sentinel option value / axis-key segment for a null optional axis. */
@@ -47,8 +48,14 @@ export function formatOptionalAxis(value: number | null): string {
   return value == null ? OPTIONAL_AXIS_NONE : formatNumericOption(value)
 }
 
+/** Format the finish axis value: raw trimmed label, blank → sentinel. */
+export function formatFinish(finish: string | null): string {
+  const f = finish?.trim()
+  return f ? f : OPTIONAL_AXIS_NONE
+}
+
 /**
- * The 6-tuple that uniquely identifies a variant inside a group. Any
+ * The 7-tuple that uniquely identifies a variant inside a group. Any
  * pairwise difference in any axis yields distinct variants; the only
  * residual collision is an exact duplicate (deduped in apply).
  */
@@ -60,6 +67,7 @@ export function variantAxisKey(record: WheelNormalizedRecord): string {
     formatNumericOption(record.offsetMm),
     formatOptionalAxis(record.centerBoreMm),
     formatOptionalAxis(record.loadRatingLb),
+    formatFinish(record.finish),
   ].join("|")
 }
 
@@ -88,6 +96,7 @@ export function axisKeyFromMetadata(m: Record<string, unknown>): string {
     formatNumericOption(Number(m.offset_mm)),
     formatOptionalAxis(toOptionalNumber(m.center_bore_mm)),
     formatOptionalAxis(toOptionalNumber(m.load_rating_lb)),
+    formatFinish(typeof m.finish === "string" ? m.finish : null),
   ].join("|")
 }
 
@@ -105,6 +114,7 @@ export function buildProductOptions(
   const offsets = new Set<string>()
   const centerBores = new Set<string>()
   const loadRatings = new Set<string>()
+  const finishes = new Set<string>()
 
   for (const r of records) {
     boltPatterns.add(r.boltPatternRaw)
@@ -113,6 +123,7 @@ export function buildProductOptions(
     offsets.add(formatNumericOption(r.offsetMm))
     centerBores.add(formatOptionalAxis(r.centerBoreMm))
     loadRatings.add(formatOptionalAxis(r.loadRatingLb))
+    finishes.add(formatFinish(r.finish))
   }
 
   const numericSort = (a: string, b: string) => parseFloat(a) - parseFloat(b)
@@ -123,6 +134,7 @@ export function buildProductOptions(
     { title: WHEEL_OPTION_TITLES.OFFSET, values: [...offsets].sort(numericSort) },
     { title: WHEEL_OPTION_TITLES.CENTER_BORE, values: [...centerBores].sort(numericSort) },
     { title: WHEEL_OPTION_TITLES.LOAD_RATING, values: [...loadRatings].sort(numericSort) },
+    { title: WHEEL_OPTION_TITLES.FINISH, values: [...finishes].sort() },
   ]
 }
 
@@ -141,6 +153,7 @@ export function buildVariantOptions(
     [WHEEL_OPTION_TITLES.OFFSET]: formatNumericOption(record.offsetMm),
     [WHEEL_OPTION_TITLES.CENTER_BORE]: formatOptionalAxis(record.centerBoreMm),
     [WHEEL_OPTION_TITLES.LOAD_RATING]: formatOptionalAxis(record.loadRatingLb),
+    [WHEEL_OPTION_TITLES.FINISH]: formatFinish(record.finish),
   }
 }
 
@@ -153,28 +166,24 @@ export function buildGroupTitle(record: WheelNormalizedRecord): string {
   if (!record.displayStyleNo) {
     return record.title
   }
-  const parts = [record.brand, record.displayStyleNo]
-  if (record.finish) parts.push(record.finish)
-  return parts.join(" ")
+  return [record.brand, record.displayStyleNo].join(" ")
 }
 
 /**
  * URL-safe handle for a wheel product.
  *
- *   grouped:    brand-displayStyleNo[-finish]   e.g. performance-replicas-126-gloss-black
- *   per-SKU:    brand-partNumber                e.g. dub-1pc-y305198543-2515
+ *   grouped:    brand-displayStyleNo   e.g. performance-replicas-126
+ *   per-SKU:    brand-partNumber       e.g. dub-1pc-y305198543-2515
  *
  * Handles are derived from DisplayStyleNo, never the Style column, to
  * avoid the T-13 collision (Tuff T04, T07, T13 all surface "T-13" in
- * Style).
+ * Style). Finish is a variant axis, not part of the handle.
  */
 export function buildGroupHandle(record: WheelNormalizedRecord): string {
   if (!record.displayStyleNo) {
     return `${slugify(record.brand)}-${slugify(record.partNumber)}`
   }
-  const parts = [slugify(record.brand), slugify(record.displayStyleNo)]
-  if (record.finish) parts.push(slugify(record.finish))
-  return parts.filter(Boolean).join("-")
+  return [slugify(record.brand), slugify(record.displayStyleNo)].filter(Boolean).join("-")
 }
 
 /**
@@ -206,7 +215,7 @@ function groupByAxisKey(
   return byKey
 }
 
-/** Sets of records that share a 6-tuple (i.e. exact duplicates). */
+/** Sets of records that share a 7-tuple (i.e. exact duplicates). */
 export function findExactDuplicates(
   records: WheelNormalizedRecord[]
 ): WheelNormalizedRecord[][] {
@@ -224,7 +233,7 @@ function pickSurvivor(dupes: WheelNormalizedRecord[]): WheelNormalizedRecord {
 }
 
 /**
- * Collapse exact duplicates (identical 6-tuple) to one survivor each.
+ * Collapse exact duplicates (identical 7-tuple) to one survivor each.
  * Center-bore- / load-rating-distinct rows are NOT duplicates and pass through.
  */
 export function dedupeExactDuplicates(records: WheelNormalizedRecord[]): {
@@ -246,7 +255,7 @@ export function dedupeExactDuplicates(records: WheelNormalizedRecord[]): {
 }
 
 /**
- * Filter newly-added records against the 6-tuples already on a product
+ * Filter newly-added records against the 7-tuples already on a product
  * (and against each other), so an exact duplicate is never created as a
  * second variant with the same option tuple.
  */

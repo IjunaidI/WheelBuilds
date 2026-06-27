@@ -1,5 +1,6 @@
 import {
   WHEEL_OPTION_TITLES,
+  OPTIONAL_AXIS_NONE,
   buildGroupHandle,
   buildGroupTitle,
   buildProductOptions,
@@ -93,14 +94,18 @@ describe("formatOptionalAxis", () => {
   })
 })
 
-describe("variantAxisKey (6-axis)", () => {
-  it("combines all six axes into a stable key", () => {
-    const r = makeWheel() // centerBoreMm 71.5, loadRatingLb 2200
-    expect(variantAxisKey(r)).toBe("5X120|20|10|23|71.5|2200")
+describe("variantAxisKey (7-axis)", () => {
+  it("combines all seven axes into a stable key", () => {
+    const r = makeWheel() // centerBoreMm 71.5, loadRatingLb 2200, finish "GLOSS BLACK"
+    expect(variantAxisKey(r)).toBe("5X120|20|10|23|71.5|2200|GLOSS BLACK")
   })
   it("uses the sentinel when center bore / load rating are null", () => {
     const r = makeWheel({ centerBoreMm: null, loadRatingLb: null })
-    expect(variantAxisKey(r)).toBe("5X120|20|10|23|—|—")
+    expect(variantAxisKey(r)).toBe("5X120|20|10|23|—|—|GLOSS BLACK")
+  })
+  it("uses the sentinel when finish is null", () => {
+    const r = makeWheel({ centerBoreMm: 71.5, loadRatingLb: 2200, finish: null })
+    expect(variantAxisKey(r)).toBe("5X120|20|10|23|71.5|2200|—")
   })
   it("yields different keys when ONLY center bore differs", () => {
     expect(variantAxisKey(makeWheel({ centerBoreMm: 71.5 }))).not.toBe(
@@ -110,6 +115,11 @@ describe("variantAxisKey (6-axis)", () => {
   it("yields different keys when ONLY load rating differs", () => {
     expect(variantAxisKey(makeWheel({ loadRatingLb: 2200 }))).not.toBe(
       variantAxisKey(makeWheel({ loadRatingLb: 2500 }))
+    )
+  })
+  it("yields different keys when ONLY finish differs", () => {
+    expect(variantAxisKey(makeWheel({ finish: "GLOSS BLACK" }))).not.toBe(
+      variantAxisKey(makeWheel({ finish: "MATTE BLACK" }))
     )
   })
 })
@@ -124,6 +134,7 @@ describe("axisKeyFromMetadata", () => {
       offset_mm: r.offsetMm,
       center_bore_mm: r.centerBoreMm,
       load_rating_lb: r.loadRatingLb,
+      finish: r.finish,
     }
     expect(axisKeyFromMetadata(meta)).toBe(variantAxisKey(r))
   })
@@ -134,25 +145,25 @@ describe("axisKeyFromMetadata", () => {
       wheel_width_in: 10,
       offset_mm: 23,
       center_bore_mm: null,
-      // load_rating_lb absent
+      // load_rating_lb and finish absent
     }
-    expect(axisKeyFromMetadata(meta)).toBe("5X120|20|10|23|—|—")
+    expect(axisKeyFromMetadata(meta)).toBe("5X120|20|10|23|—|—|—")
   })
   it("coerces string-typed optional metadata values like the numeric path", () => {
     const numericMeta = {
       bolt_pattern_raw: "5X120", wheel_diameter_in: 20, wheel_width_in: 10,
-      offset_mm: 23, center_bore_mm: 67.1, load_rating_lb: 2500,
+      offset_mm: 23, center_bore_mm: 67.1, load_rating_lb: 2500, finish: "GLOSS BLACK",
     }
     const stringMeta = {
       bolt_pattern_raw: "5X120", wheel_diameter_in: "20", wheel_width_in: "10",
-      offset_mm: "23", center_bore_mm: "67.1", load_rating_lb: "2500",
+      offset_mm: "23", center_bore_mm: "67.1", load_rating_lb: "2500", finish: "GLOSS BLACK",
     }
     expect(axisKeyFromMetadata(stringMeta)).toBe(axisKeyFromMetadata(numericMeta))
-    expect(axisKeyFromMetadata(stringMeta)).toBe("5X120|20|10|23|67.1|2500")
+    expect(axisKeyFromMetadata(stringMeta)).toBe("5X120|20|10|23|67.1|2500|GLOSS BLACK")
   })
 })
 
-describe("buildProductOptions (6 axes)", () => {
+describe("buildProductOptions (7 axes)", () => {
   it("emits all six axes with deduplicated values", () => {
     const records = [
       makeWheel({ partNumber: "A", offsetMm: 23, centerBoreMm: 71.5, loadRatingLb: 2200 }),
@@ -178,7 +189,7 @@ describe("buildProductOptions (6 axes)", () => {
   })
 })
 
-describe("buildVariantOptions (6 keys)", () => {
+describe("buildVariantOptions (7 keys)", () => {
   it("emits all six option keys, sentinel for null optional axes", () => {
     const opts = buildVariantOptions(
       makeWheel({ centerBoreMm: null, loadRatingLb: 2200 })
@@ -196,16 +207,16 @@ describe("buildVariantOptions (6 keys)", () => {
 })
 
 describe("buildGroupTitle", () => {
-  it("joins brand + displayStyleNo + finish with spaces when grouped", () => {
+  it("joins brand + displayStyleNo (no finish) when grouped", () => {
     const r = makeWheel({
       brand: "Performance Replicas",
       displayStyleNo: "126",
       finish: "GLOSS BLACK",
     })
-    expect(buildGroupTitle(r)).toBe("Performance Replicas 126 GLOSS BLACK")
+    expect(buildGroupTitle(r)).toBe("Performance Replicas 126")
   })
 
-  it("omits finish when blank but model is present", () => {
+  it("same title regardless of finish value", () => {
     const r = makeWheel({
       brand: "Asanti Forged",
       displayStyleNo: "172",
@@ -224,16 +235,16 @@ describe("buildGroupTitle", () => {
 })
 
 describe("buildGroupHandle", () => {
-  it("derives from brand + displayStyleNo + finish, slugified", () => {
+  it("derives from brand + displayStyleNo only (no finish), slugified", () => {
     const r = makeWheel({
       brand: "Performance Replicas",
       displayStyleNo: "126",
       finish: "GLOSS BLACK",
     })
-    expect(buildGroupHandle(r)).toBe("performance-replicas-126-gloss-black")
+    expect(buildGroupHandle(r)).toBe("performance-replicas-126")
   })
 
-  it("omits finish in the handle when blank", () => {
+  it("same handle regardless of finish value", () => {
     const r = makeWheel({
       brand: "Asanti Forged",
       displayStyleNo: "172",
@@ -287,14 +298,14 @@ describe("pickGroupRepresentative", () => {
 })
 
 describe("findExactDuplicates", () => {
-  it("returns nothing when every 6-tuple is distinct", () => {
+  it("returns nothing when every 7-tuple is distinct", () => {
     const records = [
       makeWheel({ partNumber: "A", centerBoreMm: 71.5 }),
       makeWheel({ partNumber: "B", centerBoreMm: 67.1 }),
     ]
     expect(findExactDuplicates(records)).toEqual([])
   })
-  it("groups rows that share a 6-tuple", () => {
+  it("groups rows that share a 7-tuple", () => {
     const records = [
       makeWheel({ partNumber: "A" }),
       makeWheel({ partNumber: "B" }),
@@ -336,7 +347,7 @@ describe("dedupeExactDuplicates", () => {
 })
 
 describe("dedupeAddedAgainstExisting", () => {
-  it("drops a record whose 6-tuple already exists on the product", () => {
+  it("drops a record whose 7-tuple already exists on the product", () => {
     const existing = new Set([variantAxisKey(makeWheel({ partNumber: "X" }))])
     const { toCreate, dropped } = dedupeAddedAgainstExisting(
       [makeWheel({ partNumber: "DUP" }), makeWheel({ partNumber: "NEW", offsetMm: 35 })],
@@ -352,5 +363,50 @@ describe("dedupeAddedAgainstExisting", () => {
     )
     expect(toCreate.map((r) => r.partNumber)).toEqual(["A"])
     expect(dropped.map((r) => r.partNumber)).toEqual(["B"])
+  })
+})
+
+// ── Task 2: Finish as the 7th variant axis ──────────────────────────────────
+
+const wheel = (over: Partial<WheelNormalizedRecord> = {}): WheelNormalizedRecord => ({
+  productType: "wheel", partNumber: "P", vendorCode: "v", title: "t", brand: "Petrol",
+  imageUrl: "i", invOrderType: "", totalQoh: 1, msrpUsd: 1, mapUsd: 1,
+  runDateVendor: new Date(0), stockByWarehouse: {}, groupKey: "Petrol|P3B",
+  displayStyleNo: "P3B", finish: "Matte Black", diameterIn: 20, widthIn: 9,
+  boltCount: 5, boltCircleIn: 4.5, boltPatternRaw: "5x114.3", offsetMm: 35,
+  centerBoreMm: 73.1, loadRatingLb: 1500, shippingWeightLb: 30, style: "P3B", ...over,
+})
+
+describe("finish as the 7th variant axis", () => {
+  it("finish is a variant axis — same size, different finish = distinct variants", () => {
+    const black = variantAxisKey(wheel({ finish: "Matte Black" }))
+    const silver = variantAxisKey(wheel({ finish: "Gloss Silver" }))
+    expect(black).not.toBe(silver)
+  })
+  it("matte vs gloss black stay distinct (raw finish, not normalized)", () => {
+    expect(variantAxisKey(wheel({ finish: "Matte Black" })))
+      .not.toBe(variantAxisKey(wheel({ finish: "Gloss Black" })))
+  })
+  it("blank finish → sentinel in the axis key", () => {
+    expect(variantAxisKey(wheel({ finish: null }))).toContain(OPTIONAL_AXIS_NONE)
+  })
+  it("buildProductOptions includes a Finish option with the union of finishes", () => {
+    const opts = buildProductOptions([wheel({ finish: "Matte Black" }), wheel({ finish: "Gloss Silver" })])
+    const finishOpt = opts.find((o) => o.title === WHEEL_OPTION_TITLES.FINISH)
+    expect(finishOpt?.values.sort()).toEqual(["Gloss Silver", "Matte Black"])
+  })
+  it("buildVariantOptions carries the raw finish", () => {
+    expect(buildVariantOptions(wheel({ finish: "Matte Black" }))[WHEEL_OPTION_TITLES.FINISH]).toBe("Matte Black")
+  })
+  it("axisKeyFromMetadata matches variantAxisKey for the same record", () => {
+    const r = wheel({ finish: "Gloss Silver" })
+    const m = { bolt_pattern_raw: r.boltPatternRaw, wheel_diameter_in: r.diameterIn,
+      wheel_width_in: r.widthIn, offset_mm: r.offsetMm, center_bore_mm: r.centerBoreMm,
+      load_rating_lb: r.loadRatingLb, finish: r.finish }
+    expect(axisKeyFromMetadata(m)).toBe(variantAxisKey(r))
+  })
+  it("handle and title drop the finish", () => {
+    expect(buildGroupHandle(wheel({ finish: "Matte Black" }))).toBe("petrol-p3b")
+    expect(buildGroupTitle(wheel({ finish: "Matte Black" }))).toBe("Petrol P3B")
   })
 })

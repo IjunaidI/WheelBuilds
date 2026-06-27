@@ -56,6 +56,18 @@ export type SizeOption = {
   priceCentsOverride?: number
 }
 
+/** One finish a wheel is offered in, with its own image + size matrix. */
+export type FinishOption = {
+  /** Raw vendor finish label, e.g. "Matte Black". The selectable variant value. */
+  raw: string
+  /** Normalized bucket (black/silver/bronze) — drives the <Wheel> fallback color. */
+  normalized: Finish
+  /** This finish's product image (vendor CDN); null falls back to <Wheel>. */
+  imageUrl: string | null
+  /** Size matrix scoped to THIS finish's variants. */
+  sizeOptions: SizeOption[]
+}
+
 /** A vehicle confirmed to fit this product. Drives the fitment list. */
 export type FitmentEntry = {
   year: string
@@ -90,8 +102,8 @@ export type ProductDetail = DiscoveryProduct & {
     finishOptions: number
   }
 
-  /** Finishes the product is offered in. The hero variant picker switches between these. */
-  finishOptions: Finish[]
+  /** Finishes the product is offered in; the hero finish selector switches between these. */
+  finishOptions: FinishOption[]
 
   /** Size matrix (Diameter × Width × Offset). */
   sizeOptions: SizeOption[]

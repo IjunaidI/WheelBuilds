@@ -5,7 +5,6 @@ export default defineConfig({
     alias: {
       "@lib": path.resolve(__dirname, "src/lib"),
       "@modules": path.resolve(__dirname, "src/modules"),
-      "@pages": path.resolve(__dirname, "src/pages"),
       "@": path.resolve(__dirname, "src"),
     },
   },

@@ -35,7 +35,7 @@ import { lit } from "./escape"
 // Re-export so any existing imports from this file keep working.
 export { parseQueryFromSearchParams } from "./types"
 
-const FACET_FIELDS = ["brand", "diameters", "bolt_patterns", "finish"] as const
+const FACET_FIELDS = ["brand", "diameters", "bolt_patterns", "finishes"] as const
 
 const NEW_DAYS = 30
 const NEW_MS = NEW_DAYS * 24 * 60 * 60 * 1000
@@ -59,7 +59,7 @@ function buildFilters(
   if (skip !== "boltPatterns" && f.boltPatterns.length)
     clauses.push(`bolt_patterns IN [${f.boltPatterns.map(lit).join(", ")}]`)
   if (skip !== "finishes" && f.finishes.length)
-    clauses.push(`finish IN [${f.finishes.map(lit).join(", ")}]`)
+    clauses.push(`finishes IN [${f.finishes.map(lit).join(", ")}]`)
   if (f.priceMinCents != null) clauses.push(`price_min >= ${f.priceMinCents}`)
   if (f.priceMaxCents != null) clauses.push(`price_min <= ${f.priceMaxCents}`)
 
@@ -89,7 +89,7 @@ type Hit = {
   handle: string
   title: string
   brand: string
-  finish: Finish
+  finishes: Finish[]
   thumbnail: string | null
   diameters: number[]
   widths: number[]
@@ -109,7 +109,7 @@ function hitToProduct(h: Hit): DiscoveryProduct {
     brand: h.brand,
     priceCents: h.price_min,
     thumbnail: h.thumbnail ?? null,
-    finish: (h.finish as Finish) ?? "black",
+    finishes: (h.finishes as Finish[]) ?? [],
     diameter: h.diameters?.[0] ?? 0,
     width: h.widths?.[0] ?? 0,
     boltPattern: h.bolt_patterns?.[0] ?? "",
@@ -145,7 +145,7 @@ export async function getDiscoveryProducts(
     brand: "brands",
     diameters: "diameters",
     bolt_patterns: "boltPatterns",
-    finish: "finishes",
+    finishes: "finishes",
   }
 
   try {
@@ -185,7 +185,7 @@ export async function getDiscoveryProducts(
       brands: facetByField["brand"],
       diameters: facetByField["diameters"],
       boltPatterns: facetByField["bolt_patterns"],
-      finishes: facetByField["finish"],
+      finishes: facetByField["finishes"],
     }
 
     return {

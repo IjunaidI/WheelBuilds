@@ -6,7 +6,7 @@ const product = {
   title: "Teraflex Nomad Matte Black",
   thumbnail: "https://cdn.example.com/x.jpg",
   created_at: "2026-05-01T00:00:00.000Z",
-  metadata: { product_type: "wheel", brand: "Teraflex", finish: "Matte Black" },
+  metadata: { product_type: "wheel", brand: "Teraflex" },
   variants: [
     {
       sku: "W-1",
@@ -15,6 +15,7 @@ const product = {
       // storefront's `priceCents` contract.
       prices: [{ amount: 369.99, currency_code: "usd" }],
       metadata: {
+        finish: "Matte Black",
         wheel_diameter_in: 17,
         wheel_width_in: 8.5,
         bolt_pattern_raw: "5X5.0",
@@ -26,6 +27,7 @@ const product = {
       sku: "W-2",
       prices: [{ amount: 419.99, currency_code: "usd" }],
       metadata: {
+        finish: "Matte Black",
         wheel_diameter_in: 18,
         wheel_width_in: 9,
         bolt_pattern_raw: "5X5.0",
@@ -43,7 +45,7 @@ describe("buildSearchDocument", () => {
       id: "prod_1",
       handle: "teraflex-nomad-matte-black",
       brand: "Teraflex",
-      finish: "black",
+      finishes: ["black"],
       product_type: "wheel",
       diameters: [17, 18],
       widths: [8.5, 9],
@@ -54,6 +56,7 @@ describe("buildSearchDocument", () => {
       price_min: 36999,
       price_max: 41999,
     })
+    expect((doc as any).finish).toBeUndefined()
   })
 
   it("converts major-unit USD prices to integer cents", () => {
@@ -83,11 +86,25 @@ describe("buildSearchDocument", () => {
     expect(doc).toMatchObject({
       id: "p2",
       brand: "B",
-      finish: "black",
+      finishes: [],
       diameters: [],
       bolt_patterns_canonical: [],
       price_min: 0,
       price_max: 0,
     })
+    expect((doc as any).finish).toBeUndefined()
+  })
+
+  it("emits the normalized union of variant finishes", () => {
+    const doc = buildSearchDocument({
+      id: "p", handle: "h", title: "t", metadata: { product_type: "wheel", brand: "Petrol" },
+      variants: [
+        { metadata: { finish: "Matte Black", bolt_pattern_raw: "5x114.3", wheel_diameter_in: 20, wheel_width_in: 9, offset_mm: 35 } },
+        { metadata: { finish: "Gloss Silver", bolt_pattern_raw: "5x114.3", wheel_diameter_in: 20, wheel_width_in: 9, offset_mm: 35 } },
+      ],
+    } as any)
+    expect(doc).not.toBeNull()
+    expect([...(doc!.finishes as string[])].sort()).toEqual(["black", "silver"])
+    expect((doc as any).finish).toBeUndefined()
   })
 })

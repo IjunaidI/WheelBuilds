@@ -2,10 +2,11 @@ import { NormalizedRecord } from "../adapters/types"
 
 /**
  * Build PRODUCT-level metadata. Only fields that are constant across all
- * variants of a wheel group (brand, displayStyleNo, finish, style, the
- * group key itself) belong here. Per-row fields like dimensions, prices,
- * bolt count, center bore, load rating go on the VARIANT via
- * buildVariantMetadata.
+ * variants of a wheel group (brand, displayStyleNo, style, the group key
+ * itself) belong here. NOTE: finish has moved to VARIANT metadata (each
+ * finish is its own variant axis). Per-row fields like dimensions, prices,
+ * bolt count, center bore, load rating, finish, and image_url go on the
+ * VARIANT via buildVariantMetadata.
  *
  * Pure function -- no side effects.
  */
@@ -23,7 +24,6 @@ export function buildProductMetadata(
     return {
       ...base,
       display_style_no: normalized.displayStyleNo,
-      finish: normalized.finish,
       style: normalized.style,
     }
   }
@@ -54,6 +54,8 @@ export function buildVariantMetadata(
   if (normalized.productType === "wheel") {
     return {
       ...base,
+      finish: normalized.finish,
+      image_url: normalized.imageUrl,
       wheel_diameter_in: normalized.diameterIn,
       wheel_width_in: normalized.widthIn,
       bolt_count: normalized.boltCount,

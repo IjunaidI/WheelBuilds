@@ -1,14 +1,14 @@
 import { computeWheelGroupKey } from '../adapters/wheelpros-wheels/group-key'
 
 describe('computeWheelGroupKey', () => {
-  it('groups by brand + displayStyleNo + finish when all present', () => {
+  it('groups by brand + displayStyleNo (finish dropped)', () => {
     const key = computeWheelGroupKey({
       brand: 'Performance Replicas',
       displayStyleNo: '126',
       finish: 'GLOSS BLACK',
       partNumber: '126GB-211223',
     })
-    expect(key).toBe('Performance Replicas|126|GLOSS BLACK')
+    expect(key).toBe('Performance Replicas|126')
   })
 
   it('places two SKUs that share brand+model+finish in the same group', () => {
@@ -27,7 +27,7 @@ describe('computeWheelGroupKey', () => {
     expect(a).toBe(b)
   })
 
-  it('separates two SKUs that differ on finish', () => {
+  it('groups all finishes of a model under one key (finish dropped)', () => {
     const a = computeWheelGroupKey({
       brand: 'Performance Replicas',
       displayStyleNo: '126',
@@ -40,7 +40,8 @@ describe('computeWheelGroupKey', () => {
       finish: 'BLACK BRONZE',
       partNumber: '126BB-211223',
     })
-    expect(a).not.toBe(b)
+    expect(a).toBe(b)
+    expect(a).toBe('Performance Replicas|126')
   })
 
   it('separates two SKUs that differ on brand even with same model code', () => {
@@ -75,7 +76,7 @@ describe('computeWheelGroupKey', () => {
       partNumber: 'ZLTCX1722090',
     })
     expect(a).toBe(b)
-    expect(a).toBe('Asanti Forged|172|')
+    expect(a).toBe('Asanti Forged|172')
   })
 
   it('falls back to a per-SKU key when displayStyleNo is empty', () => {
@@ -105,7 +106,7 @@ describe('computeWheelGroupKey', () => {
       finish: ' GLOSS BLACK ',
       partNumber: '126GB-211223',
     })
-    expect(key).toBe('Performance Replicas|126|GLOSS BLACK')
+    expect(key).toBe('Performance Replicas|126')
   })
 
   it('treats whitespace-only displayStyleNo as empty (falls back to per-SKU)', () => {

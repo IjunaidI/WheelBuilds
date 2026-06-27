@@ -44,7 +44,7 @@ const Tile = ({
       />
     ) : (
       <div className="absolute inset-0 flex items-center justify-center">
-        <Wheel size={120} finish={product.finish} />
+        <Wheel size={120} finish={product.finishes[0] ?? "black"} />
       </div>
     )}
     <div style={{ position: "absolute", left: 12, bottom: 12 }}>

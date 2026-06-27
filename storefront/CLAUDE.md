@@ -235,7 +235,7 @@ src/modules/discovery/
 
 **Live wiring:**
 
-1. One `meili.multiSearch` batch: a hits query + N facet queries (`FACET_FIELDS = [brand, diameters, bolt_patterns, finish]`), each facet query counted with the OTHER filters applied via the `buildFilters` `skip` arg so disjunctive counts stay correct within a dimension.
+1. One `meili.multiSearch` batch: a hits query + N facet queries (`FACET_FIELDS = [brand, diameters, bolt_patterns, finishes]`), each facet query counted with the OTHER filters applied via the `buildFilters` `skip` arg so disjunctive counts stay correct within a dimension. `finishes` is multi-valued in the index — a wheel product appears under each normalized bucket it offers (e.g. `["black", "silver"]`), so filtering by "black" returns any product that has at least one black-finish variant.
 2. Hits → `DiscoveryProduct` via `hitToProduct` (price_min is integer cents, read directly into `priceCents`).
 3. The indexed doc is produced by [`backend/src/modules/vendor-sync/search/build-search-document.ts`](../backend/src/modules/vendor-sync/search/build-search-document.ts) (per-product transformer; returns `null` for non-wheels, which `medusa-config.js` coalesces into `{id, product_type:"non-wheel"}`). Index settings — `filterableAttributes`, `sortableAttributes`, `searchableAttributes`, `displayedAttributes` — are wired in [`backend/medusa-config.js`](../backend/medusa-config.js) on the `@rokmohar/medusa-plugin-meilisearch` plugin block.
 4. `vehicleConstraint?: string[]` on `DiscoveryQuery` is the Spec 2 seam — empty in Spec 1. Spec 2 appends extra Meilisearch filter clauses derived from the active vehicle's wheel-size.com spec.
@@ -257,18 +257,36 @@ src/modules/product-detail/
 │   ├── types.ts             — ProductDetail (extends DiscoveryProduct + adds
 │   │                          description, specs, finishOptions, sizeOptions,
 │   │                          boltPatternOptions, fitment, relatedHandles).
+│   │                          `finishOptions: FinishOption[]` where FinishOption
+│   │                          carries { raw, normalized, imageUrl, sizeOptions } —
+│   │                          the raw vendor finish label, its normalized bucket
+│   │                          (black/silver/bronze), the per-finish vendor CDN
+│   │                          image URL, and a Diameter×Width size matrix scoped
+│   │                          to that finish's variants only (WB-059).
 │   │                          OffsetVariant has optional priceCents so the PDP
 │   │                          can price the SELECTED offset, not the size minimum.
+│   ├── finish-options.ts    — `buildFinishOptions(variants, weightLb)`: partitions
+│   │                          variants by raw finish (metadata.finish), picks the
+│   │                          first image_url within each finish group, calls
+│   │                          groupVariantsIntoSizes for a per-finish sizeOptions
+│   │                          matrix; blank finish collapses to sentinel "—".
 │   └── get-product.ts       — real Medusa Store API adapter. Maps variants →
-│                              Diameter×Width sizeOptions with best-availability +
+│                              finishOptions (via buildFinishOptions) + a flat
+│                              sizeOptions for the default finish; derives
+│                              DiscoveryProduct.finishes as the union of normalized
+│                              finishes across all finishOptions; best-availability +
 │                              min-non-zero-price across sibling offsets;
 │                              getRelatedProducts queries by same brand collection_id;
 │                              bogus handle → notFound().
 ├── components/
 │   ├── breadcrumb/          — Wheels > Brand > Model
 │   ├── hero/
-│   │   ├── index.tsx        — owns finish/size/bolt-pattern state
-│   │   ├── gallery.tsx      — big wheel render + finish-switcher thumbs
+│   │   ├── index.tsx        — owns finish/size/bolt-pattern state; selected finish
+│   │   │                      drives which FinishOption's imageUrl + sizeOptions
+│   │   │                      the rest of the hero reads (WB-059)
+│   │   ├── gallery.tsx      — big wheel render + finish-switcher thumbs; switching
+│   │   │                      a finish swaps the displayed image (FinishOption.imageUrl)
+│   │   │                      and updates the size matrix to that finish's sizeOptions
 │   │   ├── variant-picker.tsx — size matrix + bolt pattern + offset readout
 │   │   └── purchase-panel.tsx — brand/name/price/desc/fitment chip/Add to cart
 │   ├── specs/               — engineering stat grid + spotlight blurb
@@ -282,11 +300,11 @@ src/modules/product-detail/
 
 1. `getProductDetail(handle)`: `getRegion(DEFAULT_COUNTRY)` → `getProductByHandle(handle, region.id)`. The `lib/data/products.ts` fields string now includes `+collection_id` so `getRelatedProducts` can find the brand collection.
 2. `notFound()` in the adapter propagates through both `generateMetadata` and the page component — bogus handles 404 cleanly.
-3. `mapToDetail`: groups variants by `${diameter}x${width}` into `sizeOptions`; sibling offsets accumulate as `offsetVariants`; availability uses best-of-siblings ranking (`in_stock` > `low_stock` > `out_of_stock`) so the size cell shows `in_stock` when ANY offset is available; `priceCentsOverride` = min non-zero across siblings. Per-offset `priceCents` on `OffsetVariant` lets the panel price the selected offset, not the size minimum.
+3. `mapToDetail`: calls `buildFinishOptions(variants, weightLb)` → `FinishOption[]` (one entry per raw finish, each with its own image + size matrix); derives `DiscoveryProduct.finishes` as the union of `f.normalized` across those entries; the flat `sizeOptions` (all variants, finish-agnostic) is still present for consumers that don't need the per-finish split. Sibling offsets accumulate as `offsetVariants`; availability uses best-of-siblings ranking (`in_stock` > `low_stock` > `out_of_stock`) so the size cell shows `in_stock` when ANY offset is available; `priceCentsOverride` = min non-zero across siblings. Per-offset `priceCents` on `OffsetVariant` lets the panel price the selected offset, not the size minimum.
 4. `getRelatedProducts`: queries the same brand `collection_id`, capped at 6, excludes self.
 5. `fitment`: `[]` (Spec 2). The Fitment section degrades gracefully on empty.
 6. Specs grid (WB-029): `construction` / `countryOfOrigin` / `warranty` are typed `string | null` and read admin-set product metadata (`metadata.construction` / `country_of_origin` / `warranty`) if present, else `null` — and `specs/index.tsx` HIDES a null row (no fabricated `"—"`; the wheel feed has no source for these). PDP display defaults (qty default, low-stock threshold, ship/trust copy) live in [`pdp-config.ts`](src/modules/product-detail/data/pdp-config.ts), env-overridable via `NEXT_PUBLIC_PDP_*`. `weightLb = product.weight / 453.592` (Medusa stores grams).
-7. The finish normalization rule lives in [`lib/fitment/normalize-finish.ts`](src/lib/fitment/normalize-finish.ts), a lockstep twin of the backend [`normalize-finish.ts`](../backend/src/modules/vendor-sync/search/normalize-finish.ts) (WB-030). The shared [`fixtures/finish-normalize-golden.json`](../fixtures/finish-normalize-golden.json) test (one in each app) guards drift — change the golden + both copies together; don't hand-sync silently.
+7. The finish normalization rule lives in [`lib/fitment/normalize-finish.ts`](src/lib/fitment/normalize-finish.ts), a lockstep twin of the backend [`normalize-finish.ts`](../backend/src/modules/vendor-sync/search/normalize-finish.ts) (WB-030). `normalizeFinish` is called by `buildFinishOptions` to produce `FinishOption.normalized` (the `<Wheel>` fallback color) and by `mapToDetail` to derive `DiscoveryProduct.finishes` (the union of normalized buckets across all finish options). The shared [`fixtures/finish-normalize-golden.json`](../fixtures/finish-normalize-golden.json) test (one in each app) guards drift — change the golden + both copies together; don't hand-sync silently.
 8. [`lib/fitment/canonical-bolt-pattern.ts`](src/lib/fitment/canonical-bolt-pattern.ts) is a lockstep twin of the backend [`canonicalBoltPatterns`](../backend/src/modules/vendor-sync/search/bolt-pattern-canonical.ts); the shared [`fixtures/bolt-pattern-canonical-golden.json`](../fixtures/bolt-pattern-canonical-golden.json) test guards drift — keep them in sync.
 
 One `TODO(integration)` anchor remains in the code (Add-to-cart + Buy Now are now wired — WB-001):

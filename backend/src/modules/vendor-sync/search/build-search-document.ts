@@ -45,6 +45,7 @@ export function buildSearchDocument(product: IndexableProduct) {
   const boltCanonical: string[] = []
   const usdPrices: number[] = []
   const skus: string[] = []
+  const finishes: string[] = []
 
   for (const v of variants) {
     if (typeof v.sku === "string" && v.sku) skus.push(v.sku)
@@ -61,6 +62,10 @@ export function buildSearchDocument(product: IndexableProduct) {
     if (bp) {
       boltRaw.push(bp)
       boltCanonical.push(...canonicalBoltPatterns(bp))
+    }
+    if (typeof vm.finish === "string" && vm.finish) {
+      const fin = normalizeFinish(vm.finish)
+      if (fin) finishes.push(fin)
     }
     // USD-only by design: vendor-sync stores MSRP in MAJOR units under "usd"
     // (the amount Medusa v2 + cart/checkout treat as dollars). A non-USD
@@ -82,7 +87,7 @@ export function buildSearchDocument(product: IndexableProduct) {
     created_at: product.created_at ?? null,
     product_type: "wheel",
     brand: typeof meta.brand === "string" ? meta.brand : "",
-    finish: normalizeFinish(meta.finish as string | null | undefined),
+    finishes: uniqStr(finishes),
     skus: uniqStr(skus),
     diameters: uniqSorted(diameters),
     widths: uniqSorted(widths),

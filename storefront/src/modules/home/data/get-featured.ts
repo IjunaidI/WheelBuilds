@@ -40,7 +40,7 @@ function toFeatured(p: HttpTypes.StoreProduct): DiscoveryProduct {
     name: p.title ?? "",
     priceCents: pricesCents.length ? Math.min(...pricesCents) : 0,
     thumbnail: p.thumbnail ?? null,
-    finish: normalizeFinish(pmeta.finish),
+    finishes: [normalizeFinish(pmeta.finish)],
     diameter: num(rep.wheel_diameter_in),
     width: num(rep.wheel_width_in),
     boltPattern,

@@ -254,13 +254,13 @@ const medusaConfig = {
               searchableAttributes: ['title', 'brand', 'skus'],
               displayedAttributes: [
                 'id', 'handle', 'title', 'description', 'thumbnail', 'brand',
-                'finish', 'skus',
+                'finishes', 'skus',
                 'diameters', 'widths', 'offsets', 'bolt_patterns',
                 'bolt_patterns_canonical', 'center_bores',
                 'price_min', 'price_max', 'created_at', 'product_type',
               ],
               filterableAttributes: [
-                'brand', 'finish', 'diameters', 'widths', 'bolt_patterns',
+                'brand', 'finishes', 'diameters', 'widths', 'bolt_patterns',
                 'bolt_patterns_canonical', 'offsets', 'center_bores',
                 'price_min', 'price_max', 'product_type',
               ],

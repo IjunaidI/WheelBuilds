@@ -21,7 +21,7 @@ Local CSV (Phase 1) ──► fetch ──► stage ──► group-aware diff �
 
 Idempotent: re-running with the same feed is a no-op (RunDate short-circuit if the vendor timestamp is unchanged; content-hash dedup otherwise). Image-less rows are filtered out at staging — they never enter the diff or the apply.
 
-**Wheel grouping.** Multiple wheel rows that share `Brand + DisplayStyleNo + Finish` collapse into ONE Medusa product with N variants. Variant axes: Bolt Pattern, Diameter, Width, Offset. A row with empty `DisplayStyleNo` becomes its own single-variant product via the per-SKU fallback key `sku:<partNumber>`. Tires currently keep one-product-per-row.
+**Wheel grouping.** Multiple wheel rows that share `Brand + DisplayStyleNo` collapse into ONE Medusa product with N variants (WB-059). The group key is `"${brand}|${displayStyleNo}"` — finish is intentionally excluded so all color options of a model land in one product. A row with empty `DisplayStyleNo` becomes its own single-variant product via the per-SKU fallback key `sku:<partNumber>`. Tires currently keep one-product-per-row.
 
 ---
 
@@ -78,8 +78,8 @@ The pipeline is a Medusa business module with four MikroORM tables (`vendor_feed
 | [`migrations/Migration20260517220005.ts`](../../backend/src/modules/vendor-sync/migrations/Migration20260517220005.ts) | Creates all four tables |
 | [`migrations/Migration20260521150000.ts`](../../backend/src/modules/vendor-sync/migrations/Migration20260521150000.ts) | Adds `failed_part_numbers` jsonb column to `vendor_feed_run` |
 | [`adapters/types.ts`](../../backend/src/modules/vendor-sync/adapters/types.ts) | `VendorAdapter` interface + discriminated-union `NormalizedRecord` (`WheelNormalizedRecord` \| `TireNormalizedRecord`); both carry a `groupKey` field |
-| [`adapters/wheelpros-wheels/group-key.ts`](../../backend/src/modules/vendor-sync/adapters/wheelpros-wheels/group-key.ts) | Pure helper that derives a wheel `groupKey` from brand + DisplayStyleNo + Finish (per-SKU fallback when DisplayStyleNo is empty) |
-| [`pipeline/wheel-grouping.ts`](../../backend/src/modules/vendor-sync/pipeline/wheel-grouping.ts) | Pure helpers used by the apply path: option/variant builders, four-axis collision detector, group title/handle |
+| [`adapters/wheelpros-wheels/group-key.ts`](../../backend/src/modules/vendor-sync/adapters/wheelpros-wheels/group-key.ts) | Pure helper that derives a wheel `groupKey` from brand + DisplayStyleNo only (finish dropped from the key in WB-059). Per-SKU fallback (`sku:<partNumber>`) when DisplayStyleNo is empty. |
+| [`pipeline/wheel-grouping.ts`](../../backend/src/modules/vendor-sync/pipeline/wheel-grouping.ts) | Pure helpers used by the apply path: option/variant builders, seven-axis collision detector, group title/handle. `formatFinish` converts a raw finish string to its trimmed label (blank → `"—"` sentinel). |
 | [`adapters/registry.ts`](../../backend/src/modules/vendor-sync/adapters/registry.ts) | `resolveAdapter('wheelpros-wheels' \| 'wheelpros-tires')` |
 | [`adapters/wheelpros-wheels/`](../../backend/src/modules/vendor-sync/adapters/wheelpros-wheels/) | Wheel adapter (parse, normalize, schema) |
 | [`adapters/wheelpros-tires/`](../../backend/src/modules/vendor-sync/adapters/wheelpros-tires/) | Tire adapter; reuses `parse-helpers` + `tire-parse-helpers` |
@@ -89,7 +89,7 @@ The pipeline is a Medusa business module with four MikroORM tables (`vendor_feed
 | [`pipeline/bootstrap.ts`](../../backend/src/modules/vendor-sync/pipeline/bootstrap.ts) | Idempotent: US region, sales channel, `Wheels`/`Tires` categories, brand collections, shipping profile, stock locations |
 | [`pipeline/apply.ts`](../../backend/src/modules/vendor-sync/pipeline/apply.ts) | Group-aware sequential apply with try/catch per group, cancel-poll between groups, query.graph for `inventory_item_id`. Routes new/changed/discontinued groups to per-type handlers; tires still go one-product-one-variant |
 | [`pipeline/apply-stock.ts`](../../backend/src/modules/vendor-sync/pipeline/apply-stock.ts) | `batchInventoryItemLevelsWorkflow` + pure `computeStockChanges` |
-| [`pipeline/build-metadata.ts`](../../backend/src/modules/vendor-sync/pipeline/build-metadata.ts) | Two pure helpers: `buildProductMetadata` (group-constant fields) and `buildVariantMetadata` (per-row fields). The apply path drafts the product only when ALL variants in a group are discontinued; individual-variant departure marks the variant via metadata.discontinued + zeroed stock instead |
+| [`pipeline/build-metadata.ts`](../../backend/src/modules/vendor-sync/pipeline/build-metadata.ts) | Two pure helpers: `buildProductMetadata` (group-constant fields — brand, display_style_no, style, group_key; finish is NOT here) and `buildVariantMetadata` (per-row fields — includes `finish` and `image_url` so each variant carries its own color label and vendor CDN image). The apply path drafts the product only when ALL variants in a group are discontinued; individual-variant departure marks the variant via metadata.discontinued + zeroed stock instead. |
 | [`service.ts`](../../backend/src/modules/vendor-sync/service.ts) | `VendorSyncService`: orchestrator + cancel flag + `run`/`approveAndApply`/`replayRun`/`replaySku` |
 | [`jobs/vendor-sync-tick.ts`](../../backend/src/jobs/vendor-sync-tick.ts) | Cron entry |
 | [`api/admin/vendor-sync/`](../../backend/src/api/admin/vendor-sync/) | Admin endpoints (list runs, detail, approve, cancel, replay) |
@@ -99,27 +99,43 @@ The pipeline is a Medusa business module with four MikroORM tables (`vendor_feed
 
 ---
 
-### Wheel variant axes (6) and the always-emit trade-off (WB-051)
+### Wheel variant axes (7) and the always-emit trade-off (WB-051 / WB-059)
 
-Wheel variants are identified by a **6-axis** tuple: bolt pattern × diameter × width × offset ×
-center bore × load rating (`variantAxisKey`). Center bore and load rating became axes so SKUs that
-differ only on those fields import as distinct variants instead of failing the whole group on an
-axis collision.
+Wheel variants are identified by a **7-axis** tuple: bolt pattern × diameter × width × offset ×
+center bore × load rating × **finish** (`variantAxisKey`). Center bore and load rating became axes
+(WB-051) so SKUs that differ only on those fields import as distinct variants. Finish became the
+seventh axis (WB-059) so all color options of the same Brand+Model collapse into one product rather
+than creating separate products per color.
 
-**Every wheel product emits all six options, even when center bore or load rating has a single value
+The raw vendor finish label is stored verbatim on the variant (`metadata.finish`). A blank/null
+finish from the vendor is formatted as the sentinel `"—"` (`formatFinish` in `wheel-grouping.ts`)
+both in the Medusa option value and in `metadata.finish`. The finish label is intentionally NOT
+normalized at import time — normalization (`normalizeFinish`) happens downstream in the Meilisearch
+transformer and on the storefront PDP, never inside the variant axis key.
+
+**Every wheel product emits all seven options, even when a given axis has only a single value
 across the group.** This is deliberate:
 
 - Medusa can only *add values* to an existing option (`extendWheelOptions`), never add a new option to
   a product. Conditional axes would break the 12h-cron add path the day a previously-constant axis
-  starts varying. Always-6 is incremental-safe.
+  starts varying. Always-7 is incremental-safe.
 - **Cost — admin-side noise:** most products carry a single-value "Center Bore"/"Load Rating" option,
   and a null optional axis shows the sentinel `—`. This is *admin-only*: the storefront PDP hides any
   single-value selector (progressive disclosure), so shoppers never see it.
 
-Only **exact duplicates** (identical on all six axes, different part number) are deduped — kept by
+Only **exact duplicates** (identical on all seven axes, different part number) are deduped — kept by
 tie-break (in-stock first, then lowest part number), with a logged warning naming the dropped SKU.
 Dropped duplicates get no `vendor_product_current` row, so a feed that keeps listing them re-emits a
 harmless "deduped exact duplicate" warning each run.
+
+**Per-variant `finish` and `image_url`.** Because finish is a variant axis, each variant carries its
+own vendor CDN image in `metadata.image_url`. The parent product's `thumbnail` is set to the
+representative finish's image (lowest part_number in the group). The Meilisearch transformer
+(`build-search-document.ts`) reads `metadata.finish` from each variant, normalizes it via
+`normalizeFinish`, and emits a deduplicated `finishes: string[]` array on the wheel document (e.g.
+`["black", "silver"]`). This field is declared `filterableAttributes` and `displayedAttributes`
+in the Meilisearch index settings so Discovery can facet on finish and a product appears under each
+normalized bucket it offers.
 
 ---
 

@@ -308,6 +308,13 @@ async function applyNewWheelGroup(
 
   const variants = survivors.map((r) => buildWheelVariantInput(r))
 
+  // One image per finish: the product carries the union; the thumbnail is the
+  // representative finish's image; each variant keeps its own image_url in
+  // metadata (buildVariantMetadata) for the PDP finish swatch. (WB-059)
+  const imageUrls = Array.from(
+    new Set(survivors.map((r) => r.imageUrl).filter((u): u is string => !!u))
+  )
+
   const { result } = await createProductsWorkflow(ctx.container).run({
     input: {
       products: [
@@ -316,7 +323,7 @@ async function applyNewWheelGroup(
           handle: buildGroupHandle(rep),
           status: ProductStatus.PUBLISHED,
           thumbnail: rep.imageUrl ?? undefined,
-          images: rep.imageUrl ? [{ url: rep.imageUrl }] : [],
+          images: imageUrls.map((url) => ({ url })),
           weight: productWeight,
           collection_id: brandCollectionId,
           category_ids: [categoryId],

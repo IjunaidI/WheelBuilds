@@ -18,9 +18,9 @@ import { getFitmentByProduct } from "@lib/data/fitment"
 import { canonicalBoltPatterns } from "@lib/fitment/canonical-bolt-pattern"
 import { normalizeFinish } from "@lib/fitment/normalize-finish"
 import { DiscoveryProduct } from "@modules/discovery/data/types"
-import { Finish } from "@modules/common/components/wheel"
-import { ProductDetail, SizeOption } from "./types"
+import { ProductDetail } from "./types"
 import { num, groupVariantsIntoSizes, isRealBoltPattern } from "./group-sizes"
+import { buildFinishOptions } from "./finish-options"
 
 const DEFAULT_COUNTRY = process.env.NEXT_PUBLIC_DEFAULT_REGION || "us"
 
@@ -28,7 +28,6 @@ function mapToDetail(product: HttpTypes.StoreProduct): ProductDetail {
   const pmeta = (product.metadata ?? {}) as Record<string, unknown>
   const variants = product.variants ?? []
   const rep = (variants[0]?.metadata ?? {}) as Record<string, unknown>
-  const finish = normalizeFinish(pmeta.finish)
 
   // "From" price across variants — corrected from the plan's MAX_SAFE_INTEGER
   // pattern, which would render a price-less product as ~$90 quadrillion.
@@ -51,6 +50,8 @@ function mapToDetail(product: HttpTypes.StoreProduct): ProductDetail {
   // values like 31.9997 lb. Single source: specs grid + variant-picker both read this.
   const weightLb = Math.round((num((product as any).weight) / 453.592) * 10) / 10
 
+  const finishOptionsList = buildFinishOptions(variants, weightLb)
+
   return {
     // DiscoveryProduct base
     id: product.id!,
@@ -59,7 +60,7 @@ function mapToDetail(product: HttpTypes.StoreProduct): ProductDetail {
     name: product.title ?? "",
     priceCents: fromCents,
     thumbnail: product.thumbnail ?? null,
-    finish,
+    finishes: Array.from(new Set(finishOptionsList.map((f) => f.normalized))),
     diameter: num(rep.wheel_diameter_in),
     width: num(rep.wheel_width_in),
     boltPattern: boltPatterns[0] ?? "",
@@ -77,9 +78,9 @@ function mapToDetail(product: HttpTypes.StoreProduct): ProductDetail {
       countryOfOrigin:
         (typeof pmeta.country_of_origin === "string" && pmeta.country_of_origin) || null,
       warranty: (typeof pmeta.warranty === "string" && pmeta.warranty) || null,
-      finishOptions: 1,
+      finishOptions: finishOptionsList.length,
     },
-    finishOptions: [finish],
+    finishOptions: finishOptionsList,
     sizeOptions: groupVariantsIntoSizes(variants, weightLb),
     boltPatternOptions: boltPatterns,
     boltPatternsCanonical: Array.from(
@@ -137,7 +138,7 @@ export async function getRelatedProducts(
             100
         ),
         thumbnail: p.thumbnail ?? null,
-        finish: normalizeFinish(pmeta.finish),
+        finishes: [normalizeFinish(pmeta.finish)],
         diameter: num(m.wheel_diameter_in),
         width: num(m.wheel_width_in),
         boltPattern: String(m.bolt_pattern_raw ?? ""),

@@ -85,11 +85,17 @@ describe("buildProductMetadata (group-level fields)", () => {
     expect(meta.brand).toBe("Falken")
   })
 
-  it("includes wheel-only product-level fields", () => {
+  it("includes wheel-only product-level fields (finish is now per-variant, not here)", () => {
     const meta = buildProductMetadata(makeWheelRecord())
     expect(meta.display_style_no).toBe("058")
-    expect(meta.finish).toBe("Matte Black")
+    expect(meta.finish).toBeUndefined()
     expect(meta.style).toBe("NOMAD")
+  })
+
+  it("product metadata no longer carries finish (it's per-variant now)", () => {
+    const m = buildProductMetadata(makeWheelRecord({ finish: "Matte Black" }))
+    expect(m.finish).toBeUndefined()
+    expect(m.display_style_no).toBeDefined()
   })
 
   it("includes tire-only product-level fields", () => {
@@ -123,11 +129,11 @@ describe("buildProductMetadata (group-level fields)", () => {
     expect(meta).not.toHaveProperty("display_style_no")
   })
 
-  it("handles nullable wheel group-level fields", () => {
+  it("handles nullable wheel group-level fields (finish no longer on product)", () => {
     const meta = buildProductMetadata(
       makeWheelRecord({ finish: null, style: null, displayStyleNo: null })
     )
-    expect(meta.finish).toBeNull()
+    expect(meta.finish).toBeUndefined()
     expect(meta.style).toBeNull()
     expect(meta.display_style_no).toBeNull()
   })
@@ -173,12 +179,19 @@ describe("buildVariantMetadata (per-row fields)", () => {
     expect(meta.ply_rating).toBeNull()
   })
 
-  it("does NOT include group-level fields", () => {
+  it("does NOT include group-level fields (finish is now per-variant, so it IS on variant)", () => {
     const meta = buildVariantMetadata(makeWheelRecord())
     expect(meta).not.toHaveProperty("brand")
     expect(meta).not.toHaveProperty("group_key")
-    expect(meta).not.toHaveProperty("finish")
     expect(meta).not.toHaveProperty("display_style_no")
+    // finish IS now on variant (moved from product)
+    expect(meta.finish).toBe("Matte Black")
+  })
+
+  it("variant metadata carries raw finish + its own image_url", () => {
+    const m = buildVariantMetadata(makeWheelRecord({ finish: "Matte Black", imageUrl: "https://cdn/x.jpg" }))
+    expect(m.finish).toBe("Matte Black")
+    expect(m.image_url).toBe("https://cdn/x.jpg")
   })
 
   it("handles nullable wheel variant-level fields", () => {

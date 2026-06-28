@@ -1,15 +1,15 @@
 // backend/src/admin/routes/vendor-sync/run-detail-drawer.tsx
-import { useState } from "react"
+import { useState, useEffect, type ReactNode } from "react"
 import { Drawer, Badge, Button, Input, Label, Text, toast } from "@medusajs/ui"
 import { badgeForStatus } from "./status-actions"
-import { replaySku, type VendorRun } from "./api"
+import { getRun, replaySku, type VendorRun } from "./api"
 
 type Props = {
   run: VendorRun | null
   onClose: () => void
 }
 
-const Stat = ({ label, value }: { label: string; value: React.ReactNode }) => (
+const Stat = ({ label, value }: { label: string; value: ReactNode }) => (
   <div className="flex items-center justify-between py-1">
     <Text size="small" className="text-ui-fg-subtle">{label}</Text>
     <Text size="small" weight="plus">{value}</Text>
@@ -19,6 +19,19 @@ const Stat = ({ label, value }: { label: string; value: React.ReactNode }) => (
 const RunDetailDrawer = ({ run, onClose }: Props) => {
   const [partNumber, setPartNumber] = useState("")
   const [busy, setBusy] = useState(false)
+  const [fresh, setFresh] = useState<VendorRun | null>(null)
+
+  useEffect(() => {
+    if (!run) {
+      setFresh(null)
+      return
+    }
+    getRun(run.id)
+      .then((result) => setFresh(result.run))
+      .catch((e: any) => toast.error(e?.message ?? "Failed to fetch run detail"))
+  }, [run?.id])
+
+  const view = fresh ?? run
 
   const onReplaySku = async () => {
     if (!run || !partNumber.trim()) return
@@ -41,29 +54,37 @@ const RunDetailDrawer = ({ run, onClose }: Props) => {
           <Drawer.Title>{run?.vendor_code}</Drawer.Title>
         </Drawer.Header>
         <Drawer.Body className="flex flex-col gap-4 overflow-y-auto">
-          {run && (
+          {view && (
             <>
               <div className="flex items-center gap-2">
-                <Badge color={badgeForStatus(run.status)}>{run.status}</Badge>
-                <Text size="small" className="text-ui-fg-subtle">{run.source_filename}</Text>
+                <Badge color={badgeForStatus(view.status)}>{view.status}</Badge>
+                <Text size="small" className="text-ui-fg-subtle">{view.source_filename}</Text>
               </div>
               <div>
-                <Stat label="Rows" value={run.row_count} />
-                <Stat label="New" value={run.new_count} />
-                <Stat label="Changed" value={run.changed_count} />
-                <Stat label="Discontinued" value={run.discontinued_count} />
-                <Stat label="Hash-matched (skipped)" value={run.hash_match_count} />
-                <Stat label="No-image (skipped)" value={run.skipped_no_image_count} />
-                <Stat label="Apply attempts" value={run.apply_attempt_count} />
+                <Stat label="Rows" value={view.row_count} />
+                <Stat label="New" value={view.new_count} />
+                <Stat label="Changed" value={view.changed_count} />
+                <Stat label="Discontinued" value={view.discontinued_count} />
+                <Stat label="Hash-matched (skipped)" value={view.hash_match_count} />
+                <Stat label="No-image (skipped)" value={view.skipped_no_image_count} />
+                <Stat label="Apply attempts" value={view.apply_attempt_count} />
               </div>
-              {run.error_message && (
-                <Text size="small" className="text-ui-fg-error">{run.error_message}</Text>
+              {view.error_message && (
+                <Text size="small" className="text-ui-fg-error">{view.error_message}</Text>
               )}
-              {!!run.failed_group_keys?.length && (
+              {!!view.failed_group_keys?.length && (
                 <div>
-                  <Text size="small" weight="plus">Failed groups ({run.failed_group_keys.length})</Text>
+                  <Text size="small" weight="plus">Failed groups ({view.failed_group_keys.length})</Text>
                   <Text size="xsmall" className="text-ui-fg-subtle break-all">
-                    {run.failed_group_keys.join(", ")}
+                    {view.failed_group_keys.join(", ")}
+                  </Text>
+                </div>
+              )}
+              {!!view.failed_part_numbers?.length && (
+                <div>
+                  <Text size="small" weight="plus">Failed SKUs ({view.failed_part_numbers.length})</Text>
+                  <Text size="xsmall" className="text-ui-fg-subtle break-all">
+                    {view.failed_part_numbers.join(", ")}
                   </Text>
                 </div>
               )}

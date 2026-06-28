@@ -5,12 +5,12 @@ import { VENDOR_STATE_TABLES, truncateVendorState } from "../modules/vendor-sync
 /**
  * Truncate the vendor-sync STATE tables (NOT Medusa products).
  *
- * vendor-sync-dev-wipe.ts deletes these tables by collecting every row id into
- * one array and issuing `WHERE id IN (...)`. At production scale (hundreds of
- * thousands of staging rows) that overflows knex's query compiler
- * ("Maximum call stack size exceeded"). This script uses a single TRUNCATE per
- * run, which is instant regardless of row count — the correct tool for a full
- * state reset before a re-import (e.g. the WB-051 six-axis migration).
+ * Both this script and vendor-sync-dev-wipe.ts delegate to the same
+ * truncateVendorState helper, which issues a single TRUNCATE per table —
+ * instant regardless of row count, and the correct tool for a full state reset
+ * before a re-import (e.g. the WB-051 six-axis migration). This script's role
+ * is a state-only reset: it prints per-table row counts before truncating so
+ * the operator can confirm what will be erased.
  *
  * It does NOT touch Medusa products. Purge those first via the
  * /admin/vendor-sync/purge-products route (or dev-wipe --purge-products).

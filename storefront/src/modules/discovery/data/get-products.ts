@@ -31,6 +31,8 @@ import {
 } from "./types"
 import { Finish } from "@modules/common/components/wheel"
 import { lit } from "./escape"
+import { unstable_cache } from "next/cache"
+import { discoveryCacheKey } from "./cache-key"
 
 // Re-export so any existing imports from this file keep working.
 export { parseQueryFromSearchParams } from "./types"
@@ -132,7 +134,7 @@ function emptyResult(pageSize: number): DiscoveryResult {
   }
 }
 
-export async function getDiscoveryProducts(
+async function fetchDiscoveryProducts(
   query: DiscoveryQuery
 ): Promise<DiscoveryResult> {
   const pageSize = DEFAULT_PAGE_SIZE
@@ -146,54 +148,72 @@ export async function getDiscoveryProducts(
     finishes: "finishes",
   }
 
+  const { results } = await meili.multiSearch({
+    queries: [
+      {
+        indexUid: PRODUCTS_INDEX,
+        q: query.q ?? "",
+        filter: buildFilters(query.filters, query).join(" AND "),
+        sort: sortExpr(query.sort),
+        limit: pageSize,
+        offset,
+      },
+      ...FACET_FIELDS.map((field) => ({
+        indexUid: PRODUCTS_INDEX,
+        q: query.q ?? "",
+        filter: buildFilters(
+          query.filters,
+          query,
+          facetQueryByDim[field]
+        ).join(" AND "),
+        facets: [field],
+        limit: 0,
+      })),
+    ],
+  })
+
+  const [hitsRes, ...facetRes] = results as MultiSearchResult<Hit>[]
+  // facetRes is in the same order as FACET_FIELDS.
+  const facetByField: Record<string, Record<string, number>> = {}
+  FACET_FIELDS.forEach((field, i) => {
+    facetByField[field] = facetRes[i]?.facetDistribution?.[field] ?? {}
+  })
+
+  const facets: FacetCounts = {
+    brands: facetByField["brand"],
+    diameters: facetByField["diameters"],
+    boltPatterns: facetByField["bolt_patterns"],
+    finishes: facetByField["finishes"],
+  }
+
+  return {
+    products: hitsRes.hits.map(hitToProduct),
+    totalCount: hitsRes.estimatedTotalHits ?? hitsRes.hits.length,
+    pageSize,
+    facets,
+  }
+}
+
+/**
+ * Cached discovery read. Wraps the Meilisearch multiSearch in Next's
+ * unstable_cache (60s TTL, tag "discovery") keyed by the effective query, so
+ * repeated discovery/home loads within the window don't re-hit Meili. On a
+ * Meili failure the inner fn throws — unstable_cache does NOT cache a throw —
+ * and we degrade to an empty result here (never cached, so it self-heals on the
+ * next request once Meili recovers). A future re-sync can revalidateTag("discovery").
+ */
+export async function getDiscoveryProducts(
+  query: DiscoveryQuery
+): Promise<DiscoveryResult> {
   try {
-    const { results } = await meili.multiSearch({
-      queries: [
-        {
-          indexUid: PRODUCTS_INDEX,
-          q: query.q ?? "",
-          filter: buildFilters(query.filters, query).join(" AND "),
-          sort: sortExpr(query.sort),
-          limit: pageSize,
-          offset,
-        },
-        ...FACET_FIELDS.map((field) => ({
-          indexUid: PRODUCTS_INDEX,
-          q: query.q ?? "",
-          filter: buildFilters(
-            query.filters,
-            query,
-            facetQueryByDim[field]
-          ).join(" AND "),
-          facets: [field],
-          limit: 0,
-        })),
-      ],
-    })
-
-    const [hitsRes, ...facetRes] = results as MultiSearchResult<Hit>[]
-    // facetRes is in the same order as FACET_FIELDS.
-    const facetByField: Record<string, Record<string, number>> = {}
-    FACET_FIELDS.forEach((field, i) => {
-      facetByField[field] = facetRes[i]?.facetDistribution?.[field] ?? {}
-    })
-
-    const facets: FacetCounts = {
-      brands: facetByField["brand"],
-      diameters: facetByField["diameters"],
-      boltPatterns: facetByField["bolt_patterns"],
-      finishes: facetByField["finishes"],
-    }
-
-    return {
-      products: hitsRes.hits.map(hitToProduct),
-      totalCount: hitsRes.estimatedTotalHits ?? hitsRes.hits.length,
-      pageSize,
-      facets,
-    }
+    const cached = unstable_cache(
+      () => fetchDiscoveryProducts(query),
+      ["discovery", discoveryCacheKey(query)],
+      { revalidate: 60, tags: ["discovery"] }
+    )
+    return await cached()
   } catch (e) {
-    // Meilisearch unreachable / index missing → empty state, not a crash.
     console.error("[discovery] Meilisearch query failed:", e)
-    return emptyResult(pageSize)
+    return emptyResult(DEFAULT_PAGE_SIZE)
   }
 }

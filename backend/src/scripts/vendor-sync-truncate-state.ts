@@ -1,5 +1,6 @@
 import { ExecArgs } from "@medusajs/framework/types"
 import { ContainerRegistrationKeys } from "@medusajs/framework/utils"
+import { VENDOR_STATE_TABLES, truncateVendorState } from "../modules/vendor-sync/utils/truncate-state"
 
 /**
  * Truncate the vendor-sync STATE tables (NOT Medusa products).
@@ -24,12 +25,7 @@ import { ContainerRegistrationKeys } from "@medusajs/framework/utils"
  *      (truncates all four vendor-sync state tables)
  */
 
-const TABLES = [
-  "vendor_feed_run",
-  "vendor_feed_staging",
-  "vendor_stock_staging",
-  "vendor_product_current",
-]
+const TABLES = VENDOR_STATE_TABLES
 
 interface ParsedDbUrl {
   display: string
@@ -105,7 +101,7 @@ export default async function vendorSyncTruncateState({ container }: ExecArgs) {
   }
 
   // Single statement; truncating all four together resolves any inter-table FKs.
-  await knex.raw(`TRUNCATE TABLE ${TABLES.join(", ")} RESTART IDENTITY`)
+  await truncateVendorState(knex)
 
   logger.info("[truncate] Done. All vendor-sync state cleared.")
   logger.info("[truncate] The next vendor-sync run will treat every row as new.")

@@ -1,7 +1,10 @@
 import { ExecArgs } from "@medusajs/framework/types"
 import { ContainerRegistrationKeys, Modules } from "@medusajs/framework/utils"
 import { deleteProductsWorkflow } from "@medusajs/medusa/core-flows"
-import { VENDOR_SYNC_MODULE } from "../modules/vendor-sync"
+import {
+  VENDOR_STATE_TABLES,
+  truncateVendorState,
+} from "../modules/vendor-sync/utils/truncate-state"
 
 /**
  * Dev-only reset of vendor-sync state.
@@ -73,8 +76,8 @@ function hasFlag(name: string): boolean {
 
 export default async function vendorSyncDevWipe({ container }: ExecArgs) {
   const logger = container.resolve(ContainerRegistrationKeys.LOGGER)
-  const service = container.resolve(VENDOR_SYNC_MODULE) as any
   const productService = container.resolve(Modules.PRODUCT)
+  const knex = container.resolve(ContainerRegistrationKeys.PG_CONNECTION) as any
 
   const parsed = parseDatabaseUrl(process.env.DATABASE_URL)
   if (!parsed) {
@@ -156,77 +159,25 @@ export default async function vendorSyncDevWipe({ container }: ExecArgs) {
     }
   }
 
-  let runIds: string[] = []
-  let stagingIds: string[] = []
-  let stockIds: string[] = []
-  let currentIds: string[] = []
-
-  for (const vendorCode of VENDORS) {
-    const runs = await service.listVendorFeedRuns(
-      { vendor_code: vendorCode },
-      { select: ["id"], take: null }
-    )
-    runIds = runIds.concat(runs.map((r: any) => r.id))
-
-    const staging = await service.listVendorFeedStagings(
-      { vendor_code: vendorCode },
-      { select: ["id"], take: null }
-    )
-    stagingIds = stagingIds.concat(staging.map((r: any) => r.id))
-
-    const stock = await service.listVendorStockStagings(
-      { vendor_code: vendorCode },
-      { select: ["id"], take: null }
-    )
-    stockIds = stockIds.concat(stock.map((r: any) => r.id))
-
-    const current = await service.listVendorProductCurrents(
-      { vendor_code: vendorCode },
-      { select: ["id"], take: null }
-    )
-    currentIds = currentIds.concat(current.map((r: any) => r.id))
-  }
-
-  logger.info(`[wipe] Found:`)
-  logger.info(`  vendor_feed_run         ${runIds.length}`)
-  logger.info(`  vendor_feed_staging     ${stagingIds.length}`)
-  logger.info(`  vendor_stock_staging    ${stockIds.length}`)
-  logger.info(`  vendor_product_current  ${currentIds.length}`)
-  if (purgeProducts) {
-    logger.info(`  product (Medusa)        ${productIdsToDelete.length}`)
-  }
-  logger.info("")
-
-  // Delete Medusa products first (so any references to vendor_product_current
-  // are gone before we drop those rows). The workflow handles variant +
-  // inventory_item cleanup via its hooks.
+  // Delete Medusa products first (so references to vendor_product_current are
+  // gone before we drop those rows). The workflow handles variant + inventory
+  // cleanup via its hooks. Bounded by CHUNK so the workflow input stays small.
   if (purgeProducts && productIdsToDelete.length > 0) {
-    // Delete in chunks to keep the workflow input bounded.
     const CHUNK = 50
     for (let i = 0; i < productIdsToDelete.length; i += CHUNK) {
       const chunk = productIdsToDelete.slice(i, i + CHUNK)
       logger.info(
         `[wipe] Deleting Medusa products ${i + 1}..${i + chunk.length} of ${productIdsToDelete.length}...`
       )
-      await deleteProductsWorkflow(container).run({
-        input: { ids: chunk },
-      })
+      await deleteProductsWorkflow(container).run({ input: { ids: chunk } })
     }
   }
 
-  // Then the vendor-sync tables. Staging first, current next, runs last.
-  if (stagingIds.length > 0) {
-    await service.deleteVendorFeedStagings(stagingIds)
-  }
-  if (stockIds.length > 0) {
-    await service.deleteVendorStockStagings(stockIds)
-  }
-  if (currentIds.length > 0) {
-    await service.deleteVendorProductCurrents(currentIds)
-  }
-  if (runIds.length > 0) {
-    await service.deleteVendorFeedRuns(runIds)
-  }
+  // Then the vendor-sync state. One TRUNCATE over all four tables — instant at
+  // any scale, and immune to the knex `WHERE id IN (...)` stack overflow the old
+  // per-id delete hit on large staging tables (WB-052).
+  logger.info(`[wipe] Truncating state tables: ${VENDOR_STATE_TABLES.join(", ")}`)
+  await truncateVendorState(knex)
 
   logger.info("[wipe] Done.")
   logger.info(

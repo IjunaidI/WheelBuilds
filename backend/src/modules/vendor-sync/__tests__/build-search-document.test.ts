@@ -2,11 +2,11 @@ import { buildSearchDocument } from "../search/build-search-document"
 
 const product = {
   id: "prod_1",
-  handle: "teraflex-nomad-matte-black",
-  title: "Teraflex Nomad Matte Black",
+  handle: "petrol-nomad-matte-black",
+  title: "Petrol Nomad Matte Black",
   thumbnail: "https://cdn.example.com/x.jpg",
   created_at: "2026-05-01T00:00:00.000Z",
-  metadata: { product_type: "wheel", brand: "Teraflex" },
+  metadata: { product_type: "wheel", brand: "Petrol" },
   variants: [
     {
       sku: "W-1",
@@ -43,8 +43,8 @@ describe("buildSearchDocument", () => {
     const doc = buildSearchDocument(product as any)
     expect(doc).toMatchObject({
       id: "prod_1",
-      handle: "teraflex-nomad-matte-black",
-      brand: "Teraflex",
+      handle: "petrol-nomad-matte-black",
+      brand: "Petrol",
       finishes: ["black"],
       product_type: "wheel",
       diameters: [17, 18],

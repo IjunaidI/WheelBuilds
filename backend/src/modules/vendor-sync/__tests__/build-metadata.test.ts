@@ -12,7 +12,7 @@ function makeWheelRecord(
     partNumber: "000000000001058059",
     vendorCode: "wheelpros-wheels",
     title: "NOMAD SPLIT 17X8.5 5X5 71 -12 MTL-BLK",
-    brand: "Teraflex",
+    brand: "Petrol",
     imageUrl: "https://cdn.example.com/wheels/058-blk.jpg",
     invOrderType: "ST",
     totalQoh: 20,
@@ -20,7 +20,7 @@ function makeWheelRecord(
     mapUsd: 369.99,
     runDateVendor: new Date("2026-05-07T22:06:48"),
     stockByWarehouse: { "1001": 10, "1002": 5, "1003": 5 },
-    groupKey: "Teraflex|058|Matte Black",
+    groupKey: "Petrol|058|Matte Black",
     displayStyleNo: "058",
     finish: "Matte Black",
     diameterIn: 17,
@@ -73,8 +73,8 @@ describe("buildProductMetadata (group-level fields)", () => {
     const meta = buildProductMetadata(makeWheelRecord())
     expect(meta.vendor_code).toBe("wheelpros-wheels")
     expect(meta.product_type).toBe("wheel")
-    expect(meta.group_key).toBe("Teraflex|058|Matte Black")
-    expect(meta.brand).toBe("Teraflex")
+    expect(meta.group_key).toBe("Petrol|058|Matte Black")
+    expect(meta.brand).toBe("Petrol")
   })
 
   it("includes the shared identifiers for tire records", () => {

@@ -62,7 +62,7 @@ describe('normalizeWheelRow', () => {
     const raw: Record<string, string> = {
       PartNumber: '000000000001058059',
       PartDescription: 'NOMAD SPLIT 17X8.5 5X5 71 -12 MTL-BLK',
-      Brand: 'Teraflex',
+      Brand: 'Petrol',
       DisplayStyleNo: '058',
       Finish: 'Matte Black',
       Size: '17X8.5',
@@ -135,7 +135,7 @@ describe('normalizeWheelRow', () => {
 
   it('emits groupKey from brand + displayStyleNo (finish is a variant axis, not in the key — WB-059)', () => {
     const result = normalizeWheelRow(makeRow())
-    expect(result.groupKey).toBe('Teraflex|058')
+    expect(result.groupKey).toBe('Petrol|058')
   })
 
   it('emits per-SKU groupKey when displayStyleNo is empty', () => {

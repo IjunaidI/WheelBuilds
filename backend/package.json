@@ -30,6 +30,8 @@
   "dependencies": {
     "@medusajs/admin-sdk": "2.13.6",
     "@medusajs/admin-shared": "2.13.6",
+    "@medusajs/icons": "2.13.6",
+    "@medusajs/ui": "4.1.6",
     "@medusajs/cli": "2.13.6",
     "@medusajs/dashboard": "2.13.6",
     "@medusajs/draft-order": "2.13.6",

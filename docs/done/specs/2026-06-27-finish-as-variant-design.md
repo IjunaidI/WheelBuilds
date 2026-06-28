@@ -1,6 +1,6 @@
 # Finish as a variant axis (collapse colors into one product) — Design
 
-> Date: 2026-06-27. Status: in-progress. Pillar: Vendor import + PDP + Discovery. Backlog: **WB-059**.
+> Date: 2026-06-27. Status: done (merged + prod cutover run 2026-06-27: 1,724 groups / 29,445 variants / 0 errors). Pillar: Vendor import + PDP + Discovery. Backlog: **WB-059**.
 > Wheels that are identical except for color/finish should be ONE product with selectable finish
 > variants, not N separate products. `/products/petrol-p3b-matte-black` + `…-gloss-silver` →
 > one `/products/petrol-p3b` where the buyer picks Matte Black / Gloss Silver.

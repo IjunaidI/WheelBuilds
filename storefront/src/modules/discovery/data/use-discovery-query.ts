@@ -28,7 +28,6 @@ type ArrayFilterKey = Exclude<keyof DiscoveryFilters, ScalarFilterKey>
 // URL keys for array filters. Kept identical to the parser in get-products.ts
 // so the round-trip is symmetric.
 const ARRAY_PARAM: Record<ArrayFilterKey, string> = {
-  categories: "categories",
   brands: "brands",
   diameters: "diameters",
   boltPatterns: "boltPatterns",
@@ -167,7 +166,6 @@ export const useDiscoveryQuery = () => {
 }
 
 const hasAnyFilter = (f: DiscoveryFilters): boolean => {
-  if (f.categories.length) return true
   if (f.brands.length) return true
   if (f.diameters.length) return true
   if (f.boltPatterns.length) return true

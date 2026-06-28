@@ -47,7 +47,6 @@ function toFeatured(p: HttpTypes.StoreProduct): DiscoveryProduct {
     boltPatternsCanonical: boltPattern
       ? Array.from(new Set(canonicalBoltPatterns(boltPattern)))
       : [],
-    categories: [],
   }
 }
 

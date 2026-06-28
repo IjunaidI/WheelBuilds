@@ -64,7 +64,6 @@ function mapToDetail(product: HttpTypes.StoreProduct): ProductDetail {
     diameter: num(rep.wheel_diameter_in),
     width: num(rep.wheel_width_in),
     boltPattern: boltPatterns[0] ?? "",
-    categories: [],
     isNew: false,
 
     // ProductDetail extras
@@ -145,7 +144,6 @@ export async function getRelatedProducts(
         boltPatternsCanonical: m.bolt_pattern_raw
           ? Array.from(new Set(canonicalBoltPatterns(String(m.bolt_pattern_raw))))
           : [],
-        categories: [],
       }
     })
 }

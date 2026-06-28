@@ -114,7 +114,6 @@ function hitToProduct(h: Hit): DiscoveryProduct {
     width: h.widths?.[0] ?? 0,
     boltPattern: h.bolt_patterns?.[0] ?? "",
     boltPatternsCanonical: h.bolt_patterns_canonical ?? [],
-    categories: [], // Spec §5 G2: no backend source yet.
     isNew: Number.isFinite(createdMs) ? Date.now() - createdMs < NEW_MS : false,
   }
 }
@@ -125,7 +124,6 @@ function emptyResult(pageSize: number): DiscoveryResult {
     totalCount: 0,
     pageSize,
     facets: {
-      categories: {},
       brands: {},
       diameters: {},
       boltPatterns: {},
@@ -181,7 +179,6 @@ export async function getDiscoveryProducts(
     })
 
     const facets: FacetCounts = {
-      categories: {}, // Spec §5 G2: no backend source yet.
       brands: facetByField["brand"],
       diameters: facetByField["diameters"],
       boltPatterns: facetByField["bolt_patterns"],

@@ -3,7 +3,6 @@ import { styleTiles } from "./style-map"
 import type { FacetCounts } from "@modules/discovery/data/types"
 
 const facets: FacetCounts = {
-  categories: {},
   brands: { "Black Rhino Hard Alloys": 90, "Black Rhino Hard Alloys - UTV": 15 },
   diameters: { "15": 2, "17": 4, "18": 1, "19": 2, "20": 3, "22": 5, "24": 1 },
   boltPatterns: {},
@@ -32,7 +31,7 @@ describe("styleTiles", () => {
 
   it("drops tiles whose count is zero", () => {
     const empty: FacetCounts = {
-      categories: {}, brands: {}, diameters: {}, boltPatterns: {}, finishes: {},
+      brands: {}, diameters: {}, boltPatterns: {}, finishes: {},
     }
     expect(styleTiles(empty)).toHaveLength(0)
   })

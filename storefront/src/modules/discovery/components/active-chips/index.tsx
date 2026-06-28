@@ -13,15 +13,6 @@ const FINISH_LABELS: Record<string, string> = {
   silver: "Silver / polished",
 }
 
-const CATEGORY_LABELS: Record<string, string> = {
-  "off-road": "Off-road",
-  luxury: "Luxury",
-  street: "Street",
-  "truck-dually": "Truck & Dually",
-  drag: "Drag",
-  utv: "UTV",
-}
-
 const formatPrice = (cents: number) =>
   `$${Math.round(cents / 100).toLocaleString()}`
 
@@ -65,13 +56,6 @@ const ActiveChips = () => {
     })
   }
 
-  for (const c of filters.categories) {
-    chips.push({
-      key: `category-${c}`,
-      label: CATEGORY_LABELS[c] ?? c,
-      onRemove: () => removeArrayFilter("categories", c),
-    })
-  }
   for (const b of filters.brands) {
     chips.push({
       key: `brand-${b}`,

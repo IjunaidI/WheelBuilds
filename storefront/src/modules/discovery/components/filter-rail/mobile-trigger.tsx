@@ -34,7 +34,6 @@ const MobileFilterTrigger = ({
 
   // Count active filters across all dimensions for the button badge.
   const activeCount =
-    filters.categories.length +
     filters.brands.length +
     filters.diameters.length +
     filters.boltPatterns.length +

@@ -33,8 +33,6 @@ export type DiscoveryProduct = {
   boltPattern: string
   /** Canonical bolt patterns ("{count}x{pcd_mm}") used to badge fit vs the active vehicle. */
   boltPatternsCanonical: string[]
-  /** Category slugs the product belongs to (e.g. "off-road", "luxury"). */
-  categories: string[]
   /** "NEW" tag in the product card. */
   isNew?: boolean
 }
@@ -61,7 +59,6 @@ export const SORT_LABELS: Record<SortOption, string> = {
  * `buildFilters` / `FACET_FIELDS`.
  */
 export type DiscoveryFilters = {
-  categories: string[]
   brands: string[]
   diameters: number[]
   boltPatterns: string[]
@@ -71,7 +68,6 @@ export type DiscoveryFilters = {
 }
 
 export const EMPTY_FILTERS: DiscoveryFilters = {
-  categories: [],
   brands: [],
   diameters: [],
   boltPatterns: [],
@@ -93,7 +89,6 @@ export type DiscoveryQuery = {
 
 /** Per-facet counts returned alongside the product list. */
 export type FacetCounts = {
-  categories: Record<string, number>
   brands: Record<string, number>
   diameters: Record<string, number>
   boltPatterns: Record<string, number>
@@ -151,7 +146,6 @@ export function parseQueryFromSearchParams(
 
   return {
     filters: {
-      categories: arr("categories"),
       brands: arr("brands"),
       diameters: arr("diameters")
         .map((s) => Number(s))

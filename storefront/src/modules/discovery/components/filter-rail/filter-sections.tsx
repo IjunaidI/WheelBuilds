@@ -20,15 +20,6 @@ import { Separator } from "@/components/ui/separator"
 import { useDiscoveryQuery } from "../../data/use-discovery-query"
 import { FacetCounts } from "../../data/types"
 
-const CATEGORY_LABELS: Record<string, string> = {
-  "off-road": "Off-road",
-  luxury: "Luxury",
-  street: "Street",
-  "truck-dually": "Truck & Dually",
-  drag: "Drag",
-  utv: "UTV",
-}
-
 const FINISH_LABELS: Record<string, string> = {
   black: "Gloss black",
   bronze: "Bronze",
@@ -113,11 +104,6 @@ const FilterSections = ({ facets, hideClearAll }: FilterSectionsProps) => {
     ? `${active.year} ${active.make} ${active.model}`
     : "Pick a vehicle for fitment"
 
-  // Spec §5 G2: no backend category source in this cut, so the adapter returns
-  // an empty `categories` facet. Hide the section entirely rather than render a
-  // permanently-empty, dead accordion at the top of the rail.
-  const hasCategories = Object.keys(facets.categories).length > 0
-
   return (
     <>
       <div className="rounded-[var(--radius)] border border-[var(--hairline)] bg-white p-4 mb-4">
@@ -157,28 +143,9 @@ const FilterSections = ({ facets, hideClearAll }: FilterSectionsProps) => {
 
       <Accordion
         type="multiple"
-        defaultValue={["category", "brand", "diameter", "finish"]}
+        defaultValue={["brand", "diameter", "finish"]}
         className="rounded-[var(--radius)] border border-[var(--hairline)] bg-white px-4"
       >
-        {hasCategories && (
-          <>
-            <AccordionItem value="category" className="border-b-0">
-              <AccordionTrigger>Category</AccordionTrigger>
-              <AccordionContent>
-                <ChecklistSection
-                  facetMap={facets.categories}
-                  selected={filters.categories}
-                  onToggle={(v) => toggleArrayFilter("categories", v)}
-                  labelMap={CATEGORY_LABELS}
-                  formatKey={(k) => k}
-                />
-              </AccordionContent>
-            </AccordionItem>
-
-            <Separator />
-          </>
-        )}
-
         <AccordionItem value="brand">
           <AccordionTrigger>Brand</AccordionTrigger>
           <AccordionContent>

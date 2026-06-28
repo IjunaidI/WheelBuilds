@@ -53,7 +53,7 @@ const AutoFitmentCard = ({
     </span>
     <div className="flex-1 min-w-0">
       <div className="text-[13px] font-semibold text-[var(--ink)]">
-        {isOem ? "Auto-fitted to OEM spec" : "Custom fitment override"}
+        {isOem ? "Auto-fitted · standard offset" : "Custom fitment override"}
       </div>
       <div className="text-[12px] text-[var(--graphite)] mt-0.5 font-[var(--mono)] tracking-[0.03em]">
         {sizeLabel.toUpperCase()} · ET {offsetMm >= 0 ? "+" : ""}
@@ -68,7 +68,7 @@ const AutoFitmentCard = ({
         className="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-[11px] font-semibold uppercase tracking-[0.06em] text-[var(--orange)] hover:bg-[rgba(255,106,0,0.06)] rounded shrink-0"
       >
         <Icon name="return" size={12} color="#FF6A00" strokeWidth={2.5} />
-        Reset to OEM
+        Reset to standard
       </button>
     )}
   </div>

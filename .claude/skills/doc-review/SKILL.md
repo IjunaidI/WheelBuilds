@@ -17,12 +17,15 @@ These must not appear in committed docs except inside an explicit "Corrected …
 - `msrpUsd * 100` (Medusa stores dollars; cents only in the Meili index)
 - `VENDOR_WHEELPROS_WHEELS_FEED_PATH` / `VENDOR_WHEELPROS_TIRES_FEED_PATH` (wrong plural names)
 
-Run: `grep -rniE --exclude='*docs-reorg-and-drift-guard*' --exclude=STATUS.md --exclude=BACKLOG.md --exclude=2026-05-28-fitment-ready-catalog-search.md "teraflex|msrpUsd \* 100|VENDOR_WHEELPROS_(WHEELS|TIRES)_FEED_PATH" docs/ CLAUDE.md README.md backend/src/modules/*/README.md`
+Run: `grep -rniE --exclude='*docs-reorg-and-drift-guard*' --exclude=STATUS.md --exclude=BACKLOG.md --exclude=2026-05-28-fitment-ready-catalog-search.md --exclude='2026-06-28-wheel-discovery-vendor-ops*' "teraflex|msrpUsd \* 100|VENDOR_WHEELPROS_(WHEELS|TIRES)_FEED_PATH" docs/ CLAUDE.md README.md backend/src/modules/*/README.md`
 Drift-tracking docs legitimately QUOTE these tokens — the reorg spec/plan (`*docs-reorg-and-drift-guard*`),
 `STATUS.md`, `BACKLOG.md`, and this `SKILL.md` itself — so they are excluded above (and `.claude/` is
 out of the scan path). `2026-05-28-fitment-ready-catalog-search.md` is also excluded because its
-"Teraflex Nomad" hits are an annotated test-fixture brand (mirrors live fixtures, tracked as WB-044).
-Any remaining hit outside an annotated historical block = DRIFT.
+"Teraflex Nomad" hits are an annotated test-fixture brand. The WB-044 spec+plan
+(`2026-06-28-wheel-discovery-vendor-ops*`) are excluded because they are the canonical record of the
+`teraflex`→`Petrol` rename and necessarily name the old brand to document it. **WB-044 is DONE
+(2026-06-28): the live fixtures are now `Petrol`** — so any NEW `teraflex` hit in code or in a
+non-excluded doc is real drift. Any remaining hit outside an annotated historical block = DRIFT.
 
 ### 2. BACKLOG evidence freshness
 Parse each `### WB-NNN` item in `docs/future/BACKLOG.md` (status + evidence file:line).

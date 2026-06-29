@@ -1,6 +1,6 @@
 # Design — Wheel discovery & vendor-sync ops (G5 + G8-ops)
 
-> Status: in-progress · Date: 2026-06-28 · Backlog: WB-021, WB-046, WB-006, WB-044, WB-052
+> Status: done (merged to `main` 2026-06-28) · Date: 2026-06-28 · Backlog: WB-021, WB-046, WB-006, WB-044, WB-052
 > Scope: wheel-related hardening only. **Tires (WB-005) explicitly deferred.** Pricing/de-hardcode
 > (WB-024/025/026) and the general-commerce reply-to/shipping item (WB-031) are out of scope.
 

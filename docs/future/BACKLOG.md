@@ -37,10 +37,10 @@
 - **G2 · Checkout & cart (make it transactable)** `[M–L]` — ✅ **DONE 2026-06-26** (WB-033 stall, WB-034 stock cap, WB-035 express-pay/Affirm env-gated, WB-036 discount fix, WB-047 copy + WB-053 browse cap). Follow-ups: WB-054 (gift cards v2), WB-055 (brand-copy sweep).
 - **G3 · PDP correctness & polish** `[S–M]` — ✅ **DONE 2026-06-25** (WB-048 BLANK gate, WB-029 placeholders, WB-030 finish-normalizer twin).
 - **G4 · Home & merchandising** `[M]` — ✅ **DONE 2026-06-26** (WB-004 Featured Blocks real curated products + Build Gallery → catalog-wall, WB-023 newsletter persistence, WB-028 merchandising copy → config + live brand count). Follow-up: WB-057 (newsletter hardening — unsubscribe/rate-limit/double-opt-in).
-- **G5 · Discovery & search** `[S]` — Meili result cache, dead category facet. (browse `maxTotalHits` cap WB-053 ✅ done 2026-06-26 via G2.) → WB-021, WB-046
+- **G5 · Discovery & search** `[S]` — ✅ **DONE 2026-06-28** (WB-021 Meili result cache via `unstable_cache`, WB-046 dead category facet removed). (browse `maxTotalHits` cap WB-053 ✅ done 2026-06-26 via G2.)
 - **G6 · Catalog breadth & pricing** `[L–XL · WB-005 is a big spec alone]` — tires grouping+indexing, markup/MAP/margin pricing, de-hardcode bootstrap identity + vendor roster. → WB-005, WB-024, WB-025, WB-026
 - **G7 · Account & garage** `[S–M]` — ✅ **DONE 2026-06-26** (WB-032 account Garage tab/route + GarageManager, WB-022 atomic guest→login merge w/ stable idempotent client_ids, WB-045 removed license-plate stub). Follow-up: WB-058 (real plate→YMM provider).
-- **G8 · Admin & ops tooling** `[S]` — vendor-sync admin UI, seed shipping options + reply-to, rename `teraflex` fixtures, scale-safe dev-wipe. → WB-006, WB-031, WB-044, WB-052
+- **G8 · Admin & ops tooling** `[S]` — admin UI + ops slice ✅ **DONE 2026-06-28** (WB-006 vendor-sync admin console, WB-044 rename `teraflex` fixtures, WB-052 scale-safe dev-wipe). Remaining: WB-031 (seed shipping options + reply-to — general commerce, not wheel; deferred). → WB-031
 
 ---
 
@@ -110,13 +110,14 @@
 - refs: —
 
 ### WB-006 · No admin UI for vendor-sync (API/CLI only)   [HIGH]
-- status: todo
+- status: done
 - area: backend/admin
 - evidence: backend/src/admin/ (boilerplate)
 - problem: vendor-sync management (triggering runs, approving, cancelling, replaying) is only accessible via API or CLI; no Medusa admin widget exists.
 - fix: implement a Medusa admin extension widget for vendor-sync (run list, approve/cancel/replay actions, run status display).
 - verify: the Medusa admin (/app) shows a vendor-sync section where an admin can trigger a dry-run, view staged diffs, and approve or cancel a run without using the CLI.
-- refs: —
+- done: 2026-06-28 — Medusa admin route extension `src/admin/routes/vendor-sync/page.tsx` (sidebar "Vendor Sync") over the 8 existing `/admin/vendor-sync/*` routes: run list + status filter, trigger dry-run, status-gated approve/cancel/replay driven by pure jest-tested helpers (`actionsForStatus`/`badgeForStatus`/`isNonTerminal`, new `test:admin` script), confirm prompts on heavy actions, polling while runs are non-terminal, and a detail drawer (counts/errors/failed groups+SKUs, fetches fresh detail on open via `getRun`) with replay-SKU. `purge-products` deliberately NOT exposed (destructive cutover tool). Build-gated (`medusa build`); added `@medusajs/icons`@2.13.6 + `@medusajs/ui`@4.1.6 as direct backend deps so the admin bundler externalizes them (surgical lockfile change — both already resolved transitively via dashboard@2.13.6). Subagent-driven (final opus review: ready to merge).
+- refs: design [docs/done/specs/2026-06-28-wheel-discovery-vendor-ops-design.md](../done/specs/2026-06-28-wheel-discovery-vendor-ops-design.md) ; plan [docs/done/plans/2026-06-28-wheel-discovery-vendor-ops.md](../done/plans/2026-06-28-wheel-discovery-vendor-ops.md)
 
 ### WB-007 · `hub_bore_mm` INTEGER truncates fractional bore on cached reads   [HIGH]
 - status: done
@@ -256,13 +257,14 @@
 - refs: design [spec](../done/specs/2026-06-23-wheel-size-fitment-hardening-design.md) ; plan [plan](../done/plans/2026-06-23-wheel-size-fitment-hardening.md)
 
 ### WB-021 · Discovery + home Meili queries uncached (no TTL/revalidate)   [MEDIUM]
-- status: todo
+- status: done
 - area: storefront/discovery + storefront/home
 - evidence: storefront/src/modules/discovery/data/get-products.ts:137-202 ; storefront/src/modules/home/data/get-home-catalog.ts:22
 - problem: every discovery page load and home page load issues live Meilisearch queries with no caching; high traffic will hammer Meilisearch unnecessarily.
 - fix: add Next.js fetch cache / revalidate options (or unstable_cache) to the Meilisearch query functions so results are cached with a reasonable TTL (e.g. 60s).
 - verify: repeated discovery/home requests within the TTL do not re-query Meilisearch; a cache hit is observable (e.g. via Meilisearch query logs or Next.js cache headers).
-- refs: —
+- done: 2026-06-28 — `getDiscoveryProducts` wrapped in Next `unstable_cache` (60s revalidate, tag `discovery`) keyed by a pure, order-independent `discoveryCacheKey(query)`. The inner `fetchDiscoveryProducts` THROWS on Meili failure so the `try/catch → emptyResult` sits OUTSIDE the cache — empties are never cached and self-heal on the next request once Meili recovers; a future re-sync can `revalidateTag("discovery")`. 60s listing staleness is acceptable because the PDP reads live. `getHomeCatalog`'s existing `react.cache()` layers per-request dedup on top. 5 vitest cases on the key. Subagent-driven.
+- refs: design [docs/done/specs/2026-06-28-wheel-discovery-vendor-ops-design.md](../done/specs/2026-06-28-wheel-discovery-vendor-ops-design.md) ; plan [docs/done/plans/2026-06-28-wheel-discovery-vendor-ops.md](../done/plans/2026-06-28-wheel-discovery-vendor-ops.md)
 
 ### WB-022 · Guest→login garage merge = N best-effort client POSTs   [MEDIUM]
 - status: done
@@ -477,13 +479,14 @@
 - refs: design [spec](../done/specs/2026-06-23-wheel-size-fitment-hardening-design.md) ; plan [plan](../done/plans/2026-06-23-wheel-size-fitment-hardening.md)
 
 ### WB-044 · Rename `teraflex` test fixtures/handles   [LOW]
-- status: todo
+- status: done
 - area: backend/vendor-sync/tests
 - evidence: backend/src/modules/vendor-sync/__tests__/build-search-document.test.ts:5,44 ; backend/src/modules/vendor-sync/__fixtures__/*.csv
 - problem: test fixtures and handles still use the old `teraflex` name (pre-rename to wheelpros); they are functionally correct but misleading and inconsistent with the live codebase naming.
 - fix: rename teraflex fixture files and update all handle references in the test file to wheelpros equivalents.
 - verify: grep for "teraflex" in backend/src/modules/vendor-sync/__tests__/ and __fixtures__/ returns no matches; all tests still pass after rename.
-- refs: —
+- done: 2026-06-28 — renamed `Teraflex` (a real Jeep-suspension brand that does NOT make wheels → misleading wheel fixture) to `Petrol` (a genuine wheel brand) across 4 test files + 2 CSV fixtures, with handles/group-keys/assertions moved in lockstep (no weakened assertions). Repo-wide grep `teraflex` in backend = 0; full vendor-sync suite green (caught the `hash.test.ts` makeTireRecord sibling). Subagent-driven.
+- refs: design [docs/done/specs/2026-06-28-wheel-discovery-vendor-ops-design.md](../done/specs/2026-06-28-wheel-discovery-vendor-ops-design.md) ; plan [docs/done/plans/2026-06-28-wheel-discovery-vendor-ops.md](../done/plans/2026-06-28-wheel-discovery-vendor-ops.md)
 
 ### WB-045 · License-plate lookup is a disabled stub   [LOW]
 - status: done
@@ -496,13 +499,14 @@
 - refs: split out of G7 (2026-06-26)
 
 ### WB-046 · Category facet is dead in discovery (no backend source)   [LOW]
-- status: todo
+- status: done
 - area: storefront/discovery + backend/search
 - evidence: storefront/src/modules/discovery/data/get-products.ts:117,184
 - problem: the category facet is listed in FACET_FIELDS and rendered in the discovery UI, but no category data is written to the Meilisearch index by the vendor-sync transformer; the facet always returns empty.
 - fix: populate a category field in the Meilisearch wheel document from the vendor feed data (e.g. product category or type) and wire it to the category facet.
 - verify: the category facet in discovery shows real options sourced from indexed wheel documents; filtering by category returns matching products.
-- refs: —
+- done: 2026-06-28 — chose REMOVE over wire-up: no category source exists anywhere (feed → transformer → index all lack it), so the facet was permanently empty (`facets.categories` hardcoded `{}`). Same no-fabricated-content stance as WB-029. Stripped `categories` from `DiscoveryFilters`/`FacetCounts`/`DiscoveryProduct`/`EMPTY_FILTERS`/`parseQueryFromSearchParams`, the empty facet, and the filter-rail accordion + `CATEGORY_LABELS`; swept every consumer (active-chips, mobile-trigger, use-discovery-query) + the `DiscoveryProduct.categories` type-ripple into get-product/get-featured/style-map fixtures (grep `categories` in modules/discovery = 0). Home `STYLE_DEFS` (shop-by-style) is a separate predefined-query mechanism — untouched. A real wheel-style classifier to revive the facet would be a much larger separate piece → future backlog. Subagent-driven.
+- refs: design [docs/done/specs/2026-06-28-wheel-discovery-vendor-ops-design.md](../done/specs/2026-06-28-wheel-discovery-vendor-ops-design.md) ; plan [docs/done/plans/2026-06-28-wheel-discovery-vendor-ops.md](../done/plans/2026-06-28-wheel-discovery-vendor-ops.md)
 
 ---
 
@@ -559,13 +563,14 @@
 ---
 
 ### WB-052 · `vendor-sync-dev-wipe` doesn't scale to production-size state tables   [LOW]
-- status: todo
+- status: done
 - area: backend/vendor-sync/scripts
 - evidence: backend/src/scripts/vendor-sync-dev-wipe.ts (collects every id into one `delete(ids)` → `WHERE id IN (...)`) ; superseded for state resets by backend/src/scripts/vendor-sync-truncate-state.ts ; product purge superseded by the `POST /admin/vendor-sync/purge-products` route
 - problem: dev-wipe deletes each state table by collecting all row ids into one array and issuing `WHERE id IN (...)`. At prod scale (372k `vendor_stock_staging` rows) this overflows knex's query compiler (`Maximum call stack size exceeded`). `--purge-products` also deletes products one `deleteProductsWorkflow` chunk at a time over the network — hours from a local machine via the Railway proxy. Both surfaced during the WB-051 migration; workarounds (truncate script + admin route) already exist.
 - fix: for state resets, delegate to `vendor-sync-truncate-state.ts` (single TRUNCATE) or chunk the id deletes; for product purge, point operators at the server-side `purge-products` route. Consider folding both into dev-wipe or deprecating its bulk paths.
 - verify: a wipe + purge against a prod-size DB completes in seconds (state) / minutes (products, server-side) without stack overflow.
-- refs: discovered during WB-051 (2026-06-23)
+- done: 2026-06-28 — extracted the atomic `TRUNCATE … RESTART IDENTITY` into a shared `truncateVendorState(knex)` helper (`backend/src/modules/vendor-sync/utils/truncate-state.ts`); both `vendor-sync-dev-wipe.ts` and `vendor-sync-truncate-state.ts` delegate to it. dev-wipe's per-id `WHERE id IN (...)` state-delete (the knex stack-overflow at 372k rows) is gone; it keeps its `--confirm-host` guard + chunked `--purge-products` workflow path. One implementation, unit-tested (table list + exact SQL). Subagent-driven.
+- refs: discovered during WB-051 (2026-06-23) ; done via [docs/done/plans/2026-06-28-wheel-discovery-vendor-ops.md](../done/plans/2026-06-28-wheel-discovery-vendor-ops.md)
 
 ---
 

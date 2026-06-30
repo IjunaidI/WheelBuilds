@@ -21,4 +21,22 @@ describe("fitsVehicle", () => {
     const r = fitsVehicle(product, { canonicalBoltPatterns: ["6x139.7"], hubBoreMm: 78 })
     expect(r.hardGatesPass).toBe(false); expect(r.fits).toBe(false)
   })
+  it("bolts on but does NOT 'fit' when the offset is outside the vehicle's window", () => {
+    // Same bolt pattern + bore clears, but the wheel's ET (35) is below the
+    // vehicle's offset window — the random-wheel-reads-as-guaranteed bug.
+    const v = { canonicalBoltPatterns: ["5x114.3"], hubBoreMm: 64.1,
+      diameterWindow: { min: 17, max: 20 }, widthWindow: { min: 7, max: 9 }, offsetWindow: { min: 42, max: 52 } }
+    const r = fitsVehicle(product, v)
+    expect(r.hardGatesPass).toBe(true)
+    expect(r.withinWindow).toBe(false)
+    expect(r.fits).toBe(false)
+    expect(r.reasons.join(" ")).toMatch(/size or offset/i)
+  })
+  it("does not claim a confirmed fit when the vehicle has no spec windows", () => {
+    // Bolt pattern + bore pass, but there is no wheel-size window to verify size.
+    const r = fitsVehicle(product, { canonicalBoltPatterns: ["5x114.3"], hubBoreMm: 64.1 })
+    expect(r.hardGatesPass).toBe(true)
+    expect(r.fits).toBe(false)
+    expect(r.reasons.join(" ")).toMatch(/no fitment spec/i)
+  })
 })

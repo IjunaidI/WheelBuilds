@@ -193,12 +193,24 @@ export default async function seedDemoData({ container }: ExecArgs) {
   }
 
   const fulfillmentSet = await fulfillmentModuleService.createFulfillmentSets({
-    name: "European Warehouse delivery",
+    name: "Default delivery",
     type: "shipping",
     service_zones: [
       {
-        name: "Europe",
+        name: "Domestic + Europe",
         geo_zones: [
+          // US must be covered — this is a US store (storefront runs at /us/, the
+          // vendor-sync bootstrap creates a US/usd region). Without a `us` geo
+          // zone the Standard/Express options below match no US address and the
+          // checkout delivery step shows nothing to select.
+          {
+            country_code: "us",
+            type: "country",
+          },
+          {
+            country_code: "ca",
+            type: "country",
+          },
           {
             country_code: "gb",
             type: "country",

@@ -58,7 +58,13 @@ export async function signup(_currentState: unknown, formData: FormData) {
     setAuthToken(typeof loginToken === 'string' ? loginToken : loginToken.location)
 
     revalidateTag("customer")
-    return createdCustomer
+    // Do NOT return the customer object here. useFormState pipes this return
+    // value into <ErrorMessage>, which renders it as a React child — an object
+    // throws React error #31 ("Objects are not valid as a React child") and
+    // crashes the register page even though the account was created. Mirror
+    // login()'s success path (return undefined): revalidateTag("customer")
+    // re-renders the account route into the logged-in dashboard.
+    return
   } catch (error: any) {
     return error.toString()
   }

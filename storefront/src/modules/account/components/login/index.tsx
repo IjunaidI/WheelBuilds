@@ -1,4 +1,7 @@
+"use client"
+
 import { useFormState } from "react-dom"
+import { useParams } from "next/navigation"
 
 import { LOGIN_VIEW } from "@modules/account/templates/login-template"
 import Input from "@modules/common/components/input"
@@ -12,6 +15,7 @@ type Props = {
 
 const Login = ({ setCurrentView }: Props) => {
   const [message, formAction] = useFormState(login, null)
+  const { countryCode } = useParams() as { countryCode: string }
 
   return (
     <div
@@ -23,6 +27,7 @@ const Login = ({ setCurrentView }: Props) => {
         Sign in to access an enhanced shopping experience.
       </p>
       <form className="w-full" action={formAction}>
+        <input type="hidden" name="countryCode" value={countryCode} />
         <div className="flex flex-col w-full gap-y-2">
           <Input
             label="Email"

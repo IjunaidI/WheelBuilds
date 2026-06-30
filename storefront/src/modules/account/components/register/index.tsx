@@ -1,6 +1,7 @@
 "use client"
 
 import { useFormState } from "react-dom"
+import { useParams } from "next/navigation"
 
 import Input from "@modules/common/components/input"
 import { LOGIN_VIEW } from "@modules/account/templates/login-template"
@@ -15,6 +16,7 @@ type Props = {
 
 const Register = ({ setCurrentView }: Props) => {
   const [message, formAction] = useFormState(signup, null)
+  const { countryCode } = useParams() as { countryCode: string }
 
   return (
     <div
@@ -29,6 +31,7 @@ const Register = ({ setCurrentView }: Props) => {
         shopping experience.
       </p>
       <form className="w-full flex flex-col" action={formAction}>
+        <input type="hidden" name="countryCode" value={countryCode} />
         <div className="flex flex-col w-full gap-y-2">
           <Input
             label="First name"

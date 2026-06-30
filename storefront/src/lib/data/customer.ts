@@ -29,6 +29,7 @@ export const updateCustomer = cache(async function (
 
 export async function signup(_currentState: unknown, formData: FormData) {
   const password = formData.get("password") as string
+  const countryCode = (formData.get("countryCode") as string) || ""
   const customerForm = {
     email: formData.get("email") as string,
     first_name: formData.get("first_name") as string,
@@ -55,35 +56,40 @@ export async function signup(_currentState: unknown, formData: FormData) {
       password,
     })
 
-    setAuthToken(typeof loginToken === 'string' ? loginToken : loginToken.location)
+    await setAuthToken(typeof loginToken === 'string' ? loginToken : loginToken.location)
 
     revalidateTag("customer")
-    // Do NOT return the customer object here. useFormState pipes this return
-    // value into <ErrorMessage>, which renders it as a React child — an object
-    // throws React error #31 ("Objects are not valid as a React child") and
-    // crashes the register page even though the account was created. Mirror
-    // login()'s success path (return undefined): revalidateTag("customer")
-    // re-renders the account route into the logged-in dashboard.
-    return
   } catch (error: any) {
     return error.toString()
   }
+
+  // Redirect OUTSIDE the try/catch (see login()): never return the customer
+  // object — useFormState would pipe it into <ErrorMessage> and render an object
+  // as a React child (React #31, crashes the page). The fresh navigation lands
+  // the now-authenticated user on their account dashboard.
+  redirect(`/${countryCode}/account`)
 }
 
 export async function login(_currentState: unknown, formData: FormData) {
   const email = formData.get("email") as string
   const password = formData.get("password") as string
+  const countryCode = (formData.get("countryCode") as string) || ""
 
   try {
-    await sdk.auth
-      .login("customer", "emailpass", { email, password })
-      .then((token) => {
-        setAuthToken(typeof token === 'string' ? token : token.location)
-        revalidateTag("customer")
-      })
+    const token = await sdk.auth.login("customer", "emailpass", { email, password })
+    await setAuthToken(typeof token === "string" ? token : token.location)
+    revalidateTag("customer")
   } catch (error: any) {
     return error.toString()
   }
+
+  // Redirect OUTSIDE the try/catch: redirect() throws NEXT_REDIRECT, which the
+  // catch would otherwise swallow and stringify. The fresh navigation re-runs
+  // the account layout (account/layout.tsx) with the new auth cookie so it
+  // renders the dashboard slot — revalidateTag alone does not reliably
+  // re-render the parallel-route slot, so a correct login appeared to do
+  // nothing. Mirrors signout()'s set-cookie-then-redirect pattern.
+  redirect(`/${countryCode}/account`)
 }
 
 export async function signout(countryCode: string) {

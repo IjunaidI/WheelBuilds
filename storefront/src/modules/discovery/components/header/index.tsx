@@ -10,6 +10,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
+import { useSearchParams } from "next/navigation"
 import { useGarage } from "@lib/garage/use-garage"
 import { openSearch } from "@lib/stores/search-store"
 import Icon from "@modules/common/components/icon"
@@ -24,6 +25,15 @@ type DiscoveryHeaderProps = {
 const DiscoveryHeader = ({ totalCount }: DiscoveryHeaderProps) => {
   const { active } = useGarage()
   const { sort, setSort } = useDiscoveryQuery()
+  const sp = useSearchParams()
+
+  // The list is genuinely fit-filtered only when a real fit param is applied —
+  // NOT merely because a vehicle is in the garage. fit=0 means the shopper hit
+  // "show all wheels", and an absent fit means the vehicle has no wheel-size
+  // data (so nothing was filtered). Both show the full catalog, so the chip must
+  // not claim "FITS YOUR CAR" in those states.
+  const fitParam = sp.get("fit")
+  const isFitted = !!active && !!fitParam && fitParam !== "0"
 
   return (
     <header className="flex flex-col gap-4 pb-6 border-b border-[var(--hairline)] mb-6">
@@ -38,8 +48,8 @@ const DiscoveryHeader = ({ totalCount }: DiscoveryHeaderProps) => {
           </Display>
         </div>
         <div className="flex items-center gap-2 small:gap-3 flex-wrap">
-          {/* Garage indicator — appears when an active vehicle is set */}
-          {active ? (
+          {/* Garage indicator — only claims a fit when the list is actually fit-filtered */}
+          {isFitted ? (
             <Chip variant="accent" dot onClick={openSearch}>
               <span className="truncate max-w-[180px] small:max-w-none">
                 FITS YOUR {active.make.toUpperCase()}{" "}
@@ -48,7 +58,7 @@ const DiscoveryHeader = ({ totalCount }: DiscoveryHeaderProps) => {
             </Chip>
           ) : (
             <Chip variant="outline" onClick={openSearch}>
-              <Icon name="garage" size={12} strokeWidth={1.6} /> Pick a vehicle
+              <Icon name="garage" size={12} strokeWidth={1.6} /> Select a vehicle
             </Chip>
           )}
 

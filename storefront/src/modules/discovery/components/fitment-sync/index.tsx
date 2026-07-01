@@ -12,34 +12,43 @@ export default function FitmentSync() {
   const sp = useSearchParams()
 
   useEffect(() => {
-    const fit = sp.get("fit")
-    if (fit === "0") return // explicit opt-out is authoritative — never overwrite
+    if (sp.get("fit") === "0") return // explicit opt-out is authoritative — never overwrite
 
     const activePatterns = active?.canonicalBoltPatterns ?? []
-    const desired = activePatterns.length ? patternsToFitParam(activePatterns) : null
+    const desiredFit = activePatterns.length ? patternsToFitParam(activePatterns) : null
 
-    // Sync ?fit TO the active vehicle's bolt patterns, but never auto-STRIP a
-    // fit that is already in the URL. The garage loads asynchronously (and, when
-    // signed in, RoutingGarage swaps the local provider for the remote one ~1s
-    // after boot), so the active vehicle's patterns are routinely unavailable
-    // for a beat — and permanently for a vehicle wheel-size has no data on.
-    // Stripping in that window yanked the user off a valid fitment result
-    // (including the "no wheels fit this vehicle" empty state) ~1s after load,
-    // which read as "it filtered, then bounced back to the full catalog."
-    // Clearing fitment is an explicit user action: the "Fits: …" chip sets fit=0.
-    if (desired && fit !== desired) { replace(desired); return } // set / replace stale
+    // Never auto-STRIP a fit already in the URL: the garage loads asynchronously
+    // (and RoutingGarage swaps local→remote ~1s after boot), so the active
+    // vehicle's data is routinely unavailable for a beat — and permanently for a
+    // vehicle wheel-size has no data on. Only ACT once we have the vehicle's
+    // patterns; clearing fitment is an explicit user action (the "Fits: …" chip
+    // sets fit=0).
+    if (!desiredFit) return
 
-    function replace(value: string | null) {
-      const next = new URLSearchParams(Array.from(sp.entries()))
-      if (value) next.set("fit", value); else next.delete("fit")
-      const setOrDel = (k: string, v: string) => { if (value && v) next.set(k, v); else next.delete(k) }
-      setOrDel("fitb", active?.hubBoreMm != null ? String(active.hubBoreMm) : "")
-      setOrDel("fitd", winToParam(active?.diameterWindow))
-      setOrDel("fitw", winToParam(active?.widthWindow))
-      setOrDel("fito", winToParam(active?.offsetWindow))
-      next.delete("page") // reset pagination on filter change (mirrors useDiscoveryQuery)
-      router.replace(`${pathname}?${next.toString()}`)
+    // Sync the FULL fitment (bolt patterns + the size windows discovery needs to
+    // match the PDP), not just ?fit. The window params must land even when ?fit
+    // is already correct — e.g. the fitment button sets ?fit=5x100 directly, so
+    // without this the size windows would never reach discovery and it would
+    // only ever narrow by bolt pattern.
+    const desired = {
+      fit: desiredFit,
+      fitb: active?.hubBoreMm != null ? String(active.hubBoreMm) : "",
+      fitd: winToParam(active?.diameterWindow),
+      fitw: winToParam(active?.widthWindow),
+      fito: winToParam(active?.offsetWindow),
     }
+    const inSync = (Object.keys(desired) as (keyof typeof desired)[]).every(
+      (k) => (sp.get(k) ?? "") === desired[k]
+    )
+    if (inSync) return
+
+    const next = new URLSearchParams(Array.from(sp.entries()))
+    for (const [k, v] of Object.entries(desired)) {
+      if (v) next.set(k, v)
+      else next.delete(k)
+    }
+    next.delete("page") // reset pagination on filter change (mirrors useDiscoveryQuery)
+    router.replace(`${pathname}?${next.toString()}`)
   }, [
     active?.id,
     active?.canonicalBoltPatterns?.join(","),

@@ -18,6 +18,8 @@ const formatPrice = (cents: number) =>
 
 type DiscoveryProductCardProps = {
   product: DiscoveryProduct
+  /** When true (discovery fit mode), link to the PDP with ?fit=1 so the PDP filters variants to the active vehicle. */
+  fit?: boolean
 }
 
 /**
@@ -27,9 +29,9 @@ type DiscoveryProductCardProps = {
  * by the Discovery grid, the PDP "Similar wheels" row, and the home NEW THIS
  * WEEK rail.
  */
-const DiscoveryProductCard = ({ product }: DiscoveryProductCardProps) => (
+const DiscoveryProductCard = ({ product, fit = false }: DiscoveryProductCardProps) => (
   <LocalizedClientLink
-    href={`/products/${product.handle}`}
+    href={`/products/${product.handle}${fit ? "?fit=1" : ""}`}
     className="product-card group block"
     aria-label={`${product.brand} ${product.name}`}
   >

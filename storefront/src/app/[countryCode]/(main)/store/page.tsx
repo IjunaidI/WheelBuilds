@@ -29,5 +29,7 @@ export default async function StorePage({ searchParams }: StorePageProps) {
   const query = parseQueryFromSearchParams(sp)
   const result = await getDiscoveryProducts(query)
 
-  return <DiscoveryTemplate result={result} currentPage={query.page} />
+  const inFitMode = !!query.vehicleConstraint?.length
+
+  return <DiscoveryTemplate result={result} currentPage={query.page} fit={inFitMode} />
 }

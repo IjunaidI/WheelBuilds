@@ -11,6 +11,7 @@ import { DEFAULT_PAGE_SIZE, DiscoveryResult } from "../data/types"
 type DiscoveryTemplateProps = {
   result: DiscoveryResult
   currentPage: number
+  fit?: boolean
 }
 
 /**
@@ -27,6 +28,7 @@ type DiscoveryTemplateProps = {
 const DiscoveryTemplate = ({
   result,
   currentPage,
+  fit = false,
 }: DiscoveryTemplateProps) => {
   const totalPages = Math.max(
     1,
@@ -49,7 +51,7 @@ const DiscoveryTemplate = ({
             <DiscoveryEmpty />
           ) : (
             <>
-              <DiscoveryGrid products={result.products} />
+              <DiscoveryGrid products={result.products} fit={fit} />
               <DiscoveryPagination
                 currentPage={currentPage}
                 totalPages={totalPages}

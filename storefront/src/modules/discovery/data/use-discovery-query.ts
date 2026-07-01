@@ -13,7 +13,8 @@
  */
 
 import { useCallback, useMemo } from "react"
-import { useParams, usePathname, useRouter, useSearchParams } from "next/navigation"
+import { useParams, usePathname, useSearchParams } from "next/navigation"
+import { useRouter } from "@bprogress/next/app" // bprogress router → filter/sort/pagination changes show the top progress bar
 import {
   DiscoveryFilters,
   DiscoveryQuery,

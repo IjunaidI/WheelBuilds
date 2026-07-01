@@ -1,7 +1,8 @@
 // storefront/src/modules/discovery/components/fitment-sync/index.tsx
 "use client"
 import { useEffect } from "react"
-import { usePathname, useRouter, useSearchParams } from "next/navigation"
+import { usePathname, useSearchParams } from "next/navigation"
+import { useRouter } from "@bprogress/next/app" // bprogress router → the window-param refinement shows the top progress bar
 import { useGarage } from "@lib/garage/use-garage"
 import { patternsToFitParam, winToParam } from "@modules/discovery/data/vehicle-constraint"
 

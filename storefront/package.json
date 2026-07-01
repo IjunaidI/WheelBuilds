@@ -20,6 +20,7 @@
     "test:unit": "vitest run"
   },
   "dependencies": {
+    "@bprogress/next": "^3.2.12",
     "@headlessui/react": "^1.6.1",
     "@hookform/error-message": "^2.0.0",
     "@medusajs/icons": "2.13.6",

@@ -1,7 +1,8 @@
 "use client"
 
 import { FormEvent, useEffect, useState } from "react"
-import { useParams, useRouter } from "next/navigation"
+import { useParams } from "next/navigation"
+import { useRouter } from "@bprogress/next/app" // bprogress router → the fit navigation shows the top progress bar
 import { toast } from "sonner"
 import Icon from "@modules/common/components/icon"
 import Spinner from "@modules/common/icons/spinner"

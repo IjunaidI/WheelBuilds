@@ -10,7 +10,7 @@ import Icon from "@modules/common/components/icon"
 import { Button } from "@/components/ui/button"
 import { Separator } from "@/components/ui/separator"
 import { useGarage } from "@lib/garage/use-garage"
-import { fitsVehicle } from "@lib/fitment/fits-vehicle"
+import { variantFitsVehicle } from "@lib/fitment/product-has-fitting-variant"
 import { openSearch } from "@lib/stores/search-store"
 import { addToCart } from "@lib/data/cart"
 import { OffsetVariant, ProductDetail, SizeOption } from "../../data/types"
@@ -38,7 +38,23 @@ const PurchasePanel = ({
   selectedVariant,
 }: PurchasePanelProps) => {
   const { active } = useGarage()
-  const fits = active ? fitsVehicle(product, active).fits : false
+  // Fit reflects the CURRENTLY SELECTED variant (size + offset + bore + this
+  // finish's bolt pattern) — NOT whether the product fits somewhere. So after
+  // "Show all", changing to a non-fitting size/offset/colour honestly flips the
+  // chip to "MAY NOT FIT"; picking a fitting one flips it back. Same per-variant
+  // gate discovery uses, so the PDP and the catalog agree.
+  const fits = active
+    ? variantFitsVehicle(
+        {
+          boltPatternRaw: selectedSize.boltPattern,
+          centerBoreMm: selectedVariant?.centerBoreMm,
+          diameterIn: selectedSize.diameter,
+          widthIn: selectedSize.width,
+          offsetMm: selectedVariant?.value ?? selectedSize.offsetMm,
+        },
+        active
+      )
+    : false
   const router = useRouter()
   const { countryCode } = useParams() as { countryCode: string }
   const [quantity, setQuantity] = useState(DEFAULT_WHEEL_QTY)

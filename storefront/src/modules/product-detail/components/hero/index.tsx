@@ -23,11 +23,11 @@ type HeroProps = {
  * pattern / offset) and threads it down to Gallery, PurchasePanel, and the
  * fitment cards. Kept client so the picks are interactive without page reloads.
  *
- * Fitment flow: size matrix → AutoFitmentCard (auto-set to OEM offset, switches
- * to "Custom override" if the user touches the Advanced disclosure) →
- * AdvancedFitmentPanel (the only way to override — collapsed by default).
- * Stance pickers are deliberately gone; OEM auto-fit covers the default case
- * and pros get the raw ET chips one click away.
+ * Fitment flow: size matrix → AutoFitmentCard (auto-set to the wheel's default
+ * offset, switches to "Custom override" if the user touches the Advanced
+ * disclosure) → AdvancedFitmentPanel (the only way to override — collapsed by
+ * default). Stance pickers are deliberately gone; the default auto-fit covers
+ * the common case and pros get the raw ET chips one click away.
  *
  * Layout:
  *   small+: 2-col split — Gallery left, purchase+picker right
@@ -112,15 +112,15 @@ const Hero = ({ product }: HeroProps) => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [visibleSizes])
 
-  const oemOffsetMm = selectedSize.oemOffsetMm ?? selectedSize.offsetMm
-  const [selectedOffsetMm, setSelectedOffsetMm] = useState<number>(oemOffsetMm)
+  const defaultOffsetMm = selectedSize.defaultOffsetMm ?? selectedSize.offsetMm
+  const [selectedOffsetMm, setSelectedOffsetMm] = useState<number>(defaultOffsetMm)
 
-  // When the size changes, snap the offset back to the new size's OEM pick.
+  // When the size changes, snap the offset back to the new size's default pick.
   useEffect(() => {
-    setSelectedOffsetMm(oemOffsetMm)
-  }, [selectedSize, oemOffsetMm])
+    setSelectedOffsetMm(defaultOffsetMm)
+  }, [selectedSize, defaultOffsetMm])
 
-  const isOem = selectedOffsetMm === oemOffsetMm
+  const isDefault = selectedOffsetMm === defaultOffsetMm
 
   const offsetVariants = useMemo<OffsetVariant[]>(
     () => selectedSize.offsetVariants ?? [],
@@ -232,15 +232,15 @@ const Hero = ({ product }: HeroProps) => {
           sizeLabel={`${selectedSize.diameter}×${selectedSize.width}`}
           offsetMm={selectedOffsetMm}
           backspaceIn={currentOffset?.backspaceIn}
-          isOem={isOem}
-          onResetToOem={() => setSelectedOffsetMm(oemOffsetMm)}
+          isDefault={isDefault}
+          onResetToDefault={() => setSelectedOffsetMm(defaultOffsetMm)}
         />
         {offsetVariants.length > 1 && (
           <AdvancedFitmentPanel
             sizeLabel={`${selectedSize.diameter}×${selectedSize.width}`}
             offsetVariants={offsetVariants}
             selectedOffsetMm={selectedOffsetMm}
-            oemOffsetMm={oemOffsetMm}
+            defaultOffsetMm={defaultOffsetMm}
             onSelectOffset={setSelectedOffsetMm}
           />
         )}

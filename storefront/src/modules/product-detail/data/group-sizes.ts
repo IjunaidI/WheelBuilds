@@ -85,7 +85,7 @@ export function groupVariantsIntoSizes(
         diameter,
         width,
         offsetMm,
-        oemOffsetMm: offsetMm,
+        defaultOffsetMm: offsetMm,
         boltPattern,
         offsetVariants: [offset],
         weightLb: productWeightLb,

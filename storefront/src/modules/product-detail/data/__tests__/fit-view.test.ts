@@ -7,7 +7,7 @@ const size = (
   diameter: number, width: number, boltPattern: string, offsetMm: number,
   bore: number | null = 64.1, avail: SizeOption["availability"] = "in_stock"
 ): SizeOption => ({
-  diameter, width, offsetMm, oemOffsetMm: offsetMm, boltPattern, weightLb: 25, availability: avail,
+  diameter, width, offsetMm, defaultOffsetMm: offsetMm, boltPattern, weightLb: 25, availability: avail,
   offsetVariants: [{ value: offsetMm, backspaceIn: "", variantId: `v-${diameter}x${width}-${boltPattern}-${offsetMm}`,
     availability: avail, centerBoreMm: bore, loadRatingLb: null }],
 })

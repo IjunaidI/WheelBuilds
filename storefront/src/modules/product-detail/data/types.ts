@@ -40,14 +40,14 @@ export type SizeOption = {
   diameter: number
   /** Width in inches. */
   width: number
-  /** Offset (mm) — the OEM / default pick. Equals `oemOffsetMm` if provided, else the only offset. */
+  /** Offset (mm) — the default pick. Equals `defaultOffsetMm` if provided, else the only offset. */
   offsetMm: number
   /** All ET options available under this size, with per-offset spec detail. Falls back to a single entry derived from `offsetMm`. */
   offsetVariants?: OffsetVariant[]
   /** Raw bolt pattern (e.g. "5x114.3") this size is scoped to. Each SizeOption belongs to exactly one pattern; the picker filters sizes by the selected pattern. */
   boltPattern: string
-  /** OEM-recommended ET for this size on the active vehicle. Selecting anything else flips to a CustomFit override. */
-  oemOffsetMm?: number
+  /** The wheel's default ET for this size (its first-listed offset variant) — NOT a per-vehicle OEM lookup. Selecting anything else flips to a CustomFit override. */
+  defaultOffsetMm?: number
   /** Per-wheel weight in pounds. */
   weightLb: number
   /** Stock state. `low_stock` shows a warning chip; `out_of_stock` disables the variant. */

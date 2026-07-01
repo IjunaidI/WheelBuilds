@@ -6,7 +6,7 @@ const size: SizeOption = {
   diameter: 20,
   width: 9,
   offsetMm: 18,
-  oemOffsetMm: 18,
+  defaultOffsetMm: 18,
   weightLb: 28,
   availability: "in_stock",
   offsetVariants: [

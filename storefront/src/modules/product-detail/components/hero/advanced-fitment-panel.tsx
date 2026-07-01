@@ -13,8 +13,8 @@ type AdvancedFitmentPanelProps = {
   offsetVariants: OffsetVariant[]
   /** The currently selected ET. */
   selectedOffsetMm: number
-  /** The OEM-recommended ET (gets the orange badge in the chip row). */
-  oemOffsetMm?: number
+  /** The wheel's default ET (gets the orange badge in the chip row). */
+  defaultOffsetMm?: number
   /** Called when the user picks a different ET. */
   onSelectOffset: (mm: number) => void
 }
@@ -22,14 +22,14 @@ type AdvancedFitmentPanelProps = {
 /**
  * Collapsed "Technical fitment" disclosure for wheel-spec enthusiasts.
  * Default for everyone is the AutoFitmentCard above this — this is the only
- * way to override the OEM offset. One click reveals offset chips, a top-down
+ * way to override the default offset. One click reveals offset chips, a top-down
  * cross-section diagram, the per-offset spec grid, and an inline explainer.
  */
 const AdvancedFitmentPanel = ({
   sizeLabel,
   offsetVariants,
   selectedOffsetMm,
-  oemOffsetMm,
+  defaultOffsetMm,
   onSelectOffset,
 }: AdvancedFitmentPanelProps) => {
   const [open, setOpen] = useState(false)
@@ -38,7 +38,7 @@ const AdvancedFitmentPanel = ({
 
   const current =
     offsetVariants.find((o) => o.value === selectedOffsetMm) ?? offsetVariants[0]
-  const isOem = selectedOffsetMm === oemOffsetMm
+  const isDefault = selectedOffsetMm === defaultOffsetMm
 
   return (
     <div
@@ -94,7 +94,7 @@ const AdvancedFitmentPanel = ({
           <div className="flex gap-1.5 mb-3.5">
             {offsetVariants.map((o) => {
               const sel = o.value === selectedOffsetMm
-              const oem = o.value === oemOffsetMm
+              const isDefaultOffset = o.value === defaultOffsetMm
               return (
                 <button
                   type="button"
@@ -110,12 +110,12 @@ const AdvancedFitmentPanel = ({
                 >
                   +{o.value}
                   <span className="text-[10px] opacity-60 ml-0.5">MM</span>
-                  {oem && (
+                  {isDefaultOffset && (
                     <span
                       className="absolute -top-1.5 -right-1 font-[var(--mono)] text-[8px] font-bold tracking-[0.08em] text-white px-1.5 py-0.5 rounded-sm"
                       style={{ background: "var(--orange)" }}
                     >
-                      OEM
+                      DEFAULT
                     </span>
                   )}
                 </button>
@@ -167,8 +167,8 @@ const AdvancedFitmentPanel = ({
             distance from the wheel&apos;s centerline to its mounting pad.
             Positive ET tucks the wheel inboard (toward the suspension); lower
             ET pushes it out toward the fender.{" "}
-            {isOem
-              ? "You're on the OEM-matched offset — fully cleared."
+            {isDefault
+              ? "You're on the wheel's default offset — fully cleared."
               : "This is an override — may require minor fender liner trim. Pros approved."}
           </div>
         </div>

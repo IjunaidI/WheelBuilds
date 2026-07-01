@@ -12,18 +12,26 @@ type GarageSnapshot = {
 const EMPTY_SNAPSHOT: GarageSnapshot = { vehicles: [], active: null }
 
 let cachedSnapshot: GarageSnapshot | null = null
+let cachedSignature: string | null = null
 
 const getSnapshot = (): GarageSnapshot => {
   const vehicles = garage.list()
   const active = garage.getActive()
-  if (
-    cachedSnapshot &&
-    cachedSnapshot.active?.id === active?.id &&
-    cachedSnapshot.vehicles.length === vehicles.length &&
-    cachedSnapshot.vehicles.every((v, i) => v.id === vehicles[i]?.id)
-  ) {
+  // Signature over the FULL vehicle content, not just ids. The garage reads
+  // re-parse fresh objects from localStorage on every call, so this memo is
+  // what gives useSyncExternalStore a stable reference between real changes —
+  // but it must rebuild whenever ANY field changes, not only when a vehicle is
+  // added or removed. The YMM flow adds a vehicle, then a moment later calls
+  // update(id, { bolt patterns, diameter/width/offset windows }) with the SAME
+  // id and count once the async wheel-size lookup resolves. A shallow
+  // id/length check treats that as "unchanged" and returns the stale
+  // (window-less) snapshot, so the fitment never reaches React until a refresh
+  // or car-switch — which is exactly the "windows only show up on refresh" bug.
+  const signature = JSON.stringify({ active: active?.id ?? null, vehicles })
+  if (cachedSnapshot && cachedSignature === signature) {
     return cachedSnapshot
   }
+  cachedSignature = signature
   cachedSnapshot = { vehicles, active }
   return cachedSnapshot
 }

@@ -13,7 +13,8 @@
  */
 
 import { Finish } from "@modules/common/components/wheel"
-import { vehicleToConstraints, fitParamToPatterns } from "./vehicle-constraint"
+import { vehicleToConstraints, fitParamToPatterns, paramToWin } from "./vehicle-constraint"
+import type { FitVehicle } from "@lib/fitment/product-has-fitting-variant"
 
 export type DiscoveryProduct = {
   id: string
@@ -85,6 +86,12 @@ export type DiscoveryQuery = {
    * active vehicle's wheel-size.com spec. Empty/undefined in this spec.
    */
   vehicleConstraint?: string[]
+  /**
+   * Full vehicle fitment (bore + diameter/width/offset windows), carried
+   * through the URL so the post-filter can run the same per-variant check
+   * the PDP uses (see get-products.ts fit-mode branch).
+   */
+  vehicleFitment?: FitVehicle
 }
 
 /** Per-facet counts returned alongside the product list. */
@@ -144,6 +151,18 @@ export function parseQueryFromSearchParams(
       ? vehicleToConstraints({ canonicalBoltPatterns: fitParamToPatterns(fitRaw) })
       : undefined
 
+  const str = (k: string) => (typeof sp[k] === "string" ? (sp[k] as string) : Array.isArray(sp[k]) ? (sp[k]![0] as string) : undefined)
+  const vehicleFitment =
+    fitRaw && fitRaw !== "0"
+      ? {
+          canonicalBoltPatterns: fitParamToPatterns(fitRaw),
+          hubBoreMm: (() => { const b = Number(str("fitb")); return Number.isFinite(b) ? b : null })(),
+          diameterWindow: paramToWin(str("fitd")),
+          widthWindow: paramToWin(str("fitw")),
+          offsetWindow: paramToWin(str("fito")),
+        }
+      : undefined
+
   return {
     filters: {
       brands: arr("brands"),
@@ -159,5 +178,6 @@ export function parseQueryFromSearchParams(
     page: Math.max(1, num("page") ?? 1),
     q: (Array.isArray(sp.q) ? sp.q[0] : sp.q) || undefined,
     ...(vehicleConstraint?.length ? { vehicleConstraint } : {}),
+    ...(vehicleFitment ? { vehicleFitment } : {}),
   }
 }

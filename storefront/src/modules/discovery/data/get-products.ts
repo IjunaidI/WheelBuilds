@@ -33,6 +33,8 @@ import { Finish } from "@modules/common/components/wheel"
 import { lit } from "./escape"
 import { unstable_cache } from "next/cache"
 import { discoveryCacheKey } from "./cache-key"
+import { sdk } from "@lib/config"
+import { productHasFittingVariant } from "@lib/fitment/product-has-fitting-variant"
 
 // Re-export so any existing imports from this file keep working.
 export { parseQueryFromSearchParams } from "./types"
@@ -120,6 +122,25 @@ function hitToProduct(h: Hit): DiscoveryProduct {
   }
 }
 
+/**
+ * Rebuild disjunctive-ish facet counts from an in-memory product list (used
+ * only in fit mode, where results are post-filtered client-side after the
+ * bolt-pattern search — Meili's own facetDistribution would still reflect the
+ * coarse, pre-fit-filter candidate set).
+ */
+function facetsFromProducts(products: DiscoveryProduct[]): FacetCounts {
+  const tally = (m: Record<string, number>, k: string) => { m[k] = (m[k] ?? 0) + 1 }
+  const brands: Record<string, number> = {}, diameters: Record<string, number> = {}
+  const boltPatterns: Record<string, number> = {}, finishes: Record<string, number> = {}
+  for (const p of products) {
+    if (p.brand) tally(brands, p.brand)
+    if (p.diameter) tally(diameters, String(p.diameter))
+    if (p.boltPattern) tally(boltPatterns, p.boltPattern)
+    for (const f of p.finishes ?? []) tally(finishes, f)
+  }
+  return { brands, diameters, boltPatterns, finishes }
+}
+
 function emptyResult(pageSize: number): DiscoveryResult {
   return {
     products: [],
@@ -139,6 +160,58 @@ async function fetchDiscoveryProducts(
 ): Promise<DiscoveryResult> {
   const pageSize = DEFAULT_PAGE_SIZE
   const offset = (query.page - 1) * pageSize
+
+  // FIT MODE: bolt-pattern-filtered candidates from Meili, then the REAL
+  // per-variant check (same as the PDP) so a multi-pattern wheel whose matching
+  // pattern is only offered in a non-fitting size is dropped. Bounded scan +
+  // in-memory pagination.
+  const vf = query.vehicleFitment
+  if (vf?.canonicalBoltPatterns?.length) {
+    const FIT_CANDIDATE_CAP = 200
+    const { results } = await meili.multiSearch({
+      queries: [
+        {
+          indexUid: PRODUCTS_INDEX,
+          q: query.q ?? "",
+          filter: buildFilters(query.filters, query).join(" AND "),
+          sort: sortExpr(query.sort),
+          limit: FIT_CANDIDATE_CAP,
+          offset: 0,
+        },
+      ],
+    })
+    const hits = (results[0] as MultiSearchResult<Hit>).hits
+    const ids = hits.map((h) => h.id)
+
+    // Fetch the candidates' real variants (metadata only — no price/region needed).
+    let variantsById: Record<string, { metadata?: Record<string, unknown> | null }[]> = {}
+    if (ids.length) {
+      try {
+        const { products } = await sdk.store.product.list(
+          { id: ids, limit: ids.length, fields: "id,variants.id,variants.metadata" } as any,
+          { next: { revalidate: 60 } } as any
+        )
+        for (const p of products as any[]) variantsById[p.id] = p.variants ?? []
+      } catch (e) {
+        console.error("[discovery] variant fetch for fit filter failed:", e)
+        variantsById = {} // degrade to coarse (bolt-pattern) results below
+      }
+    }
+
+    // If the fetch failed entirely, fall back to the coarse candidates (never empty a valid fit result).
+    const fetched = Object.keys(variantsById).length > 0
+    const fitting = hits
+      .map(hitToProduct)
+      .filter((p) => !fetched || productHasFittingVariant(variantsById[p.id], vf))
+
+    const start = (query.page - 1) * pageSize
+    return {
+      products: fitting.slice(start, start + pageSize),
+      totalCount: fitting.length,
+      pageSize,
+      facets: facetsFromProducts(fitting),
+    }
+  }
 
   // One hits query + one facet query per dimension (disjunctive), batched.
   const facetQueryByDim: Record<string, keyof DiscoveryFilters> = {

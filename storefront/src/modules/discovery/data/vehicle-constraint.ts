@@ -12,3 +12,12 @@ export function vehicleToConstraints(v: { canonicalBoltPatterns?: string[] }): s
 export const patternsToFitParam = (patterns: string[]): string => patterns.join(",")
 export const fitParamToPatterns = (raw: string): string[] =>
   raw.split(",").map((s) => s.trim()).filter(Boolean)
+
+type Win = { min: number; max: number } | null | undefined
+// Encode/decode a spec window for the URL. ":" separator so negative offsets survive.
+export const winToParam = (w?: Win): string => (w ? `${w.min}:${w.max}` : "")
+export const paramToWin = (s?: string | null): Win => {
+  if (!s) return undefined
+  const [a, b] = s.split(":").map(Number)
+  return Number.isFinite(a) && Number.isFinite(b) ? { min: a, max: b } : undefined
+}

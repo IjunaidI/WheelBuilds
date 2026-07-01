@@ -27,4 +27,18 @@ describe("discoveryCacheKey", () => {
   it("differs when the free-text query differs", () => {
     expect(discoveryCacheKey(base)).not.toBe(discoveryCacheKey({ ...base, q: "matte" }))
   })
+
+  it("differs when vehicleFitment differs", () => {
+    const withFitment: DiscoveryQuery = {
+      ...base,
+      vehicleFitment: {
+        canonicalBoltPatterns: ["5x114.3"],
+        hubBoreMm: 64.1,
+        diameterWindow: { min: 17, max: 19 },
+        widthWindow: { min: 7, max: 8.5 },
+        offsetWindow: { min: 35, max: 45 },
+      },
+    }
+    expect(discoveryCacheKey(base)).not.toBe(discoveryCacheKey(withFitment))
+  })
 })

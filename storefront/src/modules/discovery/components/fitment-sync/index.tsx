@@ -3,7 +3,7 @@
 import { useEffect } from "react"
 import { usePathname, useRouter, useSearchParams } from "next/navigation"
 import { useGarage } from "@lib/garage/use-garage"
-import { patternsToFitParam } from "@modules/discovery/data/vehicle-constraint"
+import { patternsToFitParam, winToParam } from "@modules/discovery/data/vehicle-constraint"
 
 export default function FitmentSync() {
   const { active } = useGarage()
@@ -32,10 +32,23 @@ export default function FitmentSync() {
     function replace(value: string | null) {
       const next = new URLSearchParams(Array.from(sp.entries()))
       if (value) next.set("fit", value); else next.delete("fit")
+      const setOrDel = (k: string, v: string) => { if (value && v) next.set(k, v); else next.delete(k) }
+      setOrDel("fitb", active?.hubBoreMm != null ? String(active.hubBoreMm) : "")
+      setOrDel("fitd", winToParam(active?.diameterWindow))
+      setOrDel("fitw", winToParam(active?.widthWindow))
+      setOrDel("fito", winToParam(active?.offsetWindow))
       next.delete("page") // reset pagination on filter change (mirrors useDiscoveryQuery)
       router.replace(`${pathname}?${next.toString()}`)
     }
-  }, [active?.id, active?.canonicalBoltPatterns?.join(","), sp, pathname, router])
+  }, [
+    active?.id,
+    active?.canonicalBoltPatterns?.join(","),
+    active?.hubBoreMm,
+    JSON.stringify([active?.diameterWindow, active?.widthWindow, active?.offsetWindow]),
+    sp,
+    pathname,
+    router,
+  ])
 
   return null
 }

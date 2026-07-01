@@ -23,5 +23,14 @@ export function discoveryCacheKey(query: DiscoveryQuery): string {
     vehicleConstraint: query.vehicleConstraint
       ? [...query.vehicleConstraint].sort().join("|")
       : "",
+    vf: query.vehicleFitment
+      ? JSON.stringify([
+          [...(query.vehicleFitment.canonicalBoltPatterns ?? [])].sort(),
+          query.vehicleFitment.hubBoreMm ?? null,
+          query.vehicleFitment.diameterWindow ?? null,
+          query.vehicleFitment.widthWindow ?? null,
+          query.vehicleFitment.offsetWindow ?? null,
+        ])
+      : "",
   })
 }

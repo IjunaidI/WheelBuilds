@@ -1,3 +1,4 @@
+import { Suspense } from "react"
 import { DiscoveryProduct } from "@modules/discovery/data/types"
 import { ProductDetail } from "../data/types"
 import Breadcrumb from "../components/breadcrumb"
@@ -27,7 +28,9 @@ const ProductDetailTemplate = ({
     <div className="mb-6 small:mb-8">
       <Breadcrumb brand={product.brand} name={product.name} />
     </div>
-    <Hero product={product} />
+    <Suspense fallback={<div className="min-h-[600px]" />}>
+      <Hero product={product} />
+    </Suspense>
     <Specs product={product} />
     <Fitment product={product} />
     <Related products={related} />

@@ -80,16 +80,18 @@ export function buildFitView(product: ProductDetail, vehicle: FitVehicle): FitVi
   // produces a ?fit= filter, so this is a safety net, not a reachable route.
   if (!(vehicle.canonicalBoltPatterns && vehicle.canonicalBoltPatterns.length)) return noFit
 
-  // Floor: only bolt-compatible variants (never other bolt patterns).
-  const compatible = trim(product.finishOptions, (s) => boltCompatible(s, vehicle))
-  if (compatible.length === 0) return noFit // wheel offers no matching bolt pattern
-
-  // Refine to the spec window WHEN it leaves options; if the window would empty
-  // the whole wheel (out-of-spec-but-bolt-compatible, or no window data at all),
-  // keep the bolt-compatible floor — we never widen back to other patterns and
-  // never fall through to the full catalog.
-  const inSpec = trim(compatible, (s) => withinWindows(s, vehicle))
-  const finishOptions = inSpec.length > 0 ? inSpec : compatible
+  // Keep ONLY the genuinely-fitting sizes: bolt-compatible AND within the
+  // vehicle's spec window on every dimension we have data for (a null window
+  // passes — it can't be checked). So with spec data this really narrows by
+  // diameter/width/offset; without it, it's bolt pattern + bore. Same predicate
+  // as fitsVehicle, so the chip/section/filtering agree. hasFit:false when
+  // nothing fits → the hero shows a "doesn't fit your car" state, never a silent
+  // fall-through to every option.
+  const finishOptions = trim(
+    product.finishOptions,
+    (s) => boltCompatible(s, vehicle) && withinWindows(s, vehicle)
+  )
+  if (finishOptions.length === 0) return noFit // nothing fits → hero shows a "doesn't fit" state
 
   const boltPatterns = Array.from(
     new Set(finishOptions.flatMap((f) => f.sizeOptions.map((s) => s.boltPattern)))

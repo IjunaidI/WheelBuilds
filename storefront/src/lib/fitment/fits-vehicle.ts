@@ -34,25 +34,21 @@ export function fitsVehicle(product: ProductLike, vehicle: VehicleLike): FitVerd
   const offsets = sizes.flatMap((s) => (s.offsetVariants?.length ? s.offsetVariants.map((o) => o.value) : [s.offsetMm]))
 
   // Size/offset windows come from wheel-size.com (null when no spec is on file).
-  // A "confirmed" fit must be VERIFIED against a real window — a shared bolt
-  // pattern (e.g. 5x114.3 is on countless cars and wheels) is not a fit on its
-  // own, which is why a random same-pattern wheel must NOT read as guaranteed.
-  const haveWindow = !!(vehicle.diameterWindow || vehicle.widthWindow || vehicle.offsetWindow)
+  // We verify against whatever windows exist; a null window can't be checked, so
+  // `inWin` passes it. So: with spec data, fit is verified on diameter/width/
+  // offset; without it, fit is bolt-pattern + bore only (we can't disprove size).
+  // This same verdict drives the PDP chip, the fitment section, AND the option
+  // filtering — so they can never disagree.
   const withinWindow =
     hardGatesPass &&
-    haveWindow &&
     inWin(sizes.map((s) => s.diameter), vehicle.diameterWindow) &&
     inWin(sizes.map((s) => s.width), vehicle.widthWindow) &&
     inWin(offsets, vehicle.offsetWindow)
 
-  if (hardGatesPass && haveWindow && !withinWindow)
+  if (hardGatesPass && !withinWindow)
     reasons.push("This wheel's size or offset is outside your vehicle's spec range.")
-  if (hardGatesPass && !haveWindow)
-    reasons.push("No fitment spec on file for your vehicle to confirm size.")
 
-  // A wheel fits only when it physically mounts (bolt pattern + bore) AND is
-  // offered in a diameter/width/offset inside the vehicle's verified window.
-  const fits = hardGatesPass && withinWindow
+  const fits = withinWindow
 
   return { fits, hardGatesPass, withinWindow, reasons }
 }

@@ -43,6 +43,10 @@ const Hero = ({ product }: HeroProps) => {
     [fitParam, active, product]
   )
   const fitActive = !!fitView?.hasFit
+  // Fit mode = arrived via "fits my car" with a vehicle set. fitActive = fit mode
+  // AND this wheel has a fitting variant. noFitInMode = fit mode but nothing fits.
+  const inFitMode = fitParam && !!active
+  const noFitInMode = inFitMode && !fitActive
 
   // In fit mode the picker shows only fitting options until the shopper opts into
   // "Show all" (which is gated by FitBanner's confirmation dialog).
@@ -183,12 +187,20 @@ const Hero = ({ product }: HeroProps) => {
             onOnlyFit={() => setShowAll(false)}
           />
         )}
+        {noFitInMode && active && (
+          <div
+            className="rounded-[var(--radius)] border px-4 py-3 text-[13px] font-semibold"
+            style={{ borderColor: "rgba(184,11,11,0.35)", background: "rgba(184,11,11,0.06)", color: "var(--ink)" }}
+          >
+            This wheel doesn&apos;t fit your {active.year} {active.make} {active.model} — no matching
+            size or bolt pattern. Everything below is shown for reference only.
+          </div>
+        )}
         <PurchasePanel
           product={product}
           selectedSize={selectedSize}
           unitPriceCents={unitPriceCents}
           selectedVariant={currentOffset}
-          fitConfirmed={useFilter}
         />
         <VariantPicker
           sizes={visibleSizes}

@@ -48,16 +48,15 @@ describe("buildFitView", () => {
     expect(fv.finishOptions[0].sizeOptions.map((s) => `${s.diameter}x${s.width}`)).toEqual(["17x7.5", "19x8"])
   })
 
-  it("out-of-spec but bolt-compatible: keeps the bolt-compatible sizes rather than falling through to everything", () => {
-    // Vehicle has a diameter window that excludes EVERY size the wheel offers.
+  it("spec windows present but NO size fits: hasFit false so the hero shows a doesn't-fit state", () => {
+    // Vehicle's diameter window (24-26) excludes EVERY size the wheel offers.
     const product = productOf(["5x114.3"], [
       finish("Black", [size(18, 8, "5x114.3", 40), size(22, 10, "5x114.3", 15)]),
     ])
     const vehicle = { canonicalBoltPatterns: ["5x114.3"], hubBoreMm: 60.1, diameterWindow: { min: 24, max: 26 } }
     const fv = buildFitView(product, vehicle)
-    expect(fv.hasFit).toBe(true) // never "show everything" — bolt-compatible is the floor
-    expect(fv.finishOptions[0].sizeOptions.map((s) => `${s.diameter}x${s.width}`)).toEqual(["18x8", "22x10"])
-    expect(fv.boltPatterns).toEqual(["5x114.3"])
+    expect(fv.hasFit).toBe(false)
+    expect(fv.finishOptions).toBe(product.finishOptions) // identity → hero shows all + a "doesn't fit" banner
   })
 
   it("falls back to the full set only when the vehicle has NO bolt-pattern data", () => {

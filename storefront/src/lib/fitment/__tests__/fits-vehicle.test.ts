@@ -32,11 +32,12 @@ describe("fitsVehicle", () => {
     expect(r.fits).toBe(false)
     expect(r.reasons.join(" ")).toMatch(/size or offset/i)
   })
-  it("does not claim a confirmed fit when the vehicle has no spec windows", () => {
-    // Bolt pattern + bore pass, but there is no wheel-size window to verify size.
+  it("fits on bolt pattern + bore when the vehicle has no spec windows (size can't be disproved)", () => {
+    // No wheel-size ranges on file → we verify what we can (bolt pattern + bore).
+    // A null window can't exclude a size, so a bolt-compatible wheel reads as fitting.
     const r = fitsVehicle(product, { canonicalBoltPatterns: ["5x114.3"], hubBoreMm: 64.1 })
     expect(r.hardGatesPass).toBe(true)
-    expect(r.fits).toBe(false)
-    expect(r.reasons.join(" ")).toMatch(/no fitment spec/i)
+    expect(r.withinWindow).toBe(true)
+    expect(r.fits).toBe(true)
   })
 })

@@ -1,6 +1,6 @@
 # Design — Fitment-aware PDP
 
-> Status: in-progress · Date: 2026-07-01 · Area: storefront/product-detail + storefront/discovery
+> Status: done (merged to `main` 2026-07-01) · Date: 2026-07-01 · Area: storefront/product-detail + storefront/discovery
 > Storefront-only. No backend, API, or migration changes.
 
 ## Problem

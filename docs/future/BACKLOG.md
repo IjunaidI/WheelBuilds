@@ -620,6 +620,18 @@
 
 ---
 
+### WB-060 · Fitment-aware PDP — filter variants + colors to the active vehicle   [MEDIUM]
+- status: done
+- area: storefront/product-detail + storefront/discovery
+- evidence: storefront/src/modules/product-detail/data/fit-view.ts (`buildFitView`) ; storefront/src/modules/product-detail/components/hero/index.tsx + hero/fit-banner.tsx ; storefront/src/modules/discovery/components/grid/product-card.tsx (`?fit=1`)
+- problem: arriving via the "fits my car" flow, the PDP defaulted to the first bolt pattern / size / finish — which, because the discovery fit filter narrows by bolt pattern ONLY, could be a variant that does NOT fit the vehicle. A shopper could buy wheels that don't fit even though they came through fitment.
+- fix: carry a `?fit=1` flag from fit-mode discovery results to the PDP; when set with an active vehicle that has wheel-size windows, filter the hero's bolt/size/offset/color options to fitting variants + default to a fitting one, with a warned "Show all" escape. Full-catalog visitors unchanged.
+- verify: from the fitment results, a wheel's PDP shows only fitting sizes/colors + defaults to a fitting variant; "Show all" prompts a confirmation before revealing non-fitting options; a full-catalog visit shows everything as before.
+- done: 2026-07-01 — pure `buildFitView(product, vehicle)` computes the fitting bolt-pattern/size/finish subsets from the vehicle's wheel-size windows (reuses the `fits-vehicle` gate; `hasFit:false` → show everything when no windows or nothing fits). The shared discovery card appends `?fit=1` in fit mode only (its other uses — PDP related, home rail — default off). The hero reads `?fit=1` + `useGarage().active`, filters the pickers + re-snaps the selection to a fitting variant, and a `FitBanner` offers a "Show all" escape gated by a shadcn Dialog confirmation (per-visit ack); the hero is wrapped in `<Suspense>` (it now uses `useSearchParams`). Storefront-only, no backend/migration. Subagent-driven (3 tasks + per-task reviews + opus final "ready to merge"). storefront 117 tests. Builds on the same-day `fitsVehicle` hardening (a shared bolt pattern alone no longer reads as "CONFIRMED FIT").
+- refs: design [docs/done/specs/2026-07-01-fitment-aware-pdp-design.md](../done/specs/2026-07-01-fitment-aware-pdp-design.md) ; plan [docs/done/plans/2026-07-01-fitment-aware-pdp.md](../done/plans/2026-07-01-fitment-aware-pdp.md)
+
+---
+
 ### WB-057 · Newsletter hardening (unsubscribe + rate-limit + double-opt-in)   [LOW]
 - status: todo
 - area: backend/newsletter + storefront/home

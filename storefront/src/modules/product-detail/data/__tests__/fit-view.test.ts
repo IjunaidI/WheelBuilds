@@ -8,54 +8,69 @@ const size = (
   bore: number | null = 64.1, avail: SizeOption["availability"] = "in_stock"
 ): SizeOption => ({
   diameter, width, offsetMm, oemOffsetMm: offsetMm, boltPattern, weightLb: 25, availability: avail,
-  offsetVariants: [{ value: offsetMm, backspaceIn: "", variantId: `v-${diameter}x${width}-${offsetMm}`,
+  offsetVariants: [{ value: offsetMm, backspaceIn: "", variantId: `v-${diameter}x${width}-${boltPattern}-${offsetMm}`,
     availability: avail, centerBoreMm: bore, loadRatingLb: null }],
 })
 
 const finish = (raw: string, sizes: SizeOption[]): FinishOption =>
   ({ raw, normalized: "black", imageUrl: null, sizeOptions: sizes })
 
-// A product offered in Matte Black (18x8 fits, 22x10 does not) and Chrome (only 22x10, does not fit).
-const product = {
-  boltPatternOptions: ["5x114.3"],
-  finishOptions: [
-    finish("Matte Black", [size(18, 8, "5x114.3", 40), size(22, 10, "5x114.3", 15)]),
-    finish("Chrome", [size(22, 10, "5x114.3", 15)]),
-  ],
-} as unknown as ProductDetail
-
-// Corolla-ish window: 17–19 in, 6.5–8.5 in, ET 35–50.
-const vehicle = { canonicalBoltPatterns: ["5x114.3"], hubBoreMm: 60.1,
-  diameterWindow: { min: 17, max: 19 }, widthWindow: { min: 6.5, max: 8.5 }, offsetWindow: { min: 35, max: 50 } }
+const productOf = (boltPatternOptions: string[], finishOptions: FinishOption[]) =>
+  ({ boltPatternOptions, finishOptions } as unknown as ProductDetail)
 
 describe("buildFitView", () => {
-  it("keeps only fitting sizes and drops finishes with no fitting size", () => {
+  it("with spec windows: trims to in-window sizes and drops a finish with only out-of-window sizes", () => {
+    // Matte Black offers a fitting 18x8 + an out-of-window 22x10; Chrome only 22x10.
+    const product = productOf(["5x114.3"], [
+      finish("Matte Black", [size(18, 8, "5x114.3", 40), size(22, 10, "5x114.3", 15)]),
+      finish("Chrome", [size(22, 10, "5x114.3", 15)]),
+    ])
+    const vehicle = { canonicalBoltPatterns: ["5x114.3"], hubBoreMm: 60.1,
+      diameterWindow: { min: 17, max: 19 }, widthWindow: { min: 6.5, max: 8.5 }, offsetWindow: { min: 35, max: 50 } }
     const fv = buildFitView(product, vehicle)
     expect(fv.hasFit).toBe(true)
-    // Chrome (only 22x10, out of window) is dropped; Matte Black keeps only 18x8.
-    expect(fv.finishOptions.map((f) => f.raw)).toEqual(["Matte Black"])
+    expect(fv.finishOptions.map((f) => f.raw)).toEqual(["Matte Black"]) // Chrome (all out-of-window) dropped
     expect(fv.finishOptions[0].sizeOptions.map((s) => `${s.diameter}x${s.width}`)).toEqual(["18x8"])
     expect(fv.boltPatterns).toEqual(["5x114.3"])
   })
-  it("the effective default (first finish's default size) is a genuine fit", () => {
+
+  it("no spec windows: filters to the vehicle's bolt pattern only, keeping all its sizes (the reported-bug case)", () => {
+    // petrol-p5a-style multi-pattern wheel; vehicle is 5x100 with NO wheel-size windows.
+    const product = productOf(["5x100", "5x114.3"], [
+      finish("Gloss Black", [
+        size(17, 7.5, "5x100", 35), size(19, 8, "5x100", 40), size(20, 9, "5x114.3", 20),
+      ]),
+    ])
+    const vehicle = { canonicalBoltPatterns: ["5x100"], hubBoreMm: 57.1 } // no windows
     const fv = buildFitView(product, vehicle)
-    const s = fv.finishOptions[0].sizeOptions[0]
-    expect(s.diameter).toBe(18)
-    expect(s.width).toBe(8)
+    expect(fv.hasFit).toBe(true)
+    expect(fv.boltPatterns).toEqual(["5x100"]) // the 5x114.3 pattern is hidden
+    expect(fv.finishOptions[0].sizeOptions.map((s) => `${s.diameter}x${s.width}`)).toEqual(["17x7.5", "19x8"])
   })
-  it("hasFit is false when no variant fits (bolt matches but size is out of window)", () => {
-    const outOfWindow = { ...vehicle, diameterWindow: { min: 20, max: 24 } }
-    const fv = buildFitView(product, outOfWindow)
-    expect(fv.hasFit).toBe(false)
-    expect(fv.finishOptions).toBe(product.finishOptions) // falls back to the full set
+
+  it("out-of-spec but bolt-compatible: keeps the bolt-compatible sizes rather than falling through to everything", () => {
+    // Vehicle has a diameter window that excludes EVERY size the wheel offers.
+    const product = productOf(["5x114.3"], [
+      finish("Black", [size(18, 8, "5x114.3", 40), size(22, 10, "5x114.3", 15)]),
+    ])
+    const vehicle = { canonicalBoltPatterns: ["5x114.3"], hubBoreMm: 60.1, diameterWindow: { min: 24, max: 26 } }
+    const fv = buildFitView(product, vehicle)
+    expect(fv.hasFit).toBe(true) // never "show everything" — bolt-compatible is the floor
+    expect(fv.finishOptions[0].sizeOptions.map((s) => `${s.diameter}x${s.width}`)).toEqual(["18x8", "22x10"])
+    expect(fv.boltPatterns).toEqual(["5x114.3"])
   })
-  it("hasFit is false when the vehicle has no spec windows", () => {
-    const fv = buildFitView(product, { canonicalBoltPatterns: ["5x114.3"], hubBoreMm: 60.1 })
+
+  it("falls back to the full set only when the vehicle has NO bolt-pattern data", () => {
+    const product = productOf(["5x114.3"], [finish("Black", [size(18, 8, "5x114.3", 40)])])
+    const fv = buildFitView(product, { hubBoreMm: 64.1 } as any) // no canonicalBoltPatterns
     expect(fv.hasFit).toBe(false)
+    expect(fv.finishOptions).toBe(product.finishOptions) // identity → caller shows everything
   })
-  it("excludes a size whose bore is smaller than the hub", () => {
-    const tightHub = { ...vehicle, hubBoreMm: 70 } // 18x8 bore 64.1 < 70 → excluded
-    const fv = buildFitView(product, tightHub)
-    expect(fv.hasFit).toBe(false)
+
+  it("excludes a size whose bore is smaller than the hub (no matching-pattern variant left → falls back)", () => {
+    const product = productOf(["5x114.3"], [finish("Black", [size(18, 8, "5x114.3", 40, 60)])]) // bore 60
+    const vehicle = { canonicalBoltPatterns: ["5x114.3"], hubBoreMm: 70 } // hub 70 > bore 60
+    const fv = buildFitView(product, vehicle)
+    expect(fv.hasFit).toBe(false) // the only size doesn't clear the hub → nothing bolt-compatible
   })
 })

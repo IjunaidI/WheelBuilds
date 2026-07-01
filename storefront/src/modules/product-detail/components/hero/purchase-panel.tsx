@@ -26,6 +26,13 @@ type PurchasePanelProps = {
   unitPriceCents: number
   /** The exact Medusa variant resolved from size × offset; null if unresolved. */
   selectedVariant: OffsetVariant | null
+  /**
+   * True when the hero is in "fits my car" mode and actively filtered to fitting
+   * options — everything shown is bolt-compatible with the active vehicle, so
+   * the chip reads positively regardless of the stricter `fitsVehicle` window
+   * check (which needs wheel-size spec data we don't always have).
+   */
+  fitConfirmed?: boolean
 }
 
 const formatUsd = (cents: number) =>
@@ -36,6 +43,7 @@ const PurchasePanel = ({
   selectedSize,
   unitPriceCents,
   selectedVariant,
+  fitConfirmed = false,
 }: PurchasePanelProps) => {
   const { active } = useGarage()
   const fits = active ? fitsVehicle(product, active).fits : false
@@ -133,10 +141,16 @@ const PurchasePanel = ({
         {product.description}
       </p>
 
-      {/* Fitment chip — real fitsVehicle verdict, never a blanket "confirmed". */}
+      {/* Fitment chip. In fit mode everything shown is bolt-compatible → positive.
+          Outside fit mode, the strict fitsVehicle verdict (never a blanket "confirmed"). */}
       <div className="mt-5">
         {active ? (
-          fits ? (
+          fitConfirmed ? (
+            <Chip variant="accent" dot>
+              FITS YOUR {active.year} {active.make.toUpperCase()}{" "}
+              {active.model.toUpperCase()}
+            </Chip>
+          ) : fits ? (
             <Chip variant="accent" dot>
               CONFIRMED FIT · {active.year} {active.make.toUpperCase()}{" "}
               {active.model.toUpperCase()}

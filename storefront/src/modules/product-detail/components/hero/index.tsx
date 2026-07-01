@@ -188,6 +188,7 @@ const Hero = ({ product }: HeroProps) => {
           selectedSize={selectedSize}
           unitPriceCents={unitPriceCents}
           selectedVariant={currentOffset}
+          fitConfirmed={useFilter}
         />
         <VariantPicker
           sizes={visibleSizes}

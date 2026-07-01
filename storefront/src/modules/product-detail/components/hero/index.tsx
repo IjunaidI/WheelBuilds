@@ -9,6 +9,10 @@ import PurchasePanel from "./purchase-panel"
 import AutoFitmentCard from "./auto-fitment-card"
 import AdvancedFitmentPanel from "./advanced-fitment-panel"
 import SpecSelector from "./spec-selector"
+import { useSearchParams } from "next/navigation"
+import { useGarage } from "@lib/garage/use-garage"
+import { buildFitView } from "../../data/fit-view"
+import FitBanner from "./fit-banner"
 
 type HeroProps = {
   product: ProductDetail
@@ -30,7 +34,22 @@ type HeroProps = {
  *   mobile: stacked — Gallery first, then purchase+picker
  */
 const Hero = ({ product }: HeroProps) => {
-  const finishOptions = product.finishOptions
+  const searchParams = useSearchParams()
+  const { active } = useGarage()
+  const fitParam = searchParams.get("fit") === "1"
+
+  const fitView = useMemo(
+    () => (fitParam && active ? buildFitView(product, active) : null),
+    [fitParam, active, product]
+  )
+  const fitActive = !!fitView?.hasFit
+
+  // In fit mode the picker shows only fitting options until the shopper opts into
+  // "Show all" (which is gated by FitBanner's confirmation dialog).
+  const [showAll, setShowAll] = useState(false)
+  const useFilter = fitActive && !showAll
+
+  const finishOptions = useFilter ? fitView!.finishOptions : product.finishOptions
   const [activeFinishRaw, setActiveFinishRaw] = useState<string>(
     finishOptions[0]?.raw ?? "—"
   )
@@ -40,9 +59,29 @@ const Hero = ({ product }: HeroProps) => {
   )
   const finishSizeOptions = activeFinish?.sizeOptions ?? product.sizeOptions
 
+  const boltPatternOptions = useFilter ? fitView!.boltPatterns : product.boltPatternOptions
+
   const [selectedBoltPattern, setSelectedBoltPattern] = useState<string>(
-    product.boltPatternOptions[0] ?? product.boltPattern
+    boltPatternOptions[0] ?? product.boltPattern
   )
+
+  // Re-snap the finish when the visible finish set changes (fit mode toggling on
+  // after the garage hydrates, or "Show all" flipping) so the selected finish is
+  // always one that's actually shown — and a fitting one when filtering.
+  useEffect(() => {
+    if (!finishOptions.some((f) => f.raw === activeFinishRaw)) {
+      setActiveFinishRaw(finishOptions[0]?.raw ?? "—")
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [finishOptions])
+
+  // Re-snap the bolt pattern the same way.
+  useEffect(() => {
+    if (boltPatternOptions.length && !boltPatternOptions.includes(selectedBoltPattern)) {
+      setSelectedBoltPattern(boltPatternOptions[0])
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [boltPatternOptions])
 
   // Bolt pattern gates the grid: only the selected pattern's sizes are shown.
   const visibleSizes = useMemo<SizeOption[]>(
@@ -136,6 +175,14 @@ const Hero = ({ product }: HeroProps) => {
         onFinishChange={setActiveFinishRaw}
       />
       <div className="flex flex-col gap-8">
+        {fitActive && active && (
+          <FitBanner
+            filtered={useFilter}
+            vehicleLabel={`${active.year} ${active.make} ${active.model}`}
+            onShowAll={() => setShowAll(true)}
+            onOnlyFit={() => setShowAll(false)}
+          />
+        )}
         <PurchasePanel
           product={product}
           selectedSize={selectedSize}
@@ -146,7 +193,7 @@ const Hero = ({ product }: HeroProps) => {
           sizes={visibleSizes}
           selectedSize={selectedSize}
           onSizeChange={setSelectedSize}
-          boltPatterns={product.boltPatternOptions}
+          boltPatterns={boltPatternOptions}
           selectedBoltPattern={selectedBoltPattern}
           onBoltPatternChange={setSelectedBoltPattern}
         />

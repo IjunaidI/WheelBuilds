@@ -81,6 +81,8 @@ export type FitmentEntry = {
 }
 
 export type ProductDetail = DiscoveryProduct & {
+  kind: "wheel"
+
   /** Marketing description, plain text. Rendered in the purchase panel. */
   description: string
 
@@ -132,3 +134,25 @@ export const FINISH_SWATCH: Record<Finish, string> = {
   bronze: "#9C6A3F",
   silver: "#C8C8CB",
 }
+
+import type { TireSizeOption } from "./tire/tire-size-options"
+import type { TireSpecs } from "./tire/tire-spec-rows"
+import type { TireType } from "./tire/classify-tire-type"
+export type { TireSizeOption, TireSpecs, TireType }
+
+export type TireProductDetail = {
+  kind: "tire"
+  id: string
+  handle: string
+  brand: string
+  name: string
+  description: string
+  thumbnail: string | null
+  priceCents: number
+  tireType: TireType
+  rimDiameters: number[]
+  sizeOptions: TireSizeOption[]
+  specs: TireSpecs
+}
+
+export type AnyProductDetail = ProductDetail | TireProductDetail

@@ -14,6 +14,9 @@ const intEnv = (v: string | undefined, fallback: number): number => {
 /** Default quantity selected on the PDP — wheels sell in sets of 4. */
 export const DEFAULT_WHEEL_QTY = intEnv(process.env.NEXT_PUBLIC_PDP_DEFAULT_QTY, 4)
 
+/** Default quantity selected on a tire PDP (a set of 4; env-overridable). */
+export const DEFAULT_TIRE_QTY = intEnv(process.env.NEXT_PUBLIC_PDP_TIRE_DEFAULT_QTY, 4)
+
 /** On-hand count at or below which a size shows "low stock". */
 export const LOW_STOCK_THRESHOLD = intEnv(process.env.NEXT_PUBLIC_PDP_LOW_STOCK_THRESHOLD, 4)
 

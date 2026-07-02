@@ -18,9 +18,13 @@ import { getFitmentByProduct } from "@lib/data/fitment"
 import { canonicalBoltPatterns } from "@lib/fitment/canonical-bolt-pattern"
 import { normalizeFinish } from "@lib/fitment/normalize-finish"
 import { DiscoveryProduct } from "@modules/discovery/data/types"
-import { ProductDetail } from "./types"
+import { AnyProductDetail, ProductDetail } from "./types"
 import { num, groupVariantsIntoSizes, isRealBoltPattern } from "./group-sizes"
 import { buildFinishOptions } from "./finish-options"
+import { mapTireDetail } from "./tire/map-tire-detail"
+import { getTireDiscoveryProducts } from "@modules/tire-discovery/data/get-tire-products"
+import { EMPTY_TIRE_FILTERS } from "@modules/tire-discovery/data/types"
+import type { TireDiscoveryProduct } from "@modules/tire-discovery/data/types"
 
 const DEFAULT_COUNTRY = process.env.NEXT_PUBLIC_DEFAULT_REGION || "us"
 
@@ -53,6 +57,8 @@ function mapToDetail(product: HttpTypes.StoreProduct): ProductDetail {
   const finishOptionsList = buildFinishOptions(variants, weightLb)
 
   return {
+    kind: "wheel",
+
     // DiscoveryProduct base
     id: product.id!,
     handle: product.handle!,
@@ -90,17 +96,36 @@ function mapToDetail(product: HttpTypes.StoreProduct): ProductDetail {
   }
 }
 
-export async function getProductDetail(handle: string): Promise<ProductDetail> {
+export async function getProductDetail(handle: string): Promise<AnyProductDetail> {
   const region = await getRegion(DEFAULT_COUNTRY)
   if (!region) notFound()
   const product = await getProductByHandle(handle, region.id)
   if (!product) notFound()
+
+  if ((product.metadata as any)?.product_type === "tire") {
+    return mapTireDetail(product)
+  }
+
   const detail = mapToDetail(product)
   const fitment = await getFitmentByProduct(
     detail.boltPatternsCanonical,
     detail.specs.centerBoreMm || undefined
   )
   return { ...detail, fitment }
+}
+
+/** Related tires by brand, via the SP2 Meili discovery path (throw-safe). */
+export async function getRelatedTireProducts(
+  brand: string,
+  excludeHandle: string
+): Promise<TireDiscoveryProduct[]> {
+  if (!brand) return []
+  const result = await getTireDiscoveryProducts({
+    filters: { ...EMPTY_TIRE_FILTERS, brands: [brand] },
+    sort: "relevance",
+    page: 1,
+  })
+  return result.products.filter((p) => p.handle !== excludeHandle).slice(0, 4)
 }
 
 export async function getRelatedProducts(

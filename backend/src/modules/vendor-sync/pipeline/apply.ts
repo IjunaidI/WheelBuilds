@@ -15,6 +15,7 @@ import {
 import {
   NormalizedRecord,
   WheelNormalizedRecord,
+  TireNormalizedRecord,
 } from "../adapters/types"
 import {
   ChangedGroup,
@@ -48,6 +49,14 @@ import {
   pickGroupRepresentative,
   slugify,
 } from "./wheel-grouping"
+import {
+  buildTireGroupHandle,
+  buildTireGroupTitle,
+  buildTireProductOptions,
+  buildTireVariantOptions,
+  dedupeTireExactDuplicates,
+  findTireExactDuplicates,
+} from "./tire-grouping"
 import VendorSyncService from "../service"
 import { indexVariantsBySku, partitionRecordsBySku } from "./adopt"
 
@@ -255,8 +264,12 @@ async function applyNewGroup(
   // (createProductsWorkflow succeeded) but never persisted vendor_product_current
   // rows, so the re-diff still classifies this group as "new". Adopt the existing
   // product by external_id instead of creating a duplicate.
-  const externalId =
-    first.productType === "wheel" ? group.group_key : first.partNumber
+  // Grouped products (wheels always; tires when a model was extracted) adopt by
+  // group_key. Per-SKU fallback groups (group_key starts with "sku:") keep the
+  // part number as their external id.
+  const externalId = group.group_key.startsWith("sku:")
+    ? first.partNumber
+    : group.group_key
   const existing = await findProductByExternalId(ctx, externalId)
   if (existing) {
     ctx.logger.warn(
@@ -348,58 +361,77 @@ async function applyNewTireGroup(
   group: NewGroup,
   records: NormalizedRecord[]
 ): Promise<{ variantCount: number }> {
-  // Tires still go through the one-product-one-variant path until a
-  // tire grouping rule is defined. Each tire "group" has exactly one
-  // part_number (sku: fallback).
-  if (records.length !== 1) {
-    throw new Error(
-      `tire group ${group.group_key} has ${records.length} records; expected 1`
+  const tires = records as TireNormalizedRecord[]
+
+  // Collapse exact-duplicate size labels (in-stock-first), then guard.
+  const { survivors, dropped } = dedupeTireExactDuplicates(tires)
+  for (const d of dropped) {
+    ctx.logger.warn(
+      `[vendor-sync] [${ctx.runId}] deduped exact duplicate tire size, dropped ${d.partNumber} (group ${group.group_key})`
     )
   }
-  const r = records[0]
-  const brandCollectionId = await getBrandCollectionId(ctx, r.brand)
+  const residual = findTireExactDuplicates(survivors)
+  if (residual.length > 0) {
+    throw new Error(
+      `unexpected residual tire size collision after dedupe in group ${group.group_key}: ${residual[0]
+        .map((r) => r.partNumber)
+        .join(", ")}`
+    )
+  }
+
+  const rep = pickGroupRepresentative(
+    survivors as any
+  ) as unknown as TireNormalizedRecord
+  const brandCollectionId = await getBrandCollectionId(ctx, rep.brand)
   const categoryId = ctx.categories.tiresCategoryId
+  const productOptions = buildTireProductOptions(survivors)
+
+  const imageUrls = Array.from(
+    new Set(survivors.map((r) => r.imageUrl).filter((u): u is string => !!u))
+  )
+
+  const variants = survivors.map((r) => ({
+    title: tireSizeLabelForVariantTitle(r),
+    sku: r.partNumber,
+    options: buildTireVariantOptions(r),
+    manage_inventory: true,
+    allow_backorder: false,
+    metadata: buildVariantMetadata(r),
+    prices: [{ amount: r.msrpUsd, currency_code: "usd" }],
+  }))
 
   const { result } = await createProductsWorkflow(ctx.container).run({
     input: {
       products: [
         {
-          title: r.title,
-          handle: slugify(r.partNumber),
+          title: buildTireGroupTitle(rep),
+          handle: buildTireGroupHandle(rep),
           status: ProductStatus.PUBLISHED,
-          thumbnail: r.imageUrl ?? undefined,
-          images: r.imageUrl ? [{ url: r.imageUrl }] : [],
+          thumbnail: rep.imageUrl ?? undefined,
+          images: imageUrls.map((url) => ({ url })),
           collection_id: brandCollectionId,
           category_ids: [categoryId],
           sales_channels: [{ id: ctx.salesChannelId }],
           shipping_profile_id: ctx.shippingProfileId,
-          external_id: r.partNumber,
-          metadata: buildProductMetadata(r),
-          options: [{ title: "Default", values: ["Default"] }],
-          variants: [
-            {
-              title: "Default",
-              sku: r.partNumber,
-              options: { Default: "Default" },
-              manage_inventory: true,
-              allow_backorder: false,
-              metadata: buildVariantMetadata(r),
-              prices: [
-                {
-                  amount: r.msrpUsd,
-                  currency_code: "usd",
-                },
-              ],
-            },
-          ],
+          external_id: group.group_key.startsWith("sku:")
+            ? rep.partNumber
+            : group.group_key,
+          metadata: buildProductMetadata(rep),
+          options: productOptions,
+          variants,
         },
       ],
     },
   })
 
   const createdProduct = result[0]
-  await persistGroupAfterCreate(ctx, group, records, createdProduct)
-  return { variantCount: 1 }
+  await persistGroupAfterCreate(ctx, group, survivors, createdProduct)
+  return { variantCount: survivors.length }
+}
+
+// Variant display title: the size label is already unique + human-readable.
+function tireSizeLabelForVariantTitle(r: TireNormalizedRecord): string {
+  return buildTireVariantOptions(r).Size
 }
 
 // ---------------------------------------------------------------------------

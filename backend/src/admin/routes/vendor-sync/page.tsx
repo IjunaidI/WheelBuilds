@@ -23,19 +23,26 @@ const ACTION_LABEL: Record<RunAction, string> = {
 const runAction = (a: RunAction, id: string) =>
   a === "approve" ? approveRun(id) : a === "cancel" ? cancelRun(id) : replayRun(id)
 
+// Sentinel for the "All statuses" option. @medusajs/ui's Select (Radix) throws
+// if a Select.Item value is the empty string, so we can't use "" for "no filter".
+const ALL_STATUS = "__all__"
+
 type Confirm = { title: string; description: string; run: () => Promise<void> } | null
 
 const VendorSyncPage = () => {
   const [runs, setRuns] = useState<VendorRun[]>([])
   const [loading, setLoading] = useState(true)
-  const [statusFilter, setStatusFilter] = useState<string>("")
+  const [statusFilter, setStatusFilter] = useState<string>(ALL_STATUS)
   const [triggerVendor, setTriggerVendor] = useState<string>(VENDOR_CODES[0])
   const [detail, setDetail] = useState<VendorRun | null>(null)
   const [confirm, setConfirm] = useState<Confirm>(null)
 
   const load = useCallback(async () => {
     try {
-      const { runs } = await listRuns({ status: statusFilter || undefined, limit: 25 })
+      const { runs } = await listRuns({
+        status: statusFilter === ALL_STATUS ? undefined : statusFilter,
+        limit: 25,
+      })
       setRuns(runs)
     } catch (e: any) {
       toast.error(e?.message ?? "Failed to load runs")
@@ -108,7 +115,7 @@ const VendorSyncPage = () => {
         <Select value={statusFilter} onValueChange={setStatusFilter}>
           <Select.Trigger className="w-[200px]"><Select.Value placeholder="All" /></Select.Trigger>
           <Select.Content>
-            <Select.Item value="">All</Select.Item>
+            <Select.Item value={ALL_STATUS}>All</Select.Item>
             {["awaiting_approval", "applying", "completed", "failed", "partially_failed", "cancelled", "exhausted"].map((s) => (
               <Select.Item key={s} value={s}>{s}</Select.Item>
             ))}

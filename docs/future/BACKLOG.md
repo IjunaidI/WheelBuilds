@@ -38,7 +38,7 @@
 - **G3 · PDP correctness & polish** `[S–M]` — ✅ **DONE 2026-06-25** (WB-048 BLANK gate, WB-029 placeholders, WB-030 finish-normalizer twin).
 - **G4 · Home & merchandising** `[M]` — ✅ **DONE 2026-06-26** (WB-004 Featured Blocks real curated products + Build Gallery → catalog-wall, WB-023 newsletter persistence, WB-028 merchandising copy → config + live brand count). Follow-up: WB-057 (newsletter hardening — unsubscribe/rate-limit/double-opt-in).
 - **G5 · Discovery & search** `[S]` — ✅ **DONE 2026-06-28** (WB-021 Meili result cache via `unstable_cache`, WB-046 dead category facet removed). (browse `maxTotalHits` cap WB-053 ✅ done 2026-06-26 via G2.)
-- **G6 · Catalog breadth & pricing** `[L–XL · WB-005 is a big spec alone]` — **← NEXT STEP (2026-07-01): wheel work is complete, so tires is unblocked and up next.** Tires grouping+indexing (WB-005 — define a grouping rule + a `buildSearchDocument` tire branch so tires become grouped, discoverable products), then markup/MAP/margin pricing, de-hardcode bootstrap identity + vendor roster. Start WB-005 with its own brainstorm → spec → plan. → WB-005, WB-024, WB-025, WB-026
+- **G6 · Catalog breadth & pricing** `[L–XL · WB-005 is a big spec alone]` — **IN PROGRESS (2026-07-02): WB-005 tires decomposed into 3 sub-projects; SP1 (backend grouping + indexing) DONE on `feat/tire-store-backend`** — tires group by Brand+model with the canonical size as the variant axis, indexed as `product_type = "tire"` with facets. Remaining: SP2 (tire discovery `/tires` route) + SP3 (tire PDP) + prod cutover; then markup/MAP/margin pricing, de-hardcode bootstrap identity + vendor roster. → WB-005, WB-024, WB-025, WB-026
 - **G7 · Account & garage** `[S–M]` — ✅ **DONE 2026-06-26** (WB-032 account Garage tab/route + GarageManager, WB-022 atomic guest→login merge w/ stable idempotent client_ids, WB-045 removed license-plate stub). Follow-up: WB-058 (real plate→YMM provider).
 - **G8 · Admin & ops tooling** `[S]` — admin UI + ops slice ✅ **DONE 2026-06-28** (WB-006 vendor-sync admin console, WB-044 rename `teraflex` fixtures, WB-052 scale-safe dev-wipe). Remaining: WB-031 (seed shipping options + reply-to — general commerce, not wheel; deferred). → WB-031
 
@@ -101,13 +101,13 @@
 - refs: design [docs/done/specs/2026-06-26-home-merchandising-real-content-design.md](../done/specs/2026-06-26-home-merchandising-real-content-design.md) ; plan [docs/done/plans/2026-06-26-home-merchandising-real-content.md](../done/plans/2026-06-26-home-merchandising-real-content.md)
 
 ### WB-005 · Tires never grouped + never indexed in Meili   [HIGH]
-- status: todo
-- area: backend/vendor-sync + backend/search
-- evidence: backend/src/modules/vendor-sync/adapters/wheelpros-tires/normalize.ts:56 ; backend/src/modules/vendor-sync/pipeline/apply.ts:314-326 ; backend/src/modules/vendor-sync/search/build-search-document.ts:36
+- status: in-progress
+- area: backend/vendor-sync + backend/search + storefront/discovery + storefront/pdp
+- evidence: backend/src/modules/vendor-sync/adapters/wheelpros-tires/{model-key,group-key}.ts ; backend/src/modules/vendor-sync/pipeline/{tire-facets,tire-grouping}.ts ; backend/src/modules/vendor-sync/pipeline/apply.ts (applyNewTireGroup + changed-group tire add) ; backend/src/modules/vendor-sync/search/build-search-document.ts (buildTireDocument) ; backend/medusa-config.js (tire facets)
 - problem: tire records go through the per-SKU one-product-per-row path with no grouping rule; buildSearchDocument returns a non-wheel stub for tires so they are not indexed in Meilisearch for discovery.
-- fix: define a tire grouping rule (e.g. Brand + SectionWidth + AspectRatio + RimDiameter) and add a tire transformer branch to buildSearchDocument so tires appear in search.
-- verify: after a tire feed apply, tires appear as grouped Medusa products with multiple variants; Meilisearch contains tire documents with product_type = "tire".
-- refs: —
+- fix: decomposed into 3 sub-projects (see spec). **SP1 (backend grouping + indexing) DONE** on branch `feat/tire-store-backend`: tires group by **Brand + extracted model** (per-SKU fallback), the canonical **size** is the variant axis, and a `buildSearchDocument` tire branch + Meili facets index them as `product_type = "tire"`. SP2 (tire discovery `/tires` route) and SP3 (tire PDP) remain (storefront), plus the prod cutover (deploy → backend restart → tire feed apply). Tire fitment + MAP pricing explicitly out of scope.
+- verify: after a tire feed apply, tires appear as grouped Medusa products with multiple size variants; Meilisearch contains tire documents with `product_type = "tire"` + tire facets. **SP1 unit gate met (288 backend tests); live dry-run/apply DEFERRED → pre-deploy (needs a real DB).**
+- refs: spec [docs/in-progress/specs/2026-07-02-tire-store-design.md](../in-progress/specs/2026-07-02-tire-store-design.md) ; plan [docs/in-progress/plans/2026-07-02-tire-store-backend.md](../in-progress/plans/2026-07-02-tire-store-backend.md)
 
 ### WB-006 · No admin UI for vendor-sync (API/CLI only)   [HIGH]
 - status: done

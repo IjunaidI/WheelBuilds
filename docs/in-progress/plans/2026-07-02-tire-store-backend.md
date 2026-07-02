@@ -621,11 +621,13 @@ with:
   })
 
   it('falls back to a per-SKU groupKey when no model can be extracted', () => {
-    const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {})
-    const result = normalizeTireRow(makeRow({ PartDescription: 'UNKNOWN TIRE FORMAT' }))
+    // A bare size + service description leaves no model text after stripping,
+    // so extraction is not confident → per-SKU group key. (A description with
+    // stray words like "UNKNOWN TIRE FORMAT" is instead treated as a confident
+    // model — see the golden fixture — so it is NOT a fallback case.)
+    const result = normalizeTireRow(makeRow({ PartDescription: '305/45R22 118S' }))
     expect(result.model).toBeNull()
     expect(result.groupKey).toBe('sku:F28840215')
-    warnSpy.mockRestore()
   })
 ```
 
@@ -832,17 +834,23 @@ export function tireVariantAxisKey(record: TireNormalizedRecord): string {
   return tireSizeLabel(record)
 }
 
-/** Sort size labels by rim diameter, then width, then the raw label. */
+/** Sort size labels left-to-right as the size string reads: width, then aspect
+ *  ratio, then rim diameter, then the raw label. (This matches the PDP's later
+ *  rim-chip grouping: within a rim the sizes order by width/aspect.) */
 function compareSizeLabels(a: string, b: string): number {
-  const rim = (s: string): number => {
-    const m = s.match(/R(\d{2})\b/) ?? s.match(/-(\d{2})\b/)
-    return m ? parseInt(m[1], 10) : 0
-  }
   const width = (s: string): number => {
     const m = s.match(/(\d{2,3})\//)
     return m ? parseInt(m[1], 10) : 0
   }
-  return rim(a) - rim(b) || width(a) - width(b) || a.localeCompare(b)
+  const aspect = (s: string): number => {
+    const m = s.match(/\/(\d{2,3})[A-Z]/)
+    return m ? parseInt(m[1], 10) : 0
+  }
+  const rim = (s: string): number => {
+    const m = s.match(/R(\d{2})\b/) ?? s.match(/-(\d{2})\b/)
+    return m ? parseInt(m[1], 10) : 0
+  }
+  return width(a) - width(b) || aspect(a) - aspect(b) || rim(a) - rim(b) || a.localeCompare(b)
 }
 
 export function buildTireProductOptions(
@@ -978,12 +986,19 @@ At `apply.ts:258-259`, the external id for tires must become the group key when 
 with:
 
 ```ts
-  // Grouped products (wheels always; tires when a model was extracted) adopt by
-  // group_key. Per-SKU fallback groups (group_key starts with "sku:") keep the
-  // part number as their external id.
-  const externalId = group.group_key.startsWith("sku:")
-    ? first.partNumber
-    : group.group_key
+  // Idempotency-adoption external id MUST equal what each create writes:
+  //  - wheels: applyNewWheelGroup ALWAYS creates with external_id = group_key
+  //    (including "sku:<pn>" fallback wheels) — so wheels adopt by group_key,
+  //    unchanged from the original behavior. Do NOT strip "sku:" for wheels or
+  //    per-SKU-fallback wheels fail to adopt on retry and duplicate.
+  //  - tires: applyNewTireGroup creates with external_id = group_key when
+  //    grouped, else the part number for "sku:" fallback groups — mirror that.
+  const externalId =
+    first.productType === "wheel"
+      ? group.group_key
+      : group.group_key.startsWith("sku:")
+        ? first.partNumber
+        : group.group_key
 ```
 
 - [ ] **Step 3: Rewrite `applyNewTireGroup`**

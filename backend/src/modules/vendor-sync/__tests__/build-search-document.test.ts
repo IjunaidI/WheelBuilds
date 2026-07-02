@@ -69,9 +69,56 @@ describe("buildSearchDocument", () => {
     expect(doc).toMatchObject({ price_min: 1250, price_max: 1250 })
   })
 
-  it("returns null for non-wheel products (excluded from this index cut)", () => {
-    const tire = { ...product, metadata: { product_type: "tire", brand: "X" } }
-    expect(buildSearchDocument(tire as any)).toBeNull()
+  it("builds a tire document with facet arrays", () => {
+    const tire = {
+      id: "prod_t1",
+      handle: "falken-wildpeak-at4w",
+      title: "Falken WDPEAK AT4W",
+      thumbnail: "https://cdn.example.com/t.jpg",
+      created_at: "2026-05-17T00:00:00.000Z",
+      metadata: { product_type: "tire", brand: "Falken", tire_prefix: null },
+      variants: [
+        {
+          sku: "F28840215",
+          prices: [{ amount: 462, currency_code: "usd" }],
+          metadata: {
+            size_label: "305/45R22 118S", canonical_size: "305/45R22",
+            rim_diameter_in: 22, tire_width_mm: 305, aspect_ratio: 45,
+            load_index: 118, speed_rating: "S", construction_type: "R",
+          },
+        },
+        {
+          sku: "F28844030",
+          prices: [{ amount: 405, currency_code: "usd" }],
+          metadata: {
+            size_label: "305/50R20 120T", canonical_size: "305/50R20",
+            rim_diameter_in: 20, tire_width_mm: 305, aspect_ratio: 50,
+            load_index: 120, speed_rating: "T", construction_type: "R",
+          },
+        },
+      ],
+    }
+    const doc = buildSearchDocument(tire as any)
+    expect(doc).toMatchObject({
+      id: "prod_t1",
+      product_type: "tire",
+      brand: "Falken",
+      skus: ["F28840215", "F28844030"],
+      tire_sizes: ["305/45R22", "305/50R20"],
+      rim_diameters: [20, 22],
+      section_widths: [305],
+      aspect_ratios: [45, 50],
+      load_indexes: [118, 120],
+      speed_ratings: ["S", "T"],
+      tire_type: "passenger",
+      price_min: 40500,
+      price_max: 46200,
+    })
+  })
+
+  it("returns the minimal stub for products that are neither wheel nor tire", () => {
+    const other = { ...product, metadata: { product_type: "accessory", brand: "X" } }
+    expect(buildSearchDocument(other as any)).toBeNull()
   })
 
   it("survives missing variant metadata with safe defaults", () => {

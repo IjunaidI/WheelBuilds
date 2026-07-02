@@ -27,14 +27,25 @@ const uniqSorted = (xs: number[]): number[] =>
 const uniqStr = (xs: string[]): string[] => Array.from(new Set(xs))
 
 /**
- * Medusa wheel product → flat Meilisearch document. Returns null for
- * non-wheel products so the transformer can skip them (tires are a later
- * spec). All consumers of the index read this shape.
+ * Medusa product → flat Meilisearch document. Dispatches by product_type:
+ * a wheel doc, a tire doc, or null for anything else (the plugin coalesces a
+ * falsy result to a minimal { id, product_type } stub in medusa-config.js).
  */
 export function buildSearchDocument(product: IndexableProduct) {
   const meta = product.metadata ?? {}
-  if (meta.product_type !== "wheel") return null
+  if (meta.product_type === "wheel") return buildWheelDocument(product, meta)
+  if (meta.product_type === "tire") return buildTireDocument(product, meta)
+  return null
+}
 
+/**
+ * Medusa wheel product → flat Meilisearch document. All consumers of the
+ * wheel index shape read this function's return type (`WheelSearchDocument`).
+ */
+function buildWheelDocument(
+  product: IndexableProduct,
+  meta: Record<string, unknown>
+) {
   const variants = product.variants ?? []
 
   const diameters: number[] = []
@@ -108,4 +119,86 @@ export function buildSearchDocument(product: IndexableProduct) {
  * read by the Meilisearch index settings and downstream search consumers.
  * Derived from the function's return so it can never drift from what is built.
  */
-export type WheelSearchDocument = NonNullable<ReturnType<typeof buildSearchDocument>>
+export type WheelSearchDocument = ReturnType<typeof buildWheelDocument>
+
+const str = (v: unknown): string | null =>
+  typeof v === "string" && v ? v : null
+
+function buildTireDocument(
+  product: IndexableProduct,
+  meta: Record<string, unknown>
+) {
+  const variants = product.variants ?? []
+  const sizes: string[] = []
+  const rimDiameters: number[] = []
+  const sectionWidths: number[] = []
+  const aspectRatios: number[] = []
+  const loadIndexes: number[] = []
+  const speedRatings: string[] = []
+  const usdPrices: number[] = []
+  const skus: string[] = []
+
+  for (const v of variants) {
+    if (typeof v.sku === "string" && v.sku) skus.push(v.sku)
+    const vm = v.metadata ?? {}
+    const size = str(vm.canonical_size)
+    if (size) sizes.push(size)
+    const rim = num(vm.rim_diameter_in)
+    if (rim !== null) rimDiameters.push(rim)
+    const w = num(vm.tire_width_mm)
+    if (w !== null) sectionWidths.push(w)
+    const a = num(vm.aspect_ratio)
+    if (a !== null) aspectRatios.push(a)
+    const li = num(vm.load_index)
+    if (li !== null) loadIndexes.push(li)
+    const sr = str(vm.speed_rating)
+    if (sr) speedRatings.push(sr)
+    for (const p of v.prices ?? []) {
+      if (p.currency_code === "usd" && Number.isFinite(p.amount)) {
+        usdPrices.push(p.amount)
+      }
+    }
+  }
+
+  return {
+    id: product.id,
+    handle: product.handle,
+    title: product.title,
+    description: product.description ?? "",
+    thumbnail: product.thumbnail ?? null,
+    created_at: product.created_at ?? null,
+    product_type: "tire",
+    brand: typeof meta.brand === "string" ? meta.brand : "",
+    skus: uniqStr(skus),
+    tire_sizes: uniqStr(sizes),
+    rim_diameters: uniqSorted(rimDiameters),
+    section_widths: uniqSorted(sectionWidths),
+    aspect_ratios: uniqSorted(aspectRatios),
+    load_indexes: uniqSorted(loadIndexes),
+    speed_ratings: uniqStr(speedRatings),
+    tire_type: classifyTireTypeFromMeta(meta, variants),
+    price_min: usdPrices.length ? Math.round(Math.min(...usdPrices) * 100) : 0,
+    price_max: usdPrices.length ? Math.round(Math.max(...usdPrices) * 100) : 0,
+  }
+}
+
+/**
+ * Product-level tire class from prefix (product metadata) + first variant's
+ * parsed structure. Mirrors classifyTireType but reads the flattened metadata
+ * available in the indexer (no TireNormalizedRecord here).
+ */
+function classifyTireTypeFromMeta(
+  meta: Record<string, unknown>,
+  variants: IndexableVariant[]
+): "passenger" | "light-truck" | "other" {
+  const prefix = str(meta.tire_prefix)?.toUpperCase()
+  if (prefix === "LT") return "light-truck"
+  if (prefix === "P") return "passenger"
+  if (prefix === "ST") return "other"
+  const vm = variants[0]?.metadata ?? {}
+  if (num(vm.tire_width_mm) !== null && num(vm.aspect_ratio) !== null) return "passenger"
+  if (str(vm.construction_type) !== null) return "light-truck"
+  return "other"
+}
+
+export type TireSearchDocument = ReturnType<typeof buildTireDocument>

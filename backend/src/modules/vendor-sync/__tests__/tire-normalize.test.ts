@@ -196,8 +196,18 @@ describe('normalizeTireRow', () => {
     warnSpy.mockRestore()
   })
 
-  it('emits per-SKU groupKey (no tire grouping rule yet)', () => {
+  it('groups by brand + extracted model', () => {
     const result = normalizeTireRow(makeRow())
+    expect(result.model).toBe('WDPEAK AT4W')
+    expect(result.groupKey).toBe('Falken|WDPEAK AT4W')
+    expect(result.sizeToken).toBe('305/45R22')
+  })
+
+  it('falls back to a per-SKU groupKey when no model can be extracted', () => {
+    // A bare size + service description leaves no model text after stripping,
+    // so extraction is not confident → per-SKU group key.
+    const result = normalizeTireRow(makeRow({ PartDescription: '305/45R22 118S' }))
+    expect(result.model).toBeNull()
     expect(result.groupKey).toBe('sku:F28840215')
   })
 

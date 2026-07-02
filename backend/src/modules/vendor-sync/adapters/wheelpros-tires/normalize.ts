@@ -2,6 +2,8 @@ import { ParsedRow, TireNormalizedRecord } from '../types'
 import { parseVendorDate, parsePrice } from '../../utils/parse-helpers'
 import { parseTireSize } from '../../utils/tire-parse-helpers'
 import { tireRawRowSchema } from './schema'
+import { extractTireModel } from './model-key'
+import { computeTireGroupKey } from './group-key'
 
 const VENDOR_CODE = 'wheelpros-tires'
 
@@ -37,6 +39,11 @@ export function normalizeTireRow(row: ParsedRow): TireNormalizedRecord {
   const division = raw['Division']?.trim() || null
 
   const tireSize = parseTireSize(raw['PartDescription'])
+  const { model, confident } = extractTireModel(
+    raw['Brand'],
+    raw['PartDescription'],
+    tireSize.sizeToken
+  )
 
   return {
     productType: 'tire',
@@ -51,9 +58,13 @@ export function normalizeTireRow(row: ParsedRow): TireNormalizedRecord {
     mapUsd: parsePrice(raw['MAP_USD']),
     runDateVendor: parseVendorDate(raw['RunDate']),
     stockByWarehouse,
-    // Tires keep one-product-per-row until a tire grouping rule is defined.
-    // sku: prefix mirrors the wheel fallback so logs read consistently.
-    groupKey: `sku:${row.partNumber}`,
+    groupKey: computeTireGroupKey({
+      brand: raw['Brand'],
+      model,
+      confident,
+      partNumber: row.partNumber,
+    }),
+    model,
     manufacturerPartNumber,
     division,
     ...tireSize,

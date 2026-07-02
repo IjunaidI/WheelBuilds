@@ -34,6 +34,7 @@ export const tireNormalizedSchema = z.object({
   runDateVendor: z.date(),
   stockByWarehouse: z.record(z.string(), z.number().int().min(0)),
   groupKey: z.string().min(1),
+  model: z.string().nullable(),
   manufacturerPartNumber: z.string().nullable(),
   division: z.string().nullable(),
   tireWidthMm: z.number().nullable(),

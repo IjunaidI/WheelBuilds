@@ -49,6 +49,7 @@ export interface WheelNormalizedRecord extends NormalizedRecordBase {
 
 export interface TireNormalizedRecord extends NormalizedRecordBase {
   productType: 'tire'
+  model: string | null
   manufacturerPartNumber: string | null
   division: string | null
   tireWidthMm: number | null

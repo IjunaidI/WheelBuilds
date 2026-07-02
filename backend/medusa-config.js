@@ -257,11 +257,15 @@ const medusaConfig = {
                 'finishes', 'skus',
                 'diameters', 'widths', 'offsets', 'bolt_patterns',
                 'bolt_patterns_canonical', 'center_bores',
+                'tire_sizes', 'rim_diameters', 'section_widths',
+                'aspect_ratios', 'load_indexes', 'speed_ratings', 'tire_type',
                 'price_min', 'price_max', 'created_at', 'product_type',
               ],
               filterableAttributes: [
                 'brand', 'finishes', 'diameters', 'widths', 'bolt_patterns',
                 'bolt_patterns_canonical', 'offsets', 'center_bores',
+                'tire_sizes', 'rim_diameters', 'section_widths',
+                'aspect_ratios', 'load_indexes', 'speed_ratings', 'tire_type',
                 'price_min', 'price_max', 'product_type',
               ],
               sortableAttributes: ['price_min', 'created_at', 'title'],
@@ -270,10 +274,10 @@ const medusaConfig = {
             primaryKey: 'id',
             // The plugin falls back to its DEFAULT transformer when ours returns a
             // falsy value (`transformer?.(doc) ?? defaultTransformer(doc)`), so we
-            // must never return null. buildSearchDocument returns null for
-            // non-wheels; map that to a minimal doc carrying product_type so the
-            // storefront's `product_type = "wheel"` filter excludes it (tires are
-            // a later spec).
+            // must never return null. buildSearchDocument now returns a wheel doc,
+            // a tire doc, or null for anything that is neither; map that null case
+            // to a minimal doc carrying product_type so downstream product_type
+            // filters (storefront wheel discovery, tire discovery) still exclude it.
             transformer: (product) =>
               buildSearchDocument(product) ?? {
                 id: product.id,

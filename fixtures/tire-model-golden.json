@@ -1,0 +1,15 @@
+[
+  { "brand": "Falken", "description": "WDPEAK AT4W 305/45R22 118S", "sizeToken": "305/45R22", "model": "WDPEAK AT4W", "confident": true },
+  { "brand": "Falken", "description": "WDPEAK AT4W 305/50R20 120T", "sizeToken": "305/50R20", "model": "WDPEAK AT4W", "confident": true },
+  { "brand": "Falken", "description": "WDPEAK AT4W LT37X12.50R18 128R E", "sizeToken": "LT37X12.50R18", "model": "WDPEAK AT4W", "confident": true },
+  { "brand": "Falken", "description": "235/55ZR17  AZFK450 99W  SL 26.7 2355517", "sizeToken": "235/55ZR17", "model": "AZFK450", "confident": true },
+  { "brand": "Falken", "description": "255/35ZR20  AZFK450 97Y  XL 28.4 2553520", "sizeToken": "255/35ZR20", "model": "AZFK450", "confident": true },
+  { "brand": "Falken", "description": "255/45ZR20  AZFK450 101Y  SL29.8 2554520", "sizeToken": "255/45ZR20", "model": "AZFK450", "confident": true },
+  { "brand": "Falken", "description": "275/35ZR19  AZFK450 100Y  XL29.8 2753519", "sizeToken": "275/35ZR19", "model": "AZFK450", "confident": true },
+  { "brand": "Falken", "description": "255/35ZR19 FK453 (96Y) XL BLK 2553519", "sizeToken": "255/35ZR19", "model": "FK453", "confident": true },
+  { "brand": "BKT", "description": "12.4-24 8PR BKT TR171 TT 451224", "sizeToken": "12.4-24", "model": "TR171", "confident": true },
+  { "brand": "BKT", "description": "11.2-26 8PR BKT TR171 TT 451126", "sizeToken": "11.2-26", "model": "TR171", "confident": true },
+  { "brand": "OHTSU", "description": "ST5000 285/45-22 114H", "sizeToken": null, "model": "ST5000", "confident": true },
+  { "brand": "Falken", "description": "305/45R22", "sizeToken": "305/45R22", "model": null, "confident": false },
+  { "brand": "Nowhere", "description": "UNKNOWN TIRE FORMAT", "sizeToken": null, "model": "UNKNOWN TIRE FORMAT", "confident": true }
+]

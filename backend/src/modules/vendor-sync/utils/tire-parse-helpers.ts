@@ -7,6 +7,7 @@ export interface TireSizeResult {
   speedRating: string | null
   plyRating: string | null
   tirePrefix: string | null
+  sizeToken: string | null
 }
 
 const NULL_RESULT: TireSizeResult = {
@@ -18,6 +19,7 @@ const NULL_RESULT: TireSizeResult = {
   speedRating: null,
   plyRating: null,
   tirePrefix: null,
+  sizeToken: null,
 }
 
 /**
@@ -96,6 +98,7 @@ export function parseTireSize(description: string): TireSizeResult {
       speedRating,
       plyRating,
       tirePrefix,
+      sizeToken: metricMatch[0].trim(),
     }
   }
 
@@ -122,6 +125,7 @@ export function parseTireSize(description: string): TireSizeResult {
       speedRating,
       plyRating,
       tirePrefix,
+      sizeToken: ltMatch[0].trim(),
     }
   }
 
@@ -141,6 +145,7 @@ export function parseTireSize(description: string): TireSizeResult {
       speedRating: null,
       plyRating,
       tirePrefix: null,
+      sizeToken: `${biasMatch[1]}-${biasMatch[2]}`,
     }
   }
 

@@ -80,6 +80,28 @@ describe('parseTireSize', () => {
     expect(result.rimDiameterIn).toBeNull()
     warnSpy.mockRestore()
   })
+
+  it('exposes the matched size token (metric)', () => {
+    expect(parseTireSize('WDPEAK AT4W 305/45R22 118S').sizeToken).toBe('305/45R22')
+  })
+
+  it('exposes the matched size token (metric with Z modifier)', () => {
+    expect(parseTireSize('255/35ZR19 FK453 (96Y) XL BLK 2553519').sizeToken).toBe('255/35ZR19')
+  })
+
+  it('exposes the matched size token (LT inch)', () => {
+    expect(parseTireSize('WDPEAK AT4W LT37X12.50R18 128R E').sizeToken).toBe('LT37X12.50R18')
+  })
+
+  it('exposes the matched size token (bias, excludes ply)', () => {
+    expect(parseTireSize('12.4-24 8PR BKT TR171 TT 451224').sizeToken).toBe('12.4-24')
+  })
+
+  it('returns null sizeToken for unparseable descriptions', () => {
+    const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {})
+    expect(parseTireSize('UNKNOWN TIRE FORMAT').sizeToken).toBeNull()
+    warnSpy.mockRestore()
+  })
 })
 
 describe('normalizeTireRow', () => {
@@ -177,5 +199,9 @@ describe('normalizeTireRow', () => {
   it('emits per-SKU groupKey (no tire grouping rule yet)', () => {
     const result = normalizeTireRow(makeRow())
     expect(result.groupKey).toBe('sku:F28840215')
+  })
+
+  it('carries the matched size token', () => {
+    expect(normalizeTireRow(makeRow()).sizeToken).toBe('305/45R22')
   })
 })

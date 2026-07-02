@@ -44,4 +44,5 @@ export const tireNormalizedSchema = z.object({
   speedRating: z.string().nullable(),
   plyRating: z.string().nullable(),
   tirePrefix: z.string().nullable(),
+  sizeToken: z.string().nullable(),
 })

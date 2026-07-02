@@ -59,6 +59,7 @@ export interface TireNormalizedRecord extends NormalizedRecordBase {
   speedRating: string | null
   plyRating: string | null
   tirePrefix: string | null
+  sizeToken: string | null
 }
 
 export type NormalizedRecord = WheelNormalizedRecord | TireNormalizedRecord

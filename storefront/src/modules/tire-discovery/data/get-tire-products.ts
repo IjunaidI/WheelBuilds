@@ -13,7 +13,7 @@ import type { MultiSearchResult } from "meilisearch"
 import { meili, PRODUCTS_INDEX } from "@lib/meilisearch"
 import { lit } from "@modules/discovery/data/escape"
 import {
-  DEFAULT_PAGE_SIZE, EMPTY_TIRE_FILTERS, SortOption, TireDiscoveryFilters,
+  DEFAULT_PAGE_SIZE, SortOption, TireDiscoveryFilters,
   TireDiscoveryProduct, TireDiscoveryQuery, TireDiscoveryResult, TireFacetCounts, TireType,
 } from "./types"
 import { tireDiscoveryCacheKey } from "./cache-key"

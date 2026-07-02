@@ -264,12 +264,17 @@ async function applyNewGroup(
   // (createProductsWorkflow succeeded) but never persisted vendor_product_current
   // rows, so the re-diff still classifies this group as "new". Adopt the existing
   // product by external_id instead of creating a duplicate.
-  // Grouped products (wheels always; tires when a model was extracted) adopt by
-  // group_key. Per-SKU fallback groups (group_key starts with "sku:") keep the
-  // part number as their external id.
-  const externalId = group.group_key.startsWith("sku:")
-    ? first.partNumber
-    : group.group_key
+  // Idempotency-adoption external id MUST equal what each create writes:
+  //  - wheels: applyNewWheelGroup ALWAYS creates with external_id = group_key
+  //    (incl. "sku:<pn>" fallback wheels) — adopt by group_key, unchanged.
+  //  - tires: applyNewTireGroup creates group_key when grouped, else the part
+  //    number for "sku:" fallback groups — mirror that.
+  const externalId =
+    first.productType === "wheel"
+      ? group.group_key
+      : group.group_key.startsWith("sku:")
+        ? first.partNumber
+        : group.group_key
   const existing = await findProductByExternalId(ctx, externalId)
   if (existing) {
     ctx.logger.warn(

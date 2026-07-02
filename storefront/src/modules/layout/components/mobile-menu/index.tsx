@@ -15,6 +15,7 @@ import {
 
 const NAV_ITEMS: { label: string; href: string }[] = [
   { label: "Wheels", href: "/store" },
+  { label: "Tires", href: "/tires" },
   { label: "Brands", href: "/collections" },
   { label: "Style", href: "/categories" },
   { label: "Build Gallery", href: "#" },

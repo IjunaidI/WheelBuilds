@@ -10,6 +10,7 @@ import SearchTrigger from "@modules/search/components/search-trigger"
 
 const NAV_ITEMS: { label: string; href: string; active?: boolean }[] = [
   { label: "Wheels", href: "/store", active: true },
+  { label: "Tires", href: "/tires" },
   { label: "Brands", href: "/collections" },
   { label: "Style", href: "/categories" },
   { label: "Build Gallery", href: "#" },

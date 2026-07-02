@@ -47,7 +47,6 @@ import {
   findExactDuplicates,
   formatNumericOption,
   pickGroupRepresentative,
-  slugify,
 } from "./wheel-grouping"
 import {
   buildTireGroupHandle,
@@ -56,6 +55,8 @@ import {
   buildTireVariantOptions,
   dedupeTireExactDuplicates,
   findTireExactDuplicates,
+  TIRE_OPTION_TITLES,
+  tireVariantAxisKey,
 } from "./tire-grouping"
 import VendorSyncService from "../service"
 import { indexVariantsBySku, partitionRecordsBySku } from "./adopt"
@@ -581,12 +582,67 @@ async function applyChangedGroup(
       )
       variantCount += toPersist.length
     } else {
-      // Tires: each row is its own group, so added_part_numbers on a
-      // tire changedGroup should never happen. Defensive log + skip.
-      ctx.logger.warn(
-        `[vendor-sync] [${ctx.runId}] tire group ${group.group_key} ` +
-          `unexpectedly has added_part_numbers=${group.added_part_numbers.join(",")}`
+      const tireAdds = addedRecords as TireNormalizedRecord[]
+
+      const query = ctx.container.resolve(ContainerRegistrationKeys.QUERY)
+      const { data: existingVariants } = await query.graph({
+        entity: "variant",
+        fields: ["id", "sku", "metadata", "inventory_items.inventory_item_id"],
+        filters: { product_id: [productId] },
+      })
+      const existingSkus = new Set<string>(
+        (existingVariants ?? []).map((v: any) => v.sku).filter(Boolean)
       )
+      const { toCreate: skuNew } = partitionRecordsBySku(tireAdds, existingSkus)
+
+      // Drop any added row whose size label already exists on the product.
+      const existingSizeLabels = new Set<string>(
+        (existingVariants ?? []).map((v: any) =>
+          String((v.metadata as any)?.size_label ?? "")
+        ).filter(Boolean)
+      )
+      const seen = new Set(existingSizeLabels)
+      const toCreate: TireNormalizedRecord[] = []
+      const droppedSkus = new Set<string>()
+      for (const r of skuNew) {
+        const label = tireVariantAxisKey(r)
+        if (seen.has(label)) {
+          droppedSkus.add(r.partNumber)
+          ctx.logger.warn(
+            `[vendor-sync] [${ctx.runId}] deduped duplicate tire size on add, dropped ${r.partNumber} (group ${group.group_key})`
+          )
+          continue
+        }
+        seen.add(label)
+        toCreate.push(r)
+      }
+
+      let createdVariants: any[] = []
+      if (toCreate.length > 0) {
+        await extendTireOptions(ctx, productId, toCreate)
+        const variants = toCreate.map((r) => ({
+          product_id: productId,
+          title: tireSizeLabelForVariantTitle(r),
+          sku: r.partNumber,
+          options: buildTireVariantOptions(r),
+          manage_inventory: true,
+          allow_backorder: false,
+          metadata: buildVariantMetadata(r),
+          prices: [{ amount: r.msrpUsd, currency_code: "usd" }],
+        }))
+        const created = await createProductVariantsWorkflow(ctx.container).run({
+          input: { product_variants: variants },
+        })
+        createdVariants = created.result
+      }
+
+      const skuIndex = indexVariantsBySku([
+        ...(existingVariants ?? []),
+        ...createdVariants,
+      ])
+      const toPersist = tireAdds.filter((r) => !droppedSkus.has(r.partNumber))
+      await persistAddedVariants(ctx, group.group_key, toPersist, skuIndex, productId)
+      variantCount += toPersist.length
     }
   }
 
@@ -1028,6 +1084,40 @@ async function extendWheelOptions(
       },
     })
   }
+}
+
+/**
+ * Extend the tire product's single "Size" option to include any new size label
+ * introduced by added rows. createProductVariantsWorkflow only accepts option
+ * values that already exist on the product.
+ */
+async function extendTireOptions(
+  ctx: ApplyContext,
+  productId: string,
+  addedRecords: TireNormalizedRecord[]
+): Promise<void> {
+  const query = ctx.container.resolve(ContainerRegistrationKeys.QUERY)
+  const { data: products } = await query.graph({
+    entity: "product",
+    fields: ["id", "options.id", "options.title", "options.values.value"],
+    filters: { id: [productId] },
+  })
+  const sizeOption = (products?.[0] as any)?.options?.find(
+    (o: any) => o.title === TIRE_OPTION_TITLES.SIZE
+  )
+  if (!sizeOption) return
+  const existing = new Set<string>(
+    (sizeOption.values ?? []).map((v: any) => v.value)
+  )
+  const merged = new Set(existing)
+  for (const r of addedRecords) merged.add(buildTireVariantOptions(r).Size)
+  if (merged.size === existing.size) return
+  await updateProductOptionsWorkflow(ctx.container).run({
+    input: {
+      selector: { id: sizeOption.id },
+      update: { values: [...merged] },
+    },
+  })
 }
 
 async function zeroStockForCurrentRows(

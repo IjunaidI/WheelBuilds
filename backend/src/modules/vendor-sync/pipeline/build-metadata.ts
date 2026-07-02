@@ -1,4 +1,5 @@
 import { NormalizedRecord } from "../adapters/types"
+import { canonicalTireSize, tireSizeLabel } from "./tire-facets"
 
 /**
  * Build PRODUCT-level metadata. Only fields that are constant across all
@@ -70,6 +71,8 @@ export function buildVariantMetadata(
   return {
     ...base,
     manufacturer_part_number: normalized.manufacturerPartNumber,
+    size_label: tireSizeLabel(normalized),
+    canonical_size: canonicalTireSize(normalized),
     tire_width_mm: normalized.tireWidthMm,
     aspect_ratio: normalized.aspectRatio,
     construction_type: normalized.constructionType,

@@ -64,6 +64,7 @@ function makeTireRecord(
     speedRating: "T",
     plyRating: null,
     tirePrefix: "P",
+    sizeToken: "285/70R17",
     ...overrides,
   }
 }
@@ -170,6 +171,8 @@ describe("buildVariantMetadata (per-row fields)", () => {
   it("captures tire-specific fields per variant", () => {
     const meta = buildVariantMetadata(makeTireRecord())
     expect(meta.manufacturer_part_number).toBe("28065517")
+    expect(meta.size_label).toBe("285/70R17 116T")
+    expect(meta.canonical_size).toBe("285/70R17")
     expect(meta.tire_width_mm).toBe(285)
     expect(meta.aspect_ratio).toBe(70)
     expect(meta.construction_type).toBe("R")
@@ -213,9 +216,12 @@ describe("buildVariantMetadata (per-row fields)", () => {
         loadIndex: null,
         speedRating: null,
         plyRating: null,
+        sizeToken: null,
       })
     )
     expect(meta.manufacturer_part_number).toBeNull()
+    expect(meta.size_label).toBe("000000000001100200")
+    expect(meta.canonical_size).toBeNull()
     expect(meta.tire_width_mm).toBeNull()
     expect(meta.aspect_ratio).toBeNull()
     expect(meta.construction_type).toBeNull()

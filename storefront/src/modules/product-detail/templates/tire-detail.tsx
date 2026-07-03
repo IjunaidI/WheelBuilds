@@ -4,6 +4,7 @@ import { TireProductDetail } from "../data/types"
 import TireBreadcrumb from "../components/tire/breadcrumb"
 import TireHero from "../components/tire/hero"
 import TireSpecs from "../components/tire/specs"
+import TireFitment from "../components/tire/fitment"
 import TireRelated from "../components/tire/related"
 
 type TireDetailTemplateProps = {
@@ -13,9 +14,10 @@ type TireDetailTemplateProps = {
 
 /**
  * Tire Product Detail (PDP) layout. Server component — mirrors the wheel
- * ProductDetailTemplate (templates/index.tsx), minus the Fitment section
- * (no vehicle-fitment concept for tires). The Hero is the only interactive
- * part (size picks are client state); everything else is server-rendered.
+ * ProductDetailTemplate (templates/index.tsx). The Fitment section now has a
+ * tire-specific reverse-fitment equivalent (WB-065). The Hero is the only
+ * interactive part (size picks are client state); everything else is
+ * server-rendered.
  */
 const TireDetailTemplate = ({
   product,
@@ -32,6 +34,7 @@ const TireDetailTemplate = ({
       <TireHero product={product} />
     </Suspense>
     <TireSpecs product={product} />
+    <TireFitment product={product} />
     <TireRelated products={related} />
   </section>
 )

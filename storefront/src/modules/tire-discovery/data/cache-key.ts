@@ -18,5 +18,6 @@ export function tireDiscoveryCacheKey(query: TireDiscoveryQuery): string {
     sort: query.sort,
     page: query.page,
     q: query.q ?? "",
+    fit: query.vehicleTireSizes ? [...query.vehicleTireSizes].sort().join(",") : "",
   })
 }

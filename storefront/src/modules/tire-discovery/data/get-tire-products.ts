@@ -25,7 +25,8 @@ const TIRE_FACET_FIELDS = ["brand", "rim_diameters", "tire_sizes", "tire_type", 
 
 export function buildTireFilters(
   f: TireDiscoveryFilters,
-  skip?: keyof TireDiscoveryFilters
+  skip?: keyof TireDiscoveryFilters,
+  vehicleTireSizes?: string[]
 ): string[] {
   const clauses: string[] = ['product_type = "tire"']
   if (skip !== "brands" && f.brands.length) clauses.push(`brand IN [${f.brands.map(lit).join(", ")}]`)
@@ -36,6 +37,7 @@ export function buildTireFilters(
   if (skip !== "loadIndexes" && f.loadIndexes.length) clauses.push(`load_indexes IN [${f.loadIndexes.map(lit).join(", ")}]`)
   if (f.priceMinCents != null) clauses.push(`price_min >= ${f.priceMinCents}`)
   if (f.priceMaxCents != null) clauses.push(`price_min <= ${f.priceMaxCents}`)
+  if (vehicleTireSizes?.length) clauses.push(`tire_sizes IN [${vehicleTireSizes.map(lit).join(", ")}]`)
   return clauses
 }
 
@@ -64,6 +66,7 @@ export function hitToTireProduct(h: TireHit): TireDiscoveryProduct {
     sizeCount: h.tire_sizes?.length ?? 0,
     rimDiameters: [...(h.rim_diameters ?? [])].sort((a, b) => a - b),
     tireType: h.tire_type ?? "other",
+    sizes: Array.isArray(h.tire_sizes) ? h.tire_sizes : [],
     isNew: Number.isFinite(createdMs) ? Date.now() - createdMs < NEW_MS : false,
   }
 }
@@ -88,12 +91,12 @@ async function fetchTireDiscoveryProducts(query: TireDiscoveryQuery): Promise<Ti
     queries: [
       {
         indexUid: PRODUCTS_INDEX, q: query.q ?? "",
-        filter: buildTireFilters(query.filters).join(" AND "),
+        filter: buildTireFilters(query.filters, undefined, query.vehicleTireSizes).join(" AND "),
         sort: sortExpr(query.sort), limit: pageSize, offset,
       },
       ...TIRE_FACET_FIELDS.map((field) => ({
         indexUid: PRODUCTS_INDEX, q: query.q ?? "",
-        filter: buildTireFilters(query.filters, facetQueryByDim[field]).join(" AND "),
+        filter: buildTireFilters(query.filters, facetQueryByDim[field], query.vehicleTireSizes).join(" AND "),
         facets: [field], limit: 0,
       })),
     ],

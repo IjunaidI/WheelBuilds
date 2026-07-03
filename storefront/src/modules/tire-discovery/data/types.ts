@@ -20,6 +20,8 @@ export type TireDiscoveryProduct = {
   /** Sorted rim inches → "17\"–22\"" range. */
   rimDiameters: number[]
   tireType: TireType
+  /** Canonical tire sizes this product offers (for the fit badge). */
+  sizes: string[]
   isNew?: boolean
 }
 
@@ -54,7 +56,14 @@ export type TireDiscoveryQuery = {
   sort: SortOption
   page: number
   q?: string
+  /** OEM tire sizes of the active vehicle (from ?fit=); constrains tire_sizes. */
+  vehicleTireSizes?: string[]
 }
+
+/** Serialize/parse the tire `fit` param (CSV of canonical sizes). fit="0" = off. */
+export const tireSizesToFitParam = (sizes: string[]): string => sizes.join(",")
+export const fitParamToTireSizes = (raw: string): string[] =>
+  raw.split(",").map((s) => s.trim()).filter(Boolean)
 
 export type TireFacetCounts = {
   brands: Record<string, number>
@@ -100,6 +109,9 @@ export function parseTireQueryFromSearchParams(
     ? (sortRaw as SortOption)
     : "relevance"
 
+  const fitRaw = typeof sp.fit === "string" ? sp.fit : Array.isArray(sp.fit) ? sp.fit[0] : undefined
+  const vehicleTireSizes = fitRaw && fitRaw !== "0" ? fitParamToTireSizes(fitRaw) : undefined
+
   return {
     filters: {
       brands: arr("brands"),
@@ -114,5 +126,6 @@ export function parseTireQueryFromSearchParams(
     sort,
     page: Math.max(1, num("page") ?? 1),
     q: (Array.isArray(sp.q) ? sp.q[0] : sp.q) || undefined,
+    ...(vehicleTireSizes?.length ? { vehicleTireSizes } : {}),
   }
 }

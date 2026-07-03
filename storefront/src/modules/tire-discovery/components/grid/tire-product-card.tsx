@@ -3,6 +3,7 @@ import LocalizedClientLink from "@modules/common/components/localized-client-lin
 import Label from "@modules/common/components/label"
 import Display from "@modules/common/components/display"
 import Chip from "@modules/common/components/chip"
+import TireFitBadge from "./tire-fit-badge"
 import { TireDiscoveryProduct, TireType } from "../../data/types"
 
 const TIRE_TYPE_LABEL: Record<TireType, string> = {
@@ -49,6 +50,7 @@ const TireProductCard = ({ product }: TireProductCardProps) => {
         <div className="absolute top-2.5 right-2.5">
           <Chip variant="outline" size="sm">{TIRE_TYPE_LABEL[product.tireType]}</Chip>
         </div>
+        <TireFitBadge sizes={product.sizes} />
       </div>
 
       <div className="p-3 flex flex-col gap-1">

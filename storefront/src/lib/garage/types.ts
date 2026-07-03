@@ -4,6 +4,7 @@ export type VehicleFitment = {
   canonicalBoltPatterns: string[]
   hubBoreMm: number | null
   diameterWindow: FitWindow; widthWindow: FitWindow; offsetWindow: FitWindow
+  oemTireSizes: string[]
   source: { modificationSlug: string; region: string }
 }
 export type Vehicle = {
@@ -16,6 +17,7 @@ export type Vehicle = {
   canonicalBoltPatterns?: string[]
   hubBoreMm?: number
   diameterWindow?: FitWindow; widthWindow?: FitWindow; offsetWindow?: FitWindow
+  oemTireSizes?: string[]
   fitmentStatus?: "ok" | "not_found"
   notes?: string
   savedAt: string

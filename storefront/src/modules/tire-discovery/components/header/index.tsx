@@ -2,6 +2,7 @@
 
 import Display from "@modules/common/components/display"
 import Label from "@modules/common/components/label"
+import Chip from "@modules/common/components/chip"
 import { Button } from "@/components/ui/button"
 import {
   DropdownMenu,
@@ -9,6 +10,9 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
+import { useSearchParams } from "next/navigation"
+import { useGarage } from "@lib/garage/use-garage"
+import { openSearch } from "@lib/stores/search-store"
 import Icon from "@modules/common/components/icon"
 
 import { useTireQuery } from "../../use-tire-query"
@@ -20,11 +24,20 @@ type TireHeaderProps = {
 
 /**
  * Mirrors modules/discovery/components/header — title + result count + sort
- * dropdown — minus the garage / "FITS YOUR {make}" chip. Tires have no
- * fitment constraint, so there's nothing to indicate here.
+ * dropdown + garage / "FITS YOUR {make}" chip (WB-063 T5). The list is
+ * genuinely fit-filtered only when a real `fit` param is applied AND the
+ * active vehicle actually has OEM tire sizes — an absent/opted-out fit or a
+ * vehicle with no tire-size data both show the full catalog, so the chip
+ * must not claim "FITS YOUR CAR" in those states.
  */
 const TireHeader = ({ totalCount }: TireHeaderProps) => {
+  const { active } = useGarage()
   const { sort, setSort } = useTireQuery()
+  const sp = useSearchParams()
+
+  const fitParam = sp.get("fit")
+  const isFitted =
+    !!active && !!fitParam && fitParam !== "0" && !!active.oemTireSizes?.length
 
   return (
     <header className="flex flex-col gap-4 pb-6 border-b border-[var(--hairline)] mb-6">
@@ -39,6 +52,20 @@ const TireHeader = ({ totalCount }: TireHeaderProps) => {
           </Display>
         </div>
         <div className="flex items-center gap-2 small:gap-3 flex-wrap">
+          {/* Garage indicator — only claims a fit when the list is actually fit-filtered */}
+          {isFitted ? (
+            <Chip variant="accent" dot onClick={openSearch}>
+              <span className="truncate max-w-[180px] small:max-w-none">
+                FITS YOUR {active.make.toUpperCase()}{" "}
+                <span className="hidden xsmall:inline">{active.model.toUpperCase()}</span>
+              </span>
+            </Chip>
+          ) : (
+            <Chip variant="outline" onClick={openSearch}>
+              <Icon name="garage" size={12} strokeWidth={1.6} /> Select a vehicle
+            </Chip>
+          )}
+
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="outline" size="sm">

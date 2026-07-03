@@ -157,6 +157,16 @@ export const useTireQuery = () => {
     router.push(pathname, { scroll: false })
   }, [router, pathname])
 
+  // "Show all" escape (WB-063 T5): sets fit=0, the explicit opt-out that
+  // TireFitmentSync treats as authoritative and never overwrites. Mirrors
+  // the wheel active-chips `Fits:` chip's `showAll`, centralized here (via
+  // `push`, which also resets `page`) instead of inlined in the component.
+  const clearFit = useCallback(() => {
+    push((sp) => {
+      sp.set("fit", "0")
+    })
+  }, [push])
+
   return {
     query,
     filters: query.filters,
@@ -169,6 +179,7 @@ export const useTireQuery = () => {
     setSort,
     setPage,
     clearAll,
+    clearFit,
     // Helpers
     isAnyFilterActive: hasAnyFilter(query.filters),
   }

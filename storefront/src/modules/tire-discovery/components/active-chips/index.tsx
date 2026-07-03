@@ -1,8 +1,10 @@
 "use client"
 
+import { useSearchParams } from "next/navigation"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import Icon from "@modules/common/components/icon"
+import { useGarage } from "@lib/garage/use-garage"
 import { useTireQuery } from "../../use-tire-query"
 
 const TIRE_TYPE_LABELS: Record<string, string> = {
@@ -16,8 +18,8 @@ const formatPrice = (cents: number) =>
 
 /**
  * Mirrors modules/discovery/components/active-chips — a removable chip per
- * active filter + "Clear all" — minus the `Fits:` chip (tires have no
- * fitment constraint, so there's nothing garage-driven to show or clear).
+ * active filter + "Clear all", plus the `Fits:` chip (WB-063 T5) that clears
+ * the OEM-size auto-fit (sets fit=0) when removed.
  */
 const TireActiveChips = () => {
   const {
@@ -25,10 +27,15 @@ const TireActiveChips = () => {
     removeArrayFilter,
     setScalarFilter,
     clearAll,
+    clearFit,
     isAnyFilterActive,
   } = useTireQuery()
+  const { active } = useGarage()
+  const sp = useSearchParams()
 
-  if (!isAnyFilterActive) return null
+  const fitActive = active != null && sp.get("fit") !== null && sp.get("fit") !== "0"
+
+  if (!isAnyFilterActive && !fitActive) return null
 
   type ChipRow = {
     key: string
@@ -37,6 +44,14 @@ const TireActiveChips = () => {
   }
 
   const chips: ChipRow[] = []
+
+  if (fitActive && active) {
+    chips.push({
+      key: "fit",
+      label: `Fits: ${active.year} ${active.make} ${active.model}`,
+      onRemove: clearFit,
+    })
+  }
 
   for (const b of filters.brands) {
     chips.push({

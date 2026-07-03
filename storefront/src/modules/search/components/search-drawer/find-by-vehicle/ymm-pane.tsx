@@ -210,6 +210,7 @@ const YmmPane = ({ onClose }: YmmPaneProps) => {
           diameterWindow: fitment.diameterWindow,
           widthWindow: fitment.widthWindow,
           offsetWindow: fitment.offsetWindow,
+          oemTireSizes: fitment.oemTireSizes,
           fitmentStatus: fitment.status,
         })
         if (fitment.status === "ok" && fitment.canonicalBoltPatterns.length) {

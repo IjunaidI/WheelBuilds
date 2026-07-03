@@ -27,3 +27,12 @@ export type ReverseFitmentVehicle = {
   trim?: string
   boltPattern: string
 }
+
+export type ReverseTireFitmentVehicle = {
+  year: string
+  make: string
+  model: string
+  trim?: string
+  /** The matched canonical OEM tire size, e.g. "225/55R18". */
+  size: string
+}

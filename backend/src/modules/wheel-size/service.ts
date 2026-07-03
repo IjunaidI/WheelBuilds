@@ -5,8 +5,9 @@ import WheelSizeFitment from "./models/wheel-size-fitment"
 import WheelSizeQuota from "./models/wheel-size-quota"
 import { WheelSizeClient } from "./client"
 import { normalizeByModel } from "./normalize"
-import { VehicleFitment, ReverseFitmentVehicle, Window } from "./types"
+import { VehicleFitment, ReverseFitmentVehicle, ReverseTireFitmentVehicle, Window } from "./types"
 import { buildReverseFitment } from "./reverse-fitment"
+import { buildReverseTireFitment } from "./reverse-tire-fitment"
 import { isStale } from "./staleness"
 import { extractOemTireSizes } from "./oem-tire-sizes"
 
@@ -124,6 +125,19 @@ class WheelSizeService extends MedusaService({ WheelSizeCatalog, WheelSizeFitmen
       rows as unknown as Parameters<typeof buildReverseFitment>[0],
       p.canonicalBoltPatterns,
       p.wheelBoreMm ?? null,
+      p.limit ?? 24
+    )
+  }
+
+  /**
+   * Reverse tire fitment: cached vehicles whose factory (OEM) tire size matches a
+   * product's canonical sizes. Pure cache read — no wheel-size API calls, no quota.
+   */
+  async reverseTireFitment(p: { tireSizes: string[]; limit?: number }): Promise<ReverseTireFitmentVehicle[]> {
+    const rows = await this.listWheelSizeFitments({ status: "ok" })
+    return buildReverseTireFitment(
+      rows as unknown as Parameters<typeof buildReverseTireFitment>[0],
+      p.tireSizes,
       p.limit ?? 24
     )
   }

@@ -15,6 +15,7 @@ const CustomerVehicle = model.define("customer_vehicle", {
   diameter_window: model.json().nullable(),
   width_window: model.json().nullable(),
   offset_window: model.json().nullable(),
+  oem_tire_sizes: model.json().nullable(),
   fitment_status: model.text().nullable(),
   notes: model.text().nullable(),
 }).indexes([

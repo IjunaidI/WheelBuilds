@@ -13,7 +13,8 @@ export async function POST(req: MedusaRequest, res: MedusaResponse): Promise<voi
   const vehicle = await svc.updateCustomerVehicles({
     id: row.id, modification_slug: b.modificationSlug, canonical_bolt_patterns: b.canonicalBoltPatterns,
     hub_bore_mm: b.hubBoreMm, diameter_window: b.diameterWindow, width_window: b.widthWindow,
-    offset_window: b.offsetWindow, fitment_status: b.fitmentStatus, trim: b.trim, notes: b.notes,
+    offset_window: b.offsetWindow, oem_tire_sizes: b.oemTireSizes, fitment_status: b.fitmentStatus,
+    trim: b.trim, notes: b.notes,
   })
   res.json({ vehicle })
 }

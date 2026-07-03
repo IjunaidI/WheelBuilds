@@ -17,6 +17,7 @@ export const VehicleCreateSchema = z.object({
   diameterWindow: z.any().nullish(),
   widthWindow: z.any().nullish(),
   offsetWindow: z.any().nullish(),
+  oemTireSizes: z.array(z.string()).nullish(),
   fitmentStatus: z.string().nullish(),
   notes: z.string().nullish(),
 })

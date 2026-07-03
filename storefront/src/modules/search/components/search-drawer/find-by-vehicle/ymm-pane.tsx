@@ -10,6 +10,8 @@ import Field from "@modules/common/components/field"
 import Select from "@modules/common/components/select"
 import { Button } from "@/components/ui/button"
 import { useGarage } from "@lib/garage/use-garage"
+import DestinationToggle from "./destination-toggle"
+import { fitmentDestinationUrl, FitmentTarget } from "./destination-url"
 import {
   getMakes,
   getModels,
@@ -86,6 +88,7 @@ const YmmPane = ({ onClose }: YmmPaneProps) => {
   const [loadingMods, setLoadingMods] = useState(false)
 
   const [submitting, setSubmitting] = useState(false)
+  const [target, setTarget] = useState<FitmentTarget>("wheels")
 
   // Load makes on mount; fall back to the static seed if the catalog fetch fails.
   useEffect(() => {
@@ -202,7 +205,6 @@ const YmmPane = ({ onClose }: YmmPaneProps) => {
       setActive(vehicle.id)
       // fire the (human-initiated) fitment lookup, then write it back
       const fitment = await getFitmentByVehicle(make, model, modificationSlug, year, "usdm")
-      let fitParam = ""
       if (fitment && !("error" in fitment)) {
         update(vehicle.id, {
           canonicalBoltPatterns: fitment.canonicalBoltPatterns,
@@ -214,7 +216,7 @@ const YmmPane = ({ onClose }: YmmPaneProps) => {
           fitmentStatus: fitment.status,
         })
         if (fitment.status === "ok" && fitment.canonicalBoltPatterns.length) {
-          fitParam = `?fit=${fitment.canonicalBoltPatterns.join(",")}`
+          // handled below via fitmentDestinationUrl
         } else {
           // status === "not_found" (or "ok" with no bolt pattern): wheel-size has
           // no fitment for this vehicle, so there is nothing to filter by. Tell the
@@ -230,7 +232,11 @@ const YmmPane = ({ onClose }: YmmPaneProps) => {
         })
       }
       onClose()
-      router.push(`/${countryCode}/store${fitParam}`)
+      const boltPatterns =
+        fitment && !("error" in fitment) && fitment.status === "ok" ? fitment.canonicalBoltPatterns : []
+      const oemTireSizes =
+        fitment && !("error" in fitment) ? (fitment.oemTireSizes ?? []) : []
+      router.push(fitmentDestinationUrl({ countryCode, target, boltPatterns, oemTireSizes }))
     } finally {
       setSubmitting(false)
     }
@@ -330,6 +336,9 @@ const YmmPane = ({ onClose }: YmmPaneProps) => {
             ))}
           </Select>
         </Field>
+      </div>
+      <div className="mt-3">
+        <DestinationToggle value={target} onChange={setTarget} />
       </div>
       <Button type="submit" disabled={!canSubmit} className="w-full mt-2">
         {submitting ? (

@@ -9,6 +9,8 @@ import Spinner from "@modules/common/icons/spinner"
 import Chip from "@modules/common/components/chip"
 import { Button } from "@/components/ui/button"
 import { useGarage } from "@lib/garage/use-garage"
+import DestinationToggle from "./destination-toggle"
+import { fitmentDestinationUrl, FitmentTarget } from "./destination-url"
 import { getFitmentByVehicle } from "@lib/data/fitment"
 import { Vehicle, NewVehicle } from "@lib/garage/types"
 
@@ -36,6 +38,7 @@ const GaragePane = ({ onClose, onAddNew }: GaragePaneProps) => {
   const { countryCode } = useParams() as { countryCode: string }
   const { vehicles, active, setActive, remove, add, update } = useGarage()
   const [selectingId, setSelectingId] = useState<string | null>(null)
+  const [target, setTarget] = useState<FitmentTarget>("wheels")
 
   const selectVehicle = async (id: string) => {
     const v = vehicles.find((veh) => veh.id === id)
@@ -43,6 +46,7 @@ const GaragePane = ({ onClose, onAddNew }: GaragePaneProps) => {
     setActive(id)
 
     let patterns = v.canonicalBoltPatterns ?? []
+    let oemTireSizes = v.oemTireSizes ?? []
     // A saved vehicle that was added before its fitment resolved (or whose
     // fitment didn't persist) has no stored bolt patterns. Re-resolve it from
     // the vehicle's identity so the garage tab applies the fit exactly like the
@@ -64,10 +68,12 @@ const GaragePane = ({ onClose, onAddNew }: GaragePaneProps) => {
             diameterWindow: fitment.diameterWindow,
             widthWindow: fitment.widthWindow,
             offsetWindow: fitment.offsetWindow,
+            oemTireSizes: fitment.oemTireSizes,
             fitmentStatus: fitment.status,
           })
           if (fitment.status === "ok" && fitment.canonicalBoltPatterns.length) {
             patterns = fitment.canonicalBoltPatterns
+            oemTireSizes = fitment.oemTireSizes ?? []
           } else {
             toast("No fitment data for this vehicle yet", {
               description:
@@ -84,9 +90,8 @@ const GaragePane = ({ onClose, onAddNew }: GaragePaneProps) => {
       }
     }
 
-    const fitParam = patterns.length ? `?fit=${patterns.join(",")}` : ""
     onClose()
-    router.push(`/${countryCode}/store${fitParam}`)
+    router.push(fitmentDestinationUrl({ countryCode, target, boltPatterns: patterns, oemTireSizes }))
   }
 
   const removeVehicle = (v: Vehicle) => {
@@ -139,6 +144,7 @@ const GaragePane = ({ onClose, onAddNew }: GaragePaneProps) => {
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+      <div className="pb-1"><DestinationToggle value={target} onChange={setTarget} /></div>
       {vehicles.map((v) => {
         const isActive = active?.id === v.id
         const label = [v.year, v.make, v.model, v.trim]

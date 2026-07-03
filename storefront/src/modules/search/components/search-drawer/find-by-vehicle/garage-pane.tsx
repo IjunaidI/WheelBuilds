@@ -9,7 +9,6 @@ import Spinner from "@modules/common/icons/spinner"
 import Chip from "@modules/common/components/chip"
 import { Button } from "@/components/ui/button"
 import { useGarage } from "@lib/garage/use-garage"
-import DestinationToggle from "./destination-toggle"
 import { fitmentDestinationUrl, FitmentTarget } from "./destination-url"
 import { getFitmentContext } from "@lib/stores/fitment-context"
 import { getFitmentByVehicle } from "@lib/data/fitment"
@@ -39,9 +38,10 @@ const GaragePane = ({ onClose, onAddNew }: GaragePaneProps) => {
   const { countryCode } = useParams() as { countryCode: string }
   const { vehicles, active, setActive, remove, add, update } = useGarage()
   const [selectingId, setSelectingId] = useState<string | null>(null)
-  // Default the destination to the surface the drawer was opened from: on a tire
-  // surface (/tires or a tire PDP) → "tires", else "wheels". Toggle overrides it.
-  const [target, setTarget] = useState<FitmentTarget>(() => getFitmentContext())
+  // Route by the surface the drawer was opened from: on a tire surface (/tires or
+  // a tire PDP) a saved-vehicle pick fits tires, everywhere else it fits wheels.
+  // Captured at mount; no visible control (page context drives it).
+  const [target] = useState<FitmentTarget>(() => getFitmentContext())
 
   const selectVehicle = async (id: string) => {
     const v = vehicles.find((veh) => veh.id === id)
@@ -147,7 +147,6 @@ const GaragePane = ({ onClose, onAddNew }: GaragePaneProps) => {
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-      <div className="pb-1"><DestinationToggle value={target} onChange={setTarget} /></div>
       {vehicles.map((v) => {
         const isActive = active?.id === v.id
         const label = [v.year, v.make, v.model, v.trim]

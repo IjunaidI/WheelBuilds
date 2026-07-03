@@ -10,7 +10,6 @@ import Field from "@modules/common/components/field"
 import Select from "@modules/common/components/select"
 import { Button } from "@/components/ui/button"
 import { useGarage } from "@lib/garage/use-garage"
-import DestinationToggle from "./destination-toggle"
 import { fitmentDestinationUrl, FitmentTarget } from "./destination-url"
 import { getFitmentContext } from "@lib/stores/fitment-context"
 import {
@@ -89,9 +88,10 @@ const YmmPane = ({ onClose }: YmmPaneProps) => {
   const [loadingMods, setLoadingMods] = useState(false)
 
   const [submitting, setSubmitting] = useState(false)
-  // Default the destination to the surface the drawer was opened from: on a tire
-  // surface (/tires or a tire PDP) → "tires", else "wheels". Toggle overrides it.
-  const [target, setTarget] = useState<FitmentTarget>(() => getFitmentContext())
+  // Route by the surface the drawer was opened from: on a tire surface (/tires or
+  // a tire PDP) a car pick fits tires, everywhere else it fits wheels. Captured at
+  // mount; no visible control (page context drives it).
+  const [target] = useState<FitmentTarget>(() => getFitmentContext())
 
   // Load makes on mount; fall back to the static seed if the catalog fetch fails.
   useEffect(() => {
@@ -339,9 +339,6 @@ const YmmPane = ({ onClose }: YmmPaneProps) => {
             ))}
           </Select>
         </Field>
-      </div>
-      <div className="mt-3">
-        <DestinationToggle value={target} onChange={setTarget} />
       </div>
       <Button type="submit" disabled={!canSubmit} className="w-full mt-2">
         {submitting ? (

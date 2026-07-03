@@ -712,3 +712,27 @@
 - verify: the home page renders a "Shop Tires" rail of real tire cards after the wheels rail, each linking to its tire PDP and "View all tires →" → `/tires`; with no tires indexed the section is absent (no empty shell). **Gate met: storefront tsc 0-new on the touched files; `/` compiles.** Subagent-driven (1 task + spec+quality review).
 - notes: out of scope — promo banner, fit-filtering the rail itself, hero/trust/metadata copy changes, a curated tire-handles env list (the `getHomeTires` seam leaves room for it later).
 - refs: design [docs/done/specs/2026-07-03-home-tire-rail-design.md](../done/specs/2026-07-03-home-tire-rail-design.md) ; plan [docs/done/plans/2026-07-03-home-tire-rail.md](../done/plans/2026-07-03-home-tire-rail.md)
+
+---
+
+### WB-065 · Tire PDP has no reverse "confirmed models" list   [MEDIUM]
+- status: done
+- area: backend/wheel-size + storefront/product-detail
+- evidence: backend/src/modules/wheel-size/{reverse-tire-fitment,service,types}.ts + api/store/fitment/by-tire-product/route.ts ; storefront/src/lib/data/fitment.ts + modules/product-detail/{data/types,data/get-product,data/tire/map-tire-detail}.ts + components/tire/fitment.tsx + templates/tire-detail.tsx
+- problem: the wheel PDP shows a "FITMENT · N CONFIRMED MODELS" list (WB-009), but the tire PDP had no reverse-fitment surface — a shopper couldn't see which vehicles a tire fits.
+- fix: the tire analog of WB-009, keyed on **OEM tire size** instead of bolt pattern. Pure reverse over the cached `wheel_size_fitment` rows: `buildReverseTireFitment` matches cached vehicles whose `extractOemTireSizes(raw)` intersects the product's canonical `tire_sizes`, identity via the reused `extractVehicleIdentity` — `service.reverseTireFitment` + `GET /store/fitment/by-tire-product` (degrades to `{ vehicles: [] }`, never 503). The tire PDP loader populates `TireProductDetail.fitment`; a `TireFitment` section (mirrors the wheel `components/fitment/`, verdict via `tireFitsVehicle`) renders "N CONFIRMED MODELS" + the active-vehicle status band. No new wheel-size API calls, no migration.
+- verify: a tire PDP shows a "CONFIRMED MODELS" list of vehicles that run that size from the factory + a fits/doesn't-fit band for the active garage vehicle; empty data degrades silently. **Gates met: backend `test:fitment` 71 pass / 1 skip (incl. new reverse-tire-fitment); storefront vitest 171 pass (32 files); tsc 0-new. Wheel PDP untouched.** Subagent-driven (3 tasks + per-task spec+quality reviews + opus final).
+- notes: OEM-only (matches WB-063 forward); the dead "submit your build" `<a href="#">` from the wheel section is dropped, not reimplemented.
+- refs: design [docs/done/specs/2026-07-03-tire-fitment-reach-design.md](../done/specs/2026-07-03-tire-fitment-reach-design.md) ; plan [docs/done/plans/2026-07-03-tire-fitment-reach.md](../done/plans/2026-07-03-tire-fitment-reach.md)
+
+---
+
+### WB-066 · Vehicle-picker funnel routes only to wheels   [MEDIUM]
+- status: done
+- area: storefront/search
+- evidence: storefront/src/modules/search/components/search-drawer/find-by-vehicle/{destination-url,destination-toggle}.tsx + ymm-pane.tsx + garage-pane.tsx
+- problem: every "find by vehicle" entry (YMM pane, garage pane) routed to `/store` (wheels). A shopper who picked their car always landed on wheels, never tires — even though `/tires` auto-applies the active vehicle's OEM-size fit.
+- fix: a "Shop for: Wheels | Tires" segmented toggle (default Wheels) on both the YMM and garage panes, plus a pure `fitmentDestinationUrl({ countryCode, target, boltPatterns, oemTireSizes })` builder — Wheels → `/store?fit=<boltPatterns>` (unchanged), Tires → `/tires?fit=<oemTireSizes>` so the tire surface renders pre-fitted on first paint. The garage `update()` now also persists `oemTireSizes` so re-resolved older vehicles carry them. Every existing fitment-lookup + toast branch preserved; toggle state is local to the drawer (no persistence).
+- verify: picking a car with "Tires" selected lands on `/tires` filtered to the vehicle's OEM sizes; "Wheels" behaves exactly as before. **Gate met: storefront vitest 171 pass (incl. new `fitmentDestinationUrl` cases); tsc 0-new.** Subagent-driven (2 tasks + per-task spec+quality reviews + opus final).
+- notes: out of scope — hero-tile / popular-chip / trending tire paths (separate merchandising item); changing the wheel default; toggle persistence. Known follow-up: the "No fitment data" toast is wheel-flavored regardless of target (fires off bolt-pattern availability) — cosmetic honesty nit, not fixed here.
+- refs: design [docs/done/specs/2026-07-03-tire-fitment-reach-design.md](../done/specs/2026-07-03-tire-fitment-reach-design.md) ; plan [docs/done/plans/2026-07-03-tire-fitment-reach.md](../done/plans/2026-07-03-tire-fitment-reach.md)

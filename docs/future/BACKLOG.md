@@ -700,3 +700,15 @@
 - verify: with a garage vehicle active, `/tires` auto-applies the OEM-size fit filter (header shows "FITS YOUR CAR", "Show all" escapes to `fit=0`), fitting tire cards show a FITS badge, and a fitting tire's PDP shows "FITS YOUR {car}" + defaults to a fitting size. **Gates met: backend `test:fitment` 66 pass / 1 skip (incl. new oem-tire-sizes + canonicalize-tire-size); storefront vitest 168 pass (31 files); tsc 0-new on the tire/fitment surface. Wheel fitment path unchanged (only additive optional `oemTireSizes`).** Subagent-driven (8 tasks + per-task spec+quality reviews + opus final review).
 - notes: forward-only — the reverse "N vehicles this tire fits" list (the WB-009 analog) is deferred, along with aftermarket/plus-size/`/upsteps/` sizes (OEM-only) and staggered front/rear (flattened front+rear into one size set).
 - refs: design [docs/in-progress/specs/2026-07-03-tire-fitment-design.md](../in-progress/specs/2026-07-03-tire-fitment-design.md) ; plan [docs/in-progress/plans/2026-07-03-tire-fitment.md](../in-progress/plans/2026-07-03-tire-fitment.md)
+
+---
+
+### WB-064 · Home page shows no tire content (wheels-only landing)   [MEDIUM]
+- status: done
+- area: storefront/home
+- evidence: storefront/src/app/[countryCode]/(main)/page.tsx ; storefront/src/modules/home/components/shop-tires-row/index.tsx ; storefront/src/modules/home/data/get-home-tires.ts
+- problem: the tire store is live (WB-005) with fitment (WB-063), but the home page was eight wheel-only sections — nothing on the landing page signalled that Wheel Builds also sells tires.
+- fix: one new home section — a live "Shop Tires" rail of the newest 6 tires, placed directly after "New This Week". A throw-safe `getHomeTires(limit)` wraps the existing `getTireDiscoveryProducts` (`sort:"newest"`, `EMPTY_TIRE_FILTERS`); `ShopTiresRow` (async server component mirroring `new-drops-row`) renders the existing `TireProductCard` grid and degrades to `null` when empty. Reuses the WB-063 `TireFitBadge` for free (cards show "FITS" when a garage vehicle matches). No new facet/card/test; no backend change.
+- verify: the home page renders a "Shop Tires" rail of real tire cards after the wheels rail, each linking to its tire PDP and "View all tires →" → `/tires`; with no tires indexed the section is absent (no empty shell). **Gate met: storefront tsc 0-new on the touched files; `/` compiles.** Subagent-driven (1 task + spec+quality review).
+- notes: out of scope — promo banner, fit-filtering the rail itself, hero/trust/metadata copy changes, a curated tire-handles env list (the `getHomeTires` seam leaves room for it later).
+- refs: design [docs/done/specs/2026-07-03-home-tire-rail-design.md](../done/specs/2026-07-03-home-tire-rail-design.md) ; plan [docs/done/plans/2026-07-03-home-tire-rail.md](../done/plans/2026-07-03-home-tire-rail.md)

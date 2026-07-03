@@ -25,7 +25,7 @@ export function normalizeByModel(
   const entry = raw?.data?.[0]
   if (!entry) {
     return { status: "not_found", canonicalBoltPatterns: [], hubBoreMm: null,
-      diameterWindow: null, widthWindow: null, offsetWindow: null, source }
+      diameterWindow: null, widthWindow: null, offsetWindow: null, oemTireSizes: [], source }
   }
 
   const tech = entry.technical ?? {}
@@ -53,6 +53,7 @@ export function normalizeByModel(
     diameterWindow: windowFrom(rims.map((r) => r.rim_diameter)),
     widthWindow: windowFrom(rims.map((r) => r.rim_width)),
     offsetWindow: windowFrom(rims.map((r) => r.rim_offset)),
+    oemTireSizes: [],
     source,
   }
 }

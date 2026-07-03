@@ -8,11 +8,13 @@ export type VehicleFitment = {
   diameterWindow: Window
   widthWindow: Window
   offsetWindow: Window
+  /** Factory (is_stock) tire sizes for the vehicle, canonical (e.g. "225/55R18"). */
+  oemTireSizes: string[]
   source: { modificationSlug: string; region: string }
 }
 
 // Minimal shape of the v2 by_model response we read (see Task-1 findings for the authoritative paths).
-export type RawRim = { rim_diameter: number | null; rim_width: number | null; rim_offset: number | null }
+export type RawRim = { rim_diameter: number | null; rim_width: number | null; rim_offset: number | null; tire?: string | null }
 export type RawWheelEntry = { is_stock: boolean; front?: RawRim | null; rear?: RawRim | null }
 export type RawTechnical = { bolt_pattern?: string; pcd?: number; stud_holes?: number; centre_bore?: number | string }
 export type RawByModelEntry = { technical?: RawTechnical; centre_bore?: number | string; wheels?: RawWheelEntry[] }

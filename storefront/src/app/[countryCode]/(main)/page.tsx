@@ -2,9 +2,9 @@ import { Metadata } from "next"
 
 import Hero from "@modules/home/components/hero"
 import NewDropsRow from "@modules/home/components/new-drops-row"
-import ShopTiresRow from "@modules/home/components/shop-tires-row"
 import ShopByStyle from "@modules/home/components/shop-by-style"
 import FeaturedBlocks from "@modules/home/components/featured-blocks"
+import TiresBand from "@modules/home/components/tires-band"
 import ShopByBrand from "@modules/home/components/shop-by-brand"
 import CatalogWall from "@modules/home/components/catalog-wall"
 import TrustStrip from "@modules/home/components/trust-strip"
@@ -28,9 +28,9 @@ export default async function Home() {
     <>
       <Hero brandCount={brandCount} />
       <NewDropsRow />
-      <ShopTiresRow />
       <ShopByStyle />
       <FeaturedBlocks />
+      <TiresBand />
       <ShopByBrand />
       <CatalogWall />
       <TrustStrip brandCount={brandCount} />

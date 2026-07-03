@@ -2,6 +2,7 @@ import { Metadata } from "next"
 
 import Hero from "@modules/home/components/hero"
 import NewDropsRow from "@modules/home/components/new-drops-row"
+import ShopTiresRow from "@modules/home/components/shop-tires-row"
 import ShopByStyle from "@modules/home/components/shop-by-style"
 import FeaturedBlocks from "@modules/home/components/featured-blocks"
 import ShopByBrand from "@modules/home/components/shop-by-brand"
@@ -27,6 +28,7 @@ export default async function Home() {
     <>
       <Hero brandCount={brandCount} />
       <NewDropsRow />
+      <ShopTiresRow />
       <ShopByStyle />
       <FeaturedBlocks />
       <ShopByBrand />

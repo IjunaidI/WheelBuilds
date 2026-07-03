@@ -4,8 +4,11 @@ import { useState } from "react"
 import { useParams, useRouter } from "next/navigation"
 import { toast } from "sonner"
 import Icon from "@modules/common/components/icon"
+import Chip from "@modules/common/components/chip"
 import { Button } from "@/components/ui/button"
 import { addToCart } from "@lib/data/cart"
+import { useGarage } from "@lib/garage/use-garage"
+import { tireFitsVehicle } from "@lib/fitment/tire-fits-vehicle"
 import { TireSizeOption } from "../../../data/types"
 import { DEFAULT_TIRE_QTY, TRUST_STRIP } from "../../../data/pdp-config"
 
@@ -13,17 +16,32 @@ type TirePurchasePanelProps = {
   selectedSize: TireSizeOption | undefined
   /** Computed unit price for the current size, in cents. */
   unitPriceCents: number
+  /** This product's canonical sizes (`sizeOptions[].canonicalSize`), for the fit chip. */
+  productSizes: string[]
 }
 
 const formatUsd = (cents: number) => `$${Math.round(cents / 100).toLocaleString()}`
 
 /**
- * Tire PDP purchase actions: qty stepper, Add to cart, Buy now, trust strip.
- * A SIMPLIFIED mirror of the wheel PurchasePanel — no fitment chip, no
- * finish, no brand/name/price header (those render directly in hero/index.tsx
- * above the size picker). Wishlist Save is omitted (no wishlist backend yet).
+ * Tire PDP purchase actions: fit chip, qty stepper, Add to cart, Buy now,
+ * trust strip. A SIMPLIFIED mirror of the wheel PurchasePanel — no finish, no
+ * brand/name/price header (those render directly in hero/index.tsx above the
+ * size picker). Wishlist Save is omitted (no wishlist backend yet).
  */
-const TirePurchasePanel = ({ selectedSize, unitPriceCents }: TirePurchasePanelProps) => {
+const TirePurchasePanel = ({
+  selectedSize,
+  unitPriceCents,
+  productSizes,
+}: TirePurchasePanelProps) => {
+  const { active } = useGarage()
+  // Honesty chip (WB-056 analog): reflects whether ANY size this product is
+  // offered in matches the active vehicle's OEM tire sizes — not just the
+  // currently selected size, since (unlike the wheel PDP) picking a
+  // non-fitting tire size here isn't a "custom override" the shopper opted
+  // into, it's just browsing the size list. Three states: fits / doesn't fit /
+  // no vehicle active (chip hidden entirely).
+  const fits =
+    !!active?.oemTireSizes?.length && tireFitsVehicle(productSizes, active.oemTireSizes)
   const router = useRouter()
   const { countryCode } = useParams() as { countryCode: string }
   const [quantity, setQuantity] = useState(DEFAULT_TIRE_QTY)
@@ -76,6 +94,24 @@ const TirePurchasePanel = ({ selectedSize, unitPriceCents }: TirePurchasePanelPr
 
   return (
     <div className="flex flex-col">
+      {/* Fit chip — mirrors the wheel PurchasePanel's honesty chip. Nothing
+          renders when no vehicle is active. */}
+      {active && (
+        <div className="mb-5">
+          {fits ? (
+            <Chip variant="accent" dot>
+              FITS YOUR {active.year} {active.make.toUpperCase()}{" "}
+              {active.model.toUpperCase()}
+            </Chip>
+          ) : (
+            <Chip variant="outline">
+              MAY NOT FIT · {active.year} {active.make.toUpperCase()}{" "}
+              {active.model.toUpperCase()}
+            </Chip>
+          )}
+        </div>
+      )}
+
       {/* Quantity + Add to cart */}
       <div className="flex items-stretch gap-3">
         <div className="inline-flex items-center border border-[var(--hairline)] rounded-[var(--radius)] h-14 bg-white">

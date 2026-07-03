@@ -33,7 +33,12 @@ export const getProductByHandle = cache(async function (
       {
         handle,
         region_id: regionId,
-        fields: "*variants.calculated_price,+variants.inventory_quantity,+collection_id,+weight",
+        // +metadata is load-bearing: the PDP loader branches on
+        // product.metadata.product_type ("wheel" | "tire"), and Medusa's Store API
+        // omits product metadata unless it's named — without it EVERY tire renders
+        // through the wheel template (blank image + zeroed specs), and the wheel
+        // PDP's own brand/construction/warranty (also read from metadata) come back empty.
+        fields: "*variants.calculated_price,+variants.inventory_quantity,+collection_id,+weight,+metadata",
       },
       { next: { tags: ["products"] } }
     )

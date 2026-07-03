@@ -7,9 +7,10 @@ import MobileMenu from "@modules/layout/components/mobile-menu"
 import Icon from "@modules/common/components/icon"
 import Logo from "@modules/common/components/logo"
 import SearchTrigger from "@modules/search/components/search-trigger"
+import NavLinks from "./nav-links"
 
-const NAV_ITEMS: { label: string; href: string; active?: boolean }[] = [
-  { label: "Wheels", href: "/store", active: true },
+const NAV_ITEMS: { label: string; href: string }[] = [
+  { label: "Wheels", href: "/store" },
   { label: "Tires", href: "/tires" },
   { label: "Brands", href: "/collections" },
   { label: "Style", href: "/categories" },
@@ -84,15 +85,7 @@ export default async function Nav() {
         className="hidden small:flex items-center px-10 bg-white h-14 gap-8"
         style={{ borderBottom: "1px solid var(--hairline)" }}
       >
-        {NAV_ITEMS.map((it) => (
-          <LocalizedClientLink
-            key={it.label}
-            href={it.href}
-            className={"nav-link" + (it.active ? " active" : "")}
-          >
-            {it.label}
-          </LocalizedClientLink>
-        ))}
+        <NavLinks items={NAV_ITEMS} />
       </div>
     </div>
   )

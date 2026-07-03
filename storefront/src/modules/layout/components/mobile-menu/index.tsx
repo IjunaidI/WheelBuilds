@@ -1,10 +1,12 @@
 "use client"
 
 import { useState } from "react"
+import { usePathname } from "next/navigation"
 import LocalizedClientLink from "@modules/common/components/localized-client-link"
 import Icon from "@modules/common/components/icon"
 import Logo from "@modules/common/components/logo"
 import Label from "@modules/common/components/label"
+import { isNavLinkActive } from "@modules/layout/templates/nav/nav-active"
 import { Button } from "@/components/ui/button"
 import {
   Drawer,
@@ -35,6 +37,7 @@ const ACCOUNT_ITEMS: { label: string; href: string; icon: "user" | "heart" | "ba
  */
 const MobileMenu = () => {
   const [open, setOpen] = useState(false)
+  const pathname = usePathname()
 
   return (
     <>
@@ -103,7 +106,12 @@ const MobileMenu = () => {
                   <LocalizedClientLink
                     href={it.href}
                     onClick={() => setOpen(false)}
-                    className="block py-3 text-[18px] font-[var(--display)] font-black uppercase tracking-[0.01em] text-[var(--ink)] no-underline border-b border-[var(--hairline)]"
+                    className={
+                      "block py-3 text-[18px] font-[var(--display)] font-black uppercase tracking-[0.01em] no-underline border-b border-[var(--hairline)] " +
+                      (isNavLinkActive(pathname, it.href)
+                        ? "text-[var(--orange)]"
+                        : "text-[var(--ink)]")
+                    }
                   >
                     {it.label}
                   </LocalizedClientLink>

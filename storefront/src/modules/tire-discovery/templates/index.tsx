@@ -6,6 +6,7 @@ import TireMobileFilterTrigger from "../components/filter-rail/mobile-trigger"
 import TireGrid from "../components/grid"
 import TirePagination from "../components/pagination"
 import TireEmpty from "../components/empty-state"
+import FitmentContextSetter from "@modules/common/components/fitment-context-setter"
 import { DEFAULT_PAGE_SIZE, TireDiscoveryResult } from "../data/types"
 
 type TireDiscoveryTemplateProps = {
@@ -40,6 +41,7 @@ const TireDiscoveryTemplate = ({
 
   return (
     <section className="px-5 pt-6 pb-16 xsmall:px-8 small:px-20 small:pt-8 small:pb-20">
+      <FitmentContextSetter target="tires" />
       <TireFitmentSync />
       <TireHeader totalCount={result.totalCount} />
       <TireActiveChips />

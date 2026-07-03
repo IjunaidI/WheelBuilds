@@ -6,6 +6,7 @@ import TireHero from "../components/tire/hero"
 import TireSpecs from "../components/tire/specs"
 import TireFitment from "../components/tire/fitment"
 import TireRelated from "../components/tire/related"
+import FitmentContextSetter from "@modules/common/components/fitment-context-setter"
 
 type TireDetailTemplateProps = {
   product: TireProductDetail
@@ -27,6 +28,7 @@ const TireDetailTemplate = ({
     className="px-5 pt-6 pb-16 xsmall:px-8 small:px-20 small:pt-8 small:pb-20"
     style={{ maxWidth: 1600, margin: "0 auto" }}
   >
+    <FitmentContextSetter target="tires" />
     <div className="mb-6 small:mb-8">
       <TireBreadcrumb brand={product.brand} name={product.name} />
     </div>

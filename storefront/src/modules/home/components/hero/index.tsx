@@ -25,6 +25,12 @@ const Hero = ({ brandCount }: { brandCount?: number }) => {
     ? `Find My Fit · See wheels for your ${active.make}`
     : "Find My Fit · Start with your vehicle"
 
+  // The active-vehicle CTA is a wheels CTA ("See wheels for your …"), so carry the
+  // vehicle's bolt-pattern fit into /store instead of dropping on the bare catalog.
+  const activeFitHref = active?.canonicalBoltPatterns?.length
+    ? `/store?fit=${active.canonicalBoltPatterns.join(",")}`
+    : "/store"
+
   const TRUST_POINTS = [
     ...HERO_COPY.trustPoints,
     { l: "Authorized dealer", s: brandCount ? `${brandCount} brands` : "Premium brands" },
@@ -104,7 +110,7 @@ const Hero = ({ brandCount }: { brandCount?: number }) => {
         <div className="flex gap-3 small:gap-3.5 items-stretch small:items-center flex-wrap">
           {active ? (
             <Button asChild size="lg" className="w-full small:w-auto">
-              <LocalizedClientLink href="/store">
+              <LocalizedClientLink href={activeFitHref}>
                 {primaryCtaText}
                 <Icon name="arrow-right" size={18} color="white" />
               </LocalizedClientLink>

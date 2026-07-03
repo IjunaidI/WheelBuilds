@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button"
 import { useGarage } from "@lib/garage/use-garage"
 import DestinationToggle from "./destination-toggle"
 import { fitmentDestinationUrl, FitmentTarget } from "./destination-url"
+import { getFitmentContext } from "@lib/stores/fitment-context"
 import { getFitmentByVehicle } from "@lib/data/fitment"
 import { Vehicle, NewVehicle } from "@lib/garage/types"
 
@@ -38,7 +39,9 @@ const GaragePane = ({ onClose, onAddNew }: GaragePaneProps) => {
   const { countryCode } = useParams() as { countryCode: string }
   const { vehicles, active, setActive, remove, add, update } = useGarage()
   const [selectingId, setSelectingId] = useState<string | null>(null)
-  const [target, setTarget] = useState<FitmentTarget>("wheels")
+  // Default the destination to the surface the drawer was opened from: on a tire
+  // surface (/tires or a tire PDP) → "tires", else "wheels". Toggle overrides it.
+  const [target, setTarget] = useState<FitmentTarget>(() => getFitmentContext())
 
   const selectVehicle = async (id: string) => {
     const v = vehicles.find((veh) => veh.id === id)

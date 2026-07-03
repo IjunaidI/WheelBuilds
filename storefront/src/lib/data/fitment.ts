@@ -1,6 +1,6 @@
 import { sdk } from "@lib/config"
 import type { VehicleFitment } from "@lib/garage/types"
-import type { FitmentEntry } from "@modules/product-detail/data/types"
+import type { FitmentEntry, TireFitmentEntry } from "@modules/product-detail/data/types"
 import { unwrapFitment } from "./fitment-unwrap"
 
 export const getMakes = () => sdk.client.fetch<{ makes: any }>("/store/vehicle-catalog/makes")
@@ -26,6 +26,26 @@ export async function getFitmentByProduct(
     }
     const body = await sdk.client.fetch<{ vehicles: FitmentEntry[] }>(
       `/store/fitment/by-product?${params.toString()}`,
+      { next: { revalidate: 300 } } as any
+    )
+    return Array.isArray(body?.vehicles) ? body.vehicles : []
+  } catch {
+    return []
+  }
+}
+
+/**
+ * Reverse tire fitment for the tire PDP "confirmed models" list: cached vehicles
+ * whose factory tire size matches this product's canonical sizes. Server-side;
+ * best-effort cache via Next revalidate. Returns [] on any error (section degrades).
+ */
+export async function getFitmentByTireProduct(sizes: string[]): Promise<TireFitmentEntry[]> {
+  if (!sizes?.length) return []
+  try {
+    const params = new URLSearchParams()
+    params.set("sizes", sizes.join(","))
+    const body = await sdk.client.fetch<{ vehicles: TireFitmentEntry[] }>(
+      `/store/fitment/by-tire-product?${params.toString()}`,
       { next: { revalidate: 300 } } as any
     )
     return Array.isArray(body?.vehicles) ? body.vehicles : []

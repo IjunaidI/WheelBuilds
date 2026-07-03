@@ -80,6 +80,15 @@ export type FitmentEntry = {
   notes?: string
 }
 
+/** A vehicle whose factory (OEM) tire size matches this tire. Drives the tire fitment list. */
+export type TireFitmentEntry = {
+  year: string
+  make: string
+  model: string
+  trim?: string
+  size: string
+}
+
 export type ProductDetail = DiscoveryProduct & {
   kind: "wheel"
 
@@ -153,6 +162,7 @@ export type TireProductDetail = {
   rimDiameters: number[]
   sizeOptions: TireSizeOption[]
   specs: TireSpecs
+  fitment: TireFitmentEntry[]
 }
 
 export type AnyProductDetail = ProductDetail | TireProductDetail

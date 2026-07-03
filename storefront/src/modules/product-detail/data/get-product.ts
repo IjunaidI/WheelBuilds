@@ -14,7 +14,7 @@ import { notFound } from "next/navigation"
 import { HttpTypes } from "@medusajs/types"
 import { getProductByHandle, getProductsList } from "@lib/data/products"
 import { getRegion } from "@lib/data/regions"
-import { getFitmentByProduct } from "@lib/data/fitment"
+import { getFitmentByProduct, getFitmentByTireProduct } from "@lib/data/fitment"
 import { canonicalBoltPatterns } from "@lib/fitment/canonical-bolt-pattern"
 import { normalizeFinish } from "@lib/fitment/normalize-finish"
 import { DiscoveryProduct } from "@modules/discovery/data/types"
@@ -103,7 +103,12 @@ export async function getProductDetail(handle: string): Promise<AnyProductDetail
   if (!product) notFound()
 
   if ((product.metadata as any)?.product_type === "tire") {
-    return mapTireDetail(product)
+    const tire = mapTireDetail(product)
+    const sizes = Array.from(
+      new Set(tire.sizeOptions.map((o) => o.canonicalSize).filter(Boolean))
+    )
+    const fitment = await getFitmentByTireProduct(sizes)
+    return { ...tire, fitment }
   }
 
   const detail = mapToDetail(product)

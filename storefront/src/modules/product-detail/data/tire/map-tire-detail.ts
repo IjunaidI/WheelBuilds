@@ -41,5 +41,6 @@ export function mapTireDetail(product: HttpTypes.StoreProduct): TireProductDetai
       tireType,
       weightLb,
     },
+    fitment: [], // default; getProductDetail overrides via reverse tire fitment (WB-065)
   }
 }

@@ -7,6 +7,7 @@ import { TireProductDetail, TireSizeOption } from "../../../data/types"
 import { sizesForRim, pickDefaultTireSize } from "../../../data/tire/tire-size-options"
 import { useGarage } from "@lib/garage/use-garage"
 import { tireFitsVehicle } from "@lib/fitment/tire-fits-vehicle"
+import { setSelectedTireFit } from "@lib/stores/selected-tire-fit"
 import FitBanner from "@modules/product-detail/components/hero/fit-banner"
 import TireGallery from "./gallery"
 import TireSizePicker from "./size-picker"
@@ -103,6 +104,23 @@ const TireHero = ({ product }: TireHeroProps) => {
       pickDefaultTireSize(sizesForSelectedRim),
     [visibleSizeOptions, selectedSizeLabel, sizesForSelectedRim]
   )
+
+  // Publish the selected size's fit spec so the fitment section further down the
+  // page (a sibling component) can keep its "Does it fit your ride?" band honest
+  // per selection — same per-selection honesty as the purchase-panel chip. Reset
+  // to null on unmount so the next tire PDP doesn't inherit a stale selection.
+  useEffect(() => {
+    setSelectedTireFit(
+      selectedSize
+        ? {
+            size: selectedSize.canonicalSize,
+            loadIndex: selectedSize.loadIndex ?? null,
+            speedRating: selectedSize.speedRating ?? null,
+          }
+        : null
+    )
+  }, [selectedSize])
+  useEffect(() => () => setSelectedTireFit(null), [])
 
   // Keep the selection inside the visible set — the rim must be a visible rim and
   // the size must belong to it. Runs when the visible set (fit filter toggled) or

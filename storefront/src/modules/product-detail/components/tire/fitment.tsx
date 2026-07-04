@@ -6,6 +6,7 @@ import Icon from "@modules/common/components/icon"
 import { Button } from "@/components/ui/button"
 import { useGarage } from "@lib/garage/use-garage"
 import { openSearch } from "@lib/stores/search-store"
+import { useSelectedTireFit } from "@lib/stores/selected-tire-fit"
 import { tireFitsVehicle } from "@lib/fitment/tire-fits-vehicle"
 import { TireFitmentEntry, TireProductDetail } from "../../data/types"
 
@@ -23,17 +24,26 @@ type TireFitmentProps = {
  */
 const TireFitment = ({ product }: TireFitmentProps) => {
   const { active } = useGarage()
+  // The size currently selected in the hero (published to a shared store). The
+  // band reflects THIS selection so it stays honest when the shopper hits
+  // "Show all" and picks a non-fitting size — same per-selection honesty as the
+  // hero's purchase-panel chip.
+  const selectedSpec = useSelectedTireFit()
 
-  // Reverse fit check against the active vehicle's OEM tires (size + load + speed).
+  // Reverse fit check against the active vehicle's OEM tires (size + load +
+  // speed). Prefer the selected size; before the hero has published one (first
+  // paint / SSR), fall back to "does ANY offered size fit" so the band still
+  // renders a sensible state instead of flashing empty.
   const productSpecs = product.sizeOptions.map((o) => ({
     size: o.canonicalSize,
     loadIndex: o.loadIndex ?? null,
     speedRating: o.speedRating ?? null,
   }))
-  const activeFits =
-    active?.oemTires?.length
-      ? tireFitsVehicle(productSpecs, active.oemTires)
-      : null
+  const activeFits = !active?.oemTires?.length
+    ? null
+    : selectedSpec
+      ? tireFitsVehicle([selectedSpec], active.oemTires)
+      : tireFitsVehicle(productSpecs, active.oemTires)
 
   return (
     <section className="border-t border-[var(--hairline)] py-16 small:py-20">
@@ -123,8 +133,11 @@ const TireFitment = ({ product }: TireFitmentProps) => {
           so the final row doubles as the section's bottom frame. */}
       <div className="grid grid-cols-1 small:grid-cols-2 gap-x-8 gap-y-0 border-t border-[var(--hairline)]">
         {product.fitment.map((f, i) => {
+          // Highlight the active vehicle's row whenever it's in the confirmed
+          // list — independent of the currently selected size, so switching to a
+          // non-OEM size doesn't un-mark "YOUR VEHICLE" (the band above already
+          // carries the per-selection fit verdict).
           const isActive =
-            Boolean(activeFits) &&
             active &&
             f.make.toLowerCase() === active.make.toLowerCase() &&
             f.model.toLowerCase() === active.model.toLowerCase()

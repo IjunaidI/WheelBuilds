@@ -2,18 +2,18 @@
 
 import { useGarage } from "@lib/garage/use-garage"
 import Chip from "@modules/common/components/chip"
-import { tireFitsVehicle } from "@lib/fitment/tire-fits-vehicle"
+import { tireFitsVehicle, TireFitSpec } from "@lib/fitment/tire-fits-vehicle"
 
 /**
  * Renders the FITS chip on a tire discovery card when the active garage
- * vehicle's OEM tire sizes intersect the product's canonical sizes.
- * Client-only because the active vehicle lives in the garage store; the card
- * itself stays a server component. Mirrors the wheel discovery FitBadge
- * (modules/discovery/components/grid/fit-badge.tsx).
+ * vehicle's OEM tires (size + load + speed) intersect one of the product's
+ * per-variant fit specs. Client-only because the active vehicle lives in the
+ * garage store; the card itself stays a server component. Mirrors the wheel
+ * discovery FitBadge (modules/discovery/components/grid/fit-badge.tsx).
  */
-export default function TireFitBadge({ sizes }: { sizes: string[] }) {
+export default function TireFitBadge({ fitSpecs }: { fitSpecs: TireFitSpec[] }) {
   const { active } = useGarage()
-  if (!active?.oemTireSizes?.length || !tireFitsVehicle(sizes, active.oemTireSizes)) return null
+  if (!active?.oemTires?.length || !tireFitsVehicle(fitSpecs, active.oemTires)) return null
   return (
     <div className="absolute top-11 right-2.5">
       <Chip variant="accent" size="sm" dot>

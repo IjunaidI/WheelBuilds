@@ -50,7 +50,7 @@ const TireProductCard = ({ product }: TireProductCardProps) => {
         <div className="absolute top-2.5 right-2.5">
           <Chip variant="outline" size="sm">{TIRE_TYPE_LABEL[product.tireType]}</Chip>
         </div>
-        <TireFitBadge sizes={product.sizes} />
+        <TireFitBadge fitSpecs={product.fitSpecs} />
       </div>
 
       <div className="p-3 flex flex-col gap-1">

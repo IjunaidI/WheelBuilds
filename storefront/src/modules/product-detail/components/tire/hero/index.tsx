@@ -6,7 +6,7 @@ import Display from "@modules/common/components/display"
 import { TireProductDetail, TireSizeOption } from "../../../data/types"
 import { sizesForRim, pickDefaultTireSize } from "../../../data/tire/tire-size-options"
 import { useGarage } from "@lib/garage/use-garage"
-import { tireFitsVehicle } from "@lib/fitment/tire-fits-vehicle"
+import { tireFitsVehicle, TireFitSpec } from "@lib/fitment/tire-fits-vehicle"
 import FitBanner from "@modules/product-detail/components/hero/fit-banner"
 import TireGallery from "./gallery"
 import TireSizePicker from "./size-picker"
@@ -29,21 +29,35 @@ type TireHeroProps = {
 const TireHero = ({ product }: TireHeroProps) => {
   const { active } = useGarage()
 
-  // Canonical sizes this product offers — feeds both the purchase-panel fit chip
-  // and the fit filtering below.
-  const productSizes = useMemo(
-    () => product.sizeOptions.map((o) => o.canonicalSize),
+  // Per-variant fit specs (size + load + speed) this product offers — feeds
+  // both the purchase-panel fit chip and the fit filtering below.
+  const productSpecs = useMemo<TireFitSpec[]>(
+    () =>
+      product.sizeOptions.map((o) => ({
+        size: o.canonicalSize,
+        loadIndex: o.loadIndex ?? null,
+        speedRating: o.speedRating ?? null,
+      })),
     [product.sizeOptions]
   )
 
-  // The active vehicle's OEM tire sizes + the subset of this product's sizes that
-  // fit them. `fitsCar` is true when we can filter; when the car fits NONE of this
-  // tire's sizes we never filter to empty — we show everything and the purchase
-  // chip reads "MAY NOT FIT" (same honesty as the wheel hero's hasFit:false).
-  const oemSizes = active?.oemTireSizes ?? []
-  const oemKey = oemSizes.join(",")
+  // The active vehicle's OEM tires (size + load + speed) + the subset of this
+  // product's size options that fit them. `canFilter` is true when we can
+  // filter; when the car fits NONE of this tire's sizes we never filter to
+  // empty — we show everything and the purchase chip reads "MAY NOT FIT"
+  // (same honesty as the wheel hero's hasFit:false).
+  const oemTires = active?.oemTires ?? []
+  const oemKey = oemTires.map((t) => `${t.size}|${t.loadIndex ?? ""}|${t.speedRating ?? ""}`).join(",")
   const fittingSizeOptions = useMemo(
-    () => (oemSizes.length ? product.sizeOptions.filter((o) => tireFitsVehicle([o.canonicalSize], oemSizes)) : []),
+    () =>
+      oemTires.length
+        ? product.sizeOptions.filter((o) =>
+            tireFitsVehicle(
+              [{ size: o.canonicalSize, loadIndex: o.loadIndex ?? null, speedRating: o.speedRating ?? null }],
+              oemTires
+            )
+          )
+        : [],
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [product.sizeOptions, oemKey]
   )
@@ -170,7 +184,7 @@ const TireHero = ({ product }: TireHeroProps) => {
         <TirePurchasePanel
           selectedSize={selectedSize}
           unitPriceCents={unitPriceCents}
-          productSizes={productSizes}
+          productSpecs={productSpecs}
         />
       </div>
     </section>

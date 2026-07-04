@@ -24,11 +24,15 @@ type TireFitmentProps = {
 const TireFitment = ({ product }: TireFitmentProps) => {
   const { active } = useGarage()
 
-  // Reverse tire-size fit check against the active vehicle's OEM tire sizes.
-  const productSizes = product.sizeOptions.map((o) => o.canonicalSize)
+  // Reverse fit check against the active vehicle's OEM tires (size + load + speed).
+  const productSpecs = product.sizeOptions.map((o) => ({
+    size: o.canonicalSize,
+    loadIndex: o.loadIndex ?? null,
+    speedRating: o.speedRating ?? null,
+  }))
   const activeFits =
-    active?.oemTireSizes?.length
-      ? tireFitsVehicle(productSizes, active.oemTireSizes)
+    active?.oemTires?.length
+      ? tireFitsVehicle(productSpecs, active.oemTires)
       : null
 
   return (

@@ -8,7 +8,7 @@ import Chip from "@modules/common/components/chip"
 import { Button } from "@/components/ui/button"
 import { addToCart } from "@lib/data/cart"
 import { useGarage } from "@lib/garage/use-garage"
-import { tireFitsVehicle } from "@lib/fitment/tire-fits-vehicle"
+import { tireFitsVehicle, TireFitSpec } from "@lib/fitment/tire-fits-vehicle"
 import { TireSizeOption } from "../../../data/types"
 import { DEFAULT_TIRE_QTY, TRUST_STRIP } from "../../../data/pdp-config"
 
@@ -16,8 +16,8 @@ type TirePurchasePanelProps = {
   selectedSize: TireSizeOption | undefined
   /** Computed unit price for the current size, in cents. */
   unitPriceCents: number
-  /** This product's canonical sizes (`sizeOptions[].canonicalSize`), for the fit chip. */
-  productSizes: string[]
+  /** This product's per-variant fit specs (size + load + speed), for the fit chip. */
+  productSpecs: TireFitSpec[]
 }
 
 const formatUsd = (cents: number) => `$${Math.round(cents / 100).toLocaleString()}`
@@ -31,17 +31,17 @@ const formatUsd = (cents: number) => `$${Math.round(cents / 100).toLocaleString(
 const TirePurchasePanel = ({
   selectedSize,
   unitPriceCents,
-  productSizes,
+  productSpecs,
 }: TirePurchasePanelProps) => {
   const { active } = useGarage()
   // Honesty chip (WB-056 analog): reflects whether ANY size this product is
-  // offered in matches the active vehicle's OEM tire sizes — not just the
-  // currently selected size, since (unlike the wheel PDP) picking a
-  // non-fitting tire size here isn't a "custom override" the shopper opted
-  // into, it's just browsing the size list. Three states: fits / doesn't fit /
-  // no vehicle active (chip hidden entirely).
+  // offered in matches the active vehicle's OEM tires (size + load + speed) —
+  // not just the currently selected size, since (unlike the wheel PDP)
+  // picking a non-fitting tire size here isn't a "custom override" the
+  // shopper opted into, it's just browsing the size list. Three states: fits
+  // / doesn't fit / no vehicle active (chip hidden entirely).
   const fits =
-    !!active?.oemTireSizes?.length && tireFitsVehicle(productSizes, active.oemTireSizes)
+    !!active?.oemTires?.length && tireFitsVehicle(productSpecs, active.oemTires)
   const router = useRouter()
   const { countryCode } = useParams() as { countryCode: string }
   const [quantity, setQuantity] = useState(DEFAULT_TIRE_QTY)

@@ -46,6 +46,7 @@ class CustomerVehicleService extends MedusaService({ CustomerVehicle }) {
       width_window: input.widthWindow ?? null,
       offset_window: input.offsetWindow ?? null,
       oem_tire_sizes: input.oemTireSizes ?? null,
+      oem_tires: input.oemTires ?? null,
       fitment_status: input.fitmentStatus ?? null,
       notes: input.notes ?? null,
     })

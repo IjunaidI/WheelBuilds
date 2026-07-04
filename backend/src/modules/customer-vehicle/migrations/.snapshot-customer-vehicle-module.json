@@ -246,6 +246,22 @@
           "enumItems": [],
           "mappedType": "json"
         },
+        "oem_tires": {
+          "name": "oem_tires",
+          "type": "jsonb",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": true,
+          "unique": false,
+          "length": null,
+          "precision": null,
+          "scale": null,
+          "default": null,
+          "comment": null,
+          "enumItems": [],
+          "mappedType": "json"
+        },
         "fitment_status": {
           "name": "fitment_status",
           "type": "text",

@@ -59,7 +59,7 @@ const GaragePane = ({ onClose, onAddNew }: GaragePaneProps) => {
     // WB-063/067 (so an older saved vehicle backfills its tire sizes on select
     // and the tire fit applies).
     const needsResolve =
-      !(v.fitmentStatus === "ok" && patterns.length) || oemTireSizes.length === 0
+      !(v.fitmentStatus === "ok" && patterns.length) || oemTireSizes.length === 0 || (v.oemTires?.length ?? 0) === 0
     if (needsResolve) {
       setSelectingId(id)
       try {
@@ -78,6 +78,7 @@ const GaragePane = ({ onClose, onAddNew }: GaragePaneProps) => {
             widthWindow: fitment.widthWindow,
             offsetWindow: fitment.offsetWindow,
             oemTireSizes: fitment.oemTireSizes,
+            oemTires: fitment.oemTires,
             fitmentStatus: fitment.status,
           })
           patterns = fitment.status === "ok" ? fitment.canonicalBoltPatterns : []

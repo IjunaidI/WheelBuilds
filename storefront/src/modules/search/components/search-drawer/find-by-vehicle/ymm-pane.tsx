@@ -216,6 +216,7 @@ const YmmPane = ({ onClose }: YmmPaneProps) => {
           widthWindow: fitment.widthWindow,
           offsetWindow: fitment.offsetWindow,
           oemTireSizes: fitment.oemTireSizes,
+          oemTires: fitment.oemTires,
           fitmentStatus: fitment.status,
         })
         // "Did we find something to filter by?" is target-specific: tires filter

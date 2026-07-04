@@ -9,7 +9,7 @@ function toWire(v: Vehicle) {
   return { client_id: v.id, year: v.year, make: v.make, model: v.model, trim: v.trim,
     modificationSlug: v.modificationSlug, canonicalBoltPatterns: v.canonicalBoltPatterns,
     hubBoreMm: v.hubBoreMm, diameterWindow: v.diameterWindow, widthWindow: v.widthWindow,
-    offsetWindow: v.offsetWindow, oemTireSizes: v.oemTireSizes, fitmentStatus: v.fitmentStatus,
+    offsetWindow: v.offsetWindow, oemTireSizes: v.oemTireSizes, oemTires: v.oemTires, fitmentStatus: v.fitmentStatus,
     notes: v.notes, is_active: false }
 }
 function fromWire(r: any): Vehicle {
@@ -18,6 +18,7 @@ function fromWire(r: any): Vehicle {
     hubBoreMm: r.hub_bore_mm ?? undefined, diameterWindow: r.diameter_window ?? undefined,
     widthWindow: r.width_window ?? undefined, offsetWindow: r.offset_window ?? undefined,
     oemTireSizes: r.oem_tire_sizes ?? undefined,
+    oemTires: r.oem_tires ?? undefined,
     fitmentStatus: r.fitment_status ?? undefined, notes: r.notes ?? undefined, savedAt: r.created_at ?? new Date().toISOString() }
 }
 
@@ -91,7 +92,7 @@ export class MedusaGarage implements GarageProvider {
     this.emit()
     void api.updateVehicle(id, { modificationSlug: updated.modificationSlug, canonicalBoltPatterns: updated.canonicalBoltPatterns,
       hubBoreMm: updated.hubBoreMm, diameterWindow: updated.diameterWindow, widthWindow: updated.widthWindow,
-      offsetWindow: updated.offsetWindow, oemTireSizes: updated.oemTireSizes, fitmentStatus: updated.fitmentStatus, trim: updated.trim, notes: updated.notes } as any).catch(() => {})
+      offsetWindow: updated.offsetWindow, oemTireSizes: updated.oemTireSizes, oemTires: updated.oemTires, fitmentStatus: updated.fitmentStatus, trim: updated.trim, notes: updated.notes } as any).catch(() => {})
     return updated
   }
   remove(id: string): void {

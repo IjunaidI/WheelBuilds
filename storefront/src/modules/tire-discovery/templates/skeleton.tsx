@@ -8,9 +8,9 @@ import { Skeleton } from "@/components/ui/skeleton"
  * navigation. Matches the shape of `<TireDiscoveryTemplate>` so the layout
  * doesn't shift on swap.
  *
- * Mirrors `modules/discovery/templates/skeleton.tsx`, minus the fitment
- * ("Fits: ...") chip placeholder in the header row — `TireHeader` has no
- * such chip since tires carry no vehicle-fit constraint.
+ * Mirrors `modules/discovery/templates/skeleton.tsx` exactly — including the
+ * garage/fit chip placeholder in the header row (`TireHeader` always renders
+ * one: an accent "FITS YOUR …" chip or an outline "Select a vehicle" chip).
  */
 const TireDiscoveryTemplateSkeleton = () => (
   <section className="px-5 pt-6 pb-16 xsmall:px-8 small:px-20 small:pt-8 small:pb-20">
@@ -21,6 +21,7 @@ const TireDiscoveryTemplateSkeleton = () => (
         <Skeleton className="h-9 w-44 small:h-12 small:w-56" />
       </div>
       <div className="flex items-center gap-3 flex-wrap">
+        <Skeleton className="h-7 w-44 rounded-full" />
         <Skeleton className="h-8 w-28 small:w-48" />
       </div>
     </div>

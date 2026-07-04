@@ -15,7 +15,7 @@ export default function TireFitBadge({ fitSpecs }: { fitSpecs: TireFitSpec[] }) 
   const { active } = useGarage()
   if (!active?.oemTires?.length || !tireFitsVehicle(fitSpecs, active.oemTires)) return null
   return (
-    <div className="absolute top-11 right-2.5">
+    <div className="absolute top-2.5 right-2.5">
       <Chip variant="accent" size="sm" dot>
         FITS
       </Chip>

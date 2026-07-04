@@ -2,7 +2,13 @@
 
 import { cn } from "@/lib/utils"
 import Label from "@modules/common/components/label"
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip"
 import { TireSizeOption } from "../../../data/types"
+import { SHIP_LEAD_TIME } from "../../../data/pdp-config"
 
 type TireSizePickerProps = {
   rimDiameters: number[]
@@ -14,21 +20,18 @@ type TireSizePickerProps = {
   onSizeChange: (sizeLabel: string) => void
 }
 
-/** "Section width 225mm · Aspect 45 · Rim 17" · Load 91V" — omits any null field. */
-function specReadout(s: TireSizeOption): string {
-  const parts: string[] = []
-  if (s.sectionWidthMm != null) parts.push(`Section width ${s.sectionWidthMm}mm`)
-  if (s.aspectRatio != null) parts.push(`Aspect ${s.aspectRatio}`)
-  parts.push(`Rim ${s.rimDiameterIn}"`)
-  if (s.loadIndex != null) parts.push(`Load ${s.loadIndex}${s.speedRating ?? ""}`)
-  return parts.join(" · ")
+const AVAILABILITY_LABEL: Record<TireSizeOption["availability"], string> = {
+  in_stock: `In stock — ${SHIP_LEAD_TIME}`,
+  low_stock: "Low stock — last few sets",
+  out_of_stock: "Out of stock",
 }
 
 /**
  * Two stacked rows: a rim-diameter chip row (gates which sizes are listed
  * below) and the size list for the selected rim. A SIMPLIFIED mirror of the
  * wheel VariantPicker — single Size axis only, no bolt pattern / offset /
- * bore / load rows. Mirrors its button styling.
+ * bore / load rows. Mirrors its button styling, per-cell hover Tooltip, and
+ * the bold Display stat readout at the bottom.
  */
 const TireSizePicker = ({
   rimDiameters,
@@ -83,49 +86,99 @@ const TireSizePicker = ({
             const active = selectedSize?.sizeLabel === s.sizeLabel
             const disabled = s.availability === "out_of_stock"
             return (
-              <button
-                key={s.sizeLabel}
-                type="button"
-                disabled={disabled}
-                onClick={() => onSizeChange(s.sizeLabel)}
-                aria-pressed={active}
-                className={cn(
-                  "relative h-14 rounded-[var(--radius)] border text-[13px] font-semibold transition-colors flex items-center justify-center gap-1.5",
-                  active &&
-                    !disabled &&
-                    "border-[var(--orange)] bg-[var(--orange)] text-white",
-                  !active &&
-                    !disabled &&
-                    "border-[var(--hairline)] bg-white text-[var(--ink)] hover:border-[var(--ink)]",
-                  disabled &&
-                    "border-[var(--hairline)] bg-[var(--soft)] text-[var(--ink-soft)] opacity-60 cursor-not-allowed line-through"
-                )}
-              >
-                {s.sizeLabel}
-                {s.availability === "low_stock" && (
-                  <span
-                    aria-hidden
-                    className="absolute top-1.5 right-1.5 inline-block h-1.5 w-1.5 rounded-full"
-                    style={{ background: active ? "white" : "var(--orange)" }}
-                  />
-                )}
-              </button>
+              <Tooltip key={s.sizeLabel}>
+                <TooltipTrigger asChild>
+                  <button
+                    type="button"
+                    disabled={disabled}
+                    onClick={() => onSizeChange(s.sizeLabel)}
+                    aria-pressed={active}
+                    className={cn(
+                      "relative h-14 rounded-[var(--radius)] border text-[13px] font-semibold transition-colors flex items-center justify-center gap-1.5",
+                      active &&
+                        !disabled &&
+                        "border-[var(--orange)] bg-[var(--orange)] text-white",
+                      !active &&
+                        !disabled &&
+                        "border-[var(--hairline)] bg-white text-[var(--ink)] hover:border-[var(--ink)]",
+                      disabled &&
+                        "border-[var(--hairline)] bg-[var(--soft)] text-[var(--ink-soft)] opacity-60 cursor-not-allowed line-through"
+                    )}
+                  >
+                    {s.sizeLabel}
+                    {s.availability === "low_stock" && (
+                      <span
+                        aria-hidden
+                        className="absolute top-1.5 right-1.5 inline-block h-1.5 w-1.5 rounded-full"
+                        style={{ background: active ? "white" : "var(--orange)" }}
+                      />
+                    )}
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <div className="font-semibold">{s.sizeLabel}</div>
+                  <div className="text-[10px] opacity-80">
+                    {s.loadIndex != null
+                      ? `Load ${s.loadIndex}${s.speedRating ?? ""} · `
+                      : ""}
+                    {AVAILABILITY_LABEL[s.availability]}
+                  </div>
+                </TooltipContent>
+              </Tooltip>
             )
           })}
         </div>
       </div>
 
-      {/* Selected-size spec readout. */}
+      {/* Selected-size stat readout — mirrors the wheel VariantPicker's bold
+          Display stat tiles (the rim/width/aspect are already encoded in the
+          size label + the specs grid below, so the additive facts here are
+          load index + stock status). */}
       {selectedSize && (
-        <div className="pt-4 border-t border-[var(--hairline)]">
-          <Label tone="muted" style={{ fontSize: 10, display: "block", marginBottom: 4 }}>
-            Spec
-          </Label>
-          <div className="text-[13px] text-[var(--ink)]">{specReadout(selectedSize)}</div>
+        <div className="grid grid-cols-2 gap-3 pt-4 border-t border-[var(--hairline)]">
+          {selectedSize.loadIndex != null && (
+            <Stat
+              label="Load index"
+              value={`${selectedSize.loadIndex}${selectedSize.speedRating ?? ""}`}
+            />
+          )}
+          <Stat
+            label="Status"
+            value={
+              selectedSize.availability === "in_stock"
+                ? "In stock"
+                : selectedSize.availability === "low_stock"
+                  ? "Low stock"
+                  : "Out of stock"
+            }
+            accent={selectedSize.availability !== "out_of_stock"}
+          />
         </div>
       )}
     </div>
   )
 }
+
+const Stat = ({
+  label,
+  value,
+  accent,
+}: {
+  label: string
+  value: string
+  accent?: boolean
+}) => (
+  <div>
+    <Label tone="muted" style={{ fontSize: 10, display: "block" }}>
+      {label}
+    </Label>
+    <div
+      className="font-[var(--display)] text-[18px] font-black"
+      style={{ color: accent ? "var(--orange)" : "var(--ink)", marginTop: 4 }}
+    >
+      {value}
+    </div>
+  </div>
+)
 
 export default TireSizePicker

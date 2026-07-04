@@ -150,6 +150,17 @@ const TireFitment = ({ product }: TireFitmentProps) => {
           )
         })}
       </div>
+
+      <p className="mt-6 text-[12px] text-[var(--ink-soft)] font-[var(--mono)] leading-relaxed">
+        Don&apos;t see your vehicle?{" "}
+        <a
+          href="#"
+          className="text-[var(--orange)] font-semibold no-underline hover:underline"
+        >
+          Submit your vehicle for a fitment check
+        </a>{" "}
+        — we usually confirm within 24 hours.
+      </p>
     </section>
   )
 }

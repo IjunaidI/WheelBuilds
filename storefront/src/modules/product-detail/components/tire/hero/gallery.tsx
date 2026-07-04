@@ -21,6 +21,7 @@ const TireGallery = ({ product }: TireGalleryProps) => {
         className="relative aspect-square rounded-[var(--radius)] flex items-center justify-center overflow-hidden border border-[var(--hairline)]"
         style={{ background: "var(--soft)" }}
       >
+        <div className="wheel-glow" style={{ position: "absolute", inset: 40, zIndex: 0 }} />
         {product.thumbnail ? (
           <Image
             src={product.thumbnail}
@@ -32,7 +33,7 @@ const TireGallery = ({ product }: TireGalleryProps) => {
           />
         ) : (
           <div
-            className="h-[60%] w-[60%] rounded-full border-[14px] border-[var(--hairline)] bg-[var(--ink)]/[0.04]"
+            className="relative z-10 h-[60%] w-[60%] rounded-full border-[14px] border-[var(--hairline)] bg-[var(--ink)]/[0.04]"
             aria-hidden
           />
         )}

@@ -22,7 +22,11 @@ const TireSpecs = ({ product }: TireSpecsProps) => {
 
   return (
     <section className="border-t border-[var(--hairline)] py-16 small:py-20">
-      <SectionHeader eyebrow="SPECIFICATIONS" title="Tire specifications" marginBottom={32} />
+      <SectionHeader
+        eyebrow="ENGINEERING"
+        title="Built to spec, tested at speed."
+        marginBottom={32}
+      />
       {/* spec-grid handles the responsive column count + cell borders. */}
       <div className="spec-grid border-y border-[var(--hairline)]">
         {rows.map((row) => (

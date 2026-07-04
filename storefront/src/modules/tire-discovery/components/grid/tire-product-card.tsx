@@ -4,13 +4,7 @@ import Label from "@modules/common/components/label"
 import Display from "@modules/common/components/display"
 import Chip from "@modules/common/components/chip"
 import TireFitBadge from "./tire-fit-badge"
-import { TireDiscoveryProduct, TireType } from "../../data/types"
-
-const TIRE_TYPE_LABEL: Record<TireType, string> = {
-  passenger: "Passenger",
-  "light-truck": "Light truck",
-  other: "Specialty",
-}
+import { TireDiscoveryProduct } from "../../data/types"
 
 /** "18\"–22\"" for a range, "22\"" for one, "" for none. Exported for tests. */
 export function rimRangeLabel(rims: number[]): string {
@@ -47,9 +41,6 @@ const TireProductCard = ({ product }: TireProductCardProps) => {
             <Chip variant="accent" size="sm">NEW</Chip>
           </div>
         )}
-        <div className="absolute top-2.5 right-2.5">
-          <Chip variant="outline" size="sm">{TIRE_TYPE_LABEL[product.tireType]}</Chip>
-        </div>
         <TireFitBadge fitSpecs={product.fitSpecs} />
       </div>
 
@@ -57,7 +48,7 @@ const TireProductCard = ({ product }: TireProductCardProps) => {
         <Label tone="muted" style={{ fontSize: 9, display: "block" }}>{product.brand}</Label>
         <Display size={16} as="div" style={{ marginTop: 2 }}>{product.name}</Display>
 
-        <Label tone="muted" style={{ fontSize: 10, marginTop: 6, letterSpacing: "0.06em" }}>
+        <Label tone="muted" style={{ fontSize: 10, marginTop: 8, letterSpacing: "0.06em" }}>
           {product.sizeCount} {product.sizeCount === 1 ? "size" : "sizes"}{rim ? ` · ${rim}` : ""}
         </Label>
 

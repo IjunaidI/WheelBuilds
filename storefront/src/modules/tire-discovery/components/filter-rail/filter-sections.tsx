@@ -1,5 +1,8 @@
 "use client"
 
+import { usePathname, useRouter, useSearchParams } from "next/navigation"
+import { useGarage } from "@lib/garage/use-garage"
+import { openSearch } from "@lib/stores/search-store"
 import {
   Accordion,
   AccordionContent,
@@ -10,6 +13,8 @@ import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Separator } from "@/components/ui/separator"
 import Field from "@modules/common/components/field"
+import Icon from "@modules/common/components/icon"
+import Label from "@modules/common/components/label"
 import TextInput from "@modules/common/components/text-input"
 
 import { useTireQuery } from "../../use-tire-query"
@@ -89,12 +94,17 @@ type FilterSectionsProps = {
 }
 
 /**
- * Filter Accordion + optional Clear button. Reused by the desktop
- * TireFilterRail aside and the mobile filter drawer. Unlike the wheel
- * FilterSections, there is no Vehicle band here — tires have no fitment
- * constraint to pick a vehicle for.
+ * Vehicle band + filter Accordion + optional Clear button. Reused by the
+ * desktop TireFilterRail aside and the mobile filter drawer. Mirrors the wheel
+ * FilterSections — the Vehicle band drives size-based tire fitment (the active
+ * vehicle's OEM tire sizes are applied as `?fit=` by TireFitmentSync; "Show all
+ * tires" opts out with fit=0).
  */
 const FilterSections = ({ facets, hideClearAll }: FilterSectionsProps) => {
+  const { active } = useGarage()
+  const router = useRouter()
+  const pathname = usePathname()
+  const sp = useSearchParams()
   const {
     filters,
     toggleArrayFilter,
@@ -103,8 +113,47 @@ const FilterSections = ({ facets, hideClearAll }: FilterSectionsProps) => {
     isAnyFilterActive,
   } = useTireQuery()
 
+  const vehicleLabel = active
+    ? `${active.year} ${active.make} ${active.model}`
+    : "Pick a vehicle for fitment"
+
   return (
     <>
+      <div className="rounded-[var(--radius)] border border-[var(--hairline)] bg-white p-4 mb-4">
+        <Label tone="muted" style={{ display: "block", marginBottom: 8 }}>
+          Vehicle
+        </Label>
+        <button
+          type="button"
+          onClick={openSearch}
+          className="flex w-full items-center gap-2.5 text-left"
+        >
+          <span
+            aria-hidden
+            className="inline-block h-2 w-2 rounded-full shrink-0"
+            style={{ background: active ? "var(--orange)" : "var(--ink-soft)" }}
+          />
+          <span className="flex-1 text-[13px] font-semibold text-[var(--ink)] truncate">
+            {vehicleLabel}
+          </span>
+          <Icon name="chevron-down" size={14} color="#8A8A8E" />
+        </button>
+        {active && sp.get("fit") !== "0" ? (
+          <button
+            type="button"
+            className="mt-2 text-[12px] text-[var(--ink-soft)] underline"
+            onClick={() => {
+              const n = new URLSearchParams(Array.from(sp.entries()))
+              n.set("fit", "0")
+              n.delete("page")
+              router.replace(`${pathname}?${n.toString()}`)
+            }}
+          >
+            Show all tires
+          </button>
+        ) : null}
+      </div>
+
       <Accordion
         type="multiple"
         defaultValue={["brand", "rim-diameter", "tire-type"]}

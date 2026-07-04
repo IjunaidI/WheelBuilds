@@ -1,8 +1,6 @@
 "use client"
 
 import { useEffect, useMemo, useRef, useState } from "react"
-import Label from "@modules/common/components/label"
-import Display from "@modules/common/components/display"
 import { TireProductDetail, TireSizeOption } from "../../../data/types"
 import { sizesForRim, pickDefaultTireSize } from "../../../data/tire/tire-size-options"
 import { useGarage } from "@lib/garage/use-garage"
@@ -156,21 +154,6 @@ const TireHero = ({ product }: TireHeroProps) => {
     <section className="grid grid-cols-1 small:grid-cols-2 gap-10 small:gap-16 items-start">
       <TireGallery product={product} />
       <div className="flex flex-col gap-8">
-        <div>
-          <Label style={{ display: "block", marginBottom: 12 }}>
-            {product.brand}
-          </Label>
-          <Display size={36} as="h1" className="small:!text-[56px]">
-            {product.name}
-          </Display>
-          <div className="flex items-baseline gap-3 mt-5">
-            <Display size={40} as="div">
-              <span style={{ color: "var(--orange)" }}>$</span>
-              {Math.round(unitPriceCents / 100).toLocaleString()}
-            </Display>
-            <Label tone="muted">PER TIRE</Label>
-          </div>
-        </div>
         {canFilter && (
           <FitBanner
             filtered={filtered}
@@ -179,6 +162,11 @@ const TireHero = ({ product }: TireHeroProps) => {
             onOnlyFit={() => setShowAll(false)}
           />
         )}
+        <TirePurchasePanel
+          product={product}
+          selectedSize={selectedSize}
+          unitPriceCents={unitPriceCents}
+        />
         <TireSizePicker
           rimDiameters={visibleRims}
           selectedRim={selectedRim}
@@ -186,10 +174,6 @@ const TireHero = ({ product }: TireHeroProps) => {
           sizes={sizesForSelectedRim}
           selectedSize={selectedSize}
           onSizeChange={handleSizeChange}
-        />
-        <TirePurchasePanel
-          selectedSize={selectedSize}
-          unitPriceCents={unitPriceCents}
         />
       </div>
     </section>

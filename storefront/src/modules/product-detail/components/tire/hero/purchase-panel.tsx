@@ -16,8 +16,6 @@ type TirePurchasePanelProps = {
   selectedSize: TireSizeOption | undefined
   /** Computed unit price for the current size, in cents. */
   unitPriceCents: number
-  /** This product's per-variant fit specs (size + load + speed), for the fit chip. */
-  productSpecs: TireFitSpec[]
 }
 
 const formatUsd = (cents: number) => `$${Math.round(cents / 100).toLocaleString()}`
@@ -31,17 +29,26 @@ const formatUsd = (cents: number) => `$${Math.round(cents / 100).toLocaleString(
 const TirePurchasePanel = ({
   selectedSize,
   unitPriceCents,
-  productSpecs,
 }: TirePurchasePanelProps) => {
   const { active } = useGarage()
-  // Honesty chip (WB-056 analog): reflects whether ANY size this product is
-  // offered in matches the active vehicle's OEM tires (size + load + speed) —
-  // not just the currently selected size, since (unlike the wheel PDP)
-  // picking a non-fitting tire size here isn't a "custom override" the
-  // shopper opted into, it's just browsing the size list. Three states: fits
-  // / doesn't fit / no vehicle active (chip hidden entirely).
+  // Honesty chip (WB-056 analog): reflects whether the CURRENTLY SELECTED size
+  // fits the active vehicle's OEM tires (size + load + speed) — NOT whether any
+  // offered size fits. In fit mode the picker only shows fitting sizes, so the
+  // chip reads "fits"; but once the shopper hits "Show all" and picks a
+  // non-fitting size, that's a deliberate override (mirrors the wheel PDP's
+  // per-variant chip), so the chip must honestly flip to "MAY NOT FIT". Three
+  // states: fits / doesn't fit / no vehicle active (chip hidden entirely).
+  const selectedSpec: TireFitSpec | null = selectedSize
+    ? {
+        size: selectedSize.canonicalSize,
+        loadIndex: selectedSize.loadIndex ?? null,
+        speedRating: selectedSize.speedRating ?? null,
+      }
+    : null
   const fits =
-    !!active?.oemTires?.length && tireFitsVehicle(productSpecs, active.oemTires)
+    !!active?.oemTires?.length &&
+    !!selectedSpec &&
+    tireFitsVehicle([selectedSpec], active.oemTires)
   const router = useRouter()
   const { countryCode } = useParams() as { countryCode: string }
   const [quantity, setQuantity] = useState(DEFAULT_TIRE_QTY)

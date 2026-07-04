@@ -6,7 +6,7 @@ import Display from "@modules/common/components/display"
 import { TireProductDetail, TireSizeOption } from "../../../data/types"
 import { sizesForRim, pickDefaultTireSize } from "../../../data/tire/tire-size-options"
 import { useGarage } from "@lib/garage/use-garage"
-import { tireFitsVehicle, TireFitSpec } from "@lib/fitment/tire-fits-vehicle"
+import { tireFitsVehicle } from "@lib/fitment/tire-fits-vehicle"
 import FitBanner from "@modules/product-detail/components/hero/fit-banner"
 import TireGallery from "./gallery"
 import TireSizePicker from "./size-picker"
@@ -28,18 +28,6 @@ type TireHeroProps = {
  */
 const TireHero = ({ product }: TireHeroProps) => {
   const { active } = useGarage()
-
-  // Per-variant fit specs (size + load + speed) this product offers — feeds
-  // both the purchase-panel fit chip and the fit filtering below.
-  const productSpecs = useMemo<TireFitSpec[]>(
-    () =>
-      product.sizeOptions.map((o) => ({
-        size: o.canonicalSize,
-        loadIndex: o.loadIndex ?? null,
-        speedRating: o.speedRating ?? null,
-      })),
-    [product.sizeOptions]
-  )
 
   // The active vehicle's OEM tires (size + load + speed) + the subset of this
   // product's size options that fit them. `canFilter` is true when we can
@@ -184,7 +172,6 @@ const TireHero = ({ product }: TireHeroProps) => {
         <TirePurchasePanel
           selectedSize={selectedSize}
           unitPriceCents={unitPriceCents}
-          productSpecs={productSpecs}
         />
       </div>
     </section>

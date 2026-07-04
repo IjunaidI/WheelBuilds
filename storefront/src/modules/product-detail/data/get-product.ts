@@ -104,10 +104,12 @@ export async function getProductDetail(handle: string): Promise<AnyProductDetail
 
   if ((product.metadata as any)?.product_type === "tire") {
     const tire = mapTireDetail(product)
-    const sizes = Array.from(
-      new Set(tire.sizeOptions.map((o) => o.canonicalSize).filter(Boolean))
-    )
-    const fitment = await getFitmentByTireProduct(sizes)
+    const specs = tire.sizeOptions.map((o) => ({
+      size: o.canonicalSize,
+      loadIndex: o.loadIndex ?? null,
+      speedRating: o.speedRating ?? null,
+    }))
+    const fitment = await getFitmentByTireProduct(specs)
     return { ...tire, fitment }
   }
 

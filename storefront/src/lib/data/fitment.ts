@@ -36,14 +36,25 @@ export async function getFitmentByProduct(
 
 /**
  * Reverse tire fitment for the tire PDP "confirmed models" list: cached vehicles
- * whose factory tire size matches this product's canonical sizes. Server-side;
- * best-effort cache via Next revalidate. Returns [] on any error (section degrades).
+ * whose factory tire size + load index + speed rating meet-or-exceed this
+ * product's per-variant specs. Server-side; best-effort cache via Next
+ * revalidate. Returns [] on any error (section degrades).
+ *
+ * `sizes`/`loads`/`speeds` are sent as three ALIGNED CSVs — the route zips them
+ * by index — so entries with a blank size are filtered out FIRST, then all
+ * three CSVs are built from that same filtered list.
  */
-export async function getFitmentByTireProduct(sizes: string[]): Promise<TireFitmentEntry[]> {
-  if (!sizes?.length) return []
+export async function getFitmentByTireProduct(
+  specs: { size: string; loadIndex: number | null; speedRating: string | null }[]
+): Promise<TireFitmentEntry[]> {
+  if (!specs?.length) return []
+  const withSize = specs.filter((s) => s.size)
+  if (!withSize.length) return []
   try {
     const params = new URLSearchParams()
-    params.set("sizes", sizes.join(","))
+    params.set("sizes", withSize.map((s) => s.size).join(","))
+    params.set("loads", withSize.map((s) => s.loadIndex ?? "").join(","))
+    params.set("speeds", withSize.map((s) => s.speedRating ?? "").join(","))
     const body = await sdk.client.fetch<{ vehicles: TireFitmentEntry[] }>(
       `/store/fitment/by-tire-product?${params.toString()}`,
       { next: { revalidate: 300 } } as any

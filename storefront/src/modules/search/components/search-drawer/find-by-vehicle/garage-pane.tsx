@@ -54,7 +54,13 @@ const GaragePane = ({ onClose, onAddNew }: GaragePaneProps) => {
     // fitment didn't persist) has no stored bolt patterns. Re-resolve it from
     // the vehicle's identity so the garage tab applies the fit exactly like the
     // Year/Make/Model tab does — instead of silently dropping to /store.
-    if (!(v.fitmentStatus === "ok" && patterns.length)) {
+    // Re-resolve when the data the destination needs is missing — bolt patterns
+    // for a vehicle that never resolved, OR OEM tire sizes for one saved before
+    // WB-063/067 (so an older saved vehicle backfills its tire sizes on select
+    // and the tire fit applies).
+    const needsResolve =
+      !(v.fitmentStatus === "ok" && patterns.length) || oemTireSizes.length === 0
+    if (needsResolve) {
       setSelectingId(id)
       try {
         const fitment = await getFitmentByVehicle(
@@ -74,14 +80,23 @@ const GaragePane = ({ onClose, onAddNew }: GaragePaneProps) => {
             oemTireSizes: fitment.oemTireSizes,
             fitmentStatus: fitment.status,
           })
-          if (fitment.status === "ok" && fitment.canonicalBoltPatterns.length) {
-            patterns = fitment.canonicalBoltPatterns
-            oemTireSizes = fitment.oemTireSizes ?? []
-          } else {
-            toast("No fitment data for this vehicle yet", {
-              description:
-                "We couldn't find wheel specs for it — showing the full catalog.",
-            })
+          patterns = fitment.status === "ok" ? fitment.canonicalBoltPatterns : []
+          oemTireSizes = fitment.oemTireSizes ?? []
+          // Target-specific "did we find a fit?" — tires need OEM sizes, wheels
+          // need bolt patterns. Only warn about the RIGHT thing.
+          const hasFit = target === "tires" ? oemTireSizes.length > 0 : patterns.length > 0
+          if (!hasFit) {
+            toast(
+              target === "tires"
+                ? "No tire fitment for this vehicle yet"
+                : "No fitment data for this vehicle yet",
+              {
+                description:
+                  target === "tires"
+                    ? "We couldn't find factory tire sizes for it — showing all tires."
+                    : "We couldn't find wheel specs for it — showing the full catalog.",
+              }
+            )
           }
         } else if (fitment && "error" in fitment) {
           toast.error("Fitment temporarily unavailable", {

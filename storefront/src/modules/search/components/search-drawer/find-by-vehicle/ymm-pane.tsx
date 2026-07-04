@@ -218,16 +218,26 @@ const YmmPane = ({ onClose }: YmmPaneProps) => {
           oemTireSizes: fitment.oemTireSizes,
           fitmentStatus: fitment.status,
         })
-        if (fitment.status === "ok" && fitment.canonicalBoltPatterns.length) {
-          // handled below via fitmentDestinationUrl
-        } else {
-          // status === "not_found" (or "ok" with no bolt pattern): wheel-size has
-          // no fitment for this vehicle, so there is nothing to filter by. Tell the
-          // user instead of silently dropping them on the unfiltered catalog.
-          toast("No fitment data for this vehicle yet", {
-            description:
-              "We couldn't find wheel specs for it — showing the full catalog.",
-          })
+        // "Did we find something to filter by?" is target-specific: tires filter
+        // on OEM tire sizes, wheels on bolt patterns. Only toast (and only about
+        // the RIGHT thing) when the relevant data is missing — otherwise the tire
+        // flow would wrongly show a "no wheel specs" message.
+        const hasFit =
+          target === "tires"
+            ? (fitment.oemTireSizes?.length ?? 0) > 0
+            : fitment.status === "ok" && fitment.canonicalBoltPatterns.length > 0
+        if (!hasFit) {
+          toast(
+            target === "tires"
+              ? "No tire fitment for this vehicle yet"
+              : "No fitment data for this vehicle yet",
+            {
+              description:
+                target === "tires"
+                  ? "We couldn't find factory tire sizes for it — showing all tires."
+                  : "We couldn't find wheel specs for it — showing the full catalog.",
+            }
+          )
         }
       } else if (fitment && "error" in fitment) {
         toast.error("Fitment temporarily unavailable", {

@@ -10,6 +10,7 @@ import { buildReverseFitment } from "./reverse-fitment"
 import { buildReverseTireFitment } from "./reverse-tire-fitment"
 import { isStale } from "./staleness"
 import { extractOemTireSizes } from "./oem-tire-sizes"
+import { extractOemTires } from "./oem-tires"
 
 export class QuotaOutageError extends Error {
   constructor() { super("wheel-size quota outage") ; this.name = "QuotaOutageError" }
@@ -90,6 +91,7 @@ class WheelSizeService extends MedusaService({ WheelSizeCatalog, WheelSizeFitmen
       widthWindow: (c.width_window as unknown as Window) ?? null,
       offsetWindow: (c.offset_window as unknown as Window) ?? null,
       oemTireSizes: extractOemTireSizes(c.raw),
+      oemTires: extractOemTires(c.raw),
       source: { modificationSlug: modificationSlug ?? "", region: c.region ?? region },
     }
   }
@@ -109,7 +111,7 @@ class WheelSizeService extends MedusaService({ WheelSizeCatalog, WheelSizeFitmen
     const existing = await this.listWheelSizeFitments({ cache_key })
     if (existing[0]) await this.updateWheelSizeFitments({ id: existing[0].id, ...row })
     else await this.createWheelSizeFitments(row)
-    return { ...fitment, oemTireSizes: extractOemTireSizes(body) }
+    return { ...fitment, oemTireSizes: extractOemTireSizes(body), oemTires: extractOemTires(body) }
   }
 
   /**

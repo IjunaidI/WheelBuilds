@@ -37,7 +37,7 @@ const FitBanner = ({ filtered, vehicleLabel, onShowAll, onOnlyFit }: FitBannerPr
     >
       <span className="text-[var(--ink)]">
         {filtered
-          ? `Showing only sizes, patterns & colors that fit your ${vehicleLabel}`
+          ? `Showing only options that fit your ${vehicleLabel}`
           : `Showing everything — options here may NOT fit your ${vehicleLabel}`}
       </span>
       {filtered ? (
@@ -57,8 +57,8 @@ const FitBanner = ({ filtered, vehicleLabel, onShowAll, onOnlyFit }: FitBannerPr
           <DialogHeader>
             <DialogTitle>These won&apos;t fit your {vehicleLabel}.</DialogTitle>
             <DialogDescription>
-              Showing everything reveals bolt patterns, widths, and sizes OUTSIDE your vehicle&apos;s
-              fitment — they will not fit. Only continue if you know exactly what you&apos;re doing.
+              Showing everything reveals options OUTSIDE your vehicle&apos;s fitment — they
+              will not fit. Only continue if you know exactly what you&apos;re doing.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>

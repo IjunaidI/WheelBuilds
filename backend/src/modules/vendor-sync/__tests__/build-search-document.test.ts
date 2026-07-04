@@ -116,6 +116,31 @@ describe("buildSearchDocument", () => {
     })
   })
 
+  it("emits per-variant fit_specs for multi-axis fitment, dropping absent load/speed", () => {
+    const tire = {
+      id: "prod_t2",
+      handle: "generic-tire",
+      title: "Generic Tire",
+      metadata: { product_type: "tire", brand: "Generic" },
+      variants: [
+        {
+          sku: "S-1",
+          prices: [{ amount: 200, currency_code: "usd" }],
+          metadata: { canonical_size: "305/45R22", load_index: 118, speed_rating: "S" },
+        },
+        {
+          sku: "S-2",
+          prices: [{ amount: 210, currency_code: "usd" }],
+          metadata: { canonical_size: "305/50R20" },
+        },
+      ],
+    }
+    const doc = buildSearchDocument(tire as any)
+    expect(doc).toMatchObject({
+      fit_specs: ["305/45R22|118|S", "305/50R20||"],
+    })
+  })
+
   it("returns the minimal stub for products that are neither wheel nor tire", () => {
     const other = { ...product, metadata: { product_type: "accessory", brand: "X" } }
     expect(buildSearchDocument(other as any)).toBeNull()

@@ -137,6 +137,10 @@ function buildTireDocument(
   const speedRatings: string[] = []
   const usdPrices: number[] = []
   const skus: string[] = []
+  // Per-variant (size, load, speed) tuples for the storefront's multi-axis
+  // fit filter (WB-068) — lets it check "does this tire have a variant that
+  // fits" straight off the Meili hit, no Store-API round-trip needed.
+  const fitSpecs: string[] = []
 
   for (const v of variants) {
     if (typeof v.sku === "string" && v.sku) skus.push(v.sku)
@@ -153,6 +157,11 @@ function buildTireDocument(
     if (li !== null) loadIndexes.push(li)
     const sr = str(vm.speed_rating)
     if (sr) speedRatings.push(sr)
+    if (size) {
+      const load = vm.load_index != null ? String(vm.load_index) : ""
+      const speed = sr ?? ""
+      fitSpecs.push(`${size}|${load}|${speed}`)
+    }
     for (const p of v.prices ?? []) {
       if (p.currency_code === "usd" && Number.isFinite(p.amount)) {
         usdPrices.push(p.amount)
@@ -171,6 +180,7 @@ function buildTireDocument(
     brand: typeof meta.brand === "string" ? meta.brand : "",
     skus: uniqStr(skus),
     tire_sizes: uniqStr(sizes),
+    fit_specs: fitSpecs,
     rim_diameters: uniqSorted(rimDiameters),
     section_widths: uniqSorted(sectionWidths),
     aspect_ratios: uniqSorted(aspectRatios),

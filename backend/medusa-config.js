@@ -257,7 +257,7 @@ const medusaConfig = {
                 'finishes', 'skus',
                 'diameters', 'widths', 'offsets', 'bolt_patterns',
                 'bolt_patterns_canonical', 'center_bores',
-                'tire_sizes', 'rim_diameters', 'section_widths',
+                'tire_sizes', 'fit_specs', 'rim_diameters', 'section_widths',
                 'aspect_ratios', 'load_indexes', 'speed_ratings', 'tire_type',
                 'price_min', 'price_max', 'created_at', 'product_type',
               ],

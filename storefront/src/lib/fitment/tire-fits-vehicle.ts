@@ -1,13 +1,24 @@
-import { canonicalizeTireSize } from "./canonicalize-tire-size"
+import { speedRatingRank } from "./speed-rating-rank"
+import type { OemTire } from "@lib/garage/types"
 
-/**
- * A tire fits the vehicle when any of its (canonical) sizes matches one of the
- * vehicle's OEM tire sizes. Product `tire_sizes` are already canonical; the
- * vehicle set is canonicalized here to be safe. Single source of truth for the
- * tire card badge, the discovery fit gate, and the tire-PDP chip. Pure.
- */
-export function tireFitsVehicle(productSizes: string[], vehicleOemSizes: string[]): boolean {
-  if (!productSizes.length || !vehicleOemSizes.length) return false
-  const vset = new Set(vehicleOemSizes.map(canonicalizeTireSize).filter(Boolean))
-  return productSizes.map(canonicalizeTireSize).some((s) => s && vset.has(s))
+export type TireFitSpec = OemTire
+
+function fits(spec: TireFitSpec, oem: OemTire): boolean {
+  if (spec.size !== oem.size) return false
+  if (oem.loadIndex != null && spec.loadIndex != null && spec.loadIndex < oem.loadIndex) return false
+  if (
+    oem.speedRating != null &&
+    spec.speedRating != null &&
+    speedRatingRank(spec.speedRating) < speedRatingRank(oem.speedRating)
+  )
+    return false
+  return true
 }
+
+/** True when the tire offers a variant that fits some OEM tire (size + load + speed,
+ *  meet-or-exceed; missing data passes). Single verdict for badge/PDP/reverse/filter. */
+export function tireFitsVehicle(productSpecs: TireFitSpec[], vehicleOemTires: OemTire[]): boolean {
+  if (!productSpecs?.length || !vehicleOemTires?.length) return false
+  return productSpecs.some((s) => vehicleOemTires.some((o) => fits(s, o)))
+}
+export const tireProductHasFittingVariant = tireFitsVehicle

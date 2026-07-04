@@ -1,10 +1,16 @@
 /**
  * Tire discovery data adapter — real Meilisearch wiring.
  *
- * Mirrors the wheel `modules/discovery/data/get-products.ts` NON-fit path:
- * one hits query + one disjunctive facet query per dimension, batched via
- * multiSearch. There is no fitment/vehicleConstraint branch here — tires
- * have no fit-mode seam (Spec 2 scope is wheels only).
+ * Mirrors the wheel `modules/discovery/data/get-products.ts`:
+ * - Non-fit path: one hits query + one disjunctive facet query per
+ *   dimension, batched via multiSearch.
+ * - Fit path (WB-068, mirrors the wheel `vehicleFitment` branch): a coarse
+ *   `tire_sizes IN [...]` candidate fetch (cap ~200), then an in-memory
+ *   post-filter using each hit's own `fit_specs` field — NO Store-API
+ *   round-trip needed (unlike wheels, which re-fetch variants), because the
+ *   Meili tire document already carries per-variant size+load+speed. Facet
+ *   counts are then recomputed over the fitting set only (mirrors wheels'
+ *   `facetsFromProducts`).
  */
 
 import "server-only"
@@ -17,6 +23,8 @@ import {
   TireDiscoveryProduct, TireDiscoveryQuery, TireDiscoveryResult, TireFacetCounts, TireType,
 } from "./types"
 import { tireDiscoveryCacheKey } from "./cache-key"
+import { tireProductHasFittingVariant, type TireFitSpec } from "@lib/fitment/tire-fits-vehicle"
+import type { OemTire } from "@lib/garage/types"
 
 const NEW_DAYS = 30
 const NEW_MS = NEW_DAYS * 24 * 60 * 60 * 1000
@@ -54,7 +62,23 @@ function sortExpr(sort: SortOption): string[] {
 type TireHit = {
   id: string; handle: string; title: string; brand: string; thumbnail: string | null
   tire_sizes?: string[]; rim_diameters?: number[]; tire_type?: TireType
+  /** "size|load|speed" per variant; load/speed segments are "" when absent. */
+  fit_specs?: string[]
+  speed_ratings?: string[]; load_indexes?: number[]
   price_min: number; price_max: number; created_at: string | null
+}
+
+/** Parses the Meili `fit_specs` field ("size|load|speed" per variant) into
+ *  `TireFitSpec[]`, dropping any entry with a blank size. */
+function parseFitSpecs(raw?: string[]): TireFitSpec[] {
+  if (!Array.isArray(raw)) return []
+  const out: TireFitSpec[] = []
+  for (const s of raw) {
+    const [size, load, speed] = s.split("|")
+    if (!size) continue
+    out.push({ size, loadIndex: load ? Number(load) : null, speedRating: speed || null })
+  }
+  return out
 }
 
 export function hitToTireProduct(h: TireHit): TireDiscoveryProduct {
@@ -67,8 +91,43 @@ export function hitToTireProduct(h: TireHit): TireDiscoveryProduct {
     rimDiameters: [...(h.rim_diameters ?? [])].sort((a, b) => a - b),
     tireType: h.tire_type ?? "other",
     sizes: Array.isArray(h.tire_sizes) ? h.tire_sizes : [],
+    fitSpecs: parseFitSpecs(h.fit_specs),
     isNew: Number.isFinite(createdMs) ? Date.now() - createdMs < NEW_MS : false,
   }
+}
+
+/**
+ * The multi-axis fit-mode keep/drop gate (WB-068). A product is kept when
+ * either it has no `fit_specs` yet — pre-re-sync docs degrade to "passes" so
+ * nothing vanishes from `/tires?fit=` before the Meili re-sync ships — or at
+ * least one of its variant specs meets-or-exceeds one of the vehicle's OEM
+ * tires (size exact match + load/speed meet-or-exceed).
+ */
+export function passesFitFilter(fitSpecs: TireFitSpec[], vehicleOemTires: OemTire[]): boolean {
+  return fitSpecs.length === 0 || tireProductHasFittingVariant(fitSpecs, vehicleOemTires)
+}
+
+/**
+ * Rebuild facet counts from the in-memory fitting set (used only in fit
+ * mode, mirroring the wheel `facetsFromProducts`). Tallied straight from the
+ * raw Meili hit fields (each already deduped per-product server-side) rather
+ * than from `TireDiscoveryProduct`, since the product type doesn't carry the
+ * per-product speed/load arrays needed for those two facets.
+ */
+function facetsFromTireHits(hits: TireHit[]): TireFacetCounts {
+  const tally = (m: Record<string, number>, k: string) => { m[k] = (m[k] ?? 0) + 1 }
+  const brands: Record<string, number> = {}, rimDiameters: Record<string, number> = {}
+  const sizes: Record<string, number> = {}, tireTypes: Record<string, number> = {}
+  const speedRatings: Record<string, number> = {}, loadIndexes: Record<string, number> = {}
+  for (const h of hits) {
+    if (h.brand) tally(brands, h.brand)
+    if (h.tire_type) tally(tireTypes, h.tire_type)
+    for (const d of h.rim_diameters ?? []) tally(rimDiameters, String(d))
+    for (const s of h.tire_sizes ?? []) tally(sizes, s)
+    for (const sr of h.speed_ratings ?? []) tally(speedRatings, sr)
+    for (const li of h.load_indexes ?? []) tally(loadIndexes, String(li))
+  }
+  return { brands, rimDiameters, sizes, tireTypes, speedRatings, loadIndexes }
 }
 
 function emptyResult(pageSize: number): TireDiscoveryResult {
@@ -85,18 +144,55 @@ const facetQueryByDim: Record<string, keyof TireDiscoveryFilters> = {
 
 async function fetchTireDiscoveryProducts(query: TireDiscoveryQuery): Promise<TireDiscoveryResult> {
   const pageSize = DEFAULT_PAGE_SIZE
+
+  // FIT MODE (WB-068): coarse tire_sizes-matched candidates from Meili, then
+  // the real per-variant (size+load+speed) check using each hit's OWN
+  // `fit_specs` — no Store-API round-trip needed (unlike wheels, whose bolt
+  // pattern needs a variant-metadata re-fetch). Bounded scan + in-memory
+  // pagination + facet recompute over the fitting set only.
+  const vehicleOemTires = query.vehicleOemTires
+  if (vehicleOemTires?.length) {
+    const FIT_CANDIDATE_CAP = 200
+    const sizes = Array.from(new Set(vehicleOemTires.map((o) => o.size)))
+    const { results } = await meili.multiSearch({
+      queries: [
+        {
+          indexUid: PRODUCTS_INDEX,
+          q: query.q ?? "",
+          filter: buildTireFilters(query.filters, undefined, sizes).join(" AND "),
+          sort: sortExpr(query.sort),
+          limit: FIT_CANDIDATE_CAP,
+          offset: 0,
+        },
+      ],
+    })
+    const hits = (results[0] as MultiSearchResult<TireHit>).hits
+    const candidates = hits.map((hit) => ({ hit, product: hitToTireProduct(hit) }))
+    const fitting = candidates.filter(({ product }) =>
+      passesFitFilter(product.fitSpecs, vehicleOemTires)
+    )
+
+    const start = (query.page - 1) * pageSize
+    return {
+      products: fitting.slice(start, start + pageSize).map((c) => c.product),
+      totalCount: fitting.length,
+      pageSize,
+      facets: facetsFromTireHits(fitting.map((c) => c.hit)),
+    }
+  }
+
   const offset = (query.page - 1) * pageSize
 
   const { results } = await meili.multiSearch({
     queries: [
       {
         indexUid: PRODUCTS_INDEX, q: query.q ?? "",
-        filter: buildTireFilters(query.filters, undefined, query.vehicleTireSizes).join(" AND "),
+        filter: buildTireFilters(query.filters).join(" AND "),
         sort: sortExpr(query.sort), limit: pageSize, offset,
       },
       ...TIRE_FACET_FIELDS.map((field) => ({
         indexUid: PRODUCTS_INDEX, q: query.q ?? "",
-        filter: buildTireFilters(query.filters, facetQueryByDim[field], query.vehicleTireSizes).join(" AND "),
+        filter: buildTireFilters(query.filters, facetQueryByDim[field]).join(" AND "),
         facets: [field], limit: 0,
       })),
     ],

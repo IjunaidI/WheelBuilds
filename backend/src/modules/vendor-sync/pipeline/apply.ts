@@ -125,6 +125,18 @@ export async function applyChanges(
   // recomputed between phases so a mid-apply cancel skips later phases.
   const concurrency = service.getApplyConcurrency()
   const isCancelled = () => service.isCancelled(runId)
+  // Recomputes `cancelled` between phases; logs once, at the transition to
+  // true, so a mid-run cancel is still observable (restores the log the old
+  // sequential `checkCancelled` closure used to emit).
+  const recomputeCancelled = async () => {
+    if (cancelled) return
+    if (await isCancelled()) {
+      cancelled = true
+      logger.warn(
+        `[vendor-sync] [${runId}] cancel requested; stopping apply loop`
+      )
+    }
+  }
 
   logger.info(`[vendor-sync] [${runId}] Bootstrapping Medusa entities...`)
   const [_regionId, salesChannelId, categories, shippingProfileId] =
@@ -183,7 +195,7 @@ export async function applyChanges(
     },
     isCancelled
   )
-  cancelled = cancelled || (await isCancelled())
+  await recomputeCancelled()
 
   // 2. Changed groups
   if (!cancelled) {
@@ -210,7 +222,7 @@ export async function applyChanges(
       },
       isCancelled
     )
-    cancelled = cancelled || (await isCancelled())
+    await recomputeCancelled()
   }
 
   // 3. Discontinued groups (whole-product gone)
@@ -232,7 +244,7 @@ export async function applyChanges(
       },
       isCancelled
     )
-    cancelled = cancelled || (await isCancelled())
+    await recomputeCancelled()
   }
 
   // 4. Stock pass for every part_number we touched in new or changed groups
@@ -827,6 +839,10 @@ function getBrandCollectionId(ctx: ApplyContext, brand: string): Promise<string>
   let p = ctx.brandCollectionCache.get(brand)
   if (!p) {
     p = ensureBrandCollection(ctx.container, brand)
+    // Don't poison the cache on a transient failure: drop the entry on
+    // rejection so a later same-brand group can retry. The returned promise
+    // still rejects, so the awaiting group is recorded in `errors`.
+    p.catch(() => ctx.brandCollectionCache.delete(brand))
     ctx.brandCollectionCache.set(brand, p)
   }
   return p

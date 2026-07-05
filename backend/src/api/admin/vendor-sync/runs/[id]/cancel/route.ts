@@ -31,16 +31,18 @@ export async function POST(req: MedusaRequest, res: MedusaResponse) {
     return
   }
 
-  // Set the in-memory cancel flag first so an in-flight apply loop
-  // sees it on its next iteration and stops before we (and it) try to
-  // overwrite the run status.
-  service.markCancelled(id)
+  // WB-037: persist the cancel request (DB-backed, cross-process).
+  await service.markCancelled(id)
 
-  await service.updateVendorFeedRuns({
-    id,
-    status: "cancelled",
-    finished_at: new Date(),
-  })
+  if (run.status === "awaiting_approval") {
+    // Paused — nothing is executing, so finalize immediately.
+    await service.updateVendorFeedRuns({ id, status: "cancelled", finished_at: new Date() })
+    res.json({ run: { ...run, status: "cancelled", finished_at: new Date() } })
+    return
+  }
 
-  res.json({ run: { ...run, status: "cancelled", finished_at: new Date() } })
+  // Executing (fetching/staging/diffing/applying): leave the status; the
+  // running executeRun/apply loop observes cancel_requested_at at the next
+  // boundary and finalizes to cancelled itself (no status-overwrite race).
+  res.json({ run: { ...run, cancel_requested_at: new Date() } })
 }

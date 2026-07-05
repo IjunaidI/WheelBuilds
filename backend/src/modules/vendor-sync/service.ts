@@ -53,13 +53,6 @@ class VendorSyncService extends MedusaService({
   private container_: any
   private logger_: Logger
   private options_: VendorSyncModuleOptions
-  /**
-   * In-memory set of run ids that have been requested to cancel. Lives
-   * for the lifetime of this service instance (i.e. this process). The
-   * apply loop checks this between part_numbers so cancel-while-applying
-   * stops cleanly instead of running to completion.
-   */
-  private cancelledRuns_: Set<string> = new Set()
 
   constructor(container: any, options: any) {
     super(...arguments)
@@ -82,30 +75,15 @@ class VendorSyncService extends MedusaService({
       .map(([code]) => code)
   }
 
-  /**
-   * Mark a run as cancelled so the apply loop sees it on its next
-   * iteration. The cancel endpoint calls this before flipping the DB
-   * status. Idempotent.
-   */
-  markCancelled(runId: string): void {
-    this.cancelledRuns_.add(runId)
+  /** WB-037: persist the cancel signal so it survives across processes/restarts. */
+  async markCancelled(runId: string): Promise<void> {
+    await (this as any).updateVendorFeedRuns({ id: runId, cancel_requested_at: new Date() })
   }
 
-  /**
-   * True if markCancelled was called for this runId. The apply loop
-   * polls this between part_numbers.
-   */
-  isCancelled(runId: string): boolean {
-    return this.cancelledRuns_.has(runId)
-  }
-
-  /**
-   * Forget the cancel flag for a runId. Called from the run terminator
-   * after the run row reaches a terminal status so the set doesn't grow
-   * indefinitely.
-   */
-  private clearCancelled_(runId: string): void {
-    this.cancelledRuns_.delete(runId)
+  /** WB-037: the apply loop polls this at group boundaries. */
+  async isCancelled(runId: string): Promise<boolean> {
+    const [run] = await (this as any).listVendorFeedRuns({ id: runId }, { take: 1 })
+    return !!run?.cancel_requested_at
   }
 
   /**
@@ -375,7 +353,6 @@ class VendorSyncService extends MedusaService({
         maxAttempts: this.options_.applyMaxAttempts ?? 3,
       })
 
-      this.clearCancelled_(runId)
       return { runId }
     } catch (err: any) {
       const durationMs = Date.now() - startTime
@@ -392,7 +369,6 @@ class VendorSyncService extends MedusaService({
           `[vendor-sync] [${runId}] Failed to update run status: ${updateErr.message}`
         )
       })
-      this.clearCancelled_(runId)
       return { runId }
     }
   }
@@ -448,7 +424,6 @@ class VendorSyncService extends MedusaService({
         result,
         maxAttempts: this.options_.applyMaxAttempts ?? 3,
       })
-      this.clearCancelled_(runId)
     } catch (err: any) {
       this.logger_.error(
         `[vendor-sync] [${runId}] Apply after approval failed: ${err.message}`
@@ -459,7 +434,6 @@ class VendorSyncService extends MedusaService({
         error_message: err.message?.slice(0, 2000),
         finished_at: new Date(),
       }).catch(() => {})
-      this.clearCancelled_(runId)
       throw err
     }
   }
@@ -510,7 +484,6 @@ class VendorSyncService extends MedusaService({
         result,
         maxAttempts: this.options_.applyMaxAttempts ?? 3,
       })
-      this.clearCancelled_(runId)
     } catch (err: any) {
       this.logger_.error(
         `[vendor-sync] [${runId}] Replay failed: ${err.message}`
@@ -521,7 +494,6 @@ class VendorSyncService extends MedusaService({
         error_message: err.message?.slice(0, 2000),
         finished_at: new Date(),
       }).catch(() => {})
-      this.clearCancelled_(runId)
       throw err
     }
   }

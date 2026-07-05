@@ -115,8 +115,10 @@ export async function applyChanges(
   let groupCount = 0
   let cancelled = false
 
-  const checkCancelled = (): boolean => {
-    if (service.isCancelled(runId)) {
+  // WB-037: isCancelled reads the DB-backed cancel_requested_at column, so
+  // this bridges to async. (Task 7 replaces this sequential loop entirely.)
+  const checkCancelled = async (): Promise<boolean> => {
+    if (await service.isCancelled(runId)) {
       cancelled = true
       logger.warn(
         `[vendor-sync] [${runId}] cancel requested; stopping apply loop`
@@ -161,7 +163,7 @@ export async function applyChanges(
 
   // 1. New groups
   for (const group of diff.newGroups) {
-    if (checkCancelled()) break
+    if (await checkCancelled()) break
     try {
       const result = await applyNewGroup(ctx, group)
       processedCount += result.variantCount
@@ -178,7 +180,7 @@ export async function applyChanges(
   // 2. Changed groups
   if (!cancelled) {
     for (const group of diff.changedGroups) {
-      if (checkCancelled()) break
+      if (await checkCancelled()) break
       try {
         const result = await applyChangedGroup(ctx, group)
         processedCount += result.variantCount
@@ -201,7 +203,7 @@ export async function applyChanges(
   // 3. Discontinued groups (whole-product gone)
   if (!cancelled) {
     for (const group of diff.discontinuedGroups) {
-      if (checkCancelled()) break
+      if (await checkCancelled()) break
       try {
         const result = await applyDiscontinuedGroup(ctx, group)
         processedCount += result.variantCount

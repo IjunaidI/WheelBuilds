@@ -56,14 +56,23 @@ describe("finalizeApply", () => {
     expect(out.status).toBe("exhausted")
   })
 
-  it("on cancellation only records partial-progress failures (no status change)", async () => {
-    const svc = makeService()
-    const out = await finalizeApply(svc as any, {
-      runId: "run_1", vendorCode: "v", feedDate: null,
-      result: { ...partial, cancelled: true }, maxAttempts: 3,
+  it("on cancel, sets status=cancelled + finished_at and records failed parts", async () => {
+    const updates: any[] = []
+    const service = {
+      listVendorFeedRuns: async () => [],
+      updateVendorFeedRuns: async (d: any) => { updates.push(d); return d },
+    }
+    const res = await finalizeApply(service as any, {
+      runId: "r1",
+      vendorCode: "v",
+      feedDate: null,
+      result: { processedCount: 1, groupCount: 1, errorCount: 1, errors: [{ groupKey: "g", error: "x" }], cancelled: true },
+      maxAttempts: 3,
     })
-    expect(out.status).toBe("cancelled")
-    expect(svc.updates[0]).toMatchObject({ id: "run_1", failed_group_keys: ["g1"] })
-    expect(svc.updates[0].status).toBeUndefined()
+    expect(res.status).toBe("cancelled")
+    const merged = Object.assign({}, ...updates)
+    expect(merged.status).toBe("cancelled")
+    expect(merged.finished_at).toBeInstanceOf(Date)
+    expect(merged.failed_part_numbers).toHaveLength(1)
   })
 })

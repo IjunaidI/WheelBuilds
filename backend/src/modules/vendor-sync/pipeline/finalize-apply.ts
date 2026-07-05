@@ -12,9 +12,12 @@ interface FinalizeService {
 
 /**
  * Single terminal transition for an apply (WB-016), shared by run /
- * approveAndApply / replayRun. On cancellation, preserve today's behavior
- * (record partial-progress failures only). Otherwise compute the bounded
- * attempt number and set completed / partially_failed / exhausted.
+ * approveAndApply / replayRun. On cancellation (WB-037), this function OWNS
+ * the status transition: sets status=cancelled + finished_at (plus any
+ * partial-progress failures). Callers (the cancel route, in particular) must
+ * not force-set status while a run is executing — only finalizeApply does,
+ * once the apply loop actually stops. Otherwise compute the bounded attempt
+ * number and set completed / partially_failed / exhausted.
  */
 export async function finalizeApply(
   service: FinalizeService,
@@ -29,13 +32,14 @@ export async function finalizeApply(
   const { runId, vendorCode, feedDate, result, maxAttempts } = params
 
   if (result.cancelled) {
-    if (result.errors.length > 0) {
-      await service.updateVendorFeedRuns({
-        id: runId,
-        failed_part_numbers: result.errors,
-        failed_group_keys: uniqueGroupKeys(result.errors),
-      })
-    }
+    await service.updateVendorFeedRuns({
+      id: runId,
+      status: "cancelled",
+      finished_at: new Date(),
+      ...(result.errors.length > 0
+        ? { failed_part_numbers: result.errors, failed_group_keys: uniqueGroupKeys(result.errors) }
+        : {}),
+    })
     return { status: "cancelled", attempt: 0 }
   }
 

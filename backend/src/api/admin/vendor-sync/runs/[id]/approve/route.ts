@@ -25,10 +25,7 @@ export async function POST(req: MedusaRequest, res: MedusaResponse) {
 
   const actorId = (req as any).auth_context?.actor_id || "admin"
 
-  await service.approveAndApply(id, actorId, req.scope)
-
-  // Re-fetch to return the latest state
-  const [updated] = await service.listVendorFeedRuns({ id })
-
-  res.json({ run: updated })
+  // WB-012: run the apply off-request; return 202 immediately.
+  service.enqueueApprove(id, actorId)
+  res.status(202).json({ run: { ...run, status: "applying", approved_by: actorId } })
 }

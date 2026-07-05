@@ -671,6 +671,34 @@ class VendorSyncService extends MedusaService({
       this.logger_
     )
   }
+
+  /**
+   * WB-012/013: fire the pipeline off-request so the admin approve/replay/
+   * replay-SKU routes can return 202 immediately instead of awaiting the
+   * whole apply. Same rule as `enqueueRun` -- always run on the app
+   * container (`this.container_`), NEVER `req.scope`, which is disposed
+   * once the HTTP response is sent.
+   */
+  enqueueApprove(runId: string, actorId?: string): void {
+    setImmediate(() => {
+      this.approveAndApply(runId, actorId, this.container_)
+        .catch((err) => this.logger_.error(`[vendor-sync] [${runId}] background approve failed: ${err.message}`))
+    })
+  }
+
+  enqueueReplay(runId: string): void {
+    setImmediate(() => {
+      this.replayRun(runId, this.container_)
+        .catch((err) => this.logger_.error(`[vendor-sync] [${runId}] background replay failed: ${err.message}`))
+    })
+  }
+
+  enqueueReplaySku(vendorCode: string, partNumber: string): void {
+    setImmediate(() => {
+      this.replaySku(vendorCode, partNumber, this.container_)
+        .catch((err) => this.logger_.error(`[vendor-sync] replay SKU ${partNumber} failed: ${err.message}`))
+    })
+  }
 }
 
 /**

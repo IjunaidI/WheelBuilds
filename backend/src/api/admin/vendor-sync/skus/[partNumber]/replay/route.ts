@@ -19,11 +19,10 @@ export async function POST(req: MedusaRequest, res: MedusaResponse) {
     return
   }
 
-  await service.replaySku(vendor_code, partNumber, req.scope)
+  // WB-013: run the SKU replay off-request; return 202 immediately.
+  service.enqueueReplaySku(vendor_code, partNumber)
 
-  res.json({
-    message: "replay completed",
-    part_number: partNumber,
-    vendor_code,
+  res.status(202).json({
+    replaying: { vendor_code, part_number: partNumber },
   })
 }

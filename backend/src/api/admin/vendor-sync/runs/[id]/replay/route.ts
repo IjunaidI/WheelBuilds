@@ -23,10 +23,7 @@ export async function POST(req: MedusaRequest, res: MedusaResponse) {
     return
   }
 
-  await service.replayRun(id, req.scope)
-
-  // Re-fetch to return the latest state
-  const [updated] = await service.listVendorFeedRuns({ id })
-
-  res.json({ run: updated })
+  // WB-013: run the replay off-request; return 202 immediately.
+  service.enqueueReplay(id)
+  res.status(202).json({ run: { ...run, status: "applying" } })
 }

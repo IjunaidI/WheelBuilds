@@ -55,6 +55,8 @@ Dry-run fetches, parses, normalizes, stages, and diffs — but stops before any 
 
 Cron `0 */12 * * *` (00:00 and 12:00 UTC), defined in [`backend/src/jobs/vendor-sync-tick.ts`](../../backend/src/jobs/vendor-sync-tick.ts). It iterates `service.listEnabledVendors()` and calls `service.run(vendor)` for each in series. Each vendor has its own in-progress guard, so a long-running wheels apply does not skip the tires tick on the next cycle.
 
+A second cron (WB-018), [`backend/src/jobs/vendor-sync-stock-tick.ts`](../../backend/src/jobs/vendor-sync-stock-tick.ts) — schedule `VENDOR_SYNC_STOCK_CRON`, default `0 */3 * * *` — runs `service.runStockOnly(vendor)` for each enabled vendor between full syncs. It fetches + stages the feed but skips diffing/applyChanges entirely, writing only inventory levels for the parts already known to Medusa. Full and stock runs track independent "last seen" state so neither cron's delta short-circuit causes the other to skip a feed it hasn't actually processed yet.
+
 ### Recovery
 
 ```bash
@@ -66,7 +68,13 @@ pnpm exec medusa exec ./src/scripts/vendor-sync-backfill-inventory.ts     # repa
 
 ## Architecture in one paragraph
 
-The pipeline is a Medusa business module with four MikroORM tables (`vendor_feed_run`, `vendor_feed_staging`, `vendor_stock_staging`, `vendor_product_current`) and a thin service that orchestrates fetch → stage → diff → apply against any registered `VendorAdapter`. Two adapters ship: `wheelpros-wheels` and `wheelpros-tires`, sharing the same pipeline infrastructure but with separate parse/normalize logic and separate run lifecycles. The group-aware diff is a pure function over staging × current rows bucketed by `group_key`; it emits three disjoint sets — `newGroups`, `changedGroups` (added / removed / changed variants inside an existing product), and `discontinuedGroups` — which `applyChanges` consumes to compose Medusa 2.0 core flows (`createProductsWorkflow`, `updateProductsWorkflow`, `createProductVariantsWorkflow`, `updateProductVariantsWorkflow`, `updateProductOptionsWorkflow`, `batchInventoryItemLevelsWorkflow`). Sequential per-process apply with try/catch around each group — no external queue. Process-local cancel flag lets the cancel admin endpoint stop an `applying` run between groups.
+The pipeline is a Medusa business module with four MikroORM tables (`vendor_feed_run`, `vendor_feed_staging`, `vendor_stock_staging`, `vendor_product_current`) and a thin service that orchestrates fetch → stage → diff → apply against any registered `VendorAdapter`. Two adapters ship: `wheelpros-wheels` and `wheelpros-tires`, sharing the same pipeline infrastructure but with separate parse/normalize logic and separate run lifecycles. CSV parsing streams via `csv-parse` (`adapters/csv-stream.ts`) rather than reading the whole file into memory first; warehouse columns are derived from the header row. The group-aware diff is a pure function over staging × current rows bucketed by `group_key`; it emits three disjoint sets — `newGroups`, `changedGroups` (added / removed / changed variants inside an existing product), and `discontinuedGroups` — which `applyChanges` consumes to compose Medusa 2.0 core flows (`createProductsWorkflow`, `updateProductsWorkflow`, `createProductVariantsWorkflow`, `updateProductVariantsWorkflow`, `updateProductOptionsWorkflow`, `batchInventoryItemLevelsWorkflow`).
+
+**Concurrency (WB-014).** Apply runs each phase (new / changed / discontinued groups) through a pure `mapWithConcurrency` helper up to `applyConcurrency` (`VENDOR_SYNC_APPLY_CONCURRENCY`, default 8) — no external queue, just bounded parallelism within the process — with a promise-memoized brand-collection cache (`Map<string, Promise<string>>`) so concurrent groups sharing a brand don't race to create duplicate collections.
+
+**Off-request triggers.** The manual trigger (`POST /runs`) and approve/replay/replay-sku all enqueue their work rather than running in-request: the HTTP handler returns immediately (201 for a new run, 202 for approve/replay/replay-sku) while the pipeline executes in the background on the **app container** (`this.container_`, never the per-request `req.scope`, which would be disposed before a long apply finishes). The 12h and stock-tick crons still call the blocking service methods directly.
+
+**Cancellation (WB-037)** is DB-backed, not a process-local flag: cancelling writes `vendor_feed_run.cancel_requested_at`, and the apply loop's async `isCancelled` check reads that column between groups/phases and stops cleanly — this works across process restarts and worker-mode-split deployments (`WORKER_MODE=worker`), where the HTTP request and the running apply may be different processes.
 
 ---
 
@@ -83,15 +91,17 @@ The pipeline is a Medusa business module with four MikroORM tables (`vendor_feed
 | [`adapters/registry.ts`](../../backend/src/modules/vendor-sync/adapters/registry.ts) | `resolveAdapter('wheelpros-wheels' \| 'wheelpros-tires')` |
 | [`adapters/wheelpros-wheels/`](../../backend/src/modules/vendor-sync/adapters/wheelpros-wheels/) | Wheel adapter (parse, normalize, schema) |
 | [`adapters/wheelpros-tires/`](../../backend/src/modules/vendor-sync/adapters/wheelpros-tires/) | Tire adapter; reuses `parse-helpers` + `tire-parse-helpers` |
-| [`pipeline/fetch.ts`](../../backend/src/modules/vendor-sync/pipeline/fetch.ts) | Reads local CSV, archives a copy to `static/vendor-feeds/<vendor>/<timestamp>.csv` |
+| [`pipeline/fetch.ts`](../../backend/src/modules/vendor-sync/pipeline/fetch.ts) | Reads local CSV, archives a copy to `static/vendor-feeds/<vendor>/<timestamp>.csv`. If `VENDOR_SYNC_DURABLE_ARCHIVE=true` (WB-017), also best-effort uploads the archive to a dedicated private MinIO bucket (`VENDOR_SYNC_FEED_ARCHIVE_BUCKET`, default `vendor-feeds`) via the raw MinIO client, never the shared public File provider |
+| [`adapters/csv-stream.ts`](../../backend/src/modules/vendor-sync/adapters/csv-stream.ts) | Shared streaming `csv-parse` implementation (WB-015) used by both wheel and tire `parse.ts`; derives warehouse columns from the CSV header |
 | [`pipeline/stage.ts`](../../backend/src/modules/vendor-sync/pipeline/stage.ts) | Streams parsed rows into staging tables; skips rows with empty `ImageURL` |
 | [`pipeline/diff.ts`](../../backend/src/modules/vendor-sync/pipeline/diff.ts) | Pure-function diff; `computeGroupDiff` is the production entry point (group-aware), `computeDiff` is the part-level legacy still used by tests |
 | [`pipeline/bootstrap.ts`](../../backend/src/modules/vendor-sync/pipeline/bootstrap.ts) | Idempotent: US region, sales channel, `Wheels`/`Tires` categories, brand collections, shipping profile, stock locations |
 | [`pipeline/apply.ts`](../../backend/src/modules/vendor-sync/pipeline/apply.ts) | Group-aware sequential apply with try/catch per group, cancel-poll between groups, query.graph for `inventory_item_id`. Routes new/changed/discontinued groups to per-type handlers; tires still go one-product-one-variant |
 | [`pipeline/apply-stock.ts`](../../backend/src/modules/vendor-sync/pipeline/apply-stock.ts) | `batchInventoryItemLevelsWorkflow` + pure `computeStockChanges` |
 | [`pipeline/build-metadata.ts`](../../backend/src/modules/vendor-sync/pipeline/build-metadata.ts) | Two pure helpers: `buildProductMetadata` (group-constant fields — brand, display_style_no, style, group_key; finish is NOT here) and `buildVariantMetadata` (per-row fields — includes `finish` and `image_url` so each variant carries its own color label and vendor CDN image). The apply path drafts the product only when ALL variants in a group are discontinued; individual-variant departure marks the variant via metadata.discontinued + zeroed stock instead. |
-| [`service.ts`](../../backend/src/modules/vendor-sync/service.ts) | `VendorSyncService`: orchestrator + cancel flag + `run`/`approveAndApply`/`replayRun`/`replaySku` |
-| [`jobs/vendor-sync-tick.ts`](../../backend/src/jobs/vendor-sync-tick.ts) | Cron entry |
+| [`service.ts`](../../backend/src/modules/vendor-sync/service.ts) | `VendorSyncService`: orchestrator + DB-backed cancel (`isCancelled`/`markCancelled`) + `run`/`enqueueRun`/`runStockOnly`/`approveAndApply`/`replayRun`/`replaySku` |
+| [`jobs/vendor-sync-tick.ts`](../../backend/src/jobs/vendor-sync-tick.ts) | Full-sync cron entry (`0 */12 * * *`) |
+| [`jobs/vendor-sync-stock-tick.ts`](../../backend/src/jobs/vendor-sync-stock-tick.ts) | Stock-only cron entry (WB-018, `VENDOR_SYNC_STOCK_CRON`, default `0 */3 * * *`) |
 | [`api/admin/vendor-sync/`](../../backend/src/api/admin/vendor-sync/) | Admin endpoints (list runs, detail, approve, cancel, replay) |
 | [`scripts/vendor-sync-*.ts`](../../backend/src/scripts/) | dry-run, apply, mock, cleanup, backfill-inventory, dev-wipe |
 | [`__fixtures__/`](../../backend/src/modules/vendor-sync/__fixtures__/) | wheels-small.csv + v2, tires-small.csv + v2 |
@@ -174,9 +184,10 @@ fetching ─► staging ─► diffing ─┬─► awaiting_approval ─► app
                                 └────────────► applying ─────────┴─► cancelled
 ```
 
-- `awaiting_approval` triggers when the discontinue ratio exceeds `VENDOR_SYNC_DISCONTINUE_THRESHOLD` (default 0.05). Resolve with `POST /admin/vendor-sync/runs/:id/approve`.
-- `cancelled` is set by `POST /admin/vendor-sync/runs/:id/cancel`; the apply loop sees the flag between part_numbers and stops cleanly.
+- `awaiting_approval` triggers when the discontinue ratio exceeds `VENDOR_SYNC_DISCONTINUE_THRESHOLD` (default 0.05). Resolve with `POST /admin/vendor-sync/runs/:id/approve` — returns 202 immediately, apply runs off-request.
+- `cancelled` is set by `POST /admin/vendor-sync/runs/:id/cancel`, which persists `cancel_requested_at` on the row (DB-backed, WB-037 — not an in-process flag); the apply loop's async `isCancelled` check reads it between groups/phases and stops cleanly, including across process restarts and worker-mode splits. `finalizeApply` owns the transition to `cancelled`. `cancel_requested_at` is reset to null on approve/replay re-entry so replaying a previously-cancelled run doesn't immediately self-cancel.
 - `failed` captures uncaught exceptions; per-SKU errors do NOT abort the run, they get recorded in `failed_part_numbers`.
+- **`mode` (`full` | `stock`, default `full`, WB-018)** selects the pipeline: `full` runs the diagram above end-to-end (fetch → stage → group-aware diff → apply). `stock` (`service.runStockOnly`, driven by the `vendor-sync-stock-tick` cron) fetches + stages then **skips diffing and `awaiting_approval` entirely**, going straight to applying inventory levels only for parts already known to Medusa, then `completed`. The two modes track independent "last processed" state so a stock run never causes the next full run's delta short-circuit to wrongly skip a feed (and vice versa).
 
 ---
 
@@ -187,12 +198,12 @@ All under `/admin/vendor-sync/`, all admin-auth-gated.
 | Method | Path | Use |
 |---|---|---|
 | GET | `/runs` | List runs (filter by vendor, status) |
-| POST | `/runs` | Trigger out-of-band run (body: `{ vendor_code, dry_run? }`) |
+| POST | `/runs` | Trigger out-of-band run (body: `{ vendor_code, dry_run? }`) — **returns 201 immediately** (WB-011); the run executes off-request on the app container |
 | GET | `/runs/:id` | Run detail incl. `failed_part_numbers` |
-| POST | `/runs/:id/approve` | Approve an `awaiting_approval` run |
-| POST | `/runs/:id/cancel` | Cancel an in-progress or awaiting-approval run |
-| POST | `/runs/:id/replay` | Re-apply the staging data of a completed run |
-| POST | `/skus/:partNumber/replay` | Replay one SKU from its most recent staging row |
+| POST | `/runs/:id/approve` | Approve an `awaiting_approval` run — **returns 202 immediately** (WB-012); apply executes off-request |
+| POST | `/runs/:id/cancel` | Cancel an in-progress or awaiting-approval run — DB-backed (`cancel_requested_at`), cross-process/restart-safe (WB-037) |
+| POST | `/runs/:id/replay` | Re-apply the staging data of a completed run — **returns 202 immediately** (WB-013); off-request |
+| POST | `/skus/:partNumber/replay` | Replay one SKU from its most recent staging row — **returns 202 immediately** (WB-013); off-request |
 
 ---
 
@@ -212,7 +223,7 @@ All under `/admin/vendor-sync/`, all admin-auth-gated.
 
 | | Detail | Tracked |
 |---|---|---|
-| Apply throughput | ~13 seconds per product, dominated by the Meilisearch plugin's synchronous indexing subscriber. At 7 workflows/sec, 1000 SKUs/tick = ~2 hours. Fine for current volume, will not scale to a full daily wheelpros feed. | Plan §15, risk R13 |
+| Apply throughput | ~13 seconds per product, dominated by the Meilisearch plugin's synchronous indexing subscriber. At 7 workflows/sec, 1000 SKUs/tick = ~2 hours per worker of concurrency. WB-014 (2026-07-06) added real parallelism (`applyConcurrency`, default 8) so groups now process concurrently — the per-product cost itself is unchanged, but wall-clock throughput scales roughly with the concurrency setting. | Plan §15, risk R13 |
 | SFTP fetch | Phase 1 reads a local file. Real SFTP env vars are reserved (`VENDOR_WHEELPROS_SFTP_*`) but unused. | Plan §4, OQ5 |
 | Image strategy | Pass-through to vendor CDN. If vendor URLs go offline, products show broken thumbnails. No rehost to MinIO yet. | OQ2 |
 | Integration tests | 4 `it.todo` cases in [`__tests__/integration.test.ts`](../../backend/src/modules/vendor-sync/__tests__/integration.test.ts) document the regression scenarios but the implementation requires a CI Postgres setup. | Plan §15.8 |

@@ -33,7 +33,7 @@
 > *G7 · Account & garage* (WB-032/022/045) — 2026-06-26
 > (license-plate provider split to WB-058).
 
-- **G1 · Vendor-sync productionization (async + scale)** `[L · needs Redis worker]` — move sync triggers off the HTTP request, parallelize/stream the apply, make cancel + feed archiving worker-safe. → WB-011, WB-012, WB-013, WB-014, WB-015, WB-017, WB-018, WB-037
+- **G1 · Vendor-sync productionization (async + scale)** `[L · needs Redis worker]` — ✅ **DONE 2026-07-06** (WB-011 off-request run enqueue, WB-012/013 off-request approve/replay/replay-sku, WB-014 concurrent apply + promise-memoized brand cache, WB-015 streaming CSV parse, WB-017 durable private-bucket feed archive opt-in, WB-018 stock-only fast path + cron, WB-037 DB-backed cross-process cancel).
 - **G2 · Checkout & cart (make it transactable)** `[M–L]` — ✅ **DONE 2026-06-26** (WB-033 stall, WB-034 stock cap, WB-035 express-pay/Affirm env-gated, WB-036 discount fix, WB-047 copy + WB-053 browse cap). Follow-ups: WB-054 (gift cards v2), WB-055 (brand-copy sweep).
 - **G3 · PDP correctness & polish** `[S–M]` — ✅ **DONE 2026-06-25** (WB-048 BLANK gate, WB-029 placeholders, WB-030 finish-normalizer twin).
 - **G4 · Home & merchandising** `[M]` — ✅ **DONE 2026-06-26** (WB-004 Featured Blocks real curated products + Build Gallery → catalog-wall, WB-023 newsletter persistence, WB-028 merchandising copy → config + live brand count). Follow-up: WB-057 (newsletter hardening — unsubscribe/rate-limit/double-opt-in).
@@ -165,49 +165,54 @@
 ## Move-to-queue (synchronous-in-request / non-durable → background job)
 
 ### WB-011 · Manual trigger runs full sync in-request   [MEDIUM]
-- status: todo
+- status: done
 - area: backend/vendor-sync/api
 - evidence: backend/src/api/admin/vendor-sync/runs/route.ts:63-69
 - problem: the POST /admin/vendor-sync/runs endpoint runs the full sync pipeline synchronously inside the HTTP request handler; large feeds will timeout or block the server.
 - fix: enqueue the sync as a background job (workflow or queue) and return a run id immediately; the client polls for status.
 - verify: POST /admin/vendor-sync/runs returns a run id immediately (< 1s); the sync proceeds in the background; the run status transitions to completed/failed asynchronously.
-- refs: —
+- done: 2026-07-06 — `run()` split into `startRun`/`executeRun`/`enqueueRun`; POST /admin/vendor-sync/runs now calls `enqueueRun`, which returns 201 with the run id immediately while `executeRun` runs in the background on the app container (`this.container_`, never `req.scope`). The 12h cron still uses the blocking `run()` variant. Verified `executeRun` byte-identical to the old in-request body; `test:sync` green, `medusa build` exit 0.
+- refs: [spec](../in-progress/specs/2026-07-05-vendor-sync-productionization-design.md) · [plan](../in-progress/plans/2026-07-05-vendor-sync-productionization.md)
 
 ### WB-012 · Approve-and-apply blocks the request (heaviest apply)   [MEDIUM]
-- status: todo
+- status: done
 - area: backend/vendor-sync/api
 - evidence: backend/src/api/admin/vendor-sync/runs/[id]/approve/route.ts:28
 - problem: the approve endpoint calls the full apply pipeline synchronously; the apply can take minutes for large feeds, causing HTTP timeouts.
 - fix: move apply to a background job triggered by the approve action; return 202 Accepted with a status poll URL.
 - verify: POST approve returns 202 in under 1s; apply proceeds in the background; the run transitions from approved → applying → completed/failed asynchronously.
-- refs: —
+- done: 2026-07-06 — POST .../approve now returns 202 immediately via an `enqueueApprove` wrapper (`setImmediate` on `this.container_` + `.catch` log) that runs `approveAndApply` off-request; status pre-checks preserved, `approveAndApply`'s internals untouched.
+- refs: [spec](../in-progress/specs/2026-07-05-vendor-sync-productionization-design.md) · [plan](../in-progress/plans/2026-07-05-vendor-sync-productionization.md)
 
 ### WB-013 · Replay run / replay SKU block the request   [MEDIUM]
-- status: todo
+- status: done
 - area: backend/vendor-sync/api
 - evidence: backend/src/api/admin/vendor-sync/runs/[id]/replay/route.ts:26
 - problem: replay endpoints run synchronously in-request, same issue as approve (WB-012).
 - fix: enqueue replay as a background job; return 202 with a status poll URL.
 - verify: POST replay returns 202 in under 1s; replay proceeds in background; run status updates asynchronously.
-- refs: —
+- done: 2026-07-06 — both replay endpoints (run + SKU) now return 202 immediately via `enqueueReplay`/`enqueueReplaySku` wrappers (same off-request pattern as WB-012); `replayRun`/`replaySku` internals untouched.
+- refs: [spec](../in-progress/specs/2026-07-05-vendor-sync-productionization-design.md) · [plan](../in-progress/plans/2026-07-05-vendor-sync-productionization.md)
 
 ### WB-014 · Apply loop sequential; `applyConcurrency` is dead config   [MEDIUM]
-- status: todo
+- status: done
 - area: backend/vendor-sync/pipeline
 - evidence: backend/src/modules/vendor-sync/pipeline/apply.ts:148-201
 - problem: the apply loop processes one product group at a time sequentially; the `applyConcurrency` config option is read but never used — it is dead configuration.
 - fix: implement a real concurrency limit using the applyConcurrency value (p-limit or similar) so multiple product groups are applied in parallel up to the configured limit.
 - verify: with applyConcurrency = 3, the apply loop processes up to 3 product groups concurrently; the config value is actually respected.
-- refs: —
+- done: 2026-07-06 — a pure `mapWithConcurrency` helper (no new dep) drives all 3 apply phases up to `applyConcurrency` (`VENDOR_SYNC_APPLY_CONCURRENCY`, default 8, now genuinely load-bearing) with an async `isCancelled` shouldStop gate + between-phase recompute; the brand-collection cache became a promise-memoized `Map<string, Promise<string>>` so concurrent groups sharing a brand don't create duplicate collections, and a rejected lookup un-poisons the cache entry so retry is possible.
+- refs: [spec](../in-progress/specs/2026-07-05-vendor-sync-productionization-design.md) · [plan](../in-progress/plans/2026-07-05-vendor-sync-productionization.md)
 
 ### WB-015 · CSV read fully into memory + parsed before yielding   [MEDIUM]
-- status: todo
+- status: done
 - area: backend/vendor-sync/adapters
 - evidence: backend/src/modules/vendor-sync/adapters/wheelpros-wheels/parse.ts:18-24
 - problem: the CSV parser reads the entire file into memory before yielding records; large feeds risk OOM errors and delay time-to-first-record.
 - fix: switch to a streaming CSV parse that yields records as they are parsed (e.g. csv-parse stream API).
 - verify: parsing a large feed does not load the full file into memory at once; the first record is available before the file is fully read (testable by timing or memory profiling).
-- refs: —
+- done: 2026-07-06 — both wheel and tire `parse.ts` now delegate to a shared streaming `csv-parse` implementation (`adapters/csv-stream.ts`); warehouse columns are derived from the CSV header via csv-parse's `columns:(header)=>...` callback instead of the first data record, fixing a silent stock-column loss under ragged first rows (regression test proved RED-against-old, GREEN-with-fix). `papaparse`/`@types/papaparse` are now dead deps (not yet removed).
+- refs: [spec](../in-progress/specs/2026-07-05-vendor-sync-productionization-design.md) · [plan](../in-progress/plans/2026-07-05-vendor-sync-productionization.md)
 
 ### WB-016 · Failed parts never auto-retried (cron RunDate then skips feed)   [MEDIUM]
 - status: done
@@ -220,22 +225,24 @@
 - refs: done/specs/2026-06-21-vendor-sync-partial-apply-retry-design.md · done/plans/2026-06-21-vendor-sync-partial-apply-retry.md
 
 ### WB-017 · Feed archives → ephemeral disk; `archiveBucket` unused   [MEDIUM]
-- status: todo
+- status: done
 - area: backend/vendor-sync/utils
 - evidence: backend/src/modules/vendor-sync/utils/archive.ts:12-39
 - problem: feed archives are written to local disk; on Railway the disk is ephemeral and archives are lost on redeploy; the archiveBucket config option is present but never used.
 - fix: implement archive upload to the configured object storage bucket (MinIO/S3) using the existing archiveBucket option. See also WB-042 (durable archiving — deferred Plan 4+).
 - verify: after a sync run, the feed archive is uploaded to object storage and persists across server restarts; archiveBucket config drives the destination.
-- refs: —
+- done: 2026-07-06 — durable archiving is EXPLICIT opt-in (`VENDOR_SYNC_DURABLE_ARCHIVE`, default off): `uploadArchive` is best-effort/never-throws and uploads to a DEDICATED PRIVATE MinIO bucket (`VENDOR_SYNC_FEED_ARCHIVE_BUCKET`, default `vendor-feeds`) via the raw MinIO client — deliberately NOT the shared Medusa File/minio-file provider, whose only provider forces public-read on everything it stores. Needs full MinIO creds or it's a no-op.
+- refs: [spec](../in-progress/specs/2026-07-05-vendor-sync-productionization-design.md) · [plan](../in-progress/plans/2026-07-05-vendor-sync-productionization.md)
 
 ### WB-018 · Stock freshness bound to 12h run; no stock-only fast path   [MEDIUM]
-- status: todo
+- status: done
 - area: backend/vendor-sync/jobs
 - evidence: backend/src/jobs/vendor-sync-tick.ts:33-36
 - problem: inventory levels are only updated as part of the full 12h catalog sync; there is no way to refresh stock counts more frequently without triggering a full diff-and-apply.
 - fix: add a stock-only fast path (separate cron or manual trigger) that updates inventory_item quantities from the feed without re-diffing product/variant metadata.
 - verify: a stock-only sync updates inventory levels without creating/modifying product or variant records; it can be run independently of the full 12h sync.
-- refs: —
+- done: 2026-07-06 — `service.runStockOnly` (`mode: "stock"`) fetches + stages then skips diff/applyChanges, applying only stock levels; a new cron `vendor-sync-stock-tick` (`VENDOR_SYNC_STOCK_CRON`, default `0 */3 * * *`) mirrors the full-sync tick. Full and stock runs keep independently-scoped delta short-circuits (each keyed by `mode`) so neither poisons the other's "nothing changed" skip; `source_modify_time` persists on both the changed and unchanged path for the stock chain to keep working across cycles.
+- refs: [spec](../in-progress/specs/2026-07-05-vendor-sync-productionization-design.md) · [plan](../in-progress/plans/2026-07-05-vendor-sync-productionization.md)
 
 ### WB-019 · wheel-size lookup synchronous on first miss   [MEDIUM]
 - status: done
@@ -423,13 +430,14 @@
 - refs: design [docs/done/specs/2026-06-26-checkout-cart-transactable-design.md](../done/specs/2026-06-26-checkout-cart-transactable-design.md) ; plan [docs/done/plans/2026-06-26-checkout-cart-transactable.md](../done/plans/2026-06-26-checkout-cart-transactable.md)
 
 ### WB-037 · Cancel flag is per-process in-memory (worker-mode split)   [MEDIUM]
-- status: todo
+- status: done
 - area: backend/vendor-sync/service
 - evidence: backend/src/modules/vendor-sync/service.ts:56,84-94
 - problem: the cooperative cancellation flag for vendor-sync runs is stored in-process memory; in worker-mode-split deployments (WORKER_MODE=worker), cancellation sent to the HTTP server process does not reach the worker process running the sync.
 - fix: move the cancellation flag to a shared store (Redis key or DB column) so it is visible across processes.
 - verify: sending a cancel request to the HTTP server while a sync runs in a separate worker process causes the worker to stop processing; the run transitions to cancelled.
-- refs: —
+- done: 2026-07-06 — cancellation is now DB-backed and cross-process: `vendor_feed_run.cancel_requested_at` (added by the foundation migration) replaces the in-process flag; `isCancelled` is async and reads the row, `markCancelled` persists the timestamp, and `finalizeApply` owns the `cancelled` status transition. `cancel_requested_at` resets to null on approve/replay re-entry so replaying a previously-cancelled run doesn't self-cancel.
+- refs: [spec](../in-progress/specs/2026-07-05-vendor-sync-productionization-design.md) · [plan](../in-progress/plans/2026-07-05-vendor-sync-productionization.md)
 
 ### WB-038 · Partial-apply marked completed → cron skips feed — merged into WB-016. See WB-016.
 

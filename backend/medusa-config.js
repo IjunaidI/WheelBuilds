@@ -199,6 +199,7 @@ const medusaConfig = {
         applyConcurrency: parseInt(VENDOR_SYNC_APPLY_CONCURRENCY ?? '8', 10),
         applyMaxAttempts: parseInt(VENDOR_SYNC_APPLY_MAX_ATTEMPTS ?? '3', 10),
         archiveBucket: VENDOR_SYNC_FEED_ARCHIVE_BUCKET ?? 'vendor-feeds',
+        durableArchive: process.env.VENDOR_SYNC_DURABLE_ARCHIVE === 'true',
         dryRun: VENDOR_SYNC_DRY_RUN === 'true',
         allowSampleFeed: VENDOR_ALLOW_SAMPLE_FEED === 'true',
         devMaxRows,

@@ -1,5 +1,7 @@
 import { promises as fs } from "fs"
 import path from "path"
+import { Modules } from "@medusajs/framework/utils"
+import type { MedusaContainer } from "@medusajs/framework/types"
 
 /**
  * Archives a feed file to local storage under
@@ -35,5 +37,34 @@ export async function archiveFeed(
       `[vendor-sync] Failed to archive feed for ${vendorCode}: ${err.message}. Continuing without archive.`
     )
     return sourceFilePath
+  }
+}
+
+/**
+ * Best-effort durable upload of a local archive file to object storage via the
+ * File module. Returns the stored key, or null on any failure (archiving must
+ * never block the pipeline). The caller decides IF to call this
+ * (shouldUploadArchive); descriptor.archiveKey stays local for parsing.
+ */
+export async function uploadArchive(
+  container: MedusaContainer,
+  localPath: string,
+  opts: { vendorCode: string; bucketPrefix: string }
+): Promise<string | null> {
+  try {
+    const fileModule = container.resolve(Modules.FILE)
+    const content = await fs.readFile(localPath)
+    const base = localPath.split(/[\\/]/).pop() ?? "feed.csv"
+    const [file] = await fileModule.createFiles([
+      {
+        filename: `${opts.bucketPrefix}/${opts.vendorCode}/${base}`,
+        mimeType: "text/csv",
+        content: content.toString("binary"),
+      },
+    ])
+    return file?.url ?? file?.id ?? null
+  } catch (err: any) {
+    console.warn(`[vendor-sync] durable archive upload failed for ${opts.vendorCode}: ${err.message}`)
+    return null
   }
 }

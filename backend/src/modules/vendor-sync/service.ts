@@ -14,6 +14,8 @@ import { resolveFeed, isSampleFeedPath } from "./feed-source/resolve-feed"
 import { SftpConfig } from "./feed-source/types"
 import { finalizeApply } from "./pipeline/finalize-apply"
 import { shouldShortCircuitFeed } from "./pipeline/retry-policy"
+import { uploadArchive } from "./utils/archive"
+import { shouldUploadArchive } from "./utils/archive-policy"
 
 interface Logger {
   info(message: string, ...args: any[]): void
@@ -36,6 +38,8 @@ export interface VendorSyncModuleOptions {
   devMaxRows?: number
   /** WB-041: permit the bundled sample CSV when no live feed is configured (dev/CI only). */
   allowSampleFeed?: boolean
+  /** WB-017: explicit opt-in to durably upload the fetched feed archive to object storage (private bucket only). */
+  durableArchive?: boolean
   vendors?: Record<
     string,
     { enabled?: boolean; feedPath?: string; sftp?: SftpConfig }
@@ -219,6 +223,23 @@ class VendorSyncService extends MedusaService({
         source_filename: descriptor.sourceFilename,
         source_archive_key: descriptor.archiveKey,
       })
+
+      // WB-017: best-effort durable upload of the archive to object storage.
+      // Explicit opt-in (durableArchive AND MinIO configured) — never write
+      // vendor cost CSVs to the default public MinIO media bucket by accident.
+      // descriptor.archiveKey stays a LOCAL path; only the DB column is updated.
+      const durableArchive = this.options_.durableArchive ?? false
+      const minioConfigured = !!process.env.MINIO_ENDPOINT
+      if (shouldUploadArchive(durableArchive, minioConfigured)) {
+        const durableKey = await uploadArchive(
+          resolveApplyContainer(options?.container, this.container_),
+          descriptor.archiveKey,
+          { vendorCode, bucketPrefix: this.options_.archiveBucket ?? "vendor-feeds" }
+        )
+        if (durableKey) {
+          await (this as any).updateVendorFeedRuns({ id: runId, source_archive_key: durableKey })
+        }
+      }
 
       // 5. RunDate short-circuit
       // Parse runDateVendor from a sample row (first parsed row)

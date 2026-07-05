@@ -20,6 +20,8 @@ const VendorFeedRun = model.define("vendor_feed_run", {
   failed_part_numbers: model.json().nullable(),
   failed_group_keys: model.json().nullable(),
   apply_attempt_count: model.number().default(0),
+  cancel_requested_at: model.dateTime().nullable(),
+  mode: model.text().default("full"),
   started_at: model.dateTime(),
   finished_at: model.dateTime().nullable(),
 }).indexes([

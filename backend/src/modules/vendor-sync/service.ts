@@ -229,13 +229,16 @@ class VendorSyncService extends MedusaService({
       // vendor cost CSVs to the default public MinIO media bucket by accident.
       // descriptor.archiveKey stays a LOCAL path; only the DB column is updated.
       const durableArchive = this.options_.durableArchive ?? false
-      const minioConfigured = !!process.env.MINIO_ENDPOINT
+      const minioConfigured = !!(
+        process.env.MINIO_ENDPOINT &&
+        process.env.MINIO_ACCESS_KEY &&
+        process.env.MINIO_SECRET_KEY
+      )
       if (shouldUploadArchive(durableArchive, minioConfigured)) {
-        const durableKey = await uploadArchive(
-          resolveApplyContainer(options?.container, this.container_),
-          descriptor.archiveKey,
-          { vendorCode, bucketPrefix: this.options_.archiveBucket ?? "vendor-feeds" }
-        )
+        const durableKey = await uploadArchive(descriptor.archiveKey, {
+          vendorCode,
+          bucket: this.options_.archiveBucket ?? "vendor-feeds",
+        })
         if (durableKey) {
           await (this as any).updateVendorFeedRuns({ id: runId, source_archive_key: durableKey })
         }

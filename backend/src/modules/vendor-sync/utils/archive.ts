@@ -1,7 +1,6 @@
 import { promises as fs } from "fs"
 import path from "path"
-import { Modules } from "@medusajs/framework/utils"
-import type { MedusaContainer } from "@medusajs/framework/types"
+import { Client as MinioClient } from "minio"
 
 /**
  * Archives a feed file to local storage under
@@ -41,30 +40,57 @@ export async function archiveFeed(
 }
 
 /**
- * Best-effort durable upload of a local archive file to object storage via the
- * File module. Returns the stored key, or null on any failure (archiving must
- * never block the pipeline). The caller decides IF to call this
- * (shouldUploadArchive); descriptor.archiveKey stays local for parsing.
+ * Build a MinIO client from env, mirroring minio-file/service.ts's endpoint
+ * parsing. Returns null if any of the three creds is missing.
+ */
+function buildMinioClient(): MinioClient | null {
+  const rawEndpoint = process.env.MINIO_ENDPOINT
+  const accessKey = process.env.MINIO_ACCESS_KEY
+  const secretKey = process.env.MINIO_SECRET_KEY
+  if (!rawEndpoint || !accessKey || !secretKey) return null
+
+  let endPoint = rawEndpoint
+  let useSSL = true
+  let port = 443
+  if (endPoint.startsWith("https://")) { endPoint = endPoint.replace("https://", ""); useSSL = true; port = 443 }
+  else if (endPoint.startsWith("http://")) { endPoint = endPoint.replace("http://", ""); useSSL = false; port = 80 }
+  endPoint = endPoint.replace(/\/$/, "")
+  const portMatch = endPoint.match(/:(\d+)$/)
+  if (portMatch) { port = parseInt(portMatch[1], 10); endPoint = endPoint.replace(/:(\d+)$/, "") }
+
+  return new MinioClient({ endPoint, port, useSSL, accessKey, secretKey })
+}
+
+/**
+ * WB-017: durable feed-archive upload to a DEDICATED PRIVATE bucket via the
+ * direct MinIO client — deliberately NOT the shared File module (whose only
+ * provider forces public-read). We never set a public bucket policy or a
+ * public-read object ACL, so vendor cost CSVs stay private (retrieve via a
+ * presigned URL or the MinIO console). Best-effort: returns the stored object
+ * key, or null on any failure/misconfig; NEVER throws, never blocks the sync.
+ * `fPutObject` streams the file straight from disk — no base64/binary
+ * re-encoding, so the CSV bytes round-trip exactly.
  */
 export async function uploadArchive(
-  container: MedusaContainer,
   localPath: string,
-  opts: { vendorCode: string; bucketPrefix: string }
+  opts: { vendorCode: string; bucket: string }
 ): Promise<string | null> {
   try {
-    const fileModule = container.resolve(Modules.FILE)
-    const content = await fs.readFile(localPath)
-    const base = localPath.split(/[\\/]/).pop() ?? "feed.csv"
-    const [file] = await fileModule.createFiles([
-      {
-        filename: `${opts.bucketPrefix}/${opts.vendorCode}/${base}`,
-        mimeType: "text/csv",
-        content: content.toString("binary"),
-      },
-    ])
-    return file?.url ?? file?.id ?? null
+    const client = buildMinioClient()
+    if (!client) return null
+    const bucket = opts.bucket
+
+    const exists = await client.bucketExists(bucket).catch(() => false)
+    if (!exists) {
+      await client.makeBucket(bucket) // NO setBucketPolicy → the bucket stays PRIVATE
+    }
+    const base = path.basename(localPath)
+    // Prefix an epoch so a fallback-to-source archiveKey (no timestamp) can't overwrite.
+    const objectName = `${opts.vendorCode}/${Date.now()}-${base}`
+    await client.fPutObject(bucket, objectName, localPath, { "Content-Type": "text/csv" })
+    return `${bucket}/${objectName}`
   } catch (err: any) {
-    console.warn(`[vendor-sync] durable archive upload failed for ${opts.vendorCode}: ${err.message}`)
+    console.warn(`[vendor-sync] durable archive upload failed for ${opts.vendorCode}: ${err.message}. Continuing without durable archive.`)
     return null
   }
 }

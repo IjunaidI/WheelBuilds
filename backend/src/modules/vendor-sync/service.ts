@@ -382,12 +382,16 @@ class VendorSyncService extends MedusaService({
     actorId?: string,
     container?: MedusaContainer
   ): Promise<void> {
-    // Record who approved and when
+    // Record who approved and when. WB-037: also clear any prior cancel
+    // signal on this run row -- re-entering execution must not immediately
+    // re-cancel itself against a stale cancel_requested_at from a previous
+    // attempt on the same runId.
     await (this as any).updateVendorFeedRuns({
       id: runId,
       status: "applying",
       approved_by: actorId ?? "admin",
       approved_at: new Date(),
+      cancel_requested_at: null,
     })
 
     try {
@@ -448,10 +452,12 @@ class VendorSyncService extends MedusaService({
 
     const vendorCode = run.vendor_code
 
+    // WB-037: clear any prior cancel signal -- see approveAndApply comment.
     await (this as any).updateVendorFeedRuns({
       id: runId,
       status: "applying",
       finished_at: null,
+      cancel_requested_at: null,
     })
 
     try {
@@ -581,6 +587,12 @@ class VendorSyncService extends MedusaService({
     this.logger_.info(
       `[vendor-sync] Replaying SKU ${partNumber} (${isNew ? "new" : "changed"}) in group ${groupKey} from run ${runId}`
     )
+
+    // WB-037: clear any prior cancel signal on the run row this staging
+    // data belongs to -- see approveAndApply comment. replaySku reuses
+    // stagingRow.run_id, so a run cancelled earlier must not immediately
+    // re-cancel this single-SKU replay.
+    await (this as any).updateVendorFeedRuns({ id: runId, cancel_requested_at: null })
 
     await applyChanges(
       resolveApplyContainer(container, this.container_),

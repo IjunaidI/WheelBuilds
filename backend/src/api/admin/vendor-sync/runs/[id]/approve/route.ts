@@ -1,4 +1,5 @@
 import { MedusaRequest, MedusaResponse } from "@medusajs/framework"
+import { Modules } from "@medusajs/framework/utils"
 import { VENDOR_SYNC_MODULE } from "../../../../../../modules/vendor-sync"
 
 /**
@@ -25,7 +26,15 @@ export async function POST(req: MedusaRequest, res: MedusaResponse) {
 
   const actorId = (req as any).auth_context?.actor_id || "admin"
 
-  // WB-012: run the apply off-request; return 202 immediately.
-  service.enqueueApprove(id, actorId)
+  // WB-012: run the apply off-request via the vendor-sync subscriber (global
+  // container — the module cradle can't resolve core modules). `approveAndApply`
+  // itself writes status:applying + clears cancel_requested_at at its start, so
+  // we don't pre-write status here; the 202 body below is optimistic.
+  const eventBus = req.scope.resolve(Modules.EVENT_BUS)
+  await eventBus.emit({
+    name: "vendor-sync.approve",
+    data: { runId: id, actorId },
+  })
+
   res.status(202).json({ run: { ...run, status: "applying", approved_by: actorId } })
 }

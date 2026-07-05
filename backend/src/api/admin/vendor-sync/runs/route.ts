@@ -1,4 +1,5 @@
 import { MedusaRequest, MedusaResponse } from "@medusajs/framework"
+import { Modules } from "@medusajs/framework/utils"
 import { VENDOR_SYNC_MODULE } from "../../../../modules/vendor-sync"
 
 /**
@@ -60,8 +61,31 @@ export async function POST(req: MedusaRequest, res: MedusaResponse) {
     return
   }
 
-  // WB-011: enqueue off-request; return the run id immediately.
-  const { runId } = await service.enqueueRun(vendor_code, { dryRun: dry_run })
+  // WB-011: reserve the run row synchronously (the in-progress guard lives in
+  // startRun too, so this is race-safe against the pre-check above), then hand
+  // the fetch->stage->diff->apply pipeline to the vendor-sync subscriber. The
+  // subscriber runs on the GLOBAL container, which — unlike the module cradle
+  // (`this.container_`) — can resolve the core region/product/inventory modules
+  // the apply workflows need. `req.scope` (which CAN resolve the event bus) is
+  // disposed once this response is sent, so the deferred work must not use it.
+  const { runId, inProgress: reservedInProgress } = await service.startRun(
+    vendor_code,
+    "full"
+  )
+
+  if (reservedInProgress) {
+    res.status(409).json({
+      type: "conflict",
+      message: "A run is already in progress for this vendor",
+    })
+    return
+  }
+
+  const eventBus = req.scope.resolve(Modules.EVENT_BUS)
+  await eventBus.emit({
+    name: "vendor-sync.execute",
+    data: { runId, vendorCode: vendor_code, dryRun: dry_run },
+  })
 
   res.status(201).json({ run_id: runId })
 }

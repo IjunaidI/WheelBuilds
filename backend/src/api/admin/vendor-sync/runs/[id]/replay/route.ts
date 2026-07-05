@@ -1,4 +1,5 @@
 import { MedusaRequest, MedusaResponse } from "@medusajs/framework"
+import { Modules } from "@medusajs/framework/utils"
 import { VENDOR_SYNC_MODULE } from "../../../../../../modules/vendor-sync"
 
 /**
@@ -23,7 +24,14 @@ export async function POST(req: MedusaRequest, res: MedusaResponse) {
     return
   }
 
-  // WB-013: run the replay off-request; return 202 immediately.
-  service.enqueueReplay(id)
+  // WB-013: run the replay off-request via the vendor-sync subscriber (global
+  // container — the module cradle can't resolve core modules). Return 202
+  // immediately; `replayRun` writes status:applying at its start.
+  const eventBus = req.scope.resolve(Modules.EVENT_BUS)
+  await eventBus.emit({
+    name: "vendor-sync.replay",
+    data: { runId: id },
+  })
+
   res.status(202).json({ run: { ...run, status: "applying" } })
 }

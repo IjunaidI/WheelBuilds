@@ -139,8 +139,13 @@ class VendorSyncService extends MedusaService({
   /**
    * WB-011: the fetch -> stage -> diff -> apply pipeline for an already-reserved
    * run. Extracted verbatim from the old `run()` try/catch body. Callers reserve
-   * the run id via `startRun` first; `run()` awaits this (cron, blocking) and
-   * `enqueueRun()` fires it off-request on the app container.
+   * the run id via `startRun` first, then invoke this with a container that can
+   * resolve core modules: `run()` awaits it inline (cron — global container),
+   * and the `vendor-sync.execute` subscriber fires it off-request (subscriber's
+   * global container). The apply workflows need the core region/product/
+   * inventory modules, which the module cradle (`this.container_`) CANNOT
+   * resolve — so a real caller must always pass `options.container`; the
+   * `this.container_` fallback below only keeps the signature total.
    */
   async executeRun(
     runId: string,
@@ -441,7 +446,10 @@ class VendorSyncService extends MedusaService({
   /**
    * Orchestrate a full vendor sync run: fetch -> stage -> diff -> apply.
    * BLOCKING — the cron (`vendor-sync-tick`) depends on this awaiting the whole
-   * pipeline. `enqueueRun` is the off-request variant for the admin route.
+   * pipeline and threads its own (global) container through `options.container`.
+   * The off-request path for the admin route does NOT go through here: the route
+   * calls `startRun` + emits `vendor-sync.execute`, and the vendor-sync
+   * subscriber runs `executeRun` on its global container.
    */
   async run(
     vendorCode: string,
@@ -450,26 +458,6 @@ class VendorSyncService extends MedusaService({
     const started = await this.startRun(vendorCode, "full")
     if (started.inProgress) return { runId: started.runId }
     await this.executeRun(started.runId, vendorCode, options)
-    return { runId: started.runId }
-  }
-
-  /**
-   * WB-011: reserve a run and fire the pipeline off-request. Returns the run id
-   * immediately (well under 1s) so `POST /admin/vendor-sync/runs` doesn't block
-   * on the whole fetch->stage->diff->apply. The background work runs on the app
-   * container (`this.container_`) — NEVER `req.scope`, which is disposed once the
-   * HTTP response is sent — so any container the caller passes is overridden.
-   */
-  async enqueueRun(
-    vendorCode: string,
-    options?: { dryRun?: boolean; container?: MedusaContainer; allowSample?: boolean }
-  ): Promise<{ runId: string }> {
-    const started = await this.startRun(vendorCode, "full")
-    if (started.inProgress) return { runId: started.runId }
-    setImmediate(() => {
-      this.executeRun(started.runId, vendorCode, { ...options, container: this.container_ })
-        .catch((err) => this.logger_.error(`[vendor-sync] [${started.runId}] background run failed: ${err.message}`))
-    })
     return { runId: started.runId }
   }
 
@@ -778,34 +766,6 @@ class VendorSyncService extends MedusaService({
       diff,
       this.logger_
     )
-  }
-
-  /**
-   * WB-012/013: fire the pipeline off-request so the admin approve/replay/
-   * replay-SKU routes can return 202 immediately instead of awaiting the
-   * whole apply. Same rule as `enqueueRun` -- always run on the app
-   * container (`this.container_`), NEVER `req.scope`, which is disposed
-   * once the HTTP response is sent.
-   */
-  enqueueApprove(runId: string, actorId?: string): void {
-    setImmediate(() => {
-      this.approveAndApply(runId, actorId, this.container_)
-        .catch((err) => this.logger_.error(`[vendor-sync] [${runId}] background approve failed: ${err.message}`))
-    })
-  }
-
-  enqueueReplay(runId: string): void {
-    setImmediate(() => {
-      this.replayRun(runId, this.container_)
-        .catch((err) => this.logger_.error(`[vendor-sync] [${runId}] background replay failed: ${err.message}`))
-    })
-  }
-
-  enqueueReplaySku(vendorCode: string, partNumber: string): void {
-    setImmediate(() => {
-      this.replaySku(vendorCode, partNumber, this.container_)
-        .catch((err) => this.logger_.error(`[vendor-sync] replay SKU ${partNumber} failed: ${err.message}`))
-    })
   }
 }
 

@@ -159,7 +159,7 @@ class VendorSyncService extends MedusaService({
       // 3. Resolve the feed source (local file or SFTP newest) with delta short-circuit
       const vendorOpts = (this.options_.vendors ?? {})[vendorCode] ?? {}
       const [lastForDelta] = await (this as any).listVendorFeedRuns(
-        { vendor_code: vendorCode, status: "completed" },
+        { vendor_code: vendorCode, status: "completed", mode: "full" },
         { order: { started_at: "DESC" }, take: 1 }
       )
       const lastSeen = lastForDelta?.source_filename
@@ -483,18 +483,46 @@ class VendorSyncService extends MedusaService({
     const container = options?.container ?? this.container_
     try {
       const vendorOpts = (this.options_.vendors ?? {})[vendorCode] ?? {}
+      // WB-018 fix: give the stock-only path its own delta short-circuit,
+      // scoped to the last completed STOCK run (mirrors executeRun's
+      // lastForDelta, but must stay mode:"stock" — full runs never persist
+      // source_modify_time on this cadence).
+      const [lastStock] = await (this as any).listVendorFeedRuns(
+        { vendor_code: vendorCode, status: "completed", mode: "stock" },
+        { order: { started_at: "DESC" }, take: 1 }
+      )
+      const lastSeen = lastStock?.source_filename
+        ? { name: lastStock.source_filename, modifyTime: Number(lastStock.source_modify_time ?? 0) }
+        : null
       const feed = await resolveFeed(
         { feedPath: vendorOpts.feedPath, sftp: vendorOpts.sftp },
-        null,
+        lastSeen,
         { allowSample: this.options_.allowSampleFeed ?? false, vendorCode }
       )
       if (feed.kind === "empty" || feed.kind === "unchanged") {
-        await (this as any).updateVendorFeedRuns({ id: runId, status: "completed", finished_at: new Date() })
+        await (this as any).updateVendorFeedRuns({
+          id: runId,
+          status: "completed",
+          finished_at: new Date(),
+          // Persist the same (name, modifyTime) pair executeRun's unchanged
+          // branch persists, so the NEXT stock tick's lastStock lookup still
+          // resolves a non-empty source_filename and can short-circuit again
+          // -- otherwise this run's blank source_filename would break the
+          // chain and force a redundant download every other tick.
+          ...(feed.kind === "unchanged"
+            ? { source_filename: feed.sourceName, source_modify_time: String(feed.modifyTime) }
+            : {}),
+        })
         return { runId }
       }
       const adapter = resolveAdapter(vendorCode, feed.kind === "file" ? { csvPath: feed.csvPath } : undefined)
       const descriptor = await fetchFeed(adapter)
-      await (this as any).updateVendorFeedRuns({ id: runId, status: "staging", source_filename: descriptor.sourceFilename })
+      await (this as any).updateVendorFeedRuns({
+        id: runId,
+        status: "staging",
+        source_filename: descriptor.sourceFilename,
+        ...(feed.kind === "file" && feed.modifyTime != null ? { source_modify_time: String(feed.modifyTime) } : {}),
+      })
       await stageFeed(adapter, descriptor, this, runId, this.logger_, this.options_.devMaxRows)
 
       // Which staged parts have a current row?

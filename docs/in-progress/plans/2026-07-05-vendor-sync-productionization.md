@@ -6,6 +6,8 @@
 
 **Architecture:** Lightweight async over the existing imperative pipeline. Endpoints create the run row synchronously and schedule the heavy body off-tick on the **app container** (never `req.scope`). Cancel becomes a DB column the pipeline polls at phase/group boundaries. Concurrency, streaming, and durability are localized additive changes. No Medusa Workflow Engine rewrite.
 
+> **Corrected 2026-07-06 — Tasks 5 & 6 off-request mechanism superseded.** The `enqueueRun`/`enqueueApprove`/`enqueueReplay`/`enqueueReplaySku` + `setImmediate(this.container_)` design coded in Tasks 5–6 was replaced after the final whole-branch review: `this.container_` is the module cradle and **cannot resolve core modules**, so a `setImmediate` background apply fails at bootstrap. The shipped implementation (commit `c0acacd`) removes the `enqueue*` methods and instead has each route **emit a `vendor-sync.*` event** (via `req.scope.resolve(Modules.EVENT_BUS)`) that the subscriber `src/subscribers/vendor-sync-run.ts` runs off-request on its **global** container. `startRun`/`executeRun` and the blocking cron `run()` are unchanged. Read Tasks 5–6 for the intent (return 201/202 immediately, run off-request); the event→subscriber hand-off is the accurate mechanism.
+
 **Tech Stack:** MedusaJS 2.13.6 (TypeScript, MikroORM models + migrations, core-flows), Jest + @swc/jest, `csv-parse` (new dep) for streaming, Redis-backed workflow engine already provisioned.
 
 **Spec:** [docs/in-progress/specs/2026-07-05-vendor-sync-productionization-design.md](../specs/2026-07-05-vendor-sync-productionization-design.md)

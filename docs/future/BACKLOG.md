@@ -171,7 +171,7 @@
 - problem: the POST /admin/vendor-sync/runs endpoint runs the full sync pipeline synchronously inside the HTTP request handler; large feeds will timeout or block the server.
 - fix: enqueue the sync as a background job (workflow or queue) and return a run id immediately; the client polls for status.
 - verify: POST /admin/vendor-sync/runs returns a run id immediately (< 1s); the sync proceeds in the background; the run status transitions to completed/failed asynchronously.
-- done: 2026-07-06 — `run()` split into `startRun`/`executeRun`/`enqueueRun`; POST /admin/vendor-sync/runs now calls `enqueueRun`, which returns 201 with the run id immediately while `executeRun` runs in the background on the app container (`this.container_`, never `req.scope`). The 12h cron still uses the blocking `run()` variant. Verified `executeRun` byte-identical to the old in-request body; `test:sync` green, `medusa build` exit 0.
+- done: 2026-07-06 — `run()` split into `startRun` (reserve run row) + `executeRun` (pipeline body). POST /admin/vendor-sync/runs now `startRun`s then **emits a `vendor-sync.execute` event** (via `req.scope.resolve(Modules.EVENT_BUS)`) and returns 201 with the run id immediately; the subscriber `src/subscribers/vendor-sync-run.ts` runs `executeRun` off-request on **its global container**. (An initial `enqueueRun`/`setImmediate(this.container_)` approach was replaced after the final whole-branch review caught that the module-scoped constructor container can't resolve the core region/product/inventory modules — only a caller's global container can.) The 12h cron still uses the blocking `run()` variant. Verified `executeRun` byte-identical to the old in-request body; `test:sync` green, `medusa build` exit 0 (subscriber registered).
 - refs: [spec](../in-progress/specs/2026-07-05-vendor-sync-productionization-design.md) · [plan](../in-progress/plans/2026-07-05-vendor-sync-productionization.md)
 
 ### WB-012 · Approve-and-apply blocks the request (heaviest apply)   [MEDIUM]
@@ -181,7 +181,7 @@
 - problem: the approve endpoint calls the full apply pipeline synchronously; the apply can take minutes for large feeds, causing HTTP timeouts.
 - fix: move apply to a background job triggered by the approve action; return 202 Accepted with a status poll URL.
 - verify: POST approve returns 202 in under 1s; apply proceeds in the background; the run transitions from approved → applying → completed/failed asynchronously.
-- done: 2026-07-06 — POST .../approve now returns 202 immediately via an `enqueueApprove` wrapper (`setImmediate` on `this.container_` + `.catch` log) that runs `approveAndApply` off-request; status pre-checks preserved, `approveAndApply`'s internals untouched.
+- done: 2026-07-06 — POST .../approve validates (status pre-checks preserved) then **emits a `vendor-sync.approve` event** and returns 202 immediately; the `vendor-sync-run` subscriber runs `approveAndApply` off-request on its global container. `approveAndApply`'s internals untouched.
 - refs: [spec](../in-progress/specs/2026-07-05-vendor-sync-productionization-design.md) · [plan](../in-progress/plans/2026-07-05-vendor-sync-productionization.md)
 
 ### WB-013 · Replay run / replay SKU block the request   [MEDIUM]
@@ -191,7 +191,7 @@
 - problem: replay endpoints run synchronously in-request, same issue as approve (WB-012).
 - fix: enqueue replay as a background job; return 202 with a status poll URL.
 - verify: POST replay returns 202 in under 1s; replay proceeds in background; run status updates asynchronously.
-- done: 2026-07-06 — both replay endpoints (run + SKU) now return 202 immediately via `enqueueReplay`/`enqueueReplaySku` wrappers (same off-request pattern as WB-012); `replayRun`/`replaySku` internals untouched.
+- done: 2026-07-06 — both replay endpoints (run + SKU) now return 202 immediately by **emitting `vendor-sync.replay` / `vendor-sync.replay-sku` events** (same event→subscriber pattern as WB-012); the subscriber runs `replayRun`/`replaySku` off-request on its global container. `replayRun`/`replaySku` internals untouched.
 - refs: [spec](../in-progress/specs/2026-07-05-vendor-sync-productionization-design.md) · [plan](../in-progress/plans/2026-07-05-vendor-sync-productionization.md)
 
 ### WB-014 · Apply loop sequential; `applyConcurrency` is dead config   [MEDIUM]

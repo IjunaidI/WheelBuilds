@@ -5,6 +5,19 @@
 > Governing dashboard: [docs/STATUS.md](../../STATUS.md) · Backlog: [docs/future/BACKLOG.md](../../future/BACKLOG.md)
 > Living ref: [reference/vendor-sync-implementation.md](../../reference/vendor-sync-implementation.md)
 
+> **Corrected 2026-07-06 — off-request mechanism superseded during implementation.** §3/§5.1 below
+> describe the off-request triggers as `enqueueRun`/`enqueueApprove`/… wrappers that `setImmediate`
+> the work on the "app container" (`this.container_`). The final whole-branch review caught that this
+> is wrong: `this.container_` is the **module-scoped constructor container (cradle)**, which cannot
+> resolve the core region/product/inventory modules the apply workflows need — so a `setImmediate`
+> background run would fail at bootstrap. The shipped design instead has each route **emit a
+> `vendor-sync.{execute,approve,replay,replay-sku}` event** (resolving the event bus off `req.scope`)
+> and a **subscriber** (`src/subscribers/vendor-sync-run.ts`) run the pipeline on its own **global**
+> container (which resolves core modules, like the cron does). The GOAL (WB-011/012/013 — return
+> immediately, run off-request) is unchanged; only the hand-off mechanism differs. See the living
+> [reference](../../reference/vendor-sync-implementation.md) ("Off-request triggers") for the accurate
+> picture.
+
 ## 1. Context
 
 The vendor-sync pipeline is **live** (prod cutover 2026-07-03, tires; 2026-06-27, wheels — both clean).

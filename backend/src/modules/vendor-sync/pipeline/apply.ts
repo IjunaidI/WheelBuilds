@@ -35,6 +35,7 @@ import {
   ensureShippingProfile,
 } from "./bootstrap"
 import { applyStockLevels } from "./apply-stock"
+import { mapWithConcurrency } from "./concurrency"
 import {
   WHEEL_OPTION_TITLES,
   axisKeyFromMetadata,
@@ -88,7 +89,7 @@ interface ApplyContext {
   salesChannelId: string
   shippingProfileId: string
   categories: { wheelsCategoryId: string; tiresCategoryId: string }
-  brandCollectionCache: Map<string, string>
+  brandCollectionCache: Map<string, Promise<string>>
 }
 
 /**
@@ -97,9 +98,12 @@ interface ApplyContext {
  *   - changedGroups      reconcile variants only (add/remove/update)
  *   - discontinuedGroups draft the product, mark every variant discontinued
  *
- * Groups are processed sequentially; each is wrapped in try/catch so one
- * failing group does not abort the run. Cancellation is polled between
- * groups so cancel-while-applying stops cleanly without rolling back
+ * Phases run in order (new → changed → discontinued); within a phase the
+ * groups run concurrently (up to `getApplyConcurrency()` in flight) via
+ * mapWithConcurrency. Each group is wrapped in try/catch so one failing group
+ * does not abort the run. Cancellation gates scheduling: a cancel stops
+ * launching new groups (in-flight groups finish) and `cancelled` is recomputed
+ * between phases so cancel-while-applying stops cleanly without rolling back
  * already-committed groups.
  */
 export async function applyChanges(
@@ -115,18 +119,12 @@ export async function applyChanges(
   let groupCount = 0
   let cancelled = false
 
-  // WB-037: isCancelled reads the DB-backed cancel_requested_at column, so
-  // this bridges to async. (Task 7 replaces this sequential loop entirely.)
-  const checkCancelled = async (): Promise<boolean> => {
-    if (await service.isCancelled(runId)) {
-      cancelled = true
-      logger.warn(
-        `[vendor-sync] [${runId}] cancel requested; stopping apply loop`
-      )
-      return true
-    }
-    return false
-  }
+  // WB-014: each phase runs its groups concurrently (up to `concurrency` in
+  // flight) via mapWithConcurrency. `isCancelled` is the shouldStop gate — it
+  // stops SCHEDULING new groups; in-flight groups finish. `cancelled` is
+  // recomputed between phases so a mid-apply cancel skips later phases.
+  const concurrency = service.getApplyConcurrency()
+  const isCancelled = () => service.isCancelled(runId)
 
   logger.info(`[vendor-sync] [${runId}] Bootstrapping Medusa entities...`)
   const [_regionId, salesChannelId, categories, shippingProfileId] =
@@ -146,7 +144,7 @@ export async function applyChanges(
     salesChannelId,
     shippingProfileId,
     categories,
-    brandCollectionCache: new Map<string, string>(),
+    brandCollectionCache: new Map<string, Promise<string>>(),
   }
 
   // The list of part_numbers that need a stock pass at the end. New +
@@ -161,60 +159,80 @@ export async function applyChanges(
       `${diff.discontinuedGroups.length} discontinued`
   )
 
-  // 1. New groups
-  for (const group of diff.newGroups) {
-    if (await checkCancelled()) break
-    try {
-      const result = await applyNewGroup(ctx, group)
-      processedCount += result.variantCount
-      groupCount++
-      stockPartNumbers.push(...group.part_numbers)
-    } catch (err: any) {
-      logger.error(
-        `[vendor-sync] [${runId}] new group ${group.group_key} failed: ${err.message}`
-      )
-      errors.push({ groupKey: group.group_key, error: err.message })
-    }
-  }
-
-  // 2. Changed groups
-  if (!cancelled) {
-    for (const group of diff.changedGroups) {
-      if (await checkCancelled()) break
+  // 1. New groups. The shared counters (processedCount/groupCount/errors/
+  // stockPartNumbers) are mutated SYNCHRONOUSLY after each task's own await
+  // resolves — no await splits a read-modify-write, so they are race-free
+  // under the single-threaded event loop even with `concurrency` tasks in
+  // flight. Each task catches its own errors so one bad group never rejects
+  // the batch.
+  await mapWithConcurrency(
+    diff.newGroups,
+    concurrency,
+    async (group) => {
       try {
-        const result = await applyChangedGroup(ctx, group)
+        const result = await applyNewGroup(ctx, group)
         processedCount += result.variantCount
         groupCount++
-        stockPartNumbers.push(
-          ...group.added_part_numbers,
-          ...group.changed_part_numbers,
-          // Removed parts also need a stock pass so their levels go to zero.
-          ...group.removed_part_numbers
-        )
+        stockPartNumbers.push(...group.part_numbers)
       } catch (err: any) {
         logger.error(
-          `[vendor-sync] [${runId}] changed group ${group.group_key} failed: ${err.message}`
+          `[vendor-sync] [${runId}] new group ${group.group_key} failed: ${err.message}`
         )
         errors.push({ groupKey: group.group_key, error: err.message })
       }
-    }
+    },
+    isCancelled
+  )
+  cancelled = cancelled || (await isCancelled())
+
+  // 2. Changed groups
+  if (!cancelled) {
+    await mapWithConcurrency(
+      diff.changedGroups,
+      concurrency,
+      async (group) => {
+        try {
+          const result = await applyChangedGroup(ctx, group)
+          processedCount += result.variantCount
+          groupCount++
+          stockPartNumbers.push(
+            ...group.added_part_numbers,
+            ...group.changed_part_numbers,
+            // Removed parts also need a stock pass so their levels go to zero.
+            ...group.removed_part_numbers
+          )
+        } catch (err: any) {
+          logger.error(
+            `[vendor-sync] [${runId}] changed group ${group.group_key} failed: ${err.message}`
+          )
+          errors.push({ groupKey: group.group_key, error: err.message })
+        }
+      },
+      isCancelled
+    )
+    cancelled = cancelled || (await isCancelled())
   }
 
   // 3. Discontinued groups (whole-product gone)
   if (!cancelled) {
-    for (const group of diff.discontinuedGroups) {
-      if (await checkCancelled()) break
-      try {
-        const result = await applyDiscontinuedGroup(ctx, group)
-        processedCount += result.variantCount
-        groupCount++
-      } catch (err: any) {
-        ctx.logger.error(
-          `[vendor-sync] [${runId}] discontinue group ${group.group_key} failed: ${err.message}`
-        )
-        errors.push({ groupKey: group.group_key, error: err.message })
-      }
-    }
+    await mapWithConcurrency(
+      diff.discontinuedGroups,
+      concurrency,
+      async (group) => {
+        try {
+          const result = await applyDiscontinuedGroup(ctx, group)
+          processedCount += result.variantCount
+          groupCount++
+        } catch (err: any) {
+          ctx.logger.error(
+            `[vendor-sync] [${runId}] discontinue group ${group.group_key} failed: ${err.message}`
+          )
+          errors.push({ groupKey: group.group_key, error: err.message })
+        }
+      },
+      isCancelled
+    )
+    cancelled = cancelled || (await isCancelled())
   }
 
   // 4. Stock pass for every part_number we touched in new or changed groups
@@ -801,15 +819,17 @@ async function applyDiscontinuedGroup(
 // Helpers
 // ---------------------------------------------------------------------------
 
-async function getBrandCollectionId(
-  ctx: ApplyContext,
-  brand: string
-): Promise<string> {
-  const cached = ctx.brandCollectionCache.get(brand)
-  if (cached) return cached
-  const id = await ensureBrandCollection(ctx.container, brand)
-  ctx.brandCollectionCache.set(brand, id)
-  return id
+// Promise-memoized so two concurrent same-brand groups share ONE
+// ensureBrandCollection call. Returning the shared in-flight promise (rather
+// than awaiting and caching the resolved value) closes the read-through race
+// where both callers miss the cache and both create the collection. (WB-014)
+function getBrandCollectionId(ctx: ApplyContext, brand: string): Promise<string> {
+  let p = ctx.brandCollectionCache.get(brand)
+  if (!p) {
+    p = ensureBrandCollection(ctx.container, brand)
+    ctx.brandCollectionCache.set(brand, p)
+  }
+  return p
 }
 
 async function readStagingRecords(

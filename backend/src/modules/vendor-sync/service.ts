@@ -16,6 +16,9 @@ import { finalizeApply } from "./pipeline/finalize-apply"
 import { shouldShortCircuitFeed } from "./pipeline/retry-policy"
 import { uploadArchive } from "./utils/archive"
 import { shouldUploadArchive } from "./utils/archive-policy"
+import { selectStockPartNumbers } from "./pipeline/stock-select"
+import { applyStockLevels } from "./pipeline/apply-stock"
+import { ensureDefaultSalesChannel } from "./pipeline/bootstrap"
 
 interface Logger {
   info(message: string, ...args: any[]): void
@@ -463,6 +466,54 @@ class VendorSyncService extends MedusaService({
         .catch((err) => this.logger_.error(`[vendor-sync] [${started.runId}] background run failed: ${err.message}`))
     })
     return { runId: started.runId }
+  }
+
+  /**
+   * WB-018: stock-only fast path. Fetch + stage the feed, then apply ONLY
+   * inventory levels (no product diff/create). Skipped if a run is already
+   * in progress for the vendor.
+   */
+  async runStockOnly(
+    vendorCode: string,
+    options?: { container?: MedusaContainer }
+  ): Promise<{ runId: string }> {
+    const started = await this.startRun(vendorCode, "stock")
+    if (started.inProgress) return { runId: started.runId }
+    const runId = started.runId
+    const container = options?.container ?? this.container_
+    try {
+      const vendorOpts = (this.options_.vendors ?? {})[vendorCode] ?? {}
+      const feed = await resolveFeed(
+        { feedPath: vendorOpts.feedPath, sftp: vendorOpts.sftp },
+        null,
+        { allowSample: this.options_.allowSampleFeed ?? false, vendorCode }
+      )
+      if (feed.kind === "empty" || feed.kind === "unchanged") {
+        await (this as any).updateVendorFeedRuns({ id: runId, status: "completed", finished_at: new Date() })
+        return { runId }
+      }
+      const adapter = resolveAdapter(vendorCode, feed.kind === "file" ? { csvPath: feed.csvPath } : undefined)
+      const descriptor = await fetchFeed(adapter)
+      await (this as any).updateVendorFeedRuns({ id: runId, status: "staging", source_filename: descriptor.sourceFilename })
+      await stageFeed(adapter, descriptor, this, runId, this.logger_, this.options_.devMaxRows)
+
+      // Which staged parts have a current row?
+      const stockRows = await (this as any).listVendorStockStagings({ run_id: runId }, { take: null })
+      const stagedParts = stockRows.map((r: any) => r.part_number)
+      const currentRows = await (this as any).listVendorProductCurrents({ vendor_code: vendorCode }, { select: ["part_number"], take: null })
+      const currentParts = new Set<string>(currentRows.map((r: any) => r.part_number))
+      const parts = selectStockPartNumbers(stagedParts, currentParts)
+
+      await (this as any).updateVendorFeedRuns({ id: runId, status: "applying" })
+      const salesChannelId = await ensureDefaultSalesChannel(container)
+      const stockResult = await applyStockLevels(container, this, runId, vendorCode, parts, salesChannelId, this.logger_)
+      this.logger_.info(`[vendor-sync] [${runId}] stock-only: ${stockResult.updatedCount} updated, ${stockResult.errorCount} errors over ${parts.length} parts`)
+      await (this as any).updateVendorFeedRuns({ id: runId, status: "completed", finished_at: new Date() })
+      return { runId }
+    } catch (err: any) {
+      await (this as any).updateVendorFeedRuns({ id: runId, status: "failed", error_message: err.message?.slice(0, 2000), finished_at: new Date() }).catch(() => {})
+      return { runId }
+    }
   }
 
   /**

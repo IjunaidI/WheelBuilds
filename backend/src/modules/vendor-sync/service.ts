@@ -265,8 +265,13 @@ class VendorSyncService extends MedusaService({
         // Short-circuit only when this feed has already reached a "done" state
         // (completed or exhausted). A partially_failed latest run for the same
         // feed must fall through so this cycle retries the failed groups (WB-016).
+        // Scope to full runs: the 3h stock cron (mode:"stock") creates rows
+        // ~5x faster than the 12h full sync, so an unscoped take:25 window
+        // could push a matching prior full run out of view and miss the
+        // RunDate short-circuit (WB-018). Stock runs never set run_date_vendor
+        // anyway, so filtering them out here only restores the window.
         const recentRuns = await (this as any).listVendorFeedRuns(
-          { vendor_code: vendorCode },
+          { vendor_code: vendorCode, mode: "full" },
           { order: { started_at: "DESC" }, take: 25 }
         )
         const latestSameFeed = recentRuns.find(

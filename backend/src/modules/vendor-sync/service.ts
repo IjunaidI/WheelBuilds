@@ -86,19 +86,20 @@ class VendorSyncService extends MedusaService({
     return !!run?.cancel_requested_at
   }
 
-  /**
-   * Orchestrate a full vendor sync run: fetch -> stage -> diff.
-   * Transitions the run through status states and handles errors.
-   */
-  async run(
-    vendorCode: string,
-    options?: { dryRun?: boolean; container?: MedusaContainer; allowSample?: boolean }
-  ): Promise<{ runId: string }> {
-    const isDryRun = options?.dryRun ?? this.options_.dryRun ?? false
-    const allowSample =
-      options?.allowSample ?? this.options_.allowSampleFeed ?? false
-    const threshold = this.options_.discontinueThreshold ?? 0.05
+  /** WB-011: apply concurrency knob (consumed by the apply loop). */
+  getApplyConcurrency(): number {
+    return this.options_.applyConcurrency ?? 8
+  }
 
+  /**
+   * WB-011: reserve a run — the in-progress guard + create-run-row half of the
+   * old `run()`. Returns the existing run's id with `inProgress:true` when the
+   * guard hits, otherwise a freshly-created run id with `inProgress:false`.
+   */
+  async startRun(
+    vendorCode: string,
+    mode: string = "full"
+  ): Promise<{ runId: string; inProgress: boolean }> {
     // 1. In-progress guard
     const inProgress = await (this as any).listVendorFeedRuns(
       { vendor_code: vendorCode, status: IN_PROGRESS_STATUSES },
@@ -108,7 +109,7 @@ class VendorSyncService extends MedusaService({
       this.logger_.warn(
         `[vendor-sync] Run already in progress for ${vendorCode} (run ${inProgress[0].id}, status ${inProgress[0].status}). Skipping.`
       )
-      return { runId: inProgress[0].id }
+      return { runId: inProgress[0].id, inProgress: true }
     }
 
     // 2. Create run row
@@ -123,8 +124,27 @@ class VendorSyncService extends MedusaService({
       new_count: 0,
       changed_count: 0,
       discontinued_count: 0,
+      mode,
     })
-    const runId = run.id
+    return { runId: run.id, inProgress: false }
+  }
+
+  /**
+   * WB-011: the fetch -> stage -> diff -> apply pipeline for an already-reserved
+   * run. Extracted verbatim from the old `run()` try/catch body. Callers reserve
+   * the run id via `startRun` first; `run()` awaits this (cron, blocking) and
+   * `enqueueRun()` fires it off-request on the app container.
+   */
+  async executeRun(
+    runId: string,
+    vendorCode: string,
+    options?: { dryRun?: boolean; container?: MedusaContainer; allowSample?: boolean }
+  ): Promise<void> {
+    const isDryRun = options?.dryRun ?? this.options_.dryRun ?? false
+    const allowSample =
+      options?.allowSample ?? this.options_.allowSampleFeed ?? false
+    const threshold = this.options_.discontinueThreshold ?? 0.05
+    const container = options?.container ?? this.container_
 
     const startTime = Date.now()
 
@@ -161,7 +181,7 @@ class VendorSyncService extends MedusaService({
         await (this as any).updateVendorFeedRuns({
           id: runId, status: "completed", error_message: "no feed file found", finished_at: new Date(),
         })
-        return { runId }
+        return
       }
 
       if (feed.kind === "unchanged") {
@@ -174,7 +194,7 @@ class VendorSyncService extends MedusaService({
           source_filename: feed.sourceName, source_modify_time: String(feed.modifyTime),
           finished_at: new Date(),
         })
-        return { runId }
+        return
       }
 
       const adapter = resolveAdapter(
@@ -240,7 +260,7 @@ class VendorSyncService extends MedusaService({
             run_date_vendor: runDateVendor,
             finished_at: new Date(),
           })
-          return { runId }
+          return
         }
       }
 
@@ -259,6 +279,12 @@ class VendorSyncService extends MedusaService({
       )
       await stageFeed(adapter, descriptor, this, runId, this.logger_, devMaxRows)
 
+      // WB-011: honor a cancel requested during staging before diffing starts.
+      if (await this.isCancelled(runId)) {
+        await (this as any).updateVendorFeedRuns({ id: runId, status: "cancelled", finished_at: new Date() })
+        return
+      }
+
       // Transition to diffing
       await (this as any).updateVendorFeedRuns({
         id: runId,
@@ -270,6 +296,13 @@ class VendorSyncService extends MedusaService({
         `[vendor-sync] [${runId}] stage=diffing vendor=${vendorCode}`
       )
       const diff = await computeGroupDiff(this, runId, vendorCode)
+
+      // WB-011: honor a cancel requested during diffing before apply starts.
+      if (await this.isCancelled(runId)) {
+        await (this as any).updateVendorFeedRuns({ id: runId, status: "cancelled", finished_at: new Date() })
+        return
+      }
+
       const counts = countDiffParts(diff)
       await (this as any).updateVendorFeedRuns({
         id: runId,
@@ -305,7 +338,7 @@ class VendorSyncService extends MedusaService({
           id: runId,
           status: "awaiting_approval",
         })
-        return { runId }
+        return
       }
 
       // 9. Dry run: mark completed and return
@@ -319,7 +352,7 @@ class VendorSyncService extends MedusaService({
           status: "completed",
           finished_at: new Date(),
         })
-        return { runId }
+        return
       }
 
       // 10. Transition to applying
@@ -332,7 +365,7 @@ class VendorSyncService extends MedusaService({
         `[vendor-sync] [${runId}] stage=applying vendor=${vendorCode}`
       )
       const applyResult = await applyChanges(
-        resolveApplyContainer(options?.container, this.container_),
+        container,
         this,
         runId,
         vendorCode,
@@ -353,7 +386,7 @@ class VendorSyncService extends MedusaService({
         maxAttempts: this.options_.applyMaxAttempts ?? 3,
       })
 
-      return { runId }
+      return
     } catch (err: any) {
       const durationMs = Date.now() - startTime
       this.logger_.error(
@@ -369,8 +402,43 @@ class VendorSyncService extends MedusaService({
           `[vendor-sync] [${runId}] Failed to update run status: ${updateErr.message}`
         )
       })
-      return { runId }
+      return
     }
+  }
+
+  /**
+   * Orchestrate a full vendor sync run: fetch -> stage -> diff -> apply.
+   * BLOCKING — the cron (`vendor-sync-tick`) depends on this awaiting the whole
+   * pipeline. `enqueueRun` is the off-request variant for the admin route.
+   */
+  async run(
+    vendorCode: string,
+    options?: { dryRun?: boolean; container?: MedusaContainer; allowSample?: boolean }
+  ): Promise<{ runId: string }> {
+    const started = await this.startRun(vendorCode, "full")
+    if (started.inProgress) return { runId: started.runId }
+    await this.executeRun(started.runId, vendorCode, options)
+    return { runId: started.runId }
+  }
+
+  /**
+   * WB-011: reserve a run and fire the pipeline off-request. Returns the run id
+   * immediately (well under 1s) so `POST /admin/vendor-sync/runs` doesn't block
+   * on the whole fetch->stage->diff->apply. The background work runs on the app
+   * container (`this.container_`) — NEVER `req.scope`, which is disposed once the
+   * HTTP response is sent — so any container the caller passes is overridden.
+   */
+  async enqueueRun(
+    vendorCode: string,
+    options?: { dryRun?: boolean; container?: MedusaContainer; allowSample?: boolean }
+  ): Promise<{ runId: string }> {
+    const started = await this.startRun(vendorCode, "full")
+    if (started.inProgress) return { runId: started.runId }
+    setImmediate(() => {
+      this.executeRun(started.runId, vendorCode, { ...options, container: this.container_ })
+        .catch((err) => this.logger_.error(`[vendor-sync] [${started.runId}] background run failed: ${err.message}`))
+    })
+    return { runId: started.runId }
   }
 
   /**

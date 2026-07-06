@@ -327,7 +327,14 @@ export async function placeOrder() {
     redirect(`/${countryCode}/order/confirmed/${cartRes?.order.id}`)
   }
 
-  return cartRes.cart
+  // WB-071 F-C: Medusa returns the cart + an error object with HTTP 200 when
+  // completion fails AFTER the card is authorized (e.g. inventory reservation).
+  // .catch(medusaError) never fires for this, so surface it explicitly rather
+  // than returning silently and leaving the customer on a stopped spinner.
+  throw new Error(
+    (cartRes as any)?.error?.message ||
+      "We couldn't complete your order. If you were charged, it will be reversed. Please try again."
+  )
 }
 
 /**

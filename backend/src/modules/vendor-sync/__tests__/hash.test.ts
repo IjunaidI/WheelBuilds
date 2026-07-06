@@ -95,4 +95,12 @@ describe('computeContentHash', () => {
     const tireHash = computeContentHash(makeTireRecord())
     expect(wheelHash).not.toBe(tireHash)
   })
+
+  it('produces DIFFERENT hashes when per-warehouse stock is redistributed at constant total', () => {
+    // Finding 11: the array-replacer serialized stockByWarehouse as {}, so a
+    // W1 5->0 / W2 0->5 shuffle (same totalQoh) hashed identical -> never synced.
+    const a = makeWheelRecord({ stockByWarehouse: { '1001': 5, '1002': 0 } })
+    const b = makeWheelRecord({ stockByWarehouse: { '1001': 0, '1002': 5 } })
+    expect(computeContentHash(a)).not.toBe(computeContentHash(b))
+  })
 })

@@ -19,7 +19,7 @@ export function computeContentHash(record: NormalizedRecord): string {
     mapUsd: record.mapUsd,
     productType: record.productType,
     // runDateVendor intentionally excluded
-    stockByWarehouse: sortObject(record.stockByWarehouse),
+    stockByWarehouse: record.stockByWarehouse,
   }
 
   if (record.productType === 'wheel') {
@@ -48,14 +48,21 @@ export function computeContentHash(record: NormalizedRecord): string {
     base.tirePrefix = record.tirePrefix
   }
 
-  const canonical = JSON.stringify(base, Object.keys(base).sort())
+  // Deep, order-independent canonical form: sort keys at EVERY level, then
+  // stringify with NO replacer. The old array-replacer whitelisted only the
+  // top-level keys, silently dropping nested warehouse codes (finding 11).
+  const canonical = JSON.stringify(canonicalize(base))
   return createHash('sha256').update(canonical).digest('hex')
 }
 
-function sortObject(obj: Record<string, number>): Record<string, number> {
-  const sorted: Record<string, number> = {}
-  for (const key of Object.keys(obj).sort()) {
-    sorted[key] = obj[key]
+function canonicalize(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(canonicalize)
+  if (value && typeof value === 'object') {
+    const out: Record<string, unknown> = {}
+    for (const k of Object.keys(value as Record<string, unknown>).sort()) {
+      out[k] = canonicalize((value as Record<string, unknown>)[k])
+    }
+    return out
   }
-  return sorted
+  return value
 }

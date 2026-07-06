@@ -86,9 +86,13 @@ const Payment = ({
     setIsLoading(true)
     try {
       const shouldInputCard =
-        isStripeFunc(selectedPaymentMethod) && !activeSession
+        isStripeFunc(selectedPaymentMethod) &&
+        activeSession?.provider_id !== selectedPaymentMethod
 
-      if (!activeSession) {
+      // WB-071 F-E: re-initiate whenever the selected provider differs from the
+      // active session's provider — otherwise switching methods leaves the old
+      // session and the order is charged by the previous provider.
+      if (!activeSession || activeSession.provider_id !== selectedPaymentMethod) {
         await initiatePaymentSession(cart, {
           provider_id: selectedPaymentMethod,
         })

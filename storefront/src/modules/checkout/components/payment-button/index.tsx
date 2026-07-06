@@ -35,7 +35,11 @@ const PaymentButton: React.FC<PaymentButtonProps> = ({
   //   return <GiftCardPaymentButton />
   // }
 
-  const paymentSession = cart.payment_collection?.payment_sessions?.[0]
+  // WB-071 F-E: pick the pending session (matches payment/index.tsx's activeSession)
+  // so the button that renders/charges matches the method the review shows.
+  const paymentSession = cart.payment_collection?.payment_sessions?.find(
+    (s) => s.status === "pending"
+  )
 
   switch (true) {
     case isStripe(paymentSession?.provider_id):

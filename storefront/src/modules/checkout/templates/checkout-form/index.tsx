@@ -22,10 +22,12 @@ export default async function CheckoutForm({
   }
 
   const shippingMethods = await listCartShippingMethods(cart.id)
-  const paymentMethods = filterCustomerPaymentMethods(
-    (await listCartPaymentMethods(cart.region?.id ?? "")) ?? [],
-    { isProduction: process.env.NODE_ENV === "production" }
-  )
+  const rawPaymentMethods = await listCartPaymentMethods(cart.region?.id ?? "")
+  const paymentMethods =
+    rawPaymentMethods &&
+    filterCustomerPaymentMethods(rawPaymentMethods, {
+      isProduction: process.env.NODE_ENV === "production",
+    })
 
   if (!shippingMethods || !paymentMethods) {
     return null

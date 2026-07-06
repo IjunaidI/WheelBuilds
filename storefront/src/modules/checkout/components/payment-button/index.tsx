@@ -51,7 +51,9 @@ const PaymentButton: React.FC<PaymentButtonProps> = ({
         />
       )
     case isManual(paymentSession?.provider_id):
-      return (
+      return process.env.NODE_ENV === "production" ? (
+        <Button disabled>Select a payment method</Button>
+      ) : (
         <ManualTestPaymentButton notReady={notReady} data-testid={dataTestId} />
       )
     case isPaypal(paymentSession?.provider_id):

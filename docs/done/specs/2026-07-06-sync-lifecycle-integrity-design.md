@@ -1,7 +1,7 @@
 # Sync-lifecycle integrity — honest state & recoverable failure (G9 cluster 1) — Design
 
-> Status: **in-progress** (spec). Session = epic **G9** (audit remediation), cluster **sync-lifecycle-integrity**.
-> Proposed backlog id: **WB-070** (under the WB-069 umbrella).
+> Status: **done** — implemented + merged to `main` 2026-07-06. Session = epic **G9** (audit remediation), cluster **sync-lifecycle-integrity**.
+> Backlog id: **WB-070** (under the WB-069 umbrella).
 > Remediates **9 CONFIRMED findings** (vendor-sync log #1–9) + **2 folded-in PENDING mediums** (#11, #16).
 > Governing dashboard: [docs/STATUS.md](../../STATUS.md) · Backlog: [docs/future/BACKLOG.md](../../future/BACKLOG.md)
 > Umbrella: [docs/future/plans/2026-07-06-audit-remediation-theme.md](../../future/plans/2026-07-06-audit-remediation-theme.md)

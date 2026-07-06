@@ -8,7 +8,7 @@
 
 **Tech Stack:** MedusaJS 2.13.6 business module (MikroORM models, core-flows workflows, event bus), TypeScript, Jest (`pnpm test:sync`, no DB).
 
-**Spec:** [docs/in-progress/specs/2026-07-06-sync-lifecycle-integrity-design.md](../specs/2026-07-06-sync-lifecycle-integrity-design.md)
+**Spec:** [docs/done/specs/2026-07-06-sync-lifecycle-integrity-design.md](../specs/2026-07-06-sync-lifecycle-integrity-design.md)
 
 ## Global Constraints
 

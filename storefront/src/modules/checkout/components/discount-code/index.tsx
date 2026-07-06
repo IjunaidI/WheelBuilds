@@ -2,9 +2,8 @@
 
 import { Badge, Heading, Input, Label, Text, Tooltip } from "@medusajs/ui"
 import React from "react"
-import { useFormState } from "react-dom"
 
-import { applyPromotions, submitPromotionForm } from "@lib/data/cart"
+import { applyPromotions } from "@lib/data/cart"
 import { retainedPromoCodes } from "./promo-codes"
 import { convertToLocale } from "@lib/util/money"
 import { InformationCircleSolid } from "@medusajs/icons"
@@ -19,6 +18,12 @@ type DiscountCodeProps = {
   }
 }
 
+export const promoApplied = (
+  promotions: { code?: string }[],
+  code: string
+): boolean =>
+  promotions.some((p) => (p.code ?? "").toLowerCase() === code.toLowerCase())
+
 const DiscountCode: React.FC<DiscountCodeProps> = ({ cart }) => {
   const [isOpen, setIsOpen] = React.useState(false)
 
@@ -27,20 +32,32 @@ const DiscountCode: React.FC<DiscountCodeProps> = ({ cart }) => {
     await applyPromotions(retainedPromoCodes(promotions, code))
   }
 
+  const [errorMessage, setErrorMessage] = React.useState<string | null>(null)
+  const [pendingCode, setPendingCode] = React.useState<string | null>(null)
+
   const addPromotionCode = async (formData: FormData) => {
     const code = formData.get("code")
-    if (!code) {
-      return
-    }
+    if (!code) return
+    setErrorMessage(null)
+    setPendingCode(code.toString())
     const input = document.getElementById("promotion-input") as HTMLInputElement
     await applyPromotions([...retainedPromoCodes(promotions), code.toString()])
-
-    if (input) {
-      input.value = ""
-    }
+    if (input) input.value = ""
   }
 
-  const [message, formAction] = useFormState(submitPromotionForm, null)
+  // WB-071 F-G: Medusa's updateCart no-ops unknown promo codes rather than
+  // rejecting, so after the server revalidates the cart, check whether the code
+  // we submitted actually landed; if not, tell the customer instead of failing
+  // silently.
+  React.useEffect(() => {
+    if (pendingCode && !promoApplied(promotions, pendingCode)) {
+      setErrorMessage(`"${pendingCode}" is not a valid promotion code.`)
+    } else if (pendingCode) {
+      setErrorMessage(null)
+    }
+    setPendingCode(null)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [promotions])
 
   return (
     <div className="w-full bg-white flex flex-col">
@@ -81,7 +98,7 @@ const DiscountCode: React.FC<DiscountCodeProps> = ({ cart }) => {
               </div>
 
               <ErrorMessage
-                error={message}
+                error={errorMessage}
                 data-testid="discount-error-message"
               />
             </>

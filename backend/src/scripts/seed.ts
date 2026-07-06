@@ -110,6 +110,15 @@ export default async function seedDemoData({ container }: ExecArgs) {
     },
   });
   logger.info("Seeding region data...");
+  // WB-071 F-A: only fall back to the Manual Payment provider when Stripe
+  // isn't configured. Wiring pp_system_default alongside pp_stripe_stripe
+  // would let a customer place an order with no charge in production.
+  const stripeConfigured = !!(
+    process.env.STRIPE_API_KEY && process.env.STRIPE_WEBHOOK_SECRET
+  );
+  const paymentProviders = stripeConfigured
+    ? ["pp_stripe_stripe"]
+    : ["pp_system_default"];
   const { result: regionResult } = await createRegionsWorkflow(container).run({
     input: {
       regions: [
@@ -117,7 +126,7 @@ export default async function seedDemoData({ container }: ExecArgs) {
           name: "Europe",
           currency_code: "eur",
           countries,
-          payment_providers: ["pp_system_default"],
+          payment_providers: paymentProviders,
         },
       ],
     },

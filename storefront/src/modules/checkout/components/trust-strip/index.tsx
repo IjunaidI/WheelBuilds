@@ -3,7 +3,7 @@ import Icon from "@modules/common/components/icon"
 const POINTS: { i: "shipping" | "shield" | "return"; h: string; s: string }[] = [
   {
     i: "shipping",
-    h: "Free 2–3 day shipping",
+    h: "Free shipping on orders $199+ · 2–3 day delivery",
     s: "From our Long Beach warehouse",
   },
   {

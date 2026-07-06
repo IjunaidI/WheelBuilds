@@ -26,6 +26,23 @@ import {
   WorkflowResponse,
 } from "@medusajs/framework/workflows-sdk";
 
+/**
+ * WB-071 F-H: cart item-subtotal threshold (USD, MAJOR units — Medusa's
+ * decimal amount convention, not cents) above which shipping is free.
+ * Expressed as a per-price `rules` condition on the shipping option price
+ * (attribute `item_total`, operator `gte`) — confirmed against the
+ * installed @medusajs/pricing + @medusajs/dashboard 2.13.6 source: the
+ * admin's own "conditional shipping price" feature uses this exact
+ * attribute name (`ITEM_TOTAL_ATTRIBUTE` in
+ * @medusajs/dashboard/.../locations/common/constants.ts) and renders its
+ * gte/lte value through the same currency-decimal formatting as the flat
+ * price amount (not a cents-scaled input) — see
+ * conditional-price-form.tsx's `CurrencyInput decimalScale={currency.decimal_digits}`.
+ * Keep in sync with storefront `FREE_SHIP_THRESHOLD_USD`
+ * (storefront/src/modules/product-detail/data/pdp-config.ts).
+ */
+const FREE_SHIP_THRESHOLD_USD = 199;
+
 const updateStoreCurrencies = createWorkflow(
   "update-store-currencies",
   (input: {
@@ -288,6 +305,19 @@ export default async function seedDemoData({ container }: ExecArgs) {
             region_id: region.id,
             amount: 10,
           },
+          // Free over $199 (WB-071 F-H): more-specific (ruled) price wins
+          // over the flat default whenever cart item_total >= threshold.
+          {
+            currency_code: "usd",
+            amount: 0,
+            rules: [
+              {
+                attribute: "item_total",
+                operator: "gte",
+                value: FREE_SHIP_THRESHOLD_USD,
+              },
+            ],
+          },
         ],
         rules: [
           {
@@ -325,6 +355,19 @@ export default async function seedDemoData({ container }: ExecArgs) {
           {
             region_id: region.id,
             amount: 10,
+          },
+          // Free over $199 (WB-071 F-H): more-specific (ruled) price wins
+          // over the flat default whenever cart item_total >= threshold.
+          {
+            currency_code: "usd",
+            amount: 0,
+            rules: [
+              {
+                attribute: "item_total",
+                operator: "gte",
+                value: FREE_SHIP_THRESHOLD_USD,
+              },
+            ],
           },
         ],
         rules: [

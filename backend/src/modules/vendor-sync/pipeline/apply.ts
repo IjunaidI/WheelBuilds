@@ -973,9 +973,44 @@ async function persistAdoptedGroup(
           .survivors as NormalizedRecord[])
 
   // 2. Re-list detection (F2): the product was drafted when discontinued.
+  //    Detection only here — the republish itself is deferred to step 5 so it
+  //    can act as the commit marker (see below).
   const relisted =
     existingProduct.status === "draft" ||
     (existingProduct.metadata as any)?.discontinued_at != null
+
+  // 3. Create any variant that does not yet exist on the product (F3). This
+  //    also covers a plain (non-relisted) partial-apply heal on a PUBLISHED
+  //    product: addVariantsToProduct's create + option-extend workflows never
+  //    emit product.updated, so healed variants must be recorded here or
+  //    Meilisearch keeps stale price_min/max + facets (finding 1, mirrors the
+  //    fix already applied to applyChangedGroup).
+  let skuIndex = indexVariantsBySku(existingProduct.variants ?? [])
+  const missing = deduped.filter((r) => !skuIndex.get(r.partNumber)?.variantId)
+  if (missing.length > 0) {
+    skuIndex = await addVariantsToProduct(
+      ctx,
+      existingProduct.id,
+      missing,
+      productType
+    )
+    ctx.touchedProductIds.add(existingProduct.id)
+  }
+
+  // 4. Refresh the variants that already existed when re-listing (F2/F4).
+  //    Runs BEFORE the republish (step 5) while the product is still "draft" —
+  //    variants are freely updatable on a draft product, so this ordering is
+  //    safe and lets step 5 be the sole commit marker.
+  if (relisted) {
+    const missingSet = new Set(missing.map((r) => r.partNumber))
+    const existed = deduped.filter((r) => !missingSet.has(r.partNumber))
+    await refreshReListedVariants(ctx, existingProduct.id, existed)
+  }
+
+  // 5. Republish LAST (F2): this is the commit marker for the whole re-list.
+  //    If steps 3/4 throw, the product is left "draft" with discontinued_at
+  //    still set, so a retry re-derives relisted=true and re-runs create +
+  //    refresh — nothing is silently skipped on partial failure.
   if (relisted) {
     const meta = { ...((existingProduct.metadata as any) ?? {}) }
     delete meta.discontinued_at
@@ -988,26 +1023,7 @@ async function persistAdoptedGroup(
     ctx.touchedProductIds.add(existingProduct.id)
   }
 
-  // 3. Create any variant that does not yet exist on the product (F3).
-  let skuIndex = indexVariantsBySku(existingProduct.variants ?? [])
-  const missing = deduped.filter((r) => !skuIndex.get(r.partNumber)?.variantId)
-  if (missing.length > 0) {
-    skuIndex = await addVariantsToProduct(
-      ctx,
-      existingProduct.id,
-      missing,
-      productType
-    )
-  }
-
-  // 4. Refresh the variants that already existed when re-listing (F2/F4).
-  if (relisted) {
-    const missingSet = new Set(missing.map((r) => r.partNumber))
-    const existed = deduped.filter((r) => !missingSet.has(r.partNumber))
-    await refreshReListedVariants(ctx, existingProduct.id, existed)
-  }
-
-  // 5. Persist current rows with REAL variant ids + unsettled hash. Never write
+  // 6. Persist current rows with REAL variant ids + unsettled hash. Never write
   //    a null-variant row (F3): a truly unresolvable SKU throws so the group is
   //    recorded partially_failed and retried.
   for (const r of deduped) {

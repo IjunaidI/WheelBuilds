@@ -3,6 +3,7 @@ import { Modules } from "@medusajs/framework/utils"
 import { batchInventoryItemLevelsWorkflow } from "@medusajs/medusa/core-flows"
 import { ensureStockLocation } from "./bootstrap"
 import VendorSyncService from "../service"
+import { computeContentHash } from "../utils/hash"
 
 interface Logger {
   info(message: string, ...args: any[]): void
@@ -108,13 +109,14 @@ export async function applyStockLevels(
   vendorCode: string,
   partNumbers: string[],
   salesChannelId: string,
-  logger: Logger
-): Promise<{ updatedCount: number; errorCount: number }> {
+  logger: Logger,
+  opts: { settleHash?: boolean } = {}
+): Promise<{ updatedCount: number; errors: Array<{ partNumber: string; error: string }> }> {
   const warehouseLocationCache = new Map<string, string>()
   const inventoryService = container.resolve(Modules.INVENTORY)
 
   let updatedCount = 0
-  let errorCount = 0
+  const errors: Array<{ partNumber: string; error: string }> = []
 
   for (const partNumber of partNumbers) {
     try {
@@ -200,13 +202,25 @@ export async function applyStockLevels(
         })
         updatedCount++
       }
+
+      // Finding 5: the stock pass is the LAST writer of content_hash. Group
+      // processing wrote "" (unsettled); settle it to the real hash only now
+      // that this part's stock has been applied. A failure below leaves "" so
+      // the next diff re-selects the part. Only for the full apply
+      // (settleHash) and only for active (non-discontinued) rows.
+      if (opts.settleHash && currentRow.discontinued_at == null) {
+        await (service as any).updateVendorProductCurrents({
+          id: currentRow.id,
+          content_hash: computeContentHash(currentRow.normalized),
+        })
+      }
     } catch (err: any) {
       logger.error(
         `[vendor-sync] [${runId}] Error applying stock for ${partNumber}: ${err.message}`
       )
-      errorCount++
+      errors.push({ partNumber, error: err.message })
     }
   }
 
-  return { updatedCount, errorCount }
+  return { updatedCount, errors }
 }

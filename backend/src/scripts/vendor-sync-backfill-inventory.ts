@@ -120,7 +120,7 @@ export default async function vendorSyncBackfillInventory({
       logger
     )
     logger.info(
-      `[backfill] Stock applied for run ${runId}: ${result.updatedCount} updated, ${result.errorCount} errors`
+      `[backfill] Stock applied for run ${runId}: ${result.updatedCount} updated, ${result.errors.length} errors`
     )
   }
 

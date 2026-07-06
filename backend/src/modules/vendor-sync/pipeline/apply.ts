@@ -256,10 +256,17 @@ export async function applyChanges(
       vendorCode,
       stockPartNumbers,
       salesChannelId,
-      logger
+      logger,
+      { settleHash: true }
     )
+    // Finding 5: stock errors are real apply errors — merge them so
+    // finalizeApply marks partially_failed/exhausted (not completed) and
+    // failed_part_numbers surfaces them for the console + replay-sku.
+    for (const e of stockResult.errors) {
+      errors.push({ partNumber: e.partNumber, error: e.error })
+    }
     logger.info(
-      `[vendor-sync] [${runId}] Stock levels applied: ${stockResult.updatedCount} updated, ${stockResult.errorCount} errors`
+      `[vendor-sync] [${runId}] Stock levels applied: ${stockResult.updatedCount} updated, ${stockResult.errors.length} errors`
     )
   }
 
@@ -534,7 +541,7 @@ async function applyChangedGroup(
       const stagingRow = await readStagingRow(ctx, r.partNumber)
       await (ctx.service as any).updateVendorProductCurrents({
         id: currentRow.id,
-        content_hash: stagingRow.content_hash,
+        content_hash: "", // unsettled; settled by the stock pass (F5)
         normalized: r,
         last_seen_run_id: ctx.runId,
         applied_at: new Date(),
@@ -1027,7 +1034,7 @@ async function persistGroupAfterCreate(
       vendor_code: ctx.vendorCode,
       part_number: r.partNumber,
       group_key: r.groupKey,
-      content_hash: stagingRow.content_hash,
+      content_hash: "", // unsettled; the stock pass settles on success (F5)
       medusa_product_id: createdProduct.id,
       medusa_variant_id: variantId,
       inventory_item_id: inventoryItemId,
@@ -1052,7 +1059,7 @@ async function persistAddedVariants(
 
     const fields = {
       group_key: groupKey,
-      content_hash: stagingRow.content_hash,
+      content_hash: "", // unsettled; settled by the stock pass (F5)
       medusa_product_id: productId,
       medusa_variant_id: info?.variantId ?? null,
       inventory_item_id: info?.inventoryItemId ?? null,

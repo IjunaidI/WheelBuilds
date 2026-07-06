@@ -527,7 +527,7 @@ class VendorSyncService extends MedusaService({
       await (this as any).updateVendorFeedRuns({ id: runId, status: "applying" })
       const salesChannelId = await ensureDefaultSalesChannel(container)
       const stockResult = await applyStockLevels(container, this, runId, vendorCode, parts, salesChannelId, this.logger_)
-      this.logger_.info(`[vendor-sync] [${runId}] stock-only: ${stockResult.updatedCount} updated, ${stockResult.errorCount} errors over ${parts.length} parts`)
+      this.logger_.info(`[vendor-sync] [${runId}] stock-only: ${stockResult.updatedCount} updated, ${stockResult.errors.length} errors over ${parts.length} parts`)
       await (this as any).updateVendorFeedRuns({ id: runId, status: "completed", finished_at: new Date() })
       return { runId }
     } catch (err: any) {

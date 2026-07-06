@@ -275,6 +275,14 @@ describe("computeGroupDiffFromSets", () => {
     ])
   })
 
+  it("classifies an active current row with an unsettled ('') hash as changed", () => {
+    const staging = [{ part_number: "P1", group_key: "G", content_hash: "realhash" }]
+    const current = [{ part_number: "P1", group_key: "G", content_hash: "", discontinued_at: null }]
+    const diff = computeGroupDiffFromSets(staging, current)
+    expect(diff.changedGroups).toHaveLength(1)
+    expect(diff.changedGroups[0].changed_part_numbers).toEqual(["P1"])
+  })
+
   it("mixed deltas inside one group: added + removed + changed all surface", () => {
     const staging: StagingRow[] = [
       { part_number: "A", group_key: G, content_hash: "ha-new" }, // changed

@@ -19,6 +19,7 @@ import { shouldUploadArchive } from "./utils/archive-policy"
 import { selectStockPartNumbers } from "./pipeline/stock-select"
 import { applyStockLevels } from "./pipeline/apply-stock"
 import { ensureDefaultSalesChannel } from "./pipeline/bootstrap"
+import { IN_PROGRESS_STATUSES } from "./pipeline/lifecycle-guards"
 
 interface Logger {
   info(message: string, ...args: any[]): void
@@ -48,8 +49,6 @@ export interface VendorSyncModuleOptions {
     { enabled?: boolean; feedPath?: string; sftp?: SftpConfig }
   >
 }
-
-const IN_PROGRESS_STATUSES = ["fetching", "staging", "diffing", "applying"]
 
 class VendorSyncService extends MedusaService({
   VendorFeedRun,

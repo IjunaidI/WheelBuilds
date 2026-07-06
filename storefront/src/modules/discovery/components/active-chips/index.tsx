@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button"
 import Icon from "@modules/common/components/icon"
 import { useGarage } from "@lib/garage/use-garage"
 import { useDiscoveryQuery } from "../../data/use-discovery-query"
+import { formatCentsUsd } from "@lib/util/money"
 
 const FINISH_LABELS: Record<string, string> = {
   black: "Gloss black",
@@ -13,8 +14,7 @@ const FINISH_LABELS: Record<string, string> = {
   silver: "Silver / polished",
 }
 
-const formatPrice = (cents: number) =>
-  `$${Math.round(cents / 100).toLocaleString()}`
+const formatPrice = (cents: number) => formatCentsUsd(cents)
 
 const ActiveChips = () => {
   const {

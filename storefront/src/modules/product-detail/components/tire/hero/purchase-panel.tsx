@@ -13,6 +13,7 @@ import { addToCart } from "@lib/data/cart"
 import { useGarage } from "@lib/garage/use-garage"
 import { openSearch } from "@lib/stores/search-store"
 import { tireFitsVehicle, TireFitSpec } from "@lib/fitment/tire-fits-vehicle"
+import { formatCentsUsd } from "@lib/util/money"
 import { TireProductDetail, TireSizeOption } from "../../../data/types"
 import { DEFAULT_TIRE_QTY, TRUST_STRIP } from "../../../data/pdp-config"
 
@@ -23,7 +24,7 @@ type TirePurchasePanelProps = {
   unitPriceCents: number
 }
 
-const formatUsd = (cents: number) => `$${Math.round(cents / 100).toLocaleString()}`
+const formatUsd = (cents: number) => formatCentsUsd(cents)
 
 /**
  * Tire PDP purchase block. Mirrors the wheel PurchasePanel one-for-one:
@@ -125,7 +126,7 @@ const TirePurchasePanel = ({
       <div className="flex items-baseline gap-3 mt-5">
         <Display size={40} as="div">
           <span style={{ color: "var(--orange)" }}>$</span>
-          {Math.round(unitPriceCents / 100).toLocaleString()}
+          {formatCentsUsd(unitPriceCents).slice(1)}
         </Display>
         <Label tone="muted">PER TIRE</Label>
       </div>

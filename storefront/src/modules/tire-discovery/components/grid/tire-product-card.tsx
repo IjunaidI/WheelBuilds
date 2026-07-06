@@ -5,6 +5,7 @@ import Display from "@modules/common/components/display"
 import Chip from "@modules/common/components/chip"
 import TireFitBadge from "./tire-fit-badge"
 import { TireDiscoveryProduct } from "../../data/types"
+import { formatCentsUsd } from "@lib/util/money"
 
 /** "18\"–22\"" for a range, "22\"" for one, "" for none. Exported for tests. */
 export function rimRangeLabel(rims: number[]): string {
@@ -56,7 +57,7 @@ const TireProductCard = ({ product }: TireProductCardProps) => {
           <span className="text-[10px] font-[var(--mono)] uppercase tracking-[0.08em] text-[var(--ink-soft)]">From</span>
           <span className="font-[var(--display)] text-[18px] font-black text-[var(--ink)]">
             <span style={{ color: "var(--orange)" }}>$</span>
-            {Math.round(product.priceCents / 100).toLocaleString()}
+            {formatCentsUsd(product.priceCents).slice(1)}
           </span>
         </div>
       </div>

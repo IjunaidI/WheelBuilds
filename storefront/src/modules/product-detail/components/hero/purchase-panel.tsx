@@ -13,6 +13,7 @@ import { useGarage } from "@lib/garage/use-garage"
 import { variantFitsVehicle } from "@lib/fitment/product-has-fitting-variant"
 import { openSearch } from "@lib/stores/search-store"
 import { addToCart } from "@lib/data/cart"
+import { formatCentsUsd } from "@lib/util/money"
 import { OffsetVariant, ProductDetail, SizeOption } from "../../data/types"
 import { DEFAULT_WHEEL_QTY, TRUST_STRIP } from "../../data/pdp-config"
 
@@ -28,8 +29,7 @@ type PurchasePanelProps = {
   selectedVariant: OffsetVariant | null
 }
 
-const formatUsd = (cents: number) =>
-  `$${Math.round(cents / 100).toLocaleString()}`
+const formatUsd = (cents: number) => formatCentsUsd(cents)
 
 const PurchasePanel = ({
   product,
@@ -132,7 +132,7 @@ const PurchasePanel = ({
           )}
         <Display size={40} as="div">
           <span style={{ color: "var(--orange)" }}>$</span>
-          {Math.round(unitPriceCents / 100).toLocaleString()}
+          {formatCentsUsd(unitPriceCents).slice(1)}
         </Display>
         <Label tone="muted">PER WHEEL</Label>
       </div>

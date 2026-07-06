@@ -6,6 +6,7 @@ import Display from "@modules/common/components/display"
 import Chip from "@modules/common/components/chip"
 import FitBadge from "./fit-badge"
 import { DiscoveryProduct } from "../../data/types"
+import { formatCentsUsd } from "@lib/util/money"
 
 const FINISH_SWATCH: Record<string, string> = {
   black: "#1A1A1B",
@@ -13,8 +14,7 @@ const FINISH_SWATCH: Record<string, string> = {
   silver: "#C8C8CB",
 }
 
-const formatPrice = (cents: number) =>
-  `$${Math.round(cents / 100).toLocaleString()}`
+const formatPrice = (cents: number) => formatCentsUsd(cents)
 
 type DiscoveryProductCardProps = {
   product: DiscoveryProduct
@@ -94,7 +94,7 @@ const DiscoveryProductCard = ({ product, fit = false }: DiscoveryProductCardProp
           )}
           <span className="font-[var(--display)] text-[18px] font-black text-[var(--ink)]">
             <span style={{ color: "var(--orange)" }}>$</span>
-            {Math.round(product.priceCents / 100).toLocaleString()}
+            {formatCentsUsd(product.priceCents).slice(1)}
           </span>
         </span>
       </div>

@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button"
 import Icon from "@modules/common/components/icon"
 import { useGarage } from "@lib/garage/use-garage"
 import { useTireQuery } from "../../use-tire-query"
+import { formatCentsUsd } from "@lib/util/money"
 
 const TIRE_TYPE_LABELS: Record<string, string> = {
   passenger: "Passenger",
@@ -13,8 +14,7 @@ const TIRE_TYPE_LABELS: Record<string, string> = {
   other: "Specialty",
 }
 
-const formatPrice = (cents: number) =>
-  `$${Math.round(cents / 100).toLocaleString()}`
+const formatPrice = (cents: number) => formatCentsUsd(cents)
 
 /**
  * Mirrors modules/discovery/components/active-chips — a removable chip per

@@ -7,8 +7,9 @@ import Label from "@modules/common/components/label"
 import { Button } from "@/components/ui/button"
 import { getFeaturedProducts } from "@modules/home/data/get-featured"
 import type { DiscoveryProduct } from "@modules/discovery/data/types"
+import { formatCentsUsd } from "@lib/util/money"
 
-const money = (cents: number) => Math.round(cents / 100).toLocaleString()
+const money = (cents: number) => formatCentsUsd(cents).slice(1)
 
 const Stat = ({ l, v }: { l: string; v: React.ReactNode }) => (
   <div>

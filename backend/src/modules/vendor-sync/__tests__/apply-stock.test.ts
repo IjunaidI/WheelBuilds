@@ -216,4 +216,27 @@ describe("computeStockChanges", () => {
     expect(result.creates).toHaveLength(0)
     expect(result.updates).toHaveLength(0)
   })
+
+  it("zeroes a Medusa level absent from staging even when previousStock omits it (finding 1)", () => {
+    // The changed path overwrote `normalized` before the stock pass, so
+    // previousStock is the NEW feed and no longer lists the sold-out warehouse.
+    // Medusa still holds its old stock -> must be zeroed from existingLevels.
+    const currentStaging = [{ warehouse_code: "1001", qoh: 8 }]
+    const previousStock: Record<string, number> = { "1001": 8 } // 1002 sold out, absent
+    const existingLevels = new Map([
+      ["loc_1001", { id: "level_001", stocked_quantity: 8 }],
+      ["loc_1002", { id: "level_002", stocked_quantity: 5 }], // Medusa still shows 5
+    ])
+    const warehouseToLocationMap = new Map([
+      ["1001", "loc_1001"],
+      ["1002", "loc_1002"],
+    ])
+    const result = computeStockChanges(
+      currentStaging, previousStock, existingLevels, warehouseToLocationMap, "inv_item_001"
+    )
+    expect(result.creates).toHaveLength(0)
+    expect(result.updates).toEqual([
+      { id: "level_002", inventory_item_id: "inv_item_001", location_id: "loc_1002", stocked_quantity: 0 },
+    ])
+  })
 })

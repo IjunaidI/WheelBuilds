@@ -31,7 +31,7 @@ export interface StockChanges {
 /**
  * Pure function that computes inventory level creates/updates given:
  * - currentStaging: warehouse stock rows from the current feed
- * - previousStock: stockByWarehouse from vendor_product_current.normalized
+ * - previousStock: stockByWarehouse from vendor_product_current.normalized (retained for caller compatibility; no longer consulted for zeroing)
  * - existingLevels: already-existing Medusa inventory levels keyed by location_id
  * - warehouseToLocationMap: warehouse_code -> Medusa stock_location_id
  * - inventoryItemId: the inventory item to operate on
@@ -45,19 +45,15 @@ export function computeStockChanges(
 ): StockChanges {
   const creates: StockCreate[] = []
   const updates: StockUpdate[] = []
+  const coveredLocationIds = new Set<string>()
 
-  // Track which warehouse codes we've seen in current staging
-  const seenWarehouseCodes = new Set<string>()
-
-  // Process current staging rows
+  // Apply current staging quantities into their locations.
   for (const row of currentStaging) {
-    seenWarehouseCodes.add(row.warehouse_code)
     const locationId = warehouseToLocationMap.get(row.warehouse_code)
     if (!locationId) continue
-
+    coveredLocationIds.add(locationId)
     const existing = existingLevels.get(locationId)
     if (existing) {
-      // Only update if quantity changed
       if (existing.stocked_quantity !== row.qoh) {
         updates.push({
           id: existing.id,
@@ -75,31 +71,20 @@ export function computeStockChanges(
     }
   }
 
-  // Zero out warehouses that previously had stock but are now missing
-  for (const warehouseCode of Object.keys(previousStock)) {
-    if (seenWarehouseCodes.has(warehouseCode)) continue
-    if ((previousStock[warehouseCode] ?? 0) === 0) continue
-
-    const locationId = warehouseToLocationMap.get(warehouseCode)
-    if (!locationId) continue
-
-    const existing = existingLevels.get(locationId)
-    if (existing) {
-      if (existing.stocked_quantity !== 0) {
-        updates.push({
-          id: existing.id,
-          inventory_item_id: inventoryItemId,
-          location_id: locationId,
-          stocked_quantity: 0,
-        })
-      }
-    } else {
-      creates.push({
-        inventory_item_id: inventoryItemId,
-        location_id: locationId,
-        stocked_quantity: 0,
-      })
-    }
+  // Finding 1: zero any EXISTING Medusa level whose location is not covered by
+  // the current feed. Reconciling against Medusa's real state (existingLevels)
+  // rather than `previousStock` means a sold-out warehouse is zeroed even after
+  // the changed path overwrote the vendor_product_current snapshot.
+  // `previousStock` is retained in the signature for caller compatibility.
+  for (const [locationId, level] of existingLevels) {
+    if (coveredLocationIds.has(locationId)) continue
+    if (level.stocked_quantity === 0) continue
+    updates.push({
+      id: level.id,
+      inventory_item_id: inventoryItemId,
+      location_id: locationId,
+      stocked_quantity: 0,
+    })
   }
 
   return { creates, updates }

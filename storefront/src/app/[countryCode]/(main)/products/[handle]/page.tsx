@@ -26,8 +26,8 @@ type Props = {
  * wheel-only branch below type-checks as plain `ProductDetail`.
  */
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
-  const { handle } = await params
-  const product = await getProductDetail(handle)
+  const { handle, countryCode } = await params
+  const product = await getProductDetail(handle, countryCode)
   return {
     title: `${product.brand} ${product.name} | Wheel Builds`,
     description: product.description,
@@ -35,14 +35,14 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 }
 
 export default async function ProductPage({ params }: Props) {
-  const { handle } = await params
-  const product = await getProductDetail(handle)
+  const { handle, countryCode } = await params
+  const product = await getProductDetail(handle, countryCode)
 
   if (product.kind === "tire") {
     const related = await getRelatedTireProducts(product.brand, product.handle)
     return <TireDetailTemplate product={product} related={related} />
   }
 
-  const related = await getRelatedProducts(product)
+  const related = await getRelatedProducts(product, countryCode)
   return <ProductDetailTemplate product={product} related={related} />
 }

@@ -89,8 +89,8 @@ const EditorialBlock = ({
   </div>
 )
 
-const FeaturedBlocks = async () => {
-  const products = await getFeaturedProducts(3)
+const FeaturedBlocks = async ({ countryCode }: { countryCode: string }) => {
+  const products = await getFeaturedProducts(countryCode, 3)
   if (products.length === 0) return null
 
   return (

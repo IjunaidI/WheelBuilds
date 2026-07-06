@@ -20,7 +20,12 @@ export async function generateMetadata(): Promise<Metadata> {
   }
 }
 
-export default async function Home() {
+type Props = {
+  params: Promise<{ countryCode: string }>
+}
+
+export default async function Home({ params }: Props) {
+  const { countryCode } = await params
   const { facets } = await getHomeCatalog()
   const brandCount = Object.keys(facets.brands).length
 
@@ -29,7 +34,7 @@ export default async function Home() {
       <Hero brandCount={brandCount} />
       <NewDropsRow />
       <ShopByStyle />
-      <FeaturedBlocks />
+      <FeaturedBlocks countryCode={countryCode} />
       <TiresBand />
       <ShopByBrand />
       <CatalogWall />

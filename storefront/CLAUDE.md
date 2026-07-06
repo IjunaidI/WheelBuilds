@@ -126,12 +126,14 @@ Loaded via `next/font/google` in [`app/layout.tsx`](src/app/layout.tsx): Antonio
 
 ## Routing — `[countryCode]` is mandatory
 
-`src/middleware.ts` enforces a country code on every URL. Resolution order: Vercel IP header → `NEXT_PUBLIC_DEFAULT_REGION` → first region returned by the backend. In components:
+`src/middleware.ts` enforces a country code on every URL. Resolution order: URL segment → `NEXT_PUBLIC_DEFAULT_REGION` → first region returned by the backend. In components:
 
 - Server: get it from `params` (`{ params: Promise<{ countryCode: string }> }` in Next 15).
 - Client: `const { countryCode } = useParams() as { countryCode: string }`.
 - For links, use [`LocalizedClientLink`](src/modules/common/components/localized-client-link/index.tsx) — it prepends the country code automatically.
 - For imperative `router.push(...)`, prepend it yourself: `router.push(`/${countryCode}/store?q=${encodeURIComponent(q)}`)`.
+
+**Single-region (US) operation (WB-071 F-D).** The store is operated single-region: the seed has two regions (US/usd, Europe/eur) but the catalog is USD-only, so a shopper routed into `/de` would see the wrong currency/prices with no localized catalog behind it. `middleware.ts` no longer auto-routes on the `x-vercel-ip-country` header — an EU IP no longer lands on `/de`; resolution is URL segment → `DEFAULT_REGION` (`us`) → first region. PDP (`getProductDetail`, `getRelatedProducts`) and the home Featured Blocks (`getFeaturedProducts`) now take the ROUTE `countryCode` (threaded from `params`) and resolve `getRegion(countryCode)` with it, so their pricing always matches the region add-to-cart uses — previously they hardcoded `getRegion(DEFAULT_COUNTRY)`, which could silently disagree with the cart's region if a non-default region were ever reachable. The seeded Europe region is not a shopping surface; real multi-region support (EUR catalog prices, i18n) is out of scope here and would be a separate project.
 
 ## Build + verification
 
@@ -298,7 +300,7 @@ src/modules/product-detail/
 
 **Live wiring:**
 
-1. `getProductDetail(handle)`: `getRegion(DEFAULT_COUNTRY)` → `getProductByHandle(handle, region.id)`. The `lib/data/products.ts` fields string now includes `+collection_id` so `getRelatedProducts` can find the brand collection.
+1. `getProductDetail(handle, countryCode)`: `getRegion(countryCode)` (the route country code, threaded from `params` — WB-071 F-D) → `getProductByHandle(handle, region.id)`. The `lib/data/products.ts` fields string now includes `+collection_id` so `getRelatedProducts` can find the brand collection.
 2. `notFound()` in the adapter propagates through both `generateMetadata` and the page component — bogus handles 404 cleanly.
 3. `mapToDetail`: calls `buildFinishOptions(variants, weightLb)` → `FinishOption[]` (one entry per raw finish, each with its own image + size matrix); derives `DiscoveryProduct.finishes` as the union of `f.normalized` across those entries; the flat `sizeOptions` (all variants, finish-agnostic) is still present for consumers that don't need the per-finish split. Sibling offsets accumulate as `offsetVariants`; availability uses best-of-siblings ranking (`in_stock` > `low_stock` > `out_of_stock`) so the size cell shows `in_stock` when ANY offset is available; `priceCentsOverride` = min non-zero across siblings. Per-offset `priceCents` on `OffsetVariant` lets the panel price the selected offset, not the size minimum.
 4. `getRelatedProducts`: queries the same brand `collection_id`, capped at 6, excludes self.

@@ -26,8 +26,6 @@ import { getTireDiscoveryProducts } from "@modules/tire-discovery/data/get-tire-
 import { EMPTY_TIRE_FILTERS } from "@modules/tire-discovery/data/types"
 import type { TireDiscoveryProduct } from "@modules/tire-discovery/data/types"
 
-const DEFAULT_COUNTRY = process.env.NEXT_PUBLIC_DEFAULT_REGION || "us"
-
 function mapToDetail(product: HttpTypes.StoreProduct): ProductDetail {
   const pmeta = (product.metadata ?? {}) as Record<string, unknown>
   const variants = product.variants ?? []
@@ -96,8 +94,11 @@ function mapToDetail(product: HttpTypes.StoreProduct): ProductDetail {
   }
 }
 
-export async function getProductDetail(handle: string): Promise<AnyProductDetail> {
-  const region = await getRegion(DEFAULT_COUNTRY)
+export async function getProductDetail(
+  handle: string,
+  countryCode: string
+): Promise<AnyProductDetail> {
+  const region = await getRegion(countryCode)
   if (!region) notFound()
   const product = await getProductByHandle(handle, region.id)
   if (!product) notFound()
@@ -136,9 +137,10 @@ export async function getRelatedTireProducts(
 }
 
 export async function getRelatedProducts(
-  product: ProductDetail
+  product: ProductDetail,
+  countryCode: string
 ): Promise<DiscoveryProduct[]> {
-  const region = await getRegion(DEFAULT_COUNTRY)
+  const region = await getRegion(countryCode)
   if (!region) return []
 
   // Re-read the product to get its brand collection id. getProductByHandle is
@@ -150,7 +152,7 @@ export async function getRelatedProducts(
   // Same brand collection, excluding the current product.
   const { response } = await getProductsList({
     queryParams: { collection_id: [collectionId], limit: 8 } as any,
-    countryCode: DEFAULT_COUNTRY,
+    countryCode,
   })
 
   return response.products

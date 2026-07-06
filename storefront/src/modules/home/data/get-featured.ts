@@ -9,8 +9,6 @@ import { normalizeFinish } from "@lib/fitment/normalize-finish"
 import { canonicalBoltPatterns } from "@lib/fitment/canonical-bolt-pattern"
 import { selectFeatured } from "./select-featured"
 
-const DEFAULT_COUNTRY = process.env.NEXT_PUBLIC_DEFAULT_REGION || "us"
-
 function parseHandles(raw: string | undefined): string[] {
   return (raw ?? "")
     .split(",")
@@ -56,12 +54,15 @@ function toFeatured(p: HttpTypes.StoreProduct): DiscoveryProduct {
  * API); falls back to top-priced wheels from Meili when unset/short. Never
  * throws (both sources swallow failures → []).
  */
-export async function getFeaturedProducts(limit = 3): Promise<DiscoveryProduct[]> {
+export async function getFeaturedProducts(
+  countryCode: string,
+  limit = 3
+): Promise<DiscoveryProduct[]> {
   const handles = parseHandles(process.env.NEXT_PUBLIC_FEATURED_HANDLES)
 
   let curated: DiscoveryProduct[] = []
   if (handles.length) {
-    const region = await getRegion(DEFAULT_COUNTRY).catch(() => null)
+    const region = await getRegion(countryCode).catch(() => null)
     if (region) {
       const fetched = await Promise.all(
         handles.map((h) => getProductByHandle(h, region.id).catch(() => undefined))

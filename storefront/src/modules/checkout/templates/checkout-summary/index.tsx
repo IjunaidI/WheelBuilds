@@ -128,7 +128,7 @@ const LineItemRow = ({
           style={{ fontWeight: 900 }}
         >
           <span style={{ color: "var(--orange)" }}>$</span>
-          {Math.round(total).toLocaleString()}
+          {total.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
         </div>
         {item.quantity && item.quantity > 1 && (
           <div className="text-[10px] font-[var(--mono)] text-[var(--ink-soft)] mt-0.5">
@@ -178,14 +178,14 @@ const Totals = ({ cart }: { cart: HttpTypes.StoreCart }) => {
             style={{ fontWeight: 900 }}
           >
             <span style={{ color: "var(--orange)" }}>$</span>
-            {Math.round(total).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+            {total.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
           </span>
         </div>
         {isAffirmEnabled() && total > 0 && (
           <div
             className="text-right mt-1.5 font-[var(--mono)] text-[11px] tracking-[0.03em] text-[var(--ink-soft)]"
           >
-            OR 4× ${Math.round(total / 4).toLocaleString()} WITH AFFIRM
+            OR 4× ${(total / 4).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} WITH AFFIRM
           </div>
         )}
       </div>

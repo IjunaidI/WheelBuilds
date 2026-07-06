@@ -129,6 +129,7 @@ export async function applyStockLevels(
         logger.warn(
           `[vendor-sync] [${runId}] Skipping stock for ${partNumber}: no inventory_item_id`
         )
+        errors.push({ partNumber, error: "no inventory_item_id" })
         continue
       }
 

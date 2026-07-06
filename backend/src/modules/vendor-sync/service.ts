@@ -20,6 +20,7 @@ import { selectStockPartNumbers } from "./pipeline/stock-select"
 import { applyStockLevels } from "./pipeline/apply-stock"
 import { ensureDefaultSalesChannel } from "./pipeline/bootstrap"
 import {
+  IN_PROGRESS_STATUSES,
   BLOCKING_STATUSES,
   isVendorBusy,
   isRunSuperseded,
@@ -114,8 +115,17 @@ class VendorSyncService extends MedusaService({
     // 1. In-progress guard (F8: awaiting_approval also blocks new runs — a
     // parked run must stop a newer feed from applying underneath it, which
     // would make approving the parked run a silent catalog rollback).
+    // Stock-only runs are the exception: they never write settleHash (no
+    // content_hash/discontinued_at/product-state mutation), so they can't
+    // change the diff baseline a later approval re-computes. Blocking them
+    // on a merely-parked awaiting_approval run would freeze inventory for
+    // as long as the park lasts. A concurrently-APPLYING run must still
+    // block a stock-only run (F9), hence IN_PROGRESS_STATUSES rather than
+    // no guard at all.
+    const guardStatuses =
+      mode === "stock" ? IN_PROGRESS_STATUSES : BLOCKING_STATUSES
     const inProgress = await (this as any).listVendorFeedRuns(
-      { vendor_code: vendorCode, status: BLOCKING_STATUSES },
+      { vendor_code: vendorCode, status: guardStatuses },
       { take: 1 }
     )
     if (inProgress.length > 0) {

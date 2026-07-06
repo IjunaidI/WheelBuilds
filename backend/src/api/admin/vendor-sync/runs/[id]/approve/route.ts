@@ -1,6 +1,7 @@
 import { MedusaRequest, MedusaResponse } from "@medusajs/framework"
 import { Modules } from "@medusajs/framework/utils"
 import { VENDOR_SYNC_MODULE } from "../../../../../../modules/vendor-sync"
+import { isVendorBusy } from "../../../../../../modules/vendor-sync/pipeline/lifecycle-guards"
 
 /**
  * POST /admin/vendor-sync/runs/:id/approve
@@ -20,6 +21,18 @@ export async function POST(req: MedusaRequest, res: MedusaResponse) {
     res.status(400).json({
       type: "invalid_data",
       message: `Cannot approve run with status: ${run.status}`,
+    })
+    return
+  }
+
+  const vendorRuns = await service.listVendorFeedRuns(
+    { vendor_code: run.vendor_code },
+    { order: { started_at: "DESC" }, take: 25 }
+  )
+  if (isVendorBusy(vendorRuns, id)) {
+    res.status(409).json({
+      type: "conflict",
+      message: "Another run is applying for this vendor",
     })
     return
   }

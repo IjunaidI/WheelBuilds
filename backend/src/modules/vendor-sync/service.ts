@@ -19,7 +19,12 @@ import { shouldUploadArchive } from "./utils/archive-policy"
 import { selectStockPartNumbers } from "./pipeline/stock-select"
 import { applyStockLevels } from "./pipeline/apply-stock"
 import { ensureDefaultSalesChannel } from "./pipeline/bootstrap"
-import { IN_PROGRESS_STATUSES } from "./pipeline/lifecycle-guards"
+import {
+  BLOCKING_STATUSES,
+  isVendorBusy,
+  isRunSuperseded,
+  canApprove,
+} from "./pipeline/lifecycle-guards"
 
 interface Logger {
   info(message: string, ...args: any[]): void
@@ -106,9 +111,11 @@ class VendorSyncService extends MedusaService({
     vendorCode: string,
     mode: string = "full"
   ): Promise<{ runId: string; inProgress: boolean }> {
-    // 1. In-progress guard
+    // 1. In-progress guard (F8: awaiting_approval also blocks new runs — a
+    // parked run must stop a newer feed from applying underneath it, which
+    // would make approving the parked run a silent catalog rollback).
     const inProgress = await (this as any).listVendorFeedRuns(
-      { vendor_code: vendorCode, status: IN_PROGRESS_STATUSES },
+      { vendor_code: vendorCode, status: BLOCKING_STATUSES },
       { take: 1 }
     )
     if (inProgress.length > 0) {
@@ -546,6 +553,40 @@ class VendorSyncService extends MedusaService({
     actorId?: string,
     container?: MedusaContainer
   ): Promise<void> {
+    // F16: re-read — the run may have been cancelled between the 202 and this
+    // subscriber firing. Do not apply a run that is no longer approvable.
+    const [current] = await (this as any).listVendorFeedRuns({ id: runId })
+    if (!current || !canApprove(current)) {
+      this.logger_.warn(
+        `[vendor-sync] [${runId}] approve skipped: status=${current?.status} cancel=${current?.cancel_requested_at}`
+      )
+      return
+    }
+    const vendorCode = current.vendor_code
+    const vendorRuns = await (this as any).listVendorFeedRuns(
+      { vendor_code: vendorCode },
+      { order: { started_at: "DESC" }, take: 25 }
+    )
+    // F9: never run two apply loops for one vendor at once.
+    if (isVendorBusy(vendorRuns, runId)) {
+      this.logger_.warn(
+        `[vendor-sync] [${runId}] approve skipped: another run is applying for ${vendorCode}`
+      )
+      return
+    }
+    // F8: refuse a stale approval that would roll the catalog back.
+    if (isRunSuperseded(current, vendorRuns)) {
+      this.logger_.warn(
+        `[vendor-sync] [${runId}] approve refused: superseded by a newer completed feed`
+      )
+      await (this as any).updateVendorFeedRuns({
+        id: runId,
+        status: "superseded",
+        finished_at: new Date(),
+      })
+      return
+    }
+
     // Record who approved and when. WB-037: also clear any prior cancel
     // signal on this run row -- re-entering execution must not immediately
     // re-cancel itself against a stale cancel_requested_at from a previous
@@ -559,9 +600,6 @@ class VendorSyncService extends MedusaService({
     })
 
     try {
-      const [run] = await (this as any).listVendorFeedRuns({ id: runId })
-      const vendorCode = run.vendor_code
-
       // Re-compute diff from existing staging data
       const diff = await computeGroupDiff(this, runId, vendorCode)
       const counts = countDiffParts(diff)
@@ -588,7 +626,7 @@ class VendorSyncService extends MedusaService({
       await finalizeApply(this as any, {
         runId,
         vendorCode,
-        feedDate: run.run_date_vendor ? new Date(run.run_date_vendor) : null,
+        feedDate: current.run_date_vendor ? new Date(current.run_date_vendor) : null,
         result,
         maxAttempts: this.options_.applyMaxAttempts ?? 3,
       })
@@ -615,6 +653,16 @@ class VendorSyncService extends MedusaService({
     if (!run) throw new Error(`Run ${runId} not found`)
 
     const vendorCode = run.vendor_code
+
+    const vendorRuns = await (this as any).listVendorFeedRuns(
+      { vendor_code: vendorCode },
+      { order: { started_at: "DESC" }, take: 25 }
+    )
+    if (isVendorBusy(vendorRuns, runId)) {
+      throw new Error(
+        `replay refused: another run is applying for ${vendorCode}`
+      )
+    }
 
     // WB-037: clear any prior cancel signal -- see approveAndApply comment.
     await (this as any).updateVendorFeedRuns({
@@ -690,6 +738,16 @@ class VendorSyncService extends MedusaService({
     }
 
     const runId = stagingRow.run_id
+
+    const vendorRuns = await (this as any).listVendorFeedRuns(
+      { vendor_code: vendorCode },
+      { order: { started_at: "DESC" }, take: 25 }
+    )
+    if (isVendorBusy(vendorRuns, runId)) {
+      throw new Error(
+        `replay-sku refused: another run is applying for ${vendorCode}`
+      )
+    }
 
     // Get current row for this part number
     const [currentRow] = await (this as any).listVendorProductCurrents(

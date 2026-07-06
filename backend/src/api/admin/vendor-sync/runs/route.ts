@@ -1,6 +1,7 @@
 import { MedusaRequest, MedusaResponse } from "@medusajs/framework"
 import { Modules } from "@medusajs/framework/utils"
 import { VENDOR_SYNC_MODULE } from "../../../../modules/vendor-sync"
+import { BLOCKING_STATUSES } from "../../../../modules/vendor-sync/pipeline/lifecycle-guards"
 
 /**
  * GET /admin/vendor-sync/runs
@@ -47,10 +48,10 @@ export async function POST(req: MedusaRequest, res: MedusaResponse) {
     return
   }
 
-  // Check for in-progress run
+  // Check for in-progress run (F8: awaiting_approval also blocks new runs)
   const inProgress = await service.listVendorFeedRuns({
     vendor_code,
-    status: ["fetching", "staging", "diffing", "applying"],
+    status: BLOCKING_STATUSES,
   })
 
   if (inProgress.length > 0) {

@@ -172,7 +172,7 @@
 - fix: enqueue the sync as a background job (workflow or queue) and return a run id immediately; the client polls for status.
 - verify: POST /admin/vendor-sync/runs returns a run id immediately (< 1s); the sync proceeds in the background; the run status transitions to completed/failed asynchronously.
 - done: 2026-07-06 — `run()` split into `startRun` (reserve run row) + `executeRun` (pipeline body). POST /admin/vendor-sync/runs now `startRun`s then **emits a `vendor-sync.execute` event** (via `req.scope.resolve(Modules.EVENT_BUS)`) and returns 201 with the run id immediately; the subscriber `src/subscribers/vendor-sync-run.ts` runs `executeRun` off-request on **its global container**. (An initial `enqueueRun`/`setImmediate(this.container_)` approach was replaced after the final whole-branch review caught that the module-scoped constructor container can't resolve the core region/product/inventory modules — only a caller's global container can.) The 12h cron still uses the blocking `run()` variant. Verified `executeRun` byte-identical to the old in-request body; `test:sync` green, `medusa build` exit 0 (subscriber registered).
-- refs: [spec](../in-progress/specs/2026-07-05-vendor-sync-productionization-design.md) · [plan](../in-progress/plans/2026-07-05-vendor-sync-productionization.md)
+- refs: [spec](../done/specs/2026-07-05-vendor-sync-productionization-design.md) · [plan](../done/plans/2026-07-05-vendor-sync-productionization.md)
 
 ### WB-012 · Approve-and-apply blocks the request (heaviest apply)   [MEDIUM]
 - status: done
@@ -182,7 +182,7 @@
 - fix: move apply to a background job triggered by the approve action; return 202 Accepted with a status poll URL.
 - verify: POST approve returns 202 in under 1s; apply proceeds in the background; the run transitions from approved → applying → completed/failed asynchronously.
 - done: 2026-07-06 — POST .../approve validates (status pre-checks preserved) then **emits a `vendor-sync.approve` event** and returns 202 immediately; the `vendor-sync-run` subscriber runs `approveAndApply` off-request on its global container. `approveAndApply`'s internals untouched.
-- refs: [spec](../in-progress/specs/2026-07-05-vendor-sync-productionization-design.md) · [plan](../in-progress/plans/2026-07-05-vendor-sync-productionization.md)
+- refs: [spec](../done/specs/2026-07-05-vendor-sync-productionization-design.md) · [plan](../done/plans/2026-07-05-vendor-sync-productionization.md)
 
 ### WB-013 · Replay run / replay SKU block the request   [MEDIUM]
 - status: done
@@ -192,7 +192,7 @@
 - fix: enqueue replay as a background job; return 202 with a status poll URL.
 - verify: POST replay returns 202 in under 1s; replay proceeds in background; run status updates asynchronously.
 - done: 2026-07-06 — both replay endpoints (run + SKU) now return 202 immediately by **emitting `vendor-sync.replay` / `vendor-sync.replay-sku` events** (same event→subscriber pattern as WB-012); the subscriber runs `replayRun`/`replaySku` off-request on its global container. `replayRun`/`replaySku` internals untouched.
-- refs: [spec](../in-progress/specs/2026-07-05-vendor-sync-productionization-design.md) · [plan](../in-progress/plans/2026-07-05-vendor-sync-productionization.md)
+- refs: [spec](../done/specs/2026-07-05-vendor-sync-productionization-design.md) · [plan](../done/plans/2026-07-05-vendor-sync-productionization.md)
 
 ### WB-014 · Apply loop sequential; `applyConcurrency` is dead config   [MEDIUM]
 - status: done
@@ -202,7 +202,7 @@
 - fix: implement a real concurrency limit using the applyConcurrency value (p-limit or similar) so multiple product groups are applied in parallel up to the configured limit.
 - verify: with applyConcurrency = 3, the apply loop processes up to 3 product groups concurrently; the config value is actually respected.
 - done: 2026-07-06 — a pure `mapWithConcurrency` helper (no new dep) drives all 3 apply phases up to `applyConcurrency` (`VENDOR_SYNC_APPLY_CONCURRENCY`, default 8, now genuinely load-bearing) with an async `isCancelled` shouldStop gate + between-phase recompute; the brand-collection cache became a promise-memoized `Map<string, Promise<string>>` so concurrent groups sharing a brand don't create duplicate collections, and a rejected lookup un-poisons the cache entry so retry is possible.
-- refs: [spec](../in-progress/specs/2026-07-05-vendor-sync-productionization-design.md) · [plan](../in-progress/plans/2026-07-05-vendor-sync-productionization.md)
+- refs: [spec](../done/specs/2026-07-05-vendor-sync-productionization-design.md) · [plan](../done/plans/2026-07-05-vendor-sync-productionization.md)
 
 ### WB-015 · CSV read fully into memory + parsed before yielding   [MEDIUM]
 - status: done
@@ -212,7 +212,7 @@
 - fix: switch to a streaming CSV parse that yields records as they are parsed (e.g. csv-parse stream API).
 - verify: parsing a large feed does not load the full file into memory at once; the first record is available before the file is fully read (testable by timing or memory profiling).
 - done: 2026-07-06 — both wheel and tire `parse.ts` now delegate to a shared streaming `csv-parse` implementation (`adapters/csv-stream.ts`); warehouse columns are derived from the CSV header via csv-parse's `columns:(header)=>...` callback instead of the first data record, fixing a silent stock-column loss under ragged first rows (regression test proved RED-against-old, GREEN-with-fix). `papaparse`/`@types/papaparse` are now dead deps (not yet removed).
-- refs: [spec](../in-progress/specs/2026-07-05-vendor-sync-productionization-design.md) · [plan](../in-progress/plans/2026-07-05-vendor-sync-productionization.md)
+- refs: [spec](../done/specs/2026-07-05-vendor-sync-productionization-design.md) · [plan](../done/plans/2026-07-05-vendor-sync-productionization.md)
 
 ### WB-016 · Failed parts never auto-retried (cron RunDate then skips feed)   [MEDIUM]
 - status: done
@@ -232,7 +232,7 @@
 - fix: implement archive upload to the configured object storage bucket (MinIO/S3) using the existing archiveBucket option. See also WB-042 (durable archiving — deferred Plan 4+).
 - verify: after a sync run, the feed archive is uploaded to object storage and persists across server restarts; archiveBucket config drives the destination.
 - done: 2026-07-06 — durable archiving is EXPLICIT opt-in (`VENDOR_SYNC_DURABLE_ARCHIVE`, default off): `uploadArchive` is best-effort/never-throws and uploads to a DEDICATED PRIVATE MinIO bucket (`VENDOR_SYNC_FEED_ARCHIVE_BUCKET`, default `vendor-feeds`) via the raw MinIO client — deliberately NOT the shared Medusa File/minio-file provider, whose only provider forces public-read on everything it stores. Needs full MinIO creds or it's a no-op.
-- refs: [spec](../in-progress/specs/2026-07-05-vendor-sync-productionization-design.md) · [plan](../in-progress/plans/2026-07-05-vendor-sync-productionization.md)
+- refs: [spec](../done/specs/2026-07-05-vendor-sync-productionization-design.md) · [plan](../done/plans/2026-07-05-vendor-sync-productionization.md)
 
 ### WB-018 · Stock freshness bound to 12h run; no stock-only fast path   [MEDIUM]
 - status: done
@@ -242,7 +242,7 @@
 - fix: add a stock-only fast path (separate cron or manual trigger) that updates inventory_item quantities from the feed without re-diffing product/variant metadata.
 - verify: a stock-only sync updates inventory levels without creating/modifying product or variant records; it can be run independently of the full 12h sync.
 - done: 2026-07-06 — `service.runStockOnly` (`mode: "stock"`) fetches + stages then skips diff/applyChanges, applying only stock levels; a new cron `vendor-sync-stock-tick` (`VENDOR_SYNC_STOCK_CRON`, default `0 */3 * * *`) mirrors the full-sync tick. Full and stock runs keep independently-scoped delta short-circuits (each keyed by `mode`) so neither poisons the other's "nothing changed" skip; `source_modify_time` persists on both the changed and unchanged path for the stock chain to keep working across cycles.
-- refs: [spec](../in-progress/specs/2026-07-05-vendor-sync-productionization-design.md) · [plan](../in-progress/plans/2026-07-05-vendor-sync-productionization.md)
+- refs: [spec](../done/specs/2026-07-05-vendor-sync-productionization-design.md) · [plan](../done/plans/2026-07-05-vendor-sync-productionization.md)
 
 ### WB-019 · wheel-size lookup synchronous on first miss   [MEDIUM]
 - status: done
@@ -437,7 +437,7 @@
 - fix: move the cancellation flag to a shared store (Redis key or DB column) so it is visible across processes.
 - verify: sending a cancel request to the HTTP server while a sync runs in a separate worker process causes the worker to stop processing; the run transitions to cancelled.
 - done: 2026-07-06 — cancellation is now DB-backed and cross-process: `vendor_feed_run.cancel_requested_at` (added by the foundation migration) replaces the in-process flag; `isCancelled` is async and reads the row, `markCancelled` persists the timestamp, and `finalizeApply` owns the `cancelled` status transition. `cancel_requested_at` resets to null on approve/replay re-entry so replaying a previously-cancelled run doesn't self-cancel.
-- refs: [spec](../in-progress/specs/2026-07-05-vendor-sync-productionization-design.md) · [plan](../in-progress/plans/2026-07-05-vendor-sync-productionization.md)
+- refs: [spec](../done/specs/2026-07-05-vendor-sync-productionization-design.md) · [plan](../done/plans/2026-07-05-vendor-sync-productionization.md)
 
 ### WB-038 · Partial-apply marked completed → cron skips feed — merged into WB-016. See WB-016.
 

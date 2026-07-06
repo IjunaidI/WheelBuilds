@@ -90,6 +90,7 @@ interface ApplyContext {
   shippingProfileId: string
   categories: { wheelsCategoryId: string; tiresCategoryId: string }
   brandCollectionCache: Map<string, Promise<string>>
+  touchedProductIds: Set<string>
 }
 
 /**
@@ -157,6 +158,7 @@ export async function applyChanges(
     shippingProfileId,
     categories,
     brandCollectionCache: new Map<string, Promise<string>>(),
+    touchedProductIds: new Set<string>(),
   }
 
   // The list of part_numbers that need a stock pass at the end. New +
@@ -267,6 +269,20 @@ export async function applyChanges(
     }
     logger.info(
       `[vendor-sync] [${runId}] Stock levels applied: ${stockResult.updatedCount} updated, ${stockResult.errors.length} errors`
+    )
+  }
+
+  // Finding 6: re-index changed/re-listed products in Meilisearch. New-group
+  // create and discontinue already emit via createProducts/updateProducts
+  // workflows; this covers variant-only mutations. Emitted even if the stock
+  // pass errored — the variant/price change committed and must be indexed.
+  if (ctx.touchedProductIds.size > 0) {
+    const eventBus = container.resolve(Modules.EVENT_BUS)
+    for (const id of ctx.touchedProductIds) {
+      await eventBus.emit({ name: "product.updated", data: { id } })
+    }
+    logger.info(
+      `[vendor-sync] [${runId}] emitted product.updated for ${ctx.touchedProductIds.size} products (reindex)`
     )
   }
 
@@ -736,6 +752,11 @@ async function applyChangedGroup(
     })
     variantCount++
   }
+
+  // Finding 6: the changed path mutates variants/options only, which never
+  // emits product.updated — so Meilisearch keeps stale price_min/facets. Record
+  // the product so applyChanges emits one product.updated for it.
+  ctx.touchedProductIds.add(productId)
 
   return { variantCount }
 }

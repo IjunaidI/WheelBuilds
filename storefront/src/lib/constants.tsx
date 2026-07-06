@@ -44,6 +44,16 @@ export const isManual = (providerId?: string) => {
   return providerId?.startsWith("pp_system_default")
 }
 
+/**
+ * WB-071 F-A: a customer must never be offered the `pp_system_default`
+ * "Manual Payment" option in production (it places an order with no charge).
+ * Kept available in dev/test so the manual flow can still be exercised.
+ */
+export const filterCustomerPaymentMethods = (
+  methods: { id: string }[],
+  { isProduction }: { isProduction: boolean }
+) => (isProduction ? methods.filter((m) => !isManual(m.id)) : methods)
+
 // Add currencies that don't need to be divided by 100
 export const noDivisionCurrencies = [
   "krw",

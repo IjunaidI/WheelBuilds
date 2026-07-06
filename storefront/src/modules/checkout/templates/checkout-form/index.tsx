@@ -1,5 +1,6 @@
 import { listCartShippingMethods } from "@lib/data/fulfillment"
 import { listCartPaymentMethods } from "@lib/data/payment"
+import { filterCustomerPaymentMethods } from "@lib/constants"
 import { HttpTypes } from "@medusajs/types"
 import Addresses from "@modules/checkout/components/addresses"
 import ExpressPay from "@modules/checkout/components/express-pay"
@@ -21,7 +22,10 @@ export default async function CheckoutForm({
   }
 
   const shippingMethods = await listCartShippingMethods(cart.id)
-  const paymentMethods = await listCartPaymentMethods(cart.region?.id ?? "")
+  const paymentMethods = filterCustomerPaymentMethods(
+    (await listCartPaymentMethods(cart.region?.id ?? "")) ?? [],
+    { isProduction: process.env.NODE_ENV === "production" }
+  )
 
   if (!shippingMethods || !paymentMethods) {
     return null

@@ -570,7 +570,7 @@ async function applyChangedGroup(
       const existingSkus = new Set<string>(
         (existingVariants ?? []).map((v: any) => v.sku).filter(Boolean)
       )
-      const { toCreate: skuNew } = partitionRecordsBySku(wheelAdds, existingSkus)
+      const { toCreate: skuNew, toAdopt } = partitionRecordsBySku(wheelAdds, existingSkus)
 
       // Drop any added SKU whose 6-tuple already exists on the product
       // (exact duplicate of a current variant) or repeats within this batch.
@@ -611,6 +611,11 @@ async function applyChangedGroup(
         ...(existingVariants ?? []),
         ...createdVariants,
       ])
+      // Finding 4: SKUs already on the product (re-listed after removal) are
+      // otherwise only given a current-row write — refresh the live variant so
+      // discontinued flags clear and the price is current.
+      await refreshReListedVariants(ctx, productId, toAdopt)
+
       const toPersist = wheelAdds.filter((r) => !droppedSkus.has(r.partNumber))
       await persistAddedVariants(
         ctx,
@@ -632,7 +637,7 @@ async function applyChangedGroup(
       const existingSkus = new Set<string>(
         (existingVariants ?? []).map((v: any) => v.sku).filter(Boolean)
       )
-      const { toCreate: skuNew } = partitionRecordsBySku(tireAdds, existingSkus)
+      const { toCreate: skuNew, toAdopt } = partitionRecordsBySku(tireAdds, existingSkus)
 
       // Drop any added row whose size label already exists on the product.
       const existingSizeLabels = new Set<string>(
@@ -679,6 +684,11 @@ async function applyChangedGroup(
         ...(existingVariants ?? []),
         ...createdVariants,
       ])
+      // Finding 4: SKUs already on the product (re-listed after removal) are
+      // otherwise only given a current-row write — refresh the live variant so
+      // discontinued flags clear and the price is current.
+      await refreshReListedVariants(ctx, productId, toAdopt)
+
       const toPersist = tireAdds.filter((r) => !droppedSkus.has(r.partNumber))
       await persistAddedVariants(ctx, group.group_key, toPersist, skuIndex, productId)
       variantCount += toPersist.length
@@ -1087,6 +1097,55 @@ async function persistAddedVariants(
         ...fields,
       })
     }
+  }
+}
+
+/**
+ * Findings 2/4: a previously-removed variant the vendor re-lists is adopted
+ * onto an existing product. Clear its discontinued flags and refresh price +
+ * metadata so it is neither hidden nor stale. Explicit discontinued:false /
+ * discontinued_at:null defends against Medusa metadata-merge semantics.
+ * (product.updated is emitted separately by applyChanges.)
+ */
+async function refreshReListedVariants(
+  ctx: ApplyContext,
+  productId: string,
+  records: NormalizedRecord[]
+): Promise<void> {
+  if (records.length === 0) return
+  const query = ctx.container.resolve(ContainerRegistrationKeys.QUERY)
+  const { data: variants } = await query.graph({
+    entity: "variant",
+    fields: ["id", "sku"],
+    filters: { product_id: [productId] },
+  })
+  const idBySku = new Map<string, string>()
+  for (const v of variants ?? []) {
+    if ((v as any).sku) idBySku.set((v as any).sku, (v as any).id)
+  }
+
+  const updates = records
+    .map((r) => {
+      const id = idBySku.get(r.partNumber)
+      if (!id) return null
+      return {
+        id,
+        allow_backorder: false,
+        metadata: {
+          ...buildVariantMetadata(r),
+          discontinued: false,
+          discontinued_at: null,
+        },
+        prices: [{ amount: r.msrpUsd, currency_code: "usd" }],
+        ...wheelVariantWeight(r),
+      }
+    })
+    .filter((u): u is NonNullable<typeof u> => u !== null)
+
+  if (updates.length > 0) {
+    await updateProductVariantsWorkflow(ctx.container).run({
+      input: { product_variants: updates },
+    })
   }
 }
 

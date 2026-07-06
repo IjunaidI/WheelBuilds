@@ -930,8 +930,11 @@ async function findProductByExternalId(
     entity: "product",
     fields: [
       "id",
+      "status",
+      "metadata",
       "variants.id",
       "variants.sku",
+      "variants.metadata",
       "variants.inventory_items.inventory_item_id",
     ],
     filters: { external_id: [externalId] },
@@ -941,8 +944,17 @@ async function findProductByExternalId(
 
 /**
  * Persist vendor_product_current rows for a group whose Medusa product already
- * exists (adopted on retry). Upsert by (vendor_code, part_number) so a partial
- * re-adopt is itself idempotent.
+ * exists (adopted on retry, or re-listed after a prior discontinue). Upsert by
+ * (vendor_code, part_number) so a partial re-adopt is itself idempotent.
+ *
+ * Findings 2/3: distinguishes a "prior partial apply" (product already
+ * published, some/all variants already exist — just heal the current rows)
+ * from a "re-list" (product was drafted + metadata.discontinued_at set when
+ * the group was previously discontinued — republish + clear the flag + refresh
+ * the variants that survived). Either way, any staging SKU that still has no
+ * resolvable variant after attempting to create it is a hard error: we never
+ * persist a `medusa_variant_id: null` row (that zombie wedges every future
+ * diff/apply for the part_number).
  */
 async function persistAdoptedGroup(
   ctx: ApplyContext,
@@ -950,21 +962,67 @@ async function persistAdoptedGroup(
   records: NormalizedRecord[],
   existingProduct: any
 ): Promise<void> {
-  const skuIndex = indexVariantsBySku(existingProduct.variants ?? [])
-  for (const r of records) {
-    const stagingRow = await readStagingRow(ctx, r.partNumber)
+  const productType: "wheel" | "tire" =
+    records[0]?.productType === "tire" ? "tire" : "wheel"
+
+  // 1. Dedupe like the create path so dropped duplicates never get a row (F3).
+  const deduped: NormalizedRecord[] =
+    productType === "wheel"
+      ? dedupeExactDuplicates(records as WheelNormalizedRecord[]).survivors
+      : (dedupeTireExactDuplicates(records as TireNormalizedRecord[])
+          .survivors as NormalizedRecord[])
+
+  // 2. Re-list detection (F2): the product was drafted when discontinued.
+  const relisted =
+    existingProduct.status === "draft" ||
+    (existingProduct.metadata as any)?.discontinued_at != null
+  if (relisted) {
+    const meta = { ...((existingProduct.metadata as any) ?? {}) }
+    delete meta.discontinued_at
+    await updateProductsWorkflow(ctx.container).run({
+      input: {
+        selector: { id: existingProduct.id },
+        update: { status: "published" as any, metadata: meta },
+      },
+    })
+    ctx.touchedProductIds.add(existingProduct.id)
+  }
+
+  // 3. Create any variant that does not yet exist on the product (F3).
+  let skuIndex = indexVariantsBySku(existingProduct.variants ?? [])
+  const missing = deduped.filter((r) => !skuIndex.get(r.partNumber)?.variantId)
+  if (missing.length > 0) {
+    skuIndex = await addVariantsToProduct(
+      ctx,
+      existingProduct.id,
+      missing,
+      productType
+    )
+  }
+
+  // 4. Refresh the variants that already existed when re-listing (F2/F4).
+  if (relisted) {
+    const missingSet = new Set(missing.map((r) => r.partNumber))
+    const existed = deduped.filter((r) => !missingSet.has(r.partNumber))
+    await refreshReListedVariants(ctx, existingProduct.id, existed)
+  }
+
+  // 5. Persist current rows with REAL variant ids + unsettled hash. Never write
+  //    a null-variant row (F3): a truly unresolvable SKU throws so the group is
+  //    recorded partially_failed and retried.
+  for (const r of deduped) {
     const info = skuIndex.get(r.partNumber)
-    if (!info?.inventoryItemId) {
-      ctx.logger.warn(
-        `[vendor-sync] [${ctx.runId}] adopted variant ${r.partNumber} missing inventory_item_id`
+    if (!info?.variantId) {
+      throw new Error(
+        `adopt: could not resolve or create a variant for ${r.partNumber} (group ${group.group_key})`
       )
     }
     const fields = {
       group_key: r.groupKey,
-      content_hash: stagingRow.content_hash,
+      content_hash: "", // settled by the stock pass on success (F5)
       medusa_product_id: existingProduct.id,
-      medusa_variant_id: info?.variantId ?? null,
-      inventory_item_id: info?.inventoryItemId ?? null,
+      medusa_variant_id: info.variantId,
+      inventory_item_id: info.inventoryItemId ?? null,
       normalized: r,
       last_seen_run_id: ctx.runId,
       applied_at: new Date(),
@@ -1168,6 +1226,60 @@ async function refreshReListedVariants(
       input: { product_variants: updates },
     })
   }
+}
+
+/**
+ * Create the given records as NEW variants on an existing product and return a
+ * SKU -> {variantId, inventoryItemId} index over the product's full variant set
+ * afterwards. Used by adoption (finding 3) to heal a product that exists but is
+ * missing variants, instead of persisting a null-variant current row.
+ */
+async function addVariantsToProduct(
+  ctx: ApplyContext,
+  productId: string,
+  records: NormalizedRecord[],
+  productType: "wheel" | "tire"
+): Promise<Map<string, { variantId: string; inventoryItemId: string | null }>> {
+  if (records.length > 0) {
+    if (productType === "wheel") {
+      const wheels = records as WheelNormalizedRecord[]
+      await extendWheelOptions(ctx, productId, wheels)
+      await createProductVariantsWorkflow(ctx.container).run({
+        input: {
+          product_variants: wheels.map((r) => ({
+            product_id: productId,
+            ...buildWheelVariantInput(r),
+          })),
+        },
+      })
+    } else {
+      const tires = records as TireNormalizedRecord[]
+      await extendTireOptions(ctx, productId, tires)
+      await createProductVariantsWorkflow(ctx.container).run({
+        input: {
+          product_variants: tires.map((r) => ({
+            product_id: productId,
+            title: tireSizeLabelForVariantTitle(r),
+            sku: r.partNumber,
+            options: buildTireVariantOptions(r),
+            manage_inventory: true,
+            allow_backorder: false,
+            metadata: buildVariantMetadata(r),
+            prices: [{ amount: r.msrpUsd, currency_code: "usd" }],
+          })),
+        },
+      })
+    }
+  }
+
+  // Re-query the product's variants (with inventory item ids) to index by SKU.
+  const query = ctx.container.resolve(ContainerRegistrationKeys.QUERY)
+  const { data: variants } = await query.graph({
+    entity: "variant",
+    fields: ["id", "sku", "inventory_items.inventory_item_id"],
+    filters: { product_id: [productId] },
+  })
+  return indexVariantsBySku(variants ?? [])
 }
 
 /**

@@ -454,7 +454,8 @@ class VendorSyncService extends MedusaService({
     vendorCode: string,
     options?: { dryRun?: boolean; container?: MedusaContainer; allowSample?: boolean }
   ): Promise<{ runId: string }> {
-    const started = await this.startRun(vendorCode, "full")
+    const isDry = options?.dryRun ?? this.options_.dryRun ?? false
+    const started = await this.startRun(vendorCode, isDry ? "dry" : "full")
     if (started.inProgress) return { runId: started.runId }
     await this.executeRun(started.runId, vendorCode, options)
     return { runId: started.runId }

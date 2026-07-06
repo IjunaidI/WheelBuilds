@@ -70,7 +70,7 @@ export async function POST(req: MedusaRequest, res: MedusaResponse) {
   // disposed once this response is sent, so the deferred work must not use it.
   const { runId, inProgress: reservedInProgress } = await service.startRun(
     vendor_code,
-    "full"
+    dry_run ? "dry" : "full"
   )
 
   if (reservedInProgress) {

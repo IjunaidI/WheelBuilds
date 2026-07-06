@@ -70,6 +70,16 @@ const VendorSyncPage = () => {
     }
   }
 
+  const onTriggerFull = async () => {
+    try {
+      await triggerRun(triggerVendor, false)
+      toast.success(`Sync started for ${triggerVendor}`)
+      load()
+    } catch (e: any) {
+      toast.error(e?.message ?? "Trigger failed")
+    }
+  }
+
   const doAction = (a: RunAction, run: VendorRun) => {
     const run_ = async () => {
       try {
@@ -107,6 +117,9 @@ const VendorSyncPage = () => {
             </Select.Content>
           </Select>
           <Button onClick={onTrigger}>Run dry-run</Button>
+          <Button variant="primary" size="small" onClick={onTriggerFull}>
+            Run sync
+          </Button>
         </div>
       </div>
 

@@ -10,16 +10,34 @@ type VehicleLike = {
   hubBoreMm?: number | null
   diameterWindow?: Win; widthWindow?: Win; offsetWindow?: Win
 }
-export type FitVerdict = { fits: boolean; hardGatesPass: boolean; withinWindow: boolean; reasons: string[] }
+export type FitVerdict = {
+  status: "fits" | "no-fit" | "unknown"
+  fits: boolean
+  hardGatesPass: boolean
+  withinWindow: boolean
+  reasons: string[]
+}
 
-const inWin = (vals: number[], w: Win): boolean =>
-  !w ? true : vals.some((v) => v >= w.min && v <= w.max)
+const scalarInWin = (v: number, w: Win): boolean => (!w ? true : v >= w.min && v <= w.max)
 
 export function fitsVehicle(product: ProductLike, vehicle: VehicleLike): FitVerdict {
-  const reasons: string[] = []
   const pPats = product.boltPatternsCanonical ?? []
   const vPats = vehicle.canonicalBoltPatterns ?? []
-  const boltOk = vPats.length > 0 && pPats.some((p) => vPats.includes(p))
+
+  // S5: no bolt-pattern data on file for this vehicle is an UNKNOWN fitment,
+  // not a disproven mismatch — we simply have nothing to check it against.
+  if (vPats.length === 0) {
+    return {
+      status: "unknown",
+      fits: false,
+      hardGatesPass: false,
+      withinWindow: false,
+      reasons: ["We don't have fitment data for your vehicle yet."],
+    }
+  }
+
+  const reasons: string[] = []
+  const boltOk = pPats.some((p) => vPats.includes(p))
   if (!boltOk) reasons.push("Bolt pattern does not match your vehicle.")
 
   const hub = vehicle.hubBoreMm ?? null
@@ -30,25 +48,28 @@ export function fitsVehicle(product: ProductLike, vehicle: VehicleLike): FitVerd
   const hardGatesPass = boltOk && boreOk
 
   const sizes = product.sizeOptions ?? []
-  // Offsets: include every selectable ET (sibling offsetVariants), not just the default offsetMm.
-  const offsets = sizes.flatMap((s) => (s.offsetVariants?.length ? s.offsetVariants.map((o) => o.value) : [s.offsetMm]))
 
-  // Size/offset windows come from wheel-size.com (null when no spec is on file).
-  // We verify against whatever windows exist; a null window can't be checked, so
-  // `inWin` passes it. So: with spec data, fit is verified on diameter/width/
-  // offset; without it, fit is bolt-pattern + bore only (we can't disprove size).
-  // This same verdict drives the PDP chip, the fitment section, AND the option
-  // filtering — so they can never disagree.
+  // Size/offset windows come from wheel-size.com (null when no spec is on
+  // file). A product fits only if ONE size satisfies diameter AND width AND
+  // has an in-window offset TOGETHER (per-size conjunction) — checking each
+  // dimension independently across different sizes (S1) would let a product
+  // read as "fits" when no single buildable size actually clears the vehicle.
   const withinWindow =
     hardGatesPass &&
-    inWin(sizes.map((s) => s.diameter), vehicle.diameterWindow) &&
-    inWin(sizes.map((s) => s.width), vehicle.widthWindow) &&
-    inWin(offsets, vehicle.offsetWindow)
+    sizes.some(
+      (s) =>
+        scalarInWin(s.diameter, vehicle.diameterWindow) &&
+        scalarInWin(s.width, vehicle.widthWindow) &&
+        (s.offsetVariants?.length
+          ? s.offsetVariants.some((o) => scalarInWin(o.value, vehicle.offsetWindow))
+          : scalarInWin(s.offsetMm, vehicle.offsetWindow))
+    )
 
   if (hardGatesPass && !withinWindow)
     reasons.push("This wheel's size or offset is outside your vehicle's spec range.")
 
-  const fits = withinWindow
+  const status: FitVerdict["status"] = !hardGatesPass ? "no-fit" : withinWindow ? "fits" : "no-fit"
+  const fits = status === "fits"
 
-  return { fits, hardGatesPass, withinWindow, reasons }
+  return { status, fits, hardGatesPass, withinWindow, reasons }
 }

@@ -30,6 +30,9 @@ const Fitment = ({ product }: FitmentProps) => {
   // (bolt pattern + hub bore hard gates, plus the diameter/width/offset window).
   const verdict = active ? fitsVehicle(product, active) : null
   const activeFits = verdict?.fits ?? null
+  // S5: no bolt-pattern data on file for this vehicle — informational, not a
+  // "doesn't fit" mismatch claim.
+  const activeUnknown = verdict?.status === "unknown"
 
   return (
     <section className="border-t border-[var(--hairline)] py-16 small:py-20">
@@ -46,9 +49,11 @@ const Fitment = ({ product }: FitmentProps) => {
         style={{
           borderColor: activeFits
             ? "var(--orange)"
-            : active && !activeFits
-              ? "var(--ink-soft)"
-              : "var(--hairline)",
+            : active && activeUnknown
+              ? "var(--hairline)"
+              : active && !activeFits
+                ? "var(--ink-soft)"
+                : "var(--hairline)",
           background: activeFits ? "rgba(255,106,0,0.04)" : "white",
         }}
       >
@@ -83,6 +88,16 @@ const Fitment = ({ product }: FitmentProps) => {
                   {verdict && !verdict.withinWindow
                     ? "Bolt pattern and hub bore clear, but this size is outside the typical size window for your vehicle — confirm offset before ordering."
                     : "Add this wheel to cart — we'll verify final offset against your build at order review."}
+                </div>
+              </>
+            ) : activeUnknown ? (
+              <>
+                <div className="text-[14px] font-semibold text-[var(--ink)]">
+                  We don't have fitment data for your {active.year} {active.make} {active.model}
+                  {active.trim ? ` ${active.trim}` : ""} yet.
+                </div>
+                <div className="text-[12px] text-[var(--ink-soft)] mt-0.5">
+                  This isn't a mismatch — we just haven't confirmed spec for your vehicle. Talk to fitment support before ordering.
                 </div>
               </>
             ) : (

@@ -115,9 +115,22 @@ export async function getProductDetail(
   }
 
   const detail = mapToDetail(product)
+  // WB-072 S2: pass the product's buildable (diameter, width, offset) sizes so
+  // the "confirmed models" list requires an in-window size — the same gate the
+  // active-vehicle band applies — instead of bolt+bore alone. One entry per
+  // size × offset variant (falls back to the size's offsetMm when it has no
+  // offsetVariants), matching the per-size conjunction fitsVehicle/buildFitView use.
+  const productSizes = detail.sizeOptions.flatMap((s) =>
+    (s.offsetVariants?.length ? s.offsetVariants.map((o) => o.value) : [s.offsetMm]).map((offset) => ({
+      diameter: s.diameter,
+      width: s.width,
+      offset,
+    }))
+  )
   const fitment = await getFitmentByProduct(
     detail.boltPatternsCanonical,
-    detail.specs.centerBoreMm || undefined
+    detail.specs.centerBoreMm || undefined,
+    productSizes
   )
   return { ...detail, fitment }
 }

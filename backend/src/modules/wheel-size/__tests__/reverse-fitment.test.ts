@@ -78,3 +78,53 @@ describe("buildReverseFitment", () => {
     expect(buildReverseFitment([ok("A", "B", undefined, 2020, 2020, ["5x114.3"], 60)], [], 70, 24)).toEqual([])
   })
 })
+
+describe("buildReverseFitment size-window gate (WB-072 S2)", () => {
+  const okWithWindows = (
+    make: string,
+    model: string,
+    pats: string[],
+    hub: number | null,
+    diameter_window: { min: number; max: number } | null,
+    width_window: { min: number; max: number } | null,
+    offset_window: { min: number; max: number } | null
+  ) => ({
+    status: "ok",
+    canonical_bolt_patterns: pats,
+    hub_bore_mm_x100: hub == null ? null : Math.round(hub * 100),
+    diameter_window,
+    width_window,
+    offset_window,
+    raw: rawOf(make, model, undefined, 2020, 2020),
+  })
+
+  const accordWindows = okWithWindows(
+    "Honda", "Accord", ["5x114.3"], 64.1,
+    { min: 17, max: 18 }, { min: 7, max: 8 }, { min: 35, max: 45 }
+  )
+
+  it("EXCLUDES a bolt+bore match whose spec windows exclude the product's only size (S2)", () => {
+    // 20x9 ET25 is outside all three of the vehicle's windows.
+    const sizes = [{ diameter: 20, width: 9, offset: 25 }]
+    expect(buildReverseFitment([accordWindows], ["5x114.3"], 70, 24, sizes)).toEqual([])
+  })
+
+  it("INCLUDES when at least one product size falls within all three windows", () => {
+    const sizes = [
+      { diameter: 20, width: 9, offset: 25 }, // out of window
+      { diameter: 17, width: 7.5, offset: 40 }, // in window
+    ]
+    expect(buildReverseFitment([accordWindows], ["5x114.3"], 70, 24, sizes)).toHaveLength(1)
+  })
+
+  it("BACKWARD-COMPAT: no sizes passed keeps the old bolt+bore-only behavior", () => {
+    expect(buildReverseFitment([accordWindows], ["5x114.3"], 70, 24)).toHaveLength(1)
+    expect(buildReverseFitment([accordWindows], ["5x114.3"], 70, 24, [])).toHaveLength(1)
+  })
+
+  it("a null window on the vehicle can't be checked, so it passes", () => {
+    const noWindows = okWithWindows("Toyota", "Tacoma", ["6x139.7"], 67, null, null, null)
+    const sizes = [{ diameter: 999, width: 999, offset: 999 }]
+    expect(buildReverseFitment([noWindows], ["6x139.7"], 70, 24, sizes)).toHaveLength(1)
+  })
+})

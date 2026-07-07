@@ -11,18 +11,32 @@ export const getModifications = (make: string, model: string, year: string) =>
 
 /**
  * Reverse fitment for the PDP "confirmed models" list: cached vehicles that fit
- * this product's bolt patterns (+ bore). Server-side; best-effort cache via
- * Next revalidate. Returns [] on any error — the section degrades to 0 models.
+ * this product's bolt patterns (+ bore) AND have at least one buildable size
+ * (diameter/width/offset) inside that vehicle's spec windows (WB-072 S2) — the
+ * same gate the active-vehicle band uses, so the two can't contradict each
+ * other on the same page. `sizes` is optional; omitting it (or passing an
+ * empty array) falls back to the pre-S2 bolt+bore-only match. Server-side;
+ * best-effort cache via Next revalidate. Returns [] on any error — the section
+ * degrades to 0 models.
  */
 export async function getFitmentByProduct(
   boltPatternsCanonical: string[],
-  boreMm?: number
+  boreMm?: number,
+  sizes?: { diameter: number; width: number; offset: number }[]
 ): Promise<FitmentEntry[]> {
   if (!boltPatternsCanonical?.length) return []
   try {
     const params = new URLSearchParams({ boltPatterns: boltPatternsCanonical.join(",") })
     if (typeof boreMm === "number" && Number.isFinite(boreMm) && boreMm > 0) {
       params.set("boreMm", String(boreMm))
+    }
+    const validSizes = (sizes ?? []).filter(
+      (s) => Number.isFinite(s.diameter) && Number.isFinite(s.width) && Number.isFinite(s.offset)
+    )
+    if (validSizes.length) {
+      params.set("diameters", validSizes.map((s) => s.diameter).join(","))
+      params.set("widths", validSizes.map((s) => s.width).join(","))
+      params.set("offsets", validSizes.map((s) => s.offset).join(","))
     }
     const body = await sdk.client.fetch<{ vehicles: FitmentEntry[] }>(
       `/store/fitment/by-product?${params.toString()}`,

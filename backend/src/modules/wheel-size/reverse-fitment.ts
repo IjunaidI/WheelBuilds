@@ -1,10 +1,41 @@
-import { ReverseFitmentVehicle } from "./types"
+import { ReverseFitmentVehicle, Window } from "./types"
 
 type FitmentRow = {
   raw?: any
   canonical_bolt_patterns?: string[] | null
   hub_bore_mm_x100?: number | null
   status?: string
+  diameter_window?: Window
+  width_window?: Window
+  offset_window?: Window
+}
+
+/** One of a product's buildable (diameter, width, offset) combinations, in the
+ * same units as the vehicle's spec windows (inches / inches / mm). */
+export type ProductSize = { diameter: number; width: number; offset: number }
+
+const inWin = (v: number, w: Window | null | undefined): boolean =>
+  !w ? true : v >= w.min && v <= w.max
+
+/**
+ * True when at least one of the product's sizes falls within ALL THREE of the
+ * vehicle row's spec windows (diameter, width, offset) — the same per-size
+ * conjunction the storefront's fitsVehicle/variantFitsVehicle/buildFitView use
+ * for the active-vehicle band, so the PDP "confirmed models" list and the band
+ * agree (WB-072 S2). A null window can't be checked, so it passes.
+ *
+ * BACKWARD-COMPAT: when `sizes` is empty (no caller-supplied sizes), the gate
+ * is skipped entirely (returns true) so callers that don't pass sizes keep the
+ * pre-S2 bolt+bore-only behavior.
+ */
+export function sizeInWindow(sizes: ProductSize[], row: FitmentRow): boolean {
+  if (!sizes.length) return true
+  return sizes.some(
+    (s) =>
+      inWin(s.diameter, row.diameter_window) &&
+      inWin(s.width, row.width_window) &&
+      inWin(s.offset, row.offset_window)
+  )
 }
 
 /**
@@ -50,14 +81,16 @@ export function matchedPattern(
 
 /**
  * Reduce cached fitment rows to a deduped, sorted, capped list of vehicles
- * confirmed to fit the product (bolt + bore hard gates). `raw` supplies the
- * display identity; non-ok rows and identity-less rows are dropped.
+ * confirmed to fit the product (bolt + bore hard gates, PLUS an in-window size
+ * when `productSizes` is supplied — WB-072 S2). `raw` supplies the display
+ * identity; non-ok rows and identity-less rows are dropped.
  */
 export function buildReverseFitment(
   rows: FitmentRow[],
   productPatterns: string[],
   wheelBoreMm: number | null,
-  limit: number
+  limit: number,
+  productSizes: ProductSize[] = []
 ): ReverseFitmentVehicle[] {
   if (!productPatterns.length) return []
   const seen = new Set<string>()
@@ -66,6 +99,7 @@ export function buildReverseFitment(
     if (row.status && row.status !== "ok") continue
     const pattern = matchedPattern(row, productPatterns, wheelBoreMm)
     if (!pattern) continue
+    if (!sizeInWindow(productSizes, row)) continue
     const id = extractVehicleIdentity(row.raw)
     if (!id) continue
     const key = `${id.make}|${id.model}|${id.trim ?? ""}|${id.yearLabel}`.toLowerCase()

@@ -7,7 +7,7 @@ import WheelSizeQuota from "./models/wheel-size-quota"
 import { WheelSizeClient } from "./client"
 import { normalizeByModel } from "./normalize"
 import { VehicleFitment, ReverseFitmentVehicle, ReverseTireFitmentVehicle, Window } from "./types"
-import { buildReverseFitment } from "./reverse-fitment"
+import { buildReverseFitment, ProductSize } from "./reverse-fitment"
 import { buildReverseTireFitment, TireFitSpec } from "./reverse-tire-fitment"
 import { isStale } from "./staleness"
 import { extractOemTireSizes } from "./oem-tire-sizes"
@@ -169,18 +169,21 @@ class WheelSizeService extends MedusaService({ WheelSizeCatalog, WheelSizeFitmen
 
   /**
    * Reverse fitment: cached vehicles confirmed to fit a product (bolt pattern
-   * intersection + wheel bore clears the hub). Pure cache read — no wheel-size
-   * API calls, so no quota impact. `raw` supplies the display identity.
+   * intersection + wheel bore clears the hub + PLUS an in-window size when
+   * `productSizes` is supplied — WB-072 S2, keeps this list in agreement with
+   * the active-vehicle band). Pure cache read — no wheel-size API calls, so no
+   * quota impact. `raw` supplies the display identity.
    */
-  async reverseFitment(p: { canonicalBoltPatterns: string[]; wheelBoreMm?: number | null; limit?: number }): Promise<ReverseFitmentVehicle[]> {
+  async reverseFitment(p: { canonicalBoltPatterns: string[]; wheelBoreMm?: number | null; limit?: number; productSizes?: ProductSize[] }): Promise<ReverseFitmentVehicle[]> {
     const rows = await this.listWheelSizeFitments({ status: "ok" })
     // model.json() columns are Record<string, unknown>; buildReverseFitment reads
-    // canonical_bolt_patterns as the string[] we persisted.
+    // canonical_bolt_patterns / *_window as the shapes we persisted.
     return buildReverseFitment(
       rows as unknown as Parameters<typeof buildReverseFitment>[0],
       p.canonicalBoltPatterns,
       p.wheelBoreMm ?? null,
-      p.limit ?? 24
+      p.limit ?? 24,
+      p.productSizes ?? []
     )
   }
 

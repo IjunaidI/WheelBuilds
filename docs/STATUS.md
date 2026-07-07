@@ -4,11 +4,13 @@
 > every session (see [CLAUDE.md → Documentation workflow](../CLAUDE.md)). Backlog: [future/BACKLOG.md](future/BACKLOG.md).
 
 ## Tests
-- Backend (Jest, `pnpm test:sync`): 244 passing (6 skipped — incl. 2 WB-051 integration `it.todo` stubs; +2 from WB-052 truncate-state helper)
+- Backend (Jest, `pnpm test:sync`): 312 passing (6 skipped — incl. 2 WB-051 integration `it.todo` stubs; +2 from WB-052 truncate-state helper)
 - Backend admin (Jest, `pnpm test:admin` / `jest src/admin`): 7 passing (WB-006: `actionsForStatus`/`badgeForStatus`/`isNonTerminal` status helpers for the vendor-sync console)
-- Backend wheel-size/fitment (Jest, `pnpm test:fitment` — incl. `src/modules/customer-vehicle`): 66 passing (1 skipped — gated live-slug; +3 from G7: mergeForCustomer idempotency cases; +8 from WB-063: `oem-tire-sizes` + `canonicalize-tire-size` golden)
-- Backend newsletter (Jest, `pnpm test:newsletter` / `jest src/modules/newsletter`): 5 passing (G4: email helpers + subscribe idempotency)
-- Storefront (Vitest, `pnpm test:unit` / `vitest run`): 200 passing (34 files) — incl. the tire store SP2/SP3 suites, WB-063 tire fitment, and WB-068 multi-axis (`speed-rating-rank` golden twin, multi-axis `tire-fits-vehicle`, tire-discovery `fit_specs` post-filter)
+- Backend wheel-size/fitment (Jest, `pnpm test:fitment` — incl. `src/modules/customer-vehicle`): 109 passing (1 skipped — gated live-slug; +3 from G7: mergeForCustomer idempotency cases; +8 from WB-063: `oem-tire-sizes` + `canonicalize-tire-size` golden)
+- Backend newsletter (Jest, `pnpm test:newsletter` / `jest src/modules/newsletter`): 8 passing (G4: email helpers + subscribe idempotency; WB-075 DOC2: atomic upsert always-201 cases)
+- Backend config/lib (Jest, `pnpm test:config` / `jest src/lib`): 16 passing (WB-010/039/050: module-status, CORS, dev-max-rows, resolve-optional; WB-075 DOC4: module-status truthiness alignment)
+- Storefront (Vitest, `pnpm test:unit` / `vitest run`): 312 passing (50 files) — incl. the tire store SP2/SP3 suites, WB-063 tire fitment, WB-068 multi-axis (`speed-rating-rank` golden twin, multi-axis `tire-fits-vehicle`, tire-discovery `fit_specs` post-filter), and the G9 clusters (WB-070..074)
+- Storefront tsc (`npx tsc --noEmit`, non-blocking — `next.config.js` ignores build type errors): **12-error baseline** (was 14; WB-075 DOC1 deleted the dead `resolveSelectedVariant` + its test, clearing 2). File list in [`storefront/CLAUDE.md`](../storefront/CLAUDE.md). Dated entries below that say "tsc 14-baseline" predate this DOC1 fix and are accurate as historical gate records for their own session.
 
 ## Where each pillar stands
 

@@ -697,3 +697,109 @@ describe("RoutingGarage — in-flight authed load reports 'loading', not empty (
     expect(routing.list().map((v) => v.id)).toEqual(["b1"])
   })
 })
+
+/**
+ * The (G6) suite above proves isLoaded() reports loading for the window
+ * between an identity-changed remote being built and its ready() settling.
+ * It does NOT prove anything about the window BEFORE that — between
+ * syncAuth() starting and getCustomer() itself resolving — because every
+ * fake there (FakeRemoteGarage, DeferredRemoteGarage alike) only ever comes
+ * into existence AFTER getCustomer() has already resolved to a truthy
+ * customerId (a remote is only ever built inside the identity-changed
+ * branch). getCustomer() itself was never deferred, so that earlier window
+ * was never held open long enough to assert against — exactly where the
+ * WB-073 G10 review bug lived: `loading` started `false` and was ONLY ever
+ * set from inside syncAuth()'s post-getCustomer() identity-changed branch,
+ * so for the whole getCustomer() round trip isLoaded() fell through to
+ * `this.current.isLoaded?.()` — `local`, always ready+empty — and reported
+ * `true`. FitmentSync (orphaned-?fit strip) and GaragePill (label) both read
+ * that premature `true` and acted on it.
+ */
+describe("RoutingGarage — isLoaded() during the pre-getCustomer() boot window (WB-073 G10 review)", () => {
+  it("isLoaded() is false from the instant the boot probe starts — before getCustomer() has even resolved — then true once a GUEST identity settles", async () => {
+    const createRemote = vi.fn(() => new FakeRemoteGarage([]))
+    const routing = new RoutingGarage(createRemote)
+
+    let resolveCustomer!: (v: { id: string } | null) => void
+    const pending = new Promise<{ id: string } | null>((resolve) => {
+      resolveCustomer = resolve
+    })
+    mockedGetCustomer.mockReturnValueOnce(pending as any)
+
+    const sync = routing.syncAuth() // the boot probe (gen 1) — deliberately not awaited yet
+
+    // THE BUG this test targets: before the fix, `loading` was set only from
+    // INSIDE the identity-changed branch, reachable only AFTER getCustomer()
+    // resolves — so for this entire real network round trip isLoaded() fell
+    // through to `local` (always ready+empty) and lied "true."
+    expect(routing.isLoaded()).toBe(false)
+    expect(routing.loadError()).toBeNull()
+
+    resolveCustomer(null) // guest — no customer
+    await sync
+
+    expect(routing.isLoaded()).toBe(true) // settled: local is ready, no permanent loading purgatory
+    expect(createRemote).not.toHaveBeenCalled() // never was an identity to build a remote for
+  })
+
+  it("isLoaded() is false before getCustomer() resolves, then true once an AUTHED identity settles", async () => {
+    const remote = new FakeRemoteGarage([vehicle("a1", "Ford")])
+    const createRemote = vi.fn(() => remote)
+    const routing = new RoutingGarage(createRemote)
+
+    let resolveCustomer!: (v: { id: string } | null) => void
+    const pending = new Promise<{ id: string } | null>((resolve) => {
+      resolveCustomer = resolve
+    })
+    mockedGetCustomer.mockReturnValueOnce(pending as any)
+
+    const sync = routing.syncAuth()
+    expect(routing.isLoaded()).toBe(false)
+
+    resolveCustomer({ id: "cust_a" })
+    await sync
+
+    expect(routing.isLoaded()).toBe(true)
+    expect(routing.list().map((v) => v.id)).toEqual(["a1"])
+  })
+
+  it("a SAME-customer re-sync never flips isLoaded() back to false — no nav-remount flash", async () => {
+    const remote = new FakeRemoteGarage([vehicle("a1", "Ford")])
+    const createRemote = vi.fn(() => remote)
+    const routing = new RoutingGarage(createRemote)
+
+    mockedGetCustomer.mockResolvedValue({ id: "cust_a" } as any)
+    await routing.syncAuth() // boot probe (gen 1) settles, authed
+    expect(routing.isLoaded()).toBe(true)
+
+    // GarageAuthSync re-firing on a remount with the SAME customerId (the
+    // real-world trigger: a client component remounting without any actual
+    // login/logout). syncAuth() sees customerId === remoteCustomerId and
+    // skips the identity-changed branch entirely — and this is gen 2, so it
+    // is NOT the boot probe either.
+    const sync2 = routing.syncAuth()
+    // Checked SYNCHRONOUSLY, immediately after invocation and before
+    // awaiting anything — precisely the tick a naive "always set
+    // loading=true at the top of every call" implementation would have
+    // flipped transiently, flashing every ordinary navigation.
+    expect(routing.isLoaded()).toBe(true)
+
+    await sync2
+    expect(routing.isLoaded()).toBe(true)
+    expect(createRemote).toHaveBeenCalledTimes(1) // remote was never rebuilt for the re-sync
+  })
+
+  it("a transient getCustomer() failure on the very first (boot) probe still clears loading — no permanent loading purgatory", async () => {
+    const createRemote = vi.fn(() => new FakeRemoteGarage([]))
+    const routing = new RoutingGarage(createRemote)
+
+    mockedGetCustomer.mockRejectedValueOnce(new Error("network blip"))
+    await routing.syncAuth() // boot probe (gen 1) — its only getCustomer() call fails
+
+    // local is synchronous and genuinely ready; a failed boot probe carries
+    // no identity information, so we fall back to it rather than being
+    // stuck reporting loading forever with nothing left to clear it.
+    expect(routing.isLoaded()).toBe(true)
+    expect(createRemote).not.toHaveBeenCalled()
+  })
+})

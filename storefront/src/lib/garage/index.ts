@@ -41,33 +41,50 @@ export class RoutingGarage implements GarageProvider {
   // wired to the abandoned provider).
   private listenerBindings = new Map<() => void, () => void>()
   private merged = false
-  // True for the ENTIRE span of an in-flight authed load — from the instant
-  // syncAuth() commits to a fresh remote (a customerId just appeared or
-  // changed) until that remote's ready() has settled and setCurrent(remote)
-  // has run. Exists because `current` deliberately does NOT repoint at the
-  // new remote until AFTER ready() (and any merge) settles — see the
+  // True for the ENTIRE span of an in-flight identity probe or authed load —
+  // this covers TWO distinct windows (WB-073 G10 review added the first;
+  // G6 review originally added the second):
+  //   1. The boot probe: from the instant the very first syncAuth() call
+  //      starts (before getCustomer() has even been issued) until that FIRST
+  //      call settles, regardless of what identity it resolves to. Without
+  //      this, `current` (still `local`, always ready+empty) made isLoaded()
+  //      lie as "ready" for the whole getCustomer() round trip on every
+  //      boot, not just the authed-and-loading-a-remote part of it — the
+  //      exact window FitmentSync's orphaned-?fit strip and GaragePill's
+  //      label both got fooled by (WB-073 G10 review).
+  //   2. The in-flight authed load: from the instant syncAuth() commits to a
+  //      fresh remote (a customerId just appeared or changed) until that
+  //      remote's ready() has settled and setCurrent(remote) has run.
+  // Both exist because `current` deliberately does NOT repoint at the new
+  // remote until AFTER ready() (and any merge) settles — see the
   // setCurrent(remote) call sites below, which Task 1/T6 depend on staying
   // exactly where they are — so for that whole window isLoaded()/
   // loadError() reading `this.current` live would still see whatever was
   // current BEFORE this identity change (typically `local`: always
-  // ready+empty). That produced a real, unconditional bug on the ordinary
-  // authed-page-load path: GarageManager rendered "No vehicles saved yet"
-  // for the full getCustomer()+listVehicles() round trip, then flipped to
-  // the real state once it arrived — the "loading" branch never rendered
-  // (WB-073 G6 review fix). isLoaded()/loadError() below check this flag
-  // FIRST, ahead of delegating to `this.current`, so the in-flight window is
-  // reported honestly WITHOUT touching the merge/current-switch timing
-  // itself. Set (and immediately emitted) only when the change is TO a
-  // truthy customerId — a logout needs no loading window (`local` is
-  // synchronous) and clears it via the plain else-branch below, on every
-  // identity change (not just the first) so a customer->customer swap also
-  // reports loading for the INCOMING customer rather than the outgoing
-  // one's stale settled state. Left untouched by a superseded syncAuth()'s
-  // bailed continuations — every post-await generation check below returns
-  // BEFORE reaching a `this.loading = false` write — so a stale generation
-  // can never clear a newer generation's in-flight loading state out from
-  // under it, the same discipline `generation` already enforces for
-  // `remote`/`current`/`merged`.
+  // ready+empty). Window 2 alone produced a real, unconditional bug on the
+  // ordinary authed-page-load path: GarageManager rendered "No vehicles
+  // saved yet" for the full getCustomer()+listVehicles() round trip, then
+  // flipped to the real state once it arrived — the "loading" branch never
+  // rendered (WB-073 G6 review fix). isLoaded()/loadError() below check this
+  // flag FIRST, ahead of delegating to `this.current`, so both in-flight
+  // windows are reported honestly WITHOUT touching the merge/current-switch
+  // timing itself.
+  //
+  // Set (and immediately emitted) at the TOP of syncAuth() only for the
+  // first-ever call (the boot probe, window 1 — see `isInitialProbe` there),
+  // and inside the identity-changed branch only when the change is TO a
+  // truthy customerId (window 2) — a logout needs no loading window (`local`
+  // is synchronous) and clears it via the plain else-branch below. It is
+  // NEVER set for a same-customer re-sync (customerId unchanged from
+  // `remoteCustomerId`, e.g. GarageAuthSync re-firing on a remount) — that
+  // path skips the identity-changed branch entirely, which is what keeps
+  // ordinary navigation flicker-free after boot. Left untouched by a
+  // superseded syncAuth()'s bailed continuations — every post-await
+  // generation check below returns BEFORE reaching a `this.loading = false`
+  // write (the boot-probe's own catch-block clear is explicitly re-guarded
+  // by the same check) — so a stale generation can never clear a newer
+  // generation's in-flight loading state out from under it, the same
+  // discipline `generation` already enforces for `remote`/`current`/`merged`.
   private loading = false
   private createRemote: () => RemoteGarage
   // Monotonic counter guarding syncAuth() against itself. syncAuth() is
@@ -109,6 +126,39 @@ export class RoutingGarage implements GarageProvider {
   async syncAuth(): Promise<void> {
     const gen = ++this.generation
 
+    // The very FIRST syncAuth() call ever made on this instance is the boot
+    // probe. From the instant it starts — before getCustomer() has even been
+    // issued, let alone resolved — `current` is still whatever it was built
+    // with (`local`, always ready+empty) and provides NO signal about
+    // whether a real identity check is in flight. Report loading=true for
+    // that ENTIRE window, not only from the point (later, and only if the
+    // resolved identity turns out to be a truthy customerId) where the
+    // identity-changed branch below would otherwise be the first place to
+    // set it (WB-073 G10 review). Before this fix, every isLoaded() consumer
+    // — FitmentSync's orphaned-?fit strip AND GaragePill's label — read
+    // `true` for the whole getCustomer() network round trip, acting on a
+    // garage state that hadn't actually been checked yet: an authed visitor
+    // with no locally-cached vehicles landing on a bookmarked `?fit=...` URL
+    // would see FitmentSync strip it and GaragePill flash "Select a
+    // vehicle," near-deterministically (a real network round trip, not "one
+    // tick").
+    //
+    // `gen === 1` is a precise, allocation-free "is this the first call
+    // ever" test: `generation` is a monotonic per-instance counter
+    // incremented exactly once per syncAuth() call (line above) and never
+    // reset, so no other call on this instance can ever also observe
+    // `gen === 1`. Crucially, a LATER same-customer re-sync (e.g.
+    // GarageAuthSync re-firing on a remount with an unchanged customerId)
+    // has `gen > 1` and never re-enters this branch — it does not flip
+    // `loading` back to true, which is what keeps ordinary navigation
+    // flicker-free (only a genuine identity change, handled further below,
+    // is allowed to re-arm loading after boot).
+    const isInitialProbe = gen === 1
+    if (isInitialProbe) {
+      this.loading = true
+      this.emit()
+    }
+
     let customerId: string | null
     try {
       const customer = await getCustomer()
@@ -123,6 +173,18 @@ export class RoutingGarage implements GarageProvider {
       // hiccup. Bail out leaving remote/local/current exactly as they were —
       // a confirmed `null` from a SUCCESSFUL probe below still means logout
       // (WB-073 review Fix 2).
+      //
+      // Still clear the boot-probe loading flag set above, if this WAS the
+      // boot probe AND no newer call has since superseded it (same
+      // `gen === this.generation` discipline every other post-await mutation
+      // in this method already uses) — otherwise a network hiccup on the
+      // very first load would strand every isLoaded() consumer in "loading"
+      // forever, even though `local` (what `current` still points at) is
+      // synchronous and genuinely ready.
+      if (isInitialProbe && gen === this.generation) {
+        this.loading = false
+        this.emit()
+      }
       return
     }
 

@@ -17,8 +17,8 @@ import {
   getModels,
   getYears,
   getModifications,
-  getFitmentByVehicle,
 } from "@lib/data/fitment"
+import { resolveFitmentForVehicle } from "@lib/data/fitment-resolve"
 import {
   MAKES,
   MODELS_BY_MAKE,
@@ -207,63 +207,68 @@ const YmmPane = ({ onClose }: YmmPaneProps) => {
       })
       setActive(vehicle.id)
       // fire the (human-initiated) fitment lookup, then write it back
-      let fitment: Awaited<ReturnType<typeof getFitmentByVehicle>>
-      try {
-        fitment = await getFitmentByVehicle(make, model, modificationSlug, year, "usdm")
-      } catch {
-        // A non-503 failure (network blip, unexpected 4xx/5xx) — getFitmentByVehicle
-        // already degrades a 503 to {error} above; anything else throws here (WB-073
-        // G8). The vehicle is already fully saved+active by `add`/`setActive` above —
-        // NOT rolled back, because it's in the exact same "saved, fitment unresolved"
-        // shape as any pre-fitment vehicle the garage pane already knows how to
-        // re-resolve on next select (see garage-pane's `needsResolve`), so selecting
-        // it again is the natural retry path. Keep the drawer open and tell the user
-        // rather than routing to an unfiltered catalog or closing on a silent failure.
-        toast.error("Couldn't check fitment right now — please try again.")
-        return
-      }
-      if (fitment && !("error" in fitment)) {
-        update(vehicle.id, {
-          canonicalBoltPatterns: fitment.canonicalBoltPatterns,
-          hubBoreMm: fitment.hubBoreMm ?? undefined,
-          diameterWindow: fitment.diameterWindow,
-          widthWindow: fitment.widthWindow,
-          offsetWindow: fitment.offsetWindow,
-          oemTireSizes: fitment.oemTireSizes,
-          oemTires: fitment.oemTires,
-          fitmentStatus: fitment.status,
-        })
-        // "Did we find something to filter by?" is target-specific: tires filter
-        // on OEM tire sizes, wheels on bolt patterns. Only toast (and only about
-        // the RIGHT thing) when the relevant data is missing — otherwise the tire
-        // flow would wrongly show a "no wheel specs" message.
-        const hasFit =
-          target === "tires"
-            ? (fitment.oemTireSizes?.length ?? 0) > 0
-            : fitment.status === "ok" && fitment.canonicalBoltPatterns.length > 0
-        if (!hasFit) {
-          toast(
+      const result = await resolveFitmentForVehicle(make, model, modificationSlug, year, "usdm")
+
+      let boltPatterns: string[] = []
+      let oemTireSizes: string[] = []
+
+      switch (result.kind) {
+        case "ok": {
+          const fitment = result.fitment
+          update(vehicle.id, {
+            canonicalBoltPatterns: fitment.canonicalBoltPatterns,
+            hubBoreMm: fitment.hubBoreMm ?? undefined,
+            diameterWindow: fitment.diameterWindow,
+            widthWindow: fitment.widthWindow,
+            offsetWindow: fitment.offsetWindow,
+            oemTireSizes: fitment.oemTireSizes,
+            oemTires: fitment.oemTires,
+            fitmentStatus: fitment.status,
+          })
+          // "Did we find something to filter by?" is target-specific: tires filter
+          // on OEM tire sizes, wheels on bolt patterns. Only toast (and only about
+          // the RIGHT thing) when the relevant data is missing — otherwise the tire
+          // flow would wrongly show a "no wheel specs" message.
+          const hasFit =
             target === "tires"
-              ? "No tire fitment for this vehicle yet"
-              : "No fitment data for this vehicle yet",
-            {
-              description:
-                target === "tires"
-                  ? "We couldn't find factory tire sizes for it — showing all tires."
-                  : "We couldn't find wheel specs for it — showing the full catalog.",
-            }
-          )
+              ? (fitment.oemTireSizes?.length ?? 0) > 0
+              : fitment.status === "ok" && fitment.canonicalBoltPatterns.length > 0
+          if (!hasFit) {
+            toast(
+              target === "tires"
+                ? "No tire fitment for this vehicle yet"
+                : "No fitment data for this vehicle yet",
+              {
+                description:
+                  target === "tires"
+                    ? "We couldn't find factory tire sizes for it — showing all tires."
+                    : "We couldn't find wheel specs for it — showing the full catalog.",
+              }
+            )
+          }
+          boltPatterns = fitment.status === "ok" ? fitment.canonicalBoltPatterns : []
+          oemTireSizes = fitment.oemTireSizes ?? []
+          break
         }
-      } else if (fitment && "error" in fitment) {
-        toast.error("Fitment temporarily unavailable", {
-          description: "Please contact support.",
-        })
+        case "unavailable":
+          toast.error("Fitment temporarily unavailable", {
+            description: "Please contact support.",
+          })
+          break
+        case "failed":
+          // A non-503 failure (network blip, unexpected 4xx/5xx) —
+          // resolveFitmentForVehicle already degrades a 503 to "unavailable" above;
+          // anything else lands here (WB-073 G8). The vehicle is already fully
+          // saved+active by `add`/`setActive` above — NOT rolled back, because it's
+          // in the exact same "saved, fitment unresolved" shape as any pre-fitment
+          // vehicle the garage pane already knows how to re-resolve on next select
+          // (see garage-pane's `needsResolve`), so selecting it again is the natural
+          // retry path. Keep the drawer open and tell the user rather than routing
+          // to an unfiltered catalog or closing on a silent failure.
+          toast.error("Couldn't check fitment right now — please try again.")
+          return
       }
       onClose()
-      const boltPatterns =
-        fitment && !("error" in fitment) && fitment.status === "ok" ? fitment.canonicalBoltPatterns : []
-      const oemTireSizes =
-        fitment && !("error" in fitment) ? (fitment.oemTireSizes ?? []) : []
       router.push(fitmentDestinationUrl({ countryCode, target, boltPatterns, oemTireSizes }))
     } finally {
       setSubmitting(false)

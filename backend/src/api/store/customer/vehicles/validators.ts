@@ -57,7 +57,7 @@ export function parseVehicleUpdate(body: unknown): UpdateParseResult {
 }
 
 export const VehicleMergeSchema = z.object({
-  vehicles: z.array(VehicleCreateSchema),
+  vehicles: z.array(VehicleCreateSchema).max(50, "too many vehicles"),
 })
 
 export type VehicleMergeInput = z.infer<typeof VehicleMergeSchema>

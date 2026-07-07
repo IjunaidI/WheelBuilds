@@ -8,6 +8,7 @@ vi.mock("@lib/data/customer", () => ({ getCustomer: vi.fn() }))
 
 import { getCustomer } from "@lib/data/customer"
 import { RoutingGarage } from "../index"
+import { LocalStorageGarage } from "../local-storage-garage"
 import type { GarageProvider } from "../provider"
 import type { NewVehicle, Vehicle } from "../types"
 
@@ -23,14 +24,16 @@ class FakeRemoteGarage implements GarageProvider {
   private vehicles: Vehicle[]
   private activeId: string | null = null
   private listeners = new Set<() => void>()
+  private mergeImpl: () => Promise<boolean>
 
-  constructor(seedVehicles: Vehicle[] = []) {
+  constructor(seedVehicles: Vehicle[] = [], mergeImpl: () => Promise<boolean> = () => Promise.resolve(true)) {
     this.vehicles = seedVehicles
+    this.mergeImpl = mergeImpl // overridable so a test can park a merge mid-flight (Fix 4 race coverage)
   }
 
   ready(): Promise<void> { return Promise.resolve() }
   isLoaded(): boolean { return true }
-  async mergeFrom(): Promise<boolean> { return true } // nothing under test merges local->remote here
+  mergeFrom(): Promise<boolean> { return this.mergeImpl() }
 
   list(): Vehicle[] { return this.vehicles }
   add(v: NewVehicle): Vehicle {
@@ -232,5 +235,61 @@ describe("RoutingGarage — customer identity lifecycle (WB-073 G1/G2)", () => {
 
     expect(routing.list().map((v) => v.id)).toEqual(["b1"]) // still B — not clobbered by the late A resolution
     expect(createRemote).toHaveBeenCalledTimes(1) // A's remote was never constructed by the superseded call
+  })
+
+  it("(Fix 4) a superseded generation's in-flight merge does not clear local, even once it resolves after a newer generation has already taken over", async () => {
+    // mergeLocalIntoRemote()'s `remote.mergeFrom()` await is a THIRD race
+    // window beyond the two Fix 1 already guards (getCustomer(), remote.ready()).
+    // Old (buggy) behavior: mergeLocalIntoRemote() called `this.local.clear()`
+    // unconditionally as soon as mergeFrom() resolved true — INSIDE the
+    // helper, i.e. before syncAuth()'s post-merge `gen !== this.generation`
+    // guard ever runs. A superseded generation's stale merge could therefore
+    // still wipe `local` out from under whatever generation is actually
+    // current by the time it finally resolves — and because
+    // LocalStorageGarage.clear() emits straight to its own listener set,
+    // any component still subscribed through `local` would see a spurious
+    // "everything's gone" flicker for a request that logically lost the race.
+    const clearSpy = vi.spyOn(LocalStorageGarage.prototype, "clear")
+
+    // Gen 1 (login as cust_a): let mergeFrom() park indefinitely until the
+    // test explicitly resolves it, so gen 2 can complete first.
+    let resolveMergeA!: (ok: boolean) => void
+    const pendingMergeA = new Promise<boolean>((resolve) => {
+      resolveMergeA = resolve
+    })
+    const createRemote = vi.fn((): any => new FakeRemoteGarage([vehicle("a1", "Ford")], () => pendingMergeA))
+    const routing = new RoutingGarage(createRemote)
+
+    const listener = vi.fn()
+    routing.subscribe(listener) // subscribed while current == local (unauthenticated)
+
+    mockedGetCustomer.mockResolvedValueOnce({ id: "cust_a" } as any)
+    const syncA = routing.syncAuth() // gen 1: runs ahead and parks inside mergeLocalIntoRemote's mergeFrom() await
+
+    // Flush microtasks so gen 1 actually reaches (and parks inside) the
+    // mergeFrom() call — past getCustomer() and remote.ready() — before gen
+    // 2 starts. setCurrent(remote) is only reached AFTER the merge resolves,
+    // so `current` is still `local` here, and the listener above is still
+    // bound to it.
+    for (let i = 0; i < 5; i++) await Promise.resolve()
+
+    // Gen 2: a confirmed logout for a DIFFERENT identity (customerId: null),
+    // completing fully — synchronously, no merge involved — while gen 1 is
+    // still parked. `current` was already `local`, so this is a no-op swap,
+    // but it is the real-world trigger (rapid login-then-logout) for the gap.
+    mockedGetCustomer.mockResolvedValueOnce(null as any)
+    await routing.syncAuth()
+
+    expect(routing.list()).toEqual([]) // logged out, on the (empty, windowless) local garage
+    listener.mockClear() // isolate what happens when the stale gen-1 merge finally resolves
+
+    resolveMergeA(true) // let gen 1's stale, already-superseded merge resolve now
+    await syncA
+
+    expect(clearSpy).not.toHaveBeenCalled() // local was NEVER cleared by the superseded generation
+    expect(listener).not.toHaveBeenCalled() // no stale emit reached the still-local-bound listener
+    expect(routing.list()).toEqual([]) // still local, untouched — still logged out
+
+    clearSpy.mockRestore()
   })
 })

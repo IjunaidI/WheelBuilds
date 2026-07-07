@@ -124,6 +124,22 @@ export class RoutingGarage implements GarageProvider {
       if (!this.merged && remote.isLoaded()) {
         const ok = await this.mergeLocalIntoRemote(remote) // retry on a later syncAuth if the merge failed
         if (gen !== this.generation) return             // superseded mid-merge — don't stomp a newer generation's state (Fix 1)
+        // `local.clear()` lives HERE — after the guard — rather than inside
+        // mergeLocalIntoRemote, on purpose (Fix 4). mergeFrom()'s own await
+        // means a superseded generation's continuation can still resume
+        // after a newer generation has taken over; clearing inside the
+        // helper cleared unconditionally, before this checkpoint could stop
+        // it, so a stale gen's merge could wipe local out from under the
+        // current generation (empty-garage flicker via LocalStorageGarage's
+        // own direct-to-listeners emit, and a possible double-persist if the
+        // superseding generation had already merged off the same
+        // not-yet-cleared snapshot). Keeping the clear here — gated by the
+        // same `gen === this.generation` check every other post-await
+        // mutation already uses — guarantees only the still-current
+        // generation ever clears local. (Also the natural spot for a later
+        // task, T6/G7, to swap this for a diff-clear of only the merged
+        // vehicles instead of a blanket clear.)
+        if (ok) this.local.clear()
         this.merged = ok
       }
       this.setCurrent(remote)
@@ -136,9 +152,8 @@ export class RoutingGarage implements GarageProvider {
 
   private async mergeLocalIntoRemote(remote: RemoteGarage): Promise<boolean> {
     const toAdd = planMerge(this.local.list(), remote.list(), remote.isLoaded())
-    const ok = await remote.mergeFrom(toAdd)          // ONE idempotent request; false on failure
-    if (ok) this.local.clear()                         // drop local ONLY after the merge persisted
-    return ok
+    return remote.mergeFrom(toAdd) // ONE idempotent request; false on failure. Clearing local on success is the
+    // caller's (syncAuth's) job, gated behind its post-merge generation guard — see the comment there (Fix 4).
   }
 
   list() { return this.current.list() }

@@ -244,4 +244,141 @@ describe("MedusaGarage — surfaces write failures with toast + rollback, not .c
 
     unsubscribe()
   })
+
+  it("remove() failure re-inserts the vehicle at its ORIGINAL index, not appended to the end (WB-073 G5 review Fix 3)", async () => {
+    mockedCreate.mockResolvedValue({ vehicle: {} } as any)
+    mockedDelete.mockRejectedValue(new Error("network down"))
+
+    const garage = new MedusaGarage()
+    const first = garage.add({ ...newVehicle, model: "Explorer" })
+    await flush()
+    const second = garage.add({ ...newVehicle, model: "Ranger" })
+    await flush()
+    const third = garage.add({ ...newVehicle, model: "Bronco" })
+    await flush()
+
+    expect(garage.list().map((v) => v.id)).toEqual([first.id, second.id, third.id])
+
+    garage.remove(second.id) // remove the MIDDLE vehicle
+    expect(garage.list().map((v) => v.id)).toEqual([first.id, third.id])
+
+    await flush()
+
+    // Restored between first and third — its original position — not
+    // appended after third (which would silently reorder the garage).
+    expect(garage.list().map((v) => v.id)).toEqual([first.id, second.id, third.id])
+  })
+})
+
+describe("MedusaGarage — update()/setActive() degrade gracefully on a vehicle already rolled back, instead of throwing (WB-073 G5 review Fix 1)", () => {
+  it("update() called after a real await gap during which the vehicle's create rejected (and was rolled back) does not throw and is a clean no-op", async () => {
+    // Mirrors the real ymm-pane.tsx sequencing: add() -> setActive() ->
+    // await getFitmentByVehicle(...) -> update(vehicle.id, ...). We simulate
+    // the "await gap" with a real `await flush()` between add() and
+    // update() so the createVehicle() rejection's rollback has a chance to
+    // actually run BEFORE update() is called — the exact race the review
+    // flagged as reachable, not theoretical.
+    mockedCreate.mockRejectedValue(new Error("network down"))
+    const errors: string[] = []
+    const unsubscribe = onGarageError((msg) => errors.push(msg))
+
+    const garage = new MedusaGarage()
+    const vehicle = garage.add(newVehicle)
+
+    await flush() // let the create rejection + rollback run to completion
+
+    expect(garage.list()).toEqual([]) // confirms the rollback already happened
+    expect(errors).toEqual([FAILURE_MESSAGE]) // ...and already toasted once
+
+    expect(() =>
+      garage.update(vehicle.id, { canonicalBoltPatterns: ["5x114.3"] })
+    ).not.toThrow() // the old behavior threw synchronously here
+
+    await flush()
+
+    // No second toast for the same root failure, and no network call fires
+    // for a vehicle that never reached the server.
+    expect(errors).toEqual([FAILURE_MESSAGE])
+    expect(mockedUpdate).not.toHaveBeenCalled()
+
+    unsubscribe()
+  })
+
+  it("setActive() on a vehicle whose create already rolled back does not throw and does not reactivate a ghost id", async () => {
+    mockedCreate.mockRejectedValue(new Error("network down"))
+    const errors: string[] = []
+    const unsubscribe = onGarageError((msg) => errors.push(msg))
+
+    const garage = new MedusaGarage()
+    const vehicle = garage.add(newVehicle)
+    await flush()
+
+    expect(garage.list()).toEqual([])
+    expect(garage.getActive()).toBeNull()
+
+    expect(() => garage.setActive(vehicle.id)).not.toThrow()
+    expect(garage.getActive()).toBeNull() // must not point activeId at a rolled-back vehicle
+
+    await flush()
+
+    expect(errors).toEqual([FAILURE_MESSAGE]) // no second toast
+    expect(mockedActivate).not.toHaveBeenCalled()
+
+    unsubscribe()
+  })
+})
+
+describe("MedusaGarage — a superseded instance never toasts into another session (WB-073 G5 review Fix 2)", () => {
+  it("a superseded instance's rollback still corrects its own local state, but does not notify", async () => {
+    mockedCreate.mockRejectedValue(new Error("network down"))
+    const errors: string[] = []
+    const unsubscribe = onGarageError((msg) => errors.push(msg))
+
+    const garage = new MedusaGarage()
+    const vehicle = garage.add(newVehicle)
+    // Simulates RoutingGarage rebuilding `remote` for a different identity
+    // (e.g. logout) while this instance's create is still in flight.
+    garage.markSuperseded()
+
+    await flush()
+
+    expect(garage.list().map((v) => v.id)).not.toContain(vehicle.id) // rollback still ran locally...
+    expect(errors).toEqual([]) // ...but must NOT surface as a toast to whoever is on the page now
+
+    unsubscribe()
+  })
+
+  it("a superseded instance's remove()-failure rollback also does not notify", async () => {
+    mockedCreate.mockResolvedValue({ vehicle: {} } as any)
+    mockedDelete.mockRejectedValue(new Error("network down"))
+    const errors: string[] = []
+    const unsubscribe = onGarageError((msg) => errors.push(msg))
+
+    const garage = new MedusaGarage()
+    const vehicle = garage.add(newVehicle)
+    await flush()
+
+    garage.remove(vehicle.id)
+    garage.markSuperseded() // superseded WHILE the deleteVehicle() call is in flight
+
+    await flush()
+
+    expect(errors).toEqual([]) // rollback happened, but silently — this instance is abandoned
+
+    unsubscribe()
+  })
+
+  it("markSuperseded() does not affect a fresh (still-current) instance — it still notifies normally", async () => {
+    mockedCreate.mockRejectedValue(new Error("network down"))
+    const errors: string[] = []
+    const unsubscribe = onGarageError((msg) => errors.push(msg))
+
+    const garage = new MedusaGarage()
+    garage.add(newVehicle)
+    await flush()
+
+    expect(errors).toEqual([FAILURE_MESSAGE]) // sanity: not superseded => notifies as before
+
+    unsubscribe()
+  })
 })

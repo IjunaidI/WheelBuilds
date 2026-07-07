@@ -31,9 +31,15 @@ class FakeRemoteGarage implements GarageProvider {
     this.mergeImpl = mergeImpl // overridable so a test can park a merge mid-flight (Fix 4 race coverage)
   }
 
+  // Counts calls so a test can assert RoutingGarage actually invokes it on
+  // an identity swap (WB-073 G5 review Fix 2) — satisfies the RemoteGarage
+  // structural type MedusaGarage itself implements.
+  markSupersededCalls = 0
+
   ready(): Promise<void> { return Promise.resolve() }
   isLoaded(): boolean { return true }
   mergeFrom(): Promise<boolean> { return this.mergeImpl() }
+  markSuperseded(): void { this.markSupersededCalls += 1 }
 
   list(): Vehicle[] { return this.vehicles }
   add(v: NewVehicle): Vehicle {
@@ -291,5 +297,37 @@ describe("RoutingGarage — customer identity lifecycle (WB-073 G1/G2)", () => {
     expect(routing.list()).toEqual([]) // still local, untouched — still logged out
 
     clearSpy.mockRestore()
+  })
+
+  it("(WB-073 G5 review Fix 2) supersedes the OLD remote before replacing it on an identity change, so its abandoned writes can no longer toast", async () => {
+    const perCustomer: Record<string, Vehicle[]> = {
+      cust_a: [vehicle("a1", "Ford")],
+      cust_b: [vehicle("b1", "Toyota")],
+    }
+    let lastRequestedFor = ""
+    const instances: FakeRemoteGarage[] = []
+    const createRemote = vi.fn(() => {
+      const instance = new FakeRemoteGarage(perCustomer[lastRequestedFor])
+      instances.push(instance)
+      return instance
+    })
+    const routing = new RoutingGarage(createRemote)
+
+    lastRequestedFor = "cust_a"
+    mockedGetCustomer.mockResolvedValue({ id: "cust_a" } as any)
+    await routing.syncAuth()
+    expect(instances[0].markSupersededCalls).toBe(0) // not superseded while still current
+
+    lastRequestedFor = "cust_b"
+    mockedGetCustomer.mockResolvedValue({ id: "cust_b" } as any)
+    await routing.syncAuth() // A -> B swap
+
+    expect(instances[0].markSupersededCalls).toBe(1) // A's abandoned remote was superseded exactly once
+    expect(instances[1].markSupersededCalls).toBe(0) // B (the new current) is not superseded
+
+    mockedGetCustomer.mockResolvedValue(null as any)
+    await routing.syncAuth() // B -> logout
+
+    expect(instances[1].markSupersededCalls).toBe(1) // B's remote is superseded on logout too
   })
 })

@@ -70,6 +70,19 @@ export class MedusaGarage implements GarageProvider {
   // path is unaffected. Not cleaned up — bounded by failed adds per
   // session, same lifetime tradeoff as the rest of this in-memory instance.
   private failedCreateIds = new Set<string>()
+  // False once RoutingGarage supersedes this instance — i.e. it rebuilds
+  // `remote` for a different identity (login/logout/account-switch) while
+  // this instance still has an in-flight write (WB-073 G5 review Fix 2).
+  // Gates notify() below: RoutingGarage stops READING from a superseded
+  // instance (setCurrent() re-points `current`/listeners elsewhere), but the
+  // module-level onGarageError() channel this instance's rollbacks call into
+  // is NOT scoped by construction — without this flag, an abandoned
+  // instance's late-settling rollback would still toast "couldn't save your
+  // garage change" at whoever is on the page NOW, crossing the identity
+  // boundary G1/G2 exist to close. Checked at NOTIFY time (not call-
+  // initiation time), so it covers writes that were already in flight when
+  // the swap happened, not just ones started after.
+  private superseded = false
 
   constructor() {
     this.loaded = typeof window !== "undefined" ? this.load() : Promise.resolve()
@@ -79,8 +92,25 @@ export class MedusaGarage implements GarageProvider {
   ready(): Promise<void> { return this.loaded }
   /** True only if the initial account load actually succeeded. */
   isLoaded(): boolean { return this.loadOk }
+  /**
+   * Called by RoutingGarage right before this instance stops being the
+   * current remote (identity-change branch of syncAuth()). Idempotent, and
+   * one-way — an instance can't become current again once replaced;
+   * RoutingGarage always builds a fresh one (WB-073 G5 review Fix 2).
+   */
+  markSuperseded(): void { this.superseded = true }
 
   private emit() { this.listeners.forEach((l) => l()) }
+  /**
+   * Routes a write-failure through the module-level onGarageError() channel
+   * — UNLESS this instance has been superseded (WB-073 G5 review Fix 2; see
+   * the `superseded` field comment above). All 4 rollback paths call this
+   * instead of the bare notifyError() so an abandoned instance never toasts
+   * into whoever is on the page now.
+   */
+  private notify(message: string = DEFAULT_FAILURE_MESSAGE): void {
+    if (!this.superseded) notifyError(message)
+  }
   private async load() {
     try {
       const { vehicles } = await api.listVehicles()
@@ -137,7 +167,7 @@ export class MedusaGarage implements GarageProvider {
         // already removed this vehicle themselves before the create
         // settled, rollbackMissing is a no-op and a toast would just be
         // confusing noise about a change they don't perceive as pending.
-        if (this.rollbackMissing(vehicle.id)) notifyError()
+        if (this.rollbackMissing(vehicle.id)) this.notify()
       }
     )
     this.pendingCreate.set(vehicle.id, created)
@@ -150,7 +180,27 @@ export class MedusaGarage implements GarageProvider {
   }
   update(id: string, patch: Partial<NewVehicle>): Vehicle {
     const idx = this.vehicles.findIndex((v) => v.id === id)
-    if (idx === -1) throw new Error(`vehicle ${id} not found`)
+    if (idx === -1) {
+      // Target vehicle isn't present locally — most likely its
+      // createVehicle() already rejected and add()'s rollback removed it
+      // (WB-073 G5 review Fix 1: ymm-pane.tsx's submit() calls add() ->
+      // setActive() -> awaits the fitment lookup -> update(vehicle.id, ...);
+      // a create rejecting during that await is a real, reachable sequence,
+      // not theoretical), or the user removed it themselves before this
+      // call landed. Either way the failure (if any) was already surfaced
+      // by that path's own rollback + toast, so a missing update target is
+      // an expected benign race in an optimistic garage — NOT a new error.
+      // The old behavior (throwing here) propagated synchronously out of an
+      // awaited caller with no catch (ymm-pane's submit() try/finally),
+      // aborting the rest of submit (onClose/router.push) and hanging the
+      // drawer. No known caller reads update()'s return value on this path;
+      // return a Vehicle-shaped placeholder so the (unchanged) return type
+      // stays honest without throwing.
+      if (process.env.NODE_ENV !== "production") {
+        console.debug(`[garage] update(${id}) skipped — vehicle not present (already rolled back or removed)`)
+      }
+      return { id, year: 0, make: "", model: "", savedAt: new Date().toISOString(), ...patch } as Vehicle
+    }
     const previous = this.vehicles[idx]
     const updated = { ...previous, ...patch }
     this.vehicles = [...this.vehicles.slice(0, idx), updated, ...this.vehicles.slice(idx + 1)]
@@ -167,23 +217,37 @@ export class MedusaGarage implements GarageProvider {
           offsetWindow: updated.offsetWindow, oemTireSizes: updated.oemTireSizes, oemTires: updated.oemTires, fitmentStatus: updated.fitmentStatus, trim: updated.trim, notes: updated.notes } as any)
       })
       .catch(() => {
-        if (this.rollbackUpdate(id, previous)) notifyError()
+        if (this.rollbackUpdate(id, previous)) this.notify()
       })
     return updated
   }
   remove(id: string): void {
-    const previous = this.vehicles.find((v) => v.id === id)
+    const idx = this.vehicles.findIndex((v) => v.id === id)
+    const previous = idx === -1 ? undefined : this.vehicles[idx]
     const wasActive = this.activeId === id
     this.vehicles = this.vehicles.filter((v) => v.id !== id)
     if (wasActive) this.activeId = this.vehicles[0]?.id ?? null
     this.emit()
     void api.deleteVehicle(id).catch(() => {
       if (!previous) return // wasn't present locally to begin with — nothing to restore
-      this.rollbackRemove(previous, wasActive)
-      notifyError()
+      this.rollbackRemove(previous, idx, wasActive)
+      this.notify()
     })
   }
   setActive(id: string | null): void {
+    if (id !== null && this.failedCreateIds.has(id)) {
+      // Same benign-race guard as update() above, for symmetry (WB-073 G5
+      // review Fix 1) — this vehicle's create already failed and was rolled
+      // back + toasted. Don't optimistically point activeId at a vehicle
+      // that no longer exists in this.vehicles (getActive() would just
+      // return null anyway) or schedule a network-call chain the inner
+      // failedCreateIds check below would only skip after an extra
+      // microtask hop.
+      if (process.env.NODE_ENV !== "production") {
+        console.debug(`[garage] setActive(${id}) skipped — vehicle not present (already rolled back)`)
+      }
+      return
+    }
     const previous = this.activeId
     this.activeId = id
     this.emit()
@@ -198,7 +262,7 @@ export class MedusaGarage implements GarageProvider {
         })
         .catch(() => {
           if (this.activeId === id) { this.activeId = previous; this.emit() }
-          notifyError()
+          this.notify()
         })
     }
   }
@@ -228,10 +292,19 @@ export class MedusaGarage implements GarageProvider {
     this.emit()
     return true
   }
-  /** Re-inserts a vehicle removed by remove() once its deleteVehicle() call fails, restoring it as active if it was before the removal. */
-  private rollbackRemove(vehicle: Vehicle, wasActive: boolean) {
+  /**
+   * Re-inserts a vehicle removed by remove() once its deleteVehicle() call
+   * fails, restoring it as active if it was before the removal — AT its
+   * original index rather than appended to the end, so a failed removal
+   * doesn't silently reorder the garage (WB-073 G5 review Fix 3). `index` is
+   * clamped to the current length in case the list has shrunk further since
+   * (e.g. another vehicle removed concurrently) — best-effort position, not
+   * a guarantee under concurrent mutation.
+   */
+  private rollbackRemove(vehicle: Vehicle, index: number, wasActive: boolean) {
     if (this.vehicles.some((v) => v.id === vehicle.id)) return // re-added since (fresh uuid makes this unlikely, but stay idempotent)
-    this.vehicles = [...this.vehicles, vehicle]
+    const insertAt = Math.min(Math.max(index, 0), this.vehicles.length)
+    this.vehicles = [...this.vehicles.slice(0, insertAt), vehicle, ...this.vehicles.slice(insertAt)]
     if (wasActive) this.activeId = vehicle.id
     this.emit()
   }

@@ -17,6 +17,9 @@ type RemoteGarage = GarageProvider & {
   ready(): Promise<void>
   isLoaded(): boolean
   mergeFrom(vehicles: Vehicle[]): Promise<boolean>
+  // Flags the instance as no longer current — see the identity-change
+  // branch of syncAuth() below (WB-073 G5 review Fix 2).
+  markSuperseded(): void
 }
 
 export class RoutingGarage implements GarageProvider {
@@ -105,6 +108,16 @@ export class RoutingGarage implements GarageProvider {
     // built for someone else. Logging out nulls it so a later login always
     // gets a fresh instance instead of reusing a stale one.
     if (customerId !== this.remoteCustomerId) {
+      // Supersede the OLD remote (if any) before replacing it — an abandoned
+      // instance may still have an in-flight write whose rollback fires
+      // later; markSuperseded() stops its notifyError() from reaching
+      // whoever is on the page after this swap (WB-073 G5 review Fix 2).
+      // Mirrors the listener-rebinding setCurrent() does below — same "the
+      // old instance stops being able to reach the current UI" property,
+      // extended to the error-toast channel, which setCurrent() doesn't
+      // touch (it only rebinds subscribe() listeners, not this module-level
+      // channel).
+      this.remote?.markSuperseded()
       this.remote = customerId ? this.createRemote() : null
       this.remoteCustomerId = customerId
       this.merged = false

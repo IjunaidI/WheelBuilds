@@ -10,7 +10,7 @@ export interface ModuleStatusRow {
 }
 
 export function buildModuleStatusReport(env: NodeJS.ProcessEnv): ModuleStatusRow[] {
-  const has = (k: string) => typeof env[k] === 'string'
+  const has = (k: string) => Boolean(env[k])
   const isTrue = (k: string) => env[k] === 'true'
   return [
     {

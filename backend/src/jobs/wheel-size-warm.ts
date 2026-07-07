@@ -29,18 +29,22 @@ export default async function wheelSizeWarm(container: MedusaContainer) {
   logger.info(`[wheel-size-warm] refreshed ${refreshed}/${stale.length}`)
 }
 
-// Exported for unit tests. cache_key = make|model|(modificationSlug||year||"")|region.
-// A 4-digit numeric middle slot is a YEAR (route it to `year`, which by_model requires);
-// anything else is a trim slug. NOTE: a trim-keyed entry cannot resupply `year` from the
-// key alone, so it no-ops on warm and instead self-heals via read-path stale-while-revalidate.
+// Exported for unit tests. cache_key = make|model|year|modificationSlug|region (5 slots, WB-072 B1).
+// The year is always present (as "" if not set), and the modificationSlug is in its own slot.
+// This fixes B3: trim-keyed rows now carry the year, so the warm refresh no longer 400s.
 export function parseCacheKey(
   key: string
 ): { make: string; model: string; modificationSlug?: string; year?: string; region: string } | null {
   const parts = String(key).split("|")
-  if (parts.length < 4) return null
-  const [make, model, mid, region] = parts
-  if (/^\d{4}$/.test(mid)) return { make, model, year: mid, region }
-  return { make, model, modificationSlug: mid || undefined, region }
+  if (parts.length < 5) return null
+  const [make, model, year, modificationSlug, region] = parts
+  return {
+    make,
+    model,
+    year: year || undefined,
+    modificationSlug: modificationSlug || undefined,
+    region,
+  }
 }
 
 export const config = {

@@ -11,6 +11,7 @@ import { buildReverseTireFitment, TireFitSpec } from "./reverse-tire-fitment"
 import { isStale } from "./staleness"
 import { extractOemTireSizes } from "./oem-tire-sizes"
 import { extractOemTires } from "./oem-tires"
+import { buildFitmentCacheKey } from "./cache-key"
 
 export class QuotaOutageError extends Error {
   constructor() { super("wheel-size quota outage") ; this.name = "QuotaOutageError" }
@@ -64,7 +65,7 @@ class WheelSizeService extends MedusaService({ WheelSizeCatalog, WheelSizeFitmen
 
   async getFitment(p: { make: string; model: string; modificationSlug?: string; year?: string; region?: string }): Promise<VehicleFitment> {
     const region = p.region ?? this.options_.defaultRegion ?? "usdm"
-    const cache_key = [p.make, p.model, (p.modificationSlug ?? p.year ?? ""), region].join("|")
+    const cache_key = buildFitmentCacheKey({ ...p, region })
 
     const cached = await this.listWheelSizeFitments({ cache_key })
     if (cached[0]) {
@@ -98,7 +99,7 @@ class WheelSizeService extends MedusaService({ WheelSizeCatalog, WheelSizeFitmen
 
   /** Fetch live + upsert the cache row by cache_key. Returns the fresh fitment. */
   async refreshFitment(p: { make: string; model: string; modificationSlug?: string; year?: string; region: string }): Promise<VehicleFitment> {
-    const cache_key = [p.make, p.model, (p.modificationSlug ?? p.year ?? ""), p.region].join("|")
+    const cache_key = buildFitmentCacheKey(p)
     const { body, regionUsed } = await this.resolveByModel(p)
     const fitment = normalizeByModel(body, { modificationSlug: p.modificationSlug ?? "", region: regionUsed })
     const row = {

@@ -29,7 +29,7 @@ describe("WheelSizeService.getFitment", () => {
     const { svc, store } = makeService([empty, empty])
     const f = await svc.getFitment({ make: "honda", model: "accord", modificationSlug: "m", region: "usdm" })
     expect(f.status).toBe("not_found")
-    expect(store.fitment.get("honda|accord|m|usdm").status).toBe("not_found")
+    expect(store.fitment.get("honda|accord||m|usdm").status).toBe("not_found")
   })
 
   it("returns the cached row on the second call without hitting the client", async () => {
@@ -173,7 +173,7 @@ describe("WheelSizeService.getFitment hub bore scaling (WB-007)", () => {
     ])
     const f = await svc.getFitment({ make: "honda", model: "accord", modificationSlug: "m", region: "usdm" })
     expect(f.hubBoreMm).toBe(67.1)
-    expect(store.fitment.get("honda|accord|m|usdm").hub_bore_mm_x100).toBe(6710)
+    expect(store.fitment.get("honda|accord||m|usdm").hub_bore_mm_x100).toBe(6710)
     const again = await svc.getFitment({ make: "honda", model: "accord", modificationSlug: "m", region: "usdm" })
     expect(again.hubBoreMm).toBe(67.1) // served from cache, exact
   })
@@ -182,7 +182,7 @@ describe("WheelSizeService.getFitment hub bore scaling (WB-007)", () => {
 describe("WheelSizeService.getFitment TTL / stale-while-revalidate (WB-008)", () => {
   it("serves a fresh cached row without calling the client", async () => {
     const { svc } = makeService([]) // client throws if called (no results)
-    const fresh = { cache_key: "honda|accord|m|usdm", status: "ok", canonical_bolt_patterns: ["5x114.3"], hub_bore_mm_x100: 6410, region: "usdm", fetched_at: new Date(), diameter_window: null, width_window: null, offset_window: null, raw: {} }
+    const fresh = { cache_key: "honda|accord||m|usdm", status: "ok", canonical_bolt_patterns: ["5x114.3"], hub_bore_mm_x100: 6410, region: "usdm", fetched_at: new Date(), diameter_window: null, width_window: null, offset_window: null, raw: {} }
     ;(svc as any).listWheelSizeFitments = async () => [fresh]
     const f = await svc.getFitment({ make: "honda", model: "accord", modificationSlug: "m", region: "usdm" })
     expect(f.canonicalBoltPatterns).toEqual(["5x114.3"])
@@ -190,7 +190,7 @@ describe("WheelSizeService.getFitment TTL / stale-while-revalidate (WB-008)", ()
 
   it("serves a STALE cached row immediately AND fires a background refresh", async () => {
     const old = new Date(Date.now() - 200 * 86_400_000)
-    const stale = { cache_key: "honda|accord|m|usdm", status: "ok", canonical_bolt_patterns: ["5x114.3"], hub_bore_mm_x100: 6410, region: "usdm", fetched_at: old, diameter_window: null, width_window: null, offset_window: null, raw: {} }
+    const stale = { cache_key: "honda|accord||m|usdm", status: "ok", canonical_bolt_patterns: ["5x114.3"], hub_bore_mm_x100: 6410, region: "usdm", fetched_at: old, diameter_window: null, width_window: null, offset_window: null, raw: {} }
     const { svc } = makeService([{ status: 200, empty: false, body: { data: [{ technical: { stud_holes: 5, pcd: 120, centre_bore: 72.6 }, wheels: [] } ] } }], { ttlDays: 90 })
     ;(svc as any).listWheelSizeFitments = async () => [stale]
     let refreshed = false

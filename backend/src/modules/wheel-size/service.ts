@@ -179,7 +179,14 @@ class WheelSizeService extends MedusaService({ WheelSizeCatalog, WheelSizeFitmen
 
     let firstWithData: { body: any; regionUsed: string } | null = null
     for (const region of this.otherRegionsWithData(emptyBody, p.region)) {
-      if (!(await this.incrementAndCheckQuota())) throw new QuotaOutageError() // out of daily quota mid-lookup — outage, not no-match
+      if (!(await this.incrementAndCheckQuota())) {
+        // Out of daily quota mid-lookup. If an earlier (already-paid-for) probe in
+        // this same loop already found usable data (firstWithData), surface that —
+        // discarding it here would turn an already-found result into a needless
+        // outage. Only throw when nothing has been found yet.
+        if (firstWithData) return firstWithData
+        throw new QuotaOutageError()
+      }
       let res: any
       try {
         // Drop the modification slug — it is region-specific (a usdm trim slug won't

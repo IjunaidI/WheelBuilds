@@ -171,6 +171,27 @@ describe("WheelSizeService.resolveByModel quota exhaustion mid-lookup (WB-072 B4
     expect(calls.map((c) => c.region)).toEqual(["usdm"]) // never reached the eudm probe
     expect(store.fitment.size).toBe(0)
   })
+
+  it("returns an already-found result (firstWithData) instead of throwing when quota runs out on a LATER probe iteration", async () => {
+    // Primary (usdm) empty; first probe (chdm) returns data WITHOUT a filterable
+    // bolt pattern — this sets firstWithData but the loop keeps going looking for
+    // a better (bolt-pattern-bearing) match. Quota then runs out before the next
+    // probe (jdm) — the earlier chdm result must be returned, not discarded.
+    const { svc, calls, store } = makeRegionService(
+      {
+        usdm: emptyWithRegions({ chdm: 2, jdm: 1 }),
+        chdm: record(5, null), // no PCD — not filterable, but IS data
+        jdm: record(5, 114.3), // would be filterable, but never reached
+      },
+      { ceiling: 2 } // primary check + chdm probe check consume both units; jdm's check fails
+    )
+    const f = await svc.getFitment({ make: "arcfox", model: "as6", year: "2025", region: "usdm" })
+    expect(f.status).toBe("ok")
+    expect(f.source.region).toBe("chdm")
+    expect(f.canonicalBoltPatterns).toEqual([]) // firstWithData had no bolt pattern
+    expect(calls.map((c) => c.region)).toEqual(["usdm", "chdm"]) // never reached jdm
+    expect(store.fitment.get("arcfox|as6|2025||usdm").status).toBe("ok") // persisted, not an outage
+  })
 })
 
 describe("WheelSizeService.reverseFitment", () => {

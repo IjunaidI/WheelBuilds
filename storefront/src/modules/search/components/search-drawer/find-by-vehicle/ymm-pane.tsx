@@ -207,7 +207,21 @@ const YmmPane = ({ onClose }: YmmPaneProps) => {
       })
       setActive(vehicle.id)
       // fire the (human-initiated) fitment lookup, then write it back
-      const fitment = await getFitmentByVehicle(make, model, modificationSlug, year, "usdm")
+      let fitment: Awaited<ReturnType<typeof getFitmentByVehicle>>
+      try {
+        fitment = await getFitmentByVehicle(make, model, modificationSlug, year, "usdm")
+      } catch {
+        // A non-503 failure (network blip, unexpected 4xx/5xx) — getFitmentByVehicle
+        // already degrades a 503 to {error} above; anything else throws here (WB-073
+        // G8). The vehicle is already fully saved+active by `add`/`setActive` above —
+        // NOT rolled back, because it's in the exact same "saved, fitment unresolved"
+        // shape as any pre-fitment vehicle the garage pane already knows how to
+        // re-resolve on next select (see garage-pane's `needsResolve`), so selecting
+        // it again is the natural retry path. Keep the drawer open and tell the user
+        // rather than routing to an unfiltered catalog or closing on a silent failure.
+        toast.error("Couldn't check fitment right now — please try again.")
+        return
+      }
       if (fitment && !("error" in fitment)) {
         update(vehicle.id, {
           canonicalBoltPatterns: fitment.canonicalBoltPatterns,

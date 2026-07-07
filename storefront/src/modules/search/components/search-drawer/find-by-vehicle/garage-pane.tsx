@@ -104,6 +104,16 @@ const GaragePane = ({ onClose, onAddNew }: GaragePaneProps) => {
             description: "Please contact support.",
           })
         }
+      } catch {
+        // A non-503 failure (network blip, unexpected 4xx/5xx) — getFitmentByVehicle
+        // already degrades a 503 to {error} above; anything else throws here (WB-073
+        // G8). The vehicle already exists in the garage (this pane only re-resolves
+        // STALE fitment on an existing vehicle, it never creates one), so there's
+        // nothing to roll back — keep the drawer open and let the user retry by
+        // selecting it again, rather than routing on stale/missing data or leaving
+        // the drawer silently stuck.
+        toast.error("Couldn't check fitment right now — please try again.")
+        return
       } finally {
         setSelectingId(null)
       }

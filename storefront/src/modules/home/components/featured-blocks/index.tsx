@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button"
 import { getFeaturedProducts } from "@modules/home/data/get-featured"
 import type { DiscoveryProduct } from "@modules/discovery/data/types"
 import { formatCentsUsd } from "@lib/util/money"
+import { isRealBoltPattern } from "@modules/product-detail/data/group-sizes"
 
 const money = (cents: number) => formatCentsUsd(cents).slice(1)
 
@@ -69,7 +70,9 @@ const EditorialBlock = ({
       <div className="grid grid-cols-2 small:grid-cols-4 gap-5 mt-7 mb-7 border-y border-[var(--hairline)] py-5">
         {product.diameter > 0 && <Stat l="DIAMETER" v={`${product.diameter}"`} />}
         {product.width > 0 && <Stat l="WIDTH" v={`${product.width}"`} />}
-        {product.boltPattern && <Stat l="BOLT" v={product.boltPattern} />}
+        {isRealBoltPattern(product.boltPattern) && (
+          <Stat l="BOLT" v={product.boltPattern} />
+        )}
         <Stat
           l="FROM"
           v={

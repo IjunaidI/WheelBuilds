@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest"
-import { buildFinishOptions } from "./finish-options"
+import { buildFinishOptions, finishesUnion } from "./finish-options"
 
 const variant = (finish: string, image: string | null, d: number) =>
   ({ id: `v-${finish}-${d}`, metadata: { finish, image_url: image, wheel_diameter_in: d, wheel_width_in: 9, offset_mm: 35, bolt_pattern_raw: "5x114.3" }, calculated_price: { calculated_amount: 100 }, inventory_quantity: 5 } as any)
@@ -27,5 +27,25 @@ describe("buildFinishOptions", () => {
     const out = buildFinishOptions([variant("", null, 20)], 30)
     expect(out.length).toBe(1)
     expect(out[0].raw).toBe("—")
+  })
+})
+
+// WB-074 D6 — card mappers (related products, home Featured) need the
+// normalized finish UNION without the full per-finish size-matrix cost of
+// buildFinishOptions, and must OMIT (not default to "black") when no variant
+// carries real finish data.
+describe("finishesUnion", () => {
+  it("unions normalized finishes across variants, deduped", () => {
+    const out = finishesUnion([
+      variant("Matte Black", "b.jpg", 20),
+      variant("Gloss Silver", "s.jpg", 22),
+      variant("Chrome", "c.jpg", 20), // also normalizes to silver — dedupe check
+    ])
+    expect(out.sort()).toEqual(["black", "silver"])
+  })
+
+  it("returns [] (not ['black']) when every variant has a blank finish", () => {
+    const out = finishesUnion([variant("", null, 20), variant("  ", null, 22)])
+    expect(out).toEqual([])
   })
 })

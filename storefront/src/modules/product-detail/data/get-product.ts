@@ -16,11 +16,10 @@ import { getProductByHandle, getProductsList } from "@lib/data/products"
 import { getRegion } from "@lib/data/regions"
 import { getFitmentByProduct, getFitmentByTireProduct } from "@lib/data/fitment"
 import { canonicalBoltPatterns } from "@lib/fitment/canonical-bolt-pattern"
-import { normalizeFinish } from "@lib/fitment/normalize-finish"
 import { DiscoveryProduct } from "@modules/discovery/data/types"
 import { AnyProductDetail, ProductDetail } from "./types"
 import { num, groupVariantsIntoSizes, isRealBoltPattern } from "./group-sizes"
-import { buildFinishOptions } from "./finish-options"
+import { buildFinishOptions, finishesUnion } from "./finish-options"
 import { mapTireDetail } from "./tire/map-tire-detail"
 import { getTireDiscoveryProducts } from "@modules/tire-discovery/data/get-tire-products"
 import { EMPTY_TIRE_FILTERS } from "@modules/tire-discovery/data/types"
@@ -149,6 +148,43 @@ export async function getRelatedTireProducts(
   return result.products.filter((p) => p.handle !== excludeHandle).slice(0, 4)
 }
 
+/**
+ * Related-product card mapper (WB-074 D6/D7). `finishes` is the
+ * variant-metadata UNION — mirrors mapToDetail's derivation — not the
+ * retired `product.metadata.finish` (moved to variant metadata by WB-059;
+ * reading the product-level field made `normalizeFinish(undefined)` default
+ * every card to "black"). `boltPattern` is gated through `isRealBoltPattern`
+ * so the WB-048 "BLANK" placeholder never prints on a card. Variant metadata
+ * for the full `variants` array already comes back on this fetch (same
+ * `*variants.calculated_price` field-selection base `getProductByHandle`
+ * relies on for `mapToDetail`) — if `getProductsList`'s default `fields` is
+ * ever tightened, widen the `getRelatedProducts` query to keep this working.
+ */
+export function toRelatedProduct(p: HttpTypes.StoreProduct): DiscoveryProduct {
+  const variants = p.variants ?? []
+  const m = (variants[0]?.metadata ?? {}) as Record<string, unknown>
+  const pmeta = (p.metadata ?? {}) as Record<string, unknown>
+  const rawBoltPattern = String(m.bolt_pattern_raw ?? "")
+  const boltPattern = isRealBoltPattern(rawBoltPattern) ? rawBoltPattern : ""
+  return {
+    id: p.id!,
+    handle: p.handle!,
+    brand: String(pmeta.brand ?? ""),
+    name: p.title ?? "",
+    priceCents: Math.round(
+      num((variants[0]?.calculated_price as any)?.calculated_amount) * 100
+    ),
+    thumbnail: p.thumbnail ?? null,
+    finishes: finishesUnion(variants),
+    diameter: num(m.wheel_diameter_in),
+    width: num(m.wheel_width_in),
+    boltPattern,
+    boltPatternsCanonical: boltPattern
+      ? Array.from(new Set(canonicalBoltPatterns(boltPattern)))
+      : [],
+  }
+}
+
 export async function getRelatedProducts(
   product: ProductDetail,
   countryCode: string
@@ -171,26 +207,5 @@ export async function getRelatedProducts(
   return response.products
     .filter((p) => p.handle !== product.handle)
     .slice(0, 6)
-    .map((p) => {
-      const m = (p.variants?.[0]?.metadata ?? {}) as Record<string, unknown>
-      const pmeta = (p.metadata ?? {}) as Record<string, unknown>
-      return {
-        id: p.id!,
-        handle: p.handle!,
-        brand: String(pmeta.brand ?? ""),
-        name: p.title ?? "",
-        priceCents: Math.round(
-          num((p.variants?.[0]?.calculated_price as any)?.calculated_amount) *
-            100
-        ),
-        thumbnail: p.thumbnail ?? null,
-        finishes: [normalizeFinish(pmeta.finish)],
-        diameter: num(m.wheel_diameter_in),
-        width: num(m.wheel_width_in),
-        boltPattern: String(m.bolt_pattern_raw ?? ""),
-        boltPatternsCanonical: m.bolt_pattern_raw
-          ? Array.from(new Set(canonicalBoltPatterns(String(m.bolt_pattern_raw))))
-          : [],
-      }
-    })
+    .map(toRelatedProduct)
 }

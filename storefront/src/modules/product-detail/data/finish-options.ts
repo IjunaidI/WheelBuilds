@@ -37,3 +37,26 @@ export function buildFinishOptions(
     })
     .sort((a, b) => a.raw.localeCompare(b.raw))
 }
+
+/**
+ * Normalized finish UNION across all variants — the same derivation
+ * mapToDetail uses (via buildFinishOptions → f.normalized), but without
+ * materializing the per-finish size matrices card mappers don't need.
+ * Variants with no real finish value are skipped: a product with no finish
+ * data anywhere gets an empty array so the card can OMIT its finish swatch
+ * rather than default to "black" (WB-074 D6 — the pre-fix related/featured
+ * mappers read the retired `product.metadata.finish` via
+ * `normalizeFinish(undefined)`, which always resolves to "black").
+ */
+export function finishesUnion(
+  variants: { metadata?: unknown }[]
+): Finish[] {
+  const set = new Set<Finish>()
+  for (const v of variants) {
+    const m = (v.metadata ?? {}) as Record<string, unknown>
+    const raw = String(m.finish ?? "").trim()
+    if (!raw) continue
+    set.add(normalizeFinish(raw))
+  }
+  return Array.from(set)
+}

@@ -4,8 +4,8 @@ import { getProductByHandle } from "@lib/data/products"
 import { getRegion } from "@lib/data/regions"
 import { getDiscoveryProducts } from "@modules/discovery/data/get-products"
 import { EMPTY_FILTERS, type DiscoveryProduct } from "@modules/discovery/data/types"
-import { num } from "@modules/product-detail/data/group-sizes"
-import { normalizeFinish } from "@lib/fitment/normalize-finish"
+import { num, isRealBoltPattern } from "@modules/product-detail/data/group-sizes"
+import { finishesUnion } from "@modules/product-detail/data/finish-options"
 import { canonicalBoltPatterns } from "@lib/fitment/canonical-bolt-pattern"
 import { selectFeatured } from "./select-featured"
 
@@ -18,19 +18,26 @@ function parseHandles(raw: string | undefined): string[] {
 
 /**
  * Medusa Store API product → DiscoveryProduct (from-price = min non-zero across variants).
- * Reads brand/finish + per-variant axes (bolt_pattern_raw/wheel_diameter_in/wheel_width_in) from
+ * Reads brand + per-variant axes (bolt_pattern_raw/wheel_diameter_in/wheel_width_in) from
  * `metadata`, which the Store API returns by default (same fetch the PDP's mapToDetail relies on).
  * If `getProductByHandle`'s `fields` is ever tightened to drop `metadata`, these stats go blank —
  * keep `metadata` in that fetch.
+ *
+ * `finishes` is the variant-metadata UNION (mirrors mapToDetail — WB-074 D6;
+ * the retired `product.metadata.finish` read via `normalizeFinish(undefined)`
+ * defaulted every card to "black" post-WB-059). `boltPattern` is gated
+ * through `isRealBoltPattern` so the WB-048 "BLANK" placeholder never prints
+ * on a card (WB-074 D7).
  */
-function toFeatured(p: HttpTypes.StoreProduct): DiscoveryProduct {
+export function toFeatured(p: HttpTypes.StoreProduct): DiscoveryProduct {
   const variants = p.variants ?? []
   const pmeta = (p.metadata ?? {}) as Record<string, unknown>
   const rep = (variants[0]?.metadata ?? {}) as Record<string, unknown>
   const pricesCents = variants
     .map((v) => Math.round(num((v.calculated_price as any)?.calculated_amount) * 100))
     .filter((n) => n > 0)
-  const boltPattern = String(rep.bolt_pattern_raw ?? "")
+  const rawBoltPattern = String(rep.bolt_pattern_raw ?? "")
+  const boltPattern = isRealBoltPattern(rawBoltPattern) ? rawBoltPattern : ""
   return {
     id: p.id!,
     handle: p.handle!,
@@ -38,7 +45,7 @@ function toFeatured(p: HttpTypes.StoreProduct): DiscoveryProduct {
     name: p.title ?? "",
     priceCents: pricesCents.length ? Math.min(...pricesCents) : 0,
     thumbnail: p.thumbnail ?? null,
-    finishes: [normalizeFinish(pmeta.finish)],
+    finishes: finishesUnion(variants),
     diameter: num(rep.wheel_diameter_in),
     width: num(rep.wheel_width_in),
     boltPattern,

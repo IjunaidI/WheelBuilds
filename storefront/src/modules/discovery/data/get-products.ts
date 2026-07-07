@@ -229,12 +229,24 @@ export async function fetchDiscoveryProducts(
         )
         for (const p of products as any[]) variantsById[p.id] = p.variants ?? []
       } catch (e) {
+        // WB-074 D4: do NOT degrade in place (variantsById={}) here. That
+        // used to make `!fetched || productHasFittingVariant(...)` below
+        // pass EVERY bolt-pattern candidate unverified — an over-claiming
+        // "these fit" list — and because this function would then return
+        // normally, the unstable_cache wrapper in getDiscoveryProducts
+        // CACHED that over-claim for 60s. Rethrow instead so the failure
+        // propagates past the cache exactly like a Meili failure does (see
+        // getDiscoveryProducts's doc comment below): the outer catch there
+        // degrades to an honest, UNCACHED empty result instead.
         console.error("[discovery] variant fetch for fit filter failed:", e)
-        variantsById = {} // degrade to coarse (bolt-pattern) results below
+        throw e
       }
     }
 
-    // If the fetch failed entirely, fall back to the coarse candidates (never empty a valid fit result).
+    // Candidate ids that simply weren't found in a (successful) Store API
+    // response fall back to the coarse candidates (never empty a valid fit
+    // result over a lookup miss). A genuine fetch FAILURE is handled above —
+    // it now throws instead of ever reaching this line.
     const fetched = Object.keys(variantsById).length > 0
     const candidates = hits.map((hit) => ({ hit, product: hitToProduct(hit) }))
     const fitting = candidates.filter(
@@ -310,12 +322,19 @@ export async function fetchDiscoveryProducts(
 }
 
 /**
- * Cached discovery read. Wraps the Meilisearch multiSearch in Next's
- * unstable_cache (60s TTL, tag "discovery") keyed by the effective query, so
- * repeated discovery/home loads within the window don't re-hit Meili. On a
- * Meili failure the inner fn throws — unstable_cache does NOT cache a throw —
- * and we degrade to an empty result here (never cached, so it self-heals on the
- * next request once Meili recovers). A future re-sync can revalidateTag("discovery").
+ * Cached discovery read. Wraps the Meilisearch multiSearch — and, in fit
+ * mode, the Store-API per-variant re-check inside fetchDiscoveryProducts's
+ * fit branch — in Next's unstable_cache (60s TTL, tag "discovery") keyed by
+ * the effective query, so repeated discovery/home loads within the window
+ * don't re-hit Meili or the Store API. On a Meili failure OR a fit-mode
+ * Store-API failure the inner fn throws — unstable_cache does NOT cache a
+ * throw — and we degrade to an empty result here (never cached, so it
+ * self-heals on the next request once the upstream recovers). The fit-mode
+ * Store-API case matters specifically because that failure must NOT degrade
+ * to a coarse, unverified "these fit" list (WB-074 D4): every bolt-pattern
+ * candidate would pass the fit gate unverified, and returning normally would
+ * let unstable_cache serve that over-claim for 60s. A future re-sync can
+ * revalidateTag("discovery").
  */
 export async function getDiscoveryProducts(
   query: DiscoveryQuery

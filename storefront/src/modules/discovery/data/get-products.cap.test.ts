@@ -69,12 +69,21 @@ const fitQuery = (page = 1): DiscoveryQuery => ({
 beforeEach(() => {
   mockedMultiSearch.mockReset()
   mockedProductList.mockReset()
-  // The per-variant fit re-check (Store API round-trip) fails => the code's
-  // documented fallback keeps ALL candidates ("never empty a valid fit
-  // result"). That makes `fitting === hits` deterministically, so these
-  // tests are only exercising the cap signal, not the per-variant fit gate
-  // (already covered by product-has-fitting-variant's own tests).
-  mockedProductList.mockRejectedValue(new Error("network unavailable in test"))
+  // WB-074 D4: a Store-API FAILURE now rethrows past the fit gate instead of
+  // degrading to a coarse "everything fits" fallback (see
+  // get-products.cache-contract.test.ts for that contract). To keep
+  // exercising isCapped in isolation from the per-variant fit gate itself
+  // (already covered by product-has-fitting-variant's own tests), mock a
+  // SUCCESSFUL Store-API response where every candidate has a variant that
+  // genuinely matches the query's bolt pattern — `fitting === hits` still
+  // holds deterministically, now via the real gate passing everything
+  // rather than via a failure-triggered fallback.
+  mockedProductList.mockImplementation((async (params: any) => ({
+    products: (params.id ?? []).map((id: string) => ({
+      id,
+      variants: [{ id: `${id}-v1`, metadata: { bolt_pattern_raw: "5x114.3" } }],
+    })),
+  })) as any)
 })
 
 describe("fit-mode isCapped (WB-074 D2)", () => {

@@ -1,5 +1,5 @@
 // backend/src/modules/customer-vehicle/service.ts
-import { MedusaService, ContainerRegistrationKeys } from "@medusajs/framework/utils"
+import { MedusaService, ContainerRegistrationKeys, MedusaError } from "@medusajs/framework/utils"
 import CustomerVehicle from "./models/customer-vehicle"
 
 class CustomerVehicleService extends MedusaService({ CustomerVehicle }) {
@@ -47,27 +47,68 @@ class CustomerVehicleService extends MedusaService({ CustomerVehicle }) {
    * upsertFitmentRow). Caught here and retried once: a retry re-runs against
    * the now-committed state and always resolves cleanly, so the caller never
    * sees the violation.
+   *
+   * Both halves are scoped to `customer_id` (WB-073 G4 review). The
+   * original version filtered the deactivate CTE by `customer_id` but
+   * matched the final activation UPDATE on `id` alone — so an `id` that
+   * didn't belong to `customerId` still deactivated that customer's real
+   * active vehicle (the deactivate CTE ran regardless, per Postgres CTE
+   * semantics — a data-modifying CTE executes once it's evaluated,
+   * independent of whether the main statement's WHERE later matches
+   * anything), while the activation half silently matched zero rows,
+   * leaving the customer with NO active vehicle and reporting success.
+   * Fixed by adding a `target` CTE that resolves `id` to a row this
+   * customer actually owns FIRST; the `deactivated` CTE is gated on
+   * `exists (select 1 from target)`, so if the id is unknown, soft-deleted,
+   * or belongs to another customer, `target` is empty, the EXISTS guard is
+   * false, and NOTHING is touched — not even the customer's own other
+   * vehicles. The final activation UPDATE sources its target row from the
+   * same `target` CTE rather than re-matching on a bare `id`. The legit
+   * caller (the store route) always passes an id already verified via
+   * `resolveOwned()`, so this is defense in depth, not a behavior change
+   * for the happy path.
+   *
+   * `RETURNING "id"` is inspected: if `target` was empty, the activation
+   * half matches zero rows and that is not a success — silently returning
+   * would report HTTP 200 while nothing activated. Throw a
+   * `MedusaError.Types.NOT_FOUND`, which the framework's error-handler
+   * middleware maps to an honest 404 (same convention the rest of this
+   * module leans on via `resolveOwned()` returning undefined for a
+   * missing/unowned row).
    */
   async activate(id: string, customerId: string): Promise<void> {
     const exec = async () => {
-      await this.knex_.raw(
-        `with deactivated as (
+      return this.knex_.raw(
+        `with target as (
+           select "id" from "customer_vehicle"
+           where "customer_id" = ? and "id" = ? and "deleted_at" is null
+         ),
+         deactivated as (
            update "customer_vehicle"
            set "is_active" = false, "updated_at" = now()
            where "customer_id" = ? and "id" <> ? and "is_active" = true and "deleted_at" is null
+             and exists (select 1 from target)
          )
          update "customer_vehicle"
          set "is_active" = true, "updated_at" = now()
-         where "id" = ? and "deleted_at" is null
+         where "id" in (select "id" from target)
          returning "id"`,
-        [customerId, id, id]
+        [customerId, id, customerId, id]
       )
     }
+    let result: any
     try {
-      await exec()
+      result = await exec()
     } catch (err: any) {
       if (err?.code !== "23505") throw err
-      await exec() // one retry: the concurrent writer's commit is now visible
+      result = await exec() // one retry: the concurrent writer's commit is now visible
+    }
+    const activated = result?.rows ?? []
+    if (activated.length === 0) {
+      throw new MedusaError(
+        MedusaError.Types.NOT_FOUND,
+        `CustomerVehicle with id "${id}" not found for this customer`
+      )
     }
   }
 

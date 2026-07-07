@@ -223,6 +223,7 @@ class WheelSizeService extends MedusaService({ WheelSizeCatalog, WheelSizeFitmen
   private async catalog(kind: string, key: string, fetcher: () => Promise<any>): Promise<any> {
     const hit = await this.listWheelSizeCatalogs({ kind, key })
     if (hit[0]) return hit[0].payload
+    if (!(await this.incrementAndCheckQuota())) throw new QuotaOutageError()
     const res = await fetcher()
     if (res.status >= 300) throw new QuotaOutageError()
     await this.createWheelSizeCatalogs({ kind, key, payload: res.body, fetched_at: new Date() })

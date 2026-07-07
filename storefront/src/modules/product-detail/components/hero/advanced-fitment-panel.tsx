@@ -15,6 +15,15 @@ type AdvancedFitmentPanelProps = {
   selectedOffsetMm: number
   /** The wheel's default ET (gets the orange badge in the chip row). */
   defaultOffsetMm?: number
+  /**
+   * The currently active center bore, when the hero tracks one (bore
+   * branches at the offset level — see `boresFor`/`resolveLeafVariant` in
+   * `data/group-sizes.ts`). Disambiguates chip selection when a size holds
+   * two variants at the SAME ET that differ only in bore. `undefined` means
+   * the caller doesn't track bore — selection then falls back to matching on
+   * offset alone.
+   */
+  selectedCenterBoreMm?: number | null
   /** Called when the user picks a different ET. */
   onSelectOffset: (mm: number) => void
 }
@@ -30,6 +39,7 @@ const AdvancedFitmentPanel = ({
   offsetVariants,
   selectedOffsetMm,
   defaultOffsetMm,
+  selectedCenterBoreMm,
   onSelectOffset,
 }: AdvancedFitmentPanelProps) => {
   const [open, setOpen] = useState(false)
@@ -93,12 +103,20 @@ const AdvancedFitmentPanel = ({
           </div>
           <div className="flex gap-1.5 mb-3.5">
             {offsetVariants.map((o) => {
-              const sel = o.value === selectedOffsetMm
+              // A size can hold two variants at the SAME ET that only differ
+              // in center bore (bore branches off the offset — see
+              // `boresFor` in data/group-sizes.ts). Matching on offset alone
+              // would style BOTH of those chips as selected; disambiguate with
+              // the active bore when the caller tracks one.
+              const sel =
+                o.value === selectedOffsetMm &&
+                (selectedCenterBoreMm === undefined ||
+                  o.centerBoreMm === selectedCenterBoreMm)
               const isDefaultOffset = o.value === defaultOffsetMm
               return (
                 <button
                   type="button"
-                  key={o.value}
+                  key={`${o.value}|${o.centerBoreMm ?? "x"}`}
                   onClick={() => onSelectOffset(o.value)}
                   className="flex-1 relative rounded-[4px] px-2 py-2.5 font-[var(--display)] font-black text-[16px]"
                   style={{

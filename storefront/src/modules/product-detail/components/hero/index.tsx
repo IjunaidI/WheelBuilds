@@ -249,6 +249,7 @@ const Hero = ({ product }: HeroProps) => {
             offsetVariants={offsetVariants}
             selectedOffsetMm={selectedOffsetMm}
             defaultOffsetMm={defaultOffsetMm}
+            selectedCenterBoreMm={selectedBore}
             onSelectOffset={setSelectedOffsetMm}
           />
         )}

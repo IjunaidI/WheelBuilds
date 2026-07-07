@@ -219,10 +219,25 @@ class WheelSizeService extends MedusaService({ WheelSizeCatalog, WheelSizeFitmen
       .map(([k]) => k)
   }
 
-  // Cataloging (lazy read-through). Same read→miss→write→cache shape; payload stored verbatim.
+  // Cataloging (lazy read-through + SWR). Same read→miss→write→cache shape; payload stored verbatim.
   private async catalog(kind: string, key: string, fetcher: () => Promise<any>): Promise<any> {
     const hit = await this.listWheelSizeCatalogs({ kind, key })
-    if (hit[0]) return hit[0].payload
+    if (hit[0]) {
+      if (isStale(hit[0].fetched_at as any, this.ttlDays_, new Date())) {
+        // serve stale immediately; refresh in the background (never awaited).
+        // This is a billable call too, so it counts quota the same as a miss —
+        // and its failure (incl. QuotaOutageError) must never reach the caller.
+        void (async () => {
+          if (!(await this.incrementAndCheckQuota())) throw new QuotaOutageError()
+          const res = await fetcher()
+          if (res.status >= 300) throw new QuotaOutageError()
+          await this.updateWheelSizeCatalogs({ id: hit[0].id, kind, key, payload: res.body, fetched_at: new Date() })
+        })().catch((e) =>
+          this.logger_.warn(`[wheel-size] background catalog refresh failed for ${kind}:${key}: ${e?.message ?? e}`)
+        )
+      }
+      return hit[0].payload
+    }
     if (!(await this.incrementAndCheckQuota())) throw new QuotaOutageError()
     const res = await fetcher()
     if (res.status >= 300) throw new QuotaOutageError()

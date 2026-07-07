@@ -249,6 +249,66 @@ describe("WheelSizeService.getFitment TTL / stale-while-revalidate (WB-008)", ()
   })
 })
 
+describe("WheelSizeService.catalog TTL / stale-while-revalidate (WB-072 B6)", () => {
+  function makeCatalogService(fetcherResults: any[], opts: any = {}) {
+    let i = 0
+    const store: any = { rows: new Map<string, any>() }
+    const svc = new (WheelSizeService as any)({ logger: { warn() {}, error() {} } }, { apiKey: "k", baseUrl: "b", defaultRegion: "usdm", ...opts })
+    svc.listWheelSizeCatalogs = async ({ kind, key }: any) => { const v = store.rows.get(`${kind}|${key}`); return v ? [v] : [] }
+    svc.createWheelSizeCatalogs = async (row: any) => { store.rows.set(`${row.kind}|${row.key}`, row); return row }
+    svc.updateWheelSizeCatalogs = async (row: any) => {
+      const existingKey = [...store.rows.entries()].find(([, v]) => v.id === row.id)?.[0]
+      const merged = { ...(existingKey ? store.rows.get(existingKey) : {}), ...row }
+      store.rows.set(`${merged.kind}|${merged.key}`, merged)
+      return merged
+    }
+    svc._quotaCount = 0
+    svc.incrementAndCheckQuota = async () => { svc._quotaCount++; return svc._quotaCount <= (opts.ceiling ?? 5000) }
+    const fetcher = () => Promise.resolve(fetcherResults[i++])
+    return { svc, store, fetcher }
+  }
+
+  it("serves a fresh cached row without counting quota or calling the fetcher", async () => {
+    const { svc, store, fetcher } = makeCatalogService([]) // fetcher would throw (no results) if called
+    store.rows.set("makes|all", { id: "c1", kind: "makes", key: "all", payload: ["honda"], fetched_at: new Date() })
+    const out = await (svc as any).catalog("makes", "all", fetcher)
+    expect(out).toEqual(["honda"])
+    expect(svc._quotaCount).toBe(0)
+  })
+
+  it("serves a STALE cached row immediately AND refreshes in the background without throwing", async () => {
+    const old = new Date(Date.now() - 200 * 86_400_000)
+    const { svc, store, fetcher } = makeCatalogService([{ status: 200, body: ["honda", "acura"] }], { ttlDays: 90 })
+    store.rows.set("makes|all", { id: "c1", kind: "makes", key: "all", payload: ["honda"], fetched_at: old })
+    const out = await (svc as any).catalog("makes", "all", fetcher)
+    expect(out).toEqual(["honda"]) // stale value served immediately
+    await new Promise((r) => setTimeout(r, 0)) // let the fire-and-forget background refresh run
+    expect(svc._quotaCount).toBe(1) // background refresh counted quota
+    expect(store.rows.get("makes|all").payload).toEqual(["honda", "acura"]) // row overwritten
+  })
+
+  it("swallows a background refresh failure (e.g. quota outage) instead of throwing to the caller", async () => {
+    const old = new Date(Date.now() - 200 * 86_400_000)
+    const warnings: string[] = []
+    const { svc, store, fetcher } = makeCatalogService([], { ttlDays: 90, ceiling: 0 }) // background quota check always fails
+    svc.logger_ = { warn: (m: string) => warnings.push(m), error() {} }
+    store.rows.set("makes|all", { id: "c1", kind: "makes", key: "all", payload: ["honda"], fetched_at: old })
+    const out = await (svc as any).catalog("makes", "all", fetcher)
+    expect(out).toEqual(["honda"]) // stale value still served
+    await new Promise((r) => setTimeout(r, 0))
+    expect(warnings.length).toBe(1)
+    expect(warnings[0]).toMatch(/background catalog refresh failed/i)
+    expect(store.rows.get("makes|all").payload).toEqual(["honda"]) // row NOT overwritten
+  })
+
+  it("cache miss is unchanged: counts quota and fetches", async () => {
+    const { svc, fetcher } = makeCatalogService([{ status: 200, body: ["honda"] }])
+    const out = await (svc as any).catalog("makes", "all", fetcher)
+    expect(out).toEqual(["honda"])
+    expect(svc._quotaCount).toBe(1)
+  })
+})
+
 describe("WheelSizeService.incrementAndCheckQuota (WB-020)", () => {
   function makeQuotaService(returnedCount: number, ceiling = 5000) {
     const svc = new (WheelSizeService as any)({ logger: { warn() {}, error() {} } }, { apiKey: "k", baseUrl: "b", dailyCeiling: ceiling })

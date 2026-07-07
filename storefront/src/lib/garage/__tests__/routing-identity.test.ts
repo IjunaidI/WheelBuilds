@@ -42,11 +42,17 @@ class FakeRemoteGarage implements GarageProvider {
   loadOk = true
   loadErrorValue: string | null = null
 
+  // Records every mergeFrom() payload so a test can assert WB-022's "one
+  // idempotent request, stable ids" contract survived the T6 diff-clear
+  // change (i.e. mergeFrom still only ever sees the pre-merge snapshot, not
+  // anything added to local mid-merge).
+  mergeCalls: Vehicle[][] = []
+
   ready(): Promise<void> { return Promise.resolve() }
   isLoaded(): boolean { return this.loadOk }
   loadError(): string | null { return this.loadErrorValue }
   retryLoad(): void { this.loadOk = true; this.loadErrorValue = null; this.emit() }
-  mergeFrom(): Promise<boolean> { return this.mergeImpl() }
+  mergeFrom(vehicles: Vehicle[]): Promise<boolean> { this.mergeCalls.push(vehicles); return this.mergeImpl() }
   markSuperseded(): void { this.markSupersededCalls += 1 }
 
   list(): Vehicle[] { return this.vehicles }
@@ -367,6 +373,78 @@ describe("RoutingGarage — customer identity lifecycle (WB-073 G1/G2)", () => {
     // The signal must reflect B's (current) state, not A's stale failure.
     expect(routing.isLoaded()).toBe(true)
     expect(routing.loadError()).toBeNull()
+  })
+})
+
+/**
+ * The vitest project runs with `environment: "node"` (see vitest.config.ts),
+ * so there is no real `window`/`localStorage` — LocalStorageGarage's own
+ * `hasWindow()` guard makes it a no-op everywhere else in this file (hence
+ * "windowless local garage" in the comments above). Proving the T6 diff-clear
+ * actually preserves a vehicle written mid-merge requires REAL persistence
+ * (so a second, independent `LocalStorageGarage` instance can read back what
+ * survived), so this block installs a minimal in-memory fake `window` +
+ * `localStorage` + `crypto.randomUUID` for the duration of a single test and
+ * tears it down in a `finally`, rather than reaching for jsdom (not an
+ * installed dependency here).
+ */
+function installFakeWindow(): { uninstall: () => void } {
+  const store = new Map<string, string>()
+  const fakeWindow = {
+    localStorage: {
+      getItem: (k: string) => (store.has(k) ? (store.get(k) as string) : null),
+      setItem: (k: string, v: string) => { store.set(k, v) },
+      removeItem: (k: string) => { store.delete(k) },
+    },
+    crypto: { randomUUID: () => `id_${store.size}_${Math.random().toString(36).slice(2, 10)}` },
+    addEventListener: () => {}, // LocalStorageGarage's constructor subscribes to "storage"
+  }
+  ;(globalThis as any).window = fakeWindow
+  return { uninstall: () => { delete (globalThis as any).window } }
+}
+
+describe("RoutingGarage — merge diff-clear preserves a vehicle added mid-merge (WB-073 G7 / T6)", () => {
+  it("clears only the merged snapshot, so a vehicle added to local DURING the in-flight merge survives the post-merge clear", async () => {
+    const fakeWindow = installFakeWindow()
+    try {
+      // Seed the guest's local garage BEFORE login — this is what gets
+      // snapshotted into the merge request.
+      const seedGarage = new LocalStorageGarage()
+      const v1 = seedGarage.add({ year: 2021, make: "Ford", model: "F-150", trim: "XLT" } as NewVehicle)
+
+      // Park mergeFrom() mid-flight so the test can act while it's pending —
+      // same technique as the (Fix 4) race test above.
+      let resolveMerge!: (ok: boolean) => void
+      const pendingMerge = new Promise<boolean>((resolve) => { resolveMerge = resolve })
+      const remote = new FakeRemoteGarage([], () => pendingMerge)
+      const routing = new RoutingGarage(() => remote)
+
+      mockedGetCustomer.mockResolvedValue({ id: "cust_a" } as any)
+      const sync = routing.syncAuth() // captures the toAdd=[v1] snapshot, calls remote.mergeFrom([v1]) which now pends
+
+      await flushMicrotasks() // let syncAuth reach & park inside the mergeFrom() await
+
+      // TOCTOU: add a vehicle WHILE the merge is in flight. `current` is
+      // still `local` at this point (setCurrent(remote) only runs after the
+      // merge settles — see syncAuth()), so this goes through the exact same
+      // path a real "add vehicle" UI action would take during this window.
+      const v2 = routing.add({ year: 2019, make: "Toyota", model: "Tacoma" } as NewVehicle)
+
+      resolveMerge(true)
+      await sync
+
+      // WB-022 unaffected: still exactly one merge request, still only the
+      // pre-merge snapshot — v2 (added after the snapshot was taken) was
+      // never sent.
+      expect(remote.mergeCalls).toEqual([[v1]])
+
+      // The old blanket `clear()` would wipe v2 here too. The diff-clear must
+      // remove only what was actually merged (v1) and leave v2 in place.
+      const survivors = new LocalStorageGarage().list()
+      expect(survivors.map((v) => v.id)).toEqual([v2.id])
+    } finally {
+      fakeWindow.uninstall()
+    }
   })
 })
 

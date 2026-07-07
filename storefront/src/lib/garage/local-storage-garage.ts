@@ -125,6 +125,25 @@ export class LocalStorageGarage implements GarageProvider {
     this.emit()
   }
 
+  // Diff-clear (WB-073 G7 / T6): removes only the vehicles whose client_id
+  // (== Vehicle.id) is in `clientIds`, leaving everything else untouched.
+  // RoutingGarage.syncAuth() uses this instead of a blanket clear() after a
+  // successful merge, so a vehicle added to local DURING the in-flight merge
+  // request (after the pre-merge snapshot was taken, before this call lands)
+  // survives and syncs on a later tick instead of being silently wiped.
+  // Mirrors remove()'s active-id fallback: if the active vehicle was one of
+  // the ones just merged away, fall back to the first survivor (or null).
+  clearOnly(clientIds: string[]): void {
+    const ids = new Set(clientIds)
+    const next = readVehicles().filter((v) => !ids.has(v.id))
+    writeVehicles(next)
+    const activeId = readActiveId()
+    if (activeId !== null && ids.has(activeId)) {
+      writeActiveId(next[0]?.id ?? null)
+    }
+    this.emit()
+  }
+
   subscribe(listener: () => void): () => void {
     this.listeners.add(listener)
     return () => {

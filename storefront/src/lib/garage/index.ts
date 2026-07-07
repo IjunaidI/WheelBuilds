@@ -174,24 +174,35 @@ export class RoutingGarage implements GarageProvider {
       if (gen !== this.generation) return               // superseded while awaiting readiness (Fix 1)
 
       if (!this.merged && remote.isLoaded()) {
-        const ok = await this.mergeLocalIntoRemote(remote) // retry on a later syncAuth if the merge failed
+        const { ok, ids } = await this.mergeLocalIntoRemote(remote) // retry on a later syncAuth if the merge failed
         if (gen !== this.generation) return             // superseded mid-merge — don't stomp a newer generation's state (Fix 1)
-        // `local.clear()` lives HERE — after the guard — rather than inside
-        // mergeLocalIntoRemote, on purpose (Fix 4). mergeFrom()'s own await
-        // means a superseded generation's continuation can still resume
-        // after a newer generation has taken over; clearing inside the
-        // helper cleared unconditionally, before this checkpoint could stop
-        // it, so a stale gen's merge could wipe local out from under the
-        // current generation (empty-garage flicker via LocalStorageGarage's
-        // own direct-to-listeners emit, and a possible double-persist if the
-        // superseding generation had already merged off the same
-        // not-yet-cleared snapshot). Keeping the clear here — gated by the
-        // same `gen === this.generation` check every other post-await
-        // mutation already uses — guarantees only the still-current
-        // generation ever clears local. (Also the natural spot for a later
-        // task, T6/G7, to swap this for a diff-clear of only the merged
-        // vehicles instead of a blanket clear.)
-        if (ok) this.local.clear()
+        // `local.clearOnly(ids)` lives HERE — after the guard — rather than
+        // inside mergeLocalIntoRemote, on purpose (Fix 4). mergeFrom()'s own
+        // await means a superseded generation's continuation can still
+        // resume after a newer generation has taken over; clearing inside
+        // the helper cleared unconditionally, before this checkpoint could
+        // stop it, so a stale gen's merge could wipe local out from under
+        // the current generation (empty-garage flicker via
+        // LocalStorageGarage's own direct-to-listeners emit, and a possible
+        // double-persist if the superseding generation had already merged
+        // off the same not-yet-cleared snapshot). Keeping the clear here —
+        // gated by the same `gen === this.generation` check every other
+        // post-await mutation already uses — guarantees only the
+        // still-current generation ever clears local.
+        //
+        // `ids` is the client_ids of the PRE-merge snapshot (`toAdd`) that
+        // was actually sent to remote.mergeFrom() — not a fresh
+        // `this.local.list()` read taken after the await. A blanket
+        // `clear()` here would also wipe a vehicle added to local during the
+        // mergeFrom() await (a TOCTOU: `current` is still `local` for this
+        // entire window — setCurrent(remote) below hasn't run yet — so an
+        // "add vehicle" UI action lands in local, not remote). clearOnly(ids)
+        // removes exactly the merged vehicles and nothing else, so that
+        // mid-merge addition survives and gets picked up by planMerge() on
+        // the next syncAuth() tick (WB-073 G7 / T6). WB-022's "one idempotent
+        // merge request, stable client_ids" contract is unaffected — ids
+        // still comes from the same single mergeFrom() call.
+        if (ok) this.local.clearOnly(ids)
         this.merged = ok
       }
       this.setCurrent(remote)
@@ -204,10 +215,13 @@ export class RoutingGarage implements GarageProvider {
     this.emit()
   }
 
-  private async mergeLocalIntoRemote(remote: RemoteGarage): Promise<boolean> {
+  private async mergeLocalIntoRemote(remote: RemoteGarage): Promise<{ ok: boolean; ids: string[] }> {
     const toAdd = planMerge(this.local.list(), remote.list(), remote.isLoaded())
-    return remote.mergeFrom(toAdd) // ONE idempotent request; false on failure. Clearing local on success is the
-    // caller's (syncAuth's) job, gated behind its post-merge generation guard — see the comment there (Fix 4).
+    const ok = await remote.mergeFrom(toAdd) // ONE idempotent request; false on failure (WB-022). Clearing local on
+    // success is the caller's (syncAuth's) job, gated behind its post-merge generation guard — see the comment there
+    // (Fix 4 / T6). `ids` are toAdd's client_ids — the exact snapshot that was sent — so the caller can diff-clear
+    // only what was actually merged instead of a blanket clear.
+    return { ok, ids: toAdd.map((v) => v.id) }
   }
 
   list() { return this.current.list() }

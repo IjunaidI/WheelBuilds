@@ -11,7 +11,7 @@ const NewDropsRow = async () => {
   return (
     <section className="px-5 pt-16 pb-12 xsmall:px-8 small:px-20 small:pt-[120px] small:pb-20">
       <SectionHeader
-        counter="08"
+        counter={String(drops.length).padStart(2, "0")}
         title="New This Week"
         description="Fresh fitments, first to land — first to ship."
         action={<MicroLink href="/store?sort=newest">View all</MicroLink>}

@@ -1,4 +1,5 @@
 // backend/src/modules/wheel-size/service.ts
+import { ulid } from "ulid"
 import { MedusaService, ContainerRegistrationKeys } from "@medusajs/framework/utils"
 import WheelSizeCatalog from "./models/wheel-size-catalog"
 import WheelSizeFitment from "./models/wheel-size-fitment"
@@ -109,10 +110,61 @@ class WheelSizeService extends MedusaService({ WheelSizeCatalog, WheelSizeFitmen
       diameter_window: fitment.diameterWindow, width_window: fitment.widthWindow, offset_window: fitment.offsetWindow,
       status: fitment.status, fetched_at: new Date(),
     }
-    const existing = await this.listWheelSizeFitments({ cache_key })
-    if (existing[0]) await this.updateWheelSizeFitments({ id: existing[0].id, ...row })
-    else await this.createWheelSizeFitments(row)
+    await this.upsertFitmentRow(row)
     return { ...fitment, oemTireSizes: extractOemTireSizes(body), oemTires: extractOemTires(body) }
+  }
+
+  /**
+   * Atomic upsert of a fitment cache row keyed by cache_key, against the partial
+   * unique index `IDX_wheel_size_fitment_cache_key_unique` (WHERE deleted_at IS NULL —
+   * see Migration20260601111311). Mirrors incrementAndCheckQuota's ON CONFLICT pattern:
+   * a plain list-then-create/update lets two concurrent cache misses on the same
+   * cache_key both observe "not found", both INSERT, and have the loser hit the
+   * unique-violation as an uncaught 500 (WB-072 B8). Folding the write into a single
+   * INSERT ... ON CONFLICT DO UPDATE removes that race entirely.
+   *
+   * JSON columns (raw, canonical_bolt_patterns, *_window) are explicitly
+   * JSON.stringify'd before binding: the `pg` driver's parameter serializer treats a
+   * bare JS array as a Postgres ARRAY literal (`{a,b,c}`), not a JSON array, which
+   * would fail the `::jsonb` cast — arrays/objects must be pre-stringified.
+   */
+  private async upsertFitmentRow(row: {
+    cache_key: string
+    region: string
+    raw: unknown
+    canonical_bolt_patterns: unknown
+    hub_bore_mm_x100: number | null
+    diameter_window: unknown
+    width_window: unknown
+    offset_window: unknown
+    status: string
+    fetched_at: Date
+  }): Promise<void> {
+    const id = `wsf_${ulid()}`
+    const json = (v: unknown) => (v == null ? null : JSON.stringify(v))
+    await this.knex_.raw(
+      `insert into "wheel_size_fitment"
+         ("id", "cache_key", "region", "raw", "canonical_bolt_patterns", "hub_bore_mm_x100",
+          "diameter_window", "width_window", "offset_window", "status", "fetched_at", "created_at", "updated_at")
+       values (?, ?, ?, ?::jsonb, ?::jsonb, ?, ?::jsonb, ?::jsonb, ?::jsonb, ?, ?, now(), now())
+       on conflict ("cache_key") where deleted_at is null
+       do update set
+         "region" = excluded.region,
+         "raw" = excluded.raw,
+         "canonical_bolt_patterns" = excluded.canonical_bolt_patterns,
+         "hub_bore_mm_x100" = excluded.hub_bore_mm_x100,
+         "diameter_window" = excluded.diameter_window,
+         "width_window" = excluded.width_window,
+         "offset_window" = excluded.offset_window,
+         "status" = excluded.status,
+         "fetched_at" = excluded.fetched_at,
+         "updated_at" = now()`,
+      [
+        id, row.cache_key, row.region, json(row.raw), json(row.canonical_bolt_patterns),
+        row.hub_bore_mm_x100, json(row.diameter_window), json(row.width_window), json(row.offset_window),
+        row.status, row.fetched_at,
+      ]
+    )
   }
 
   /**

@@ -1,16 +1,47 @@
 // backend/src/modules/wheel-size/__tests__/service.test.ts
 import WheelSizeService from "../service"
 
+// Fake `knex_.raw` for the fitment atomic-upsert path (WB-072 B8): parses the JSON
+// binds back into JS values (mirroring how Postgres jsonb columns read back through
+// MikroORM) and folds them onto the in-memory `store.fitment` map keyed by
+// cache_key — the same shape a real `INSERT ... ON CONFLICT DO UPDATE` would leave
+// behind for a subsequent `listWheelSizeFitments` read.
+function installFitmentKnexStub(svc: any, store: any) {
+  svc.knex_ = {
+    raw: async (_sql: string, binds: any[] = []) => {
+      const [
+        id, cache_key, region, raw, canonical_bolt_patterns, hub_bore_mm_x100,
+        diameter_window, width_window, offset_window, status, fetched_at,
+      ] = binds
+      const parse = (v: any) => (v == null ? null : JSON.parse(v))
+      const existing = store.fitment.get(cache_key)
+      const row = {
+        id: existing?.id ?? id,
+        cache_key, region,
+        raw: parse(raw),
+        canonical_bolt_patterns: parse(canonical_bolt_patterns),
+        hub_bore_mm_x100,
+        diameter_window: parse(diameter_window),
+        width_window: parse(width_window),
+        offset_window: parse(offset_window),
+        status, fetched_at,
+      }
+      store.fitment.set(cache_key, row)
+      return { rows: [row] }
+    },
+  }
+}
+
 function makeService(clientResults: any[], opts: any = {}) {
   let i = 0
   const client = { byModel: async () => clientResults[i++] }
   const store: any = { fitment: new Map(), quota: { day: "", count: 0 } }
   const svc = new (WheelSizeService as any)({ logger: { warn() {}, error() {} } }, { apiKey: "k", baseUrl: "b", defaultRegion: "usdm", ...opts })
   svc.client_ = client
-  // stub the MedusaService-generated methods used by getFitment
+  // stub the MedusaService-generated methods used by getFitment's cache read
   svc.listWheelSizeFitments = async ({ cache_key }: any) => { const v = store.fitment.get(cache_key); return v ? [v] : [] }
-  svc.createWheelSizeFitments = async (row: any) => { store.fitment.set(row.cache_key, row); return row }
-  svc.updateWheelSizeFitments = async (row: any) => { store.fitment.set(row.cache_key, row); return row }
+  // refreshFitment now writes via an atomic knex upsert (WB-072 B8), not create/update
+  installFitmentKnexStub(svc, store)
   svc._quotaCount = 0
   svc.incrementAndCheckQuota = async () => { svc._quotaCount++; return svc._quotaCount <= (opts.ceiling ?? 5000) }
   return { svc, store }
@@ -53,7 +84,7 @@ function makeRegionService(byRegion: Record<string, any>, opts: any = {}) {
   }
   const store: any = { fitment: new Map() }
   svc.listWheelSizeFitments = async ({ cache_key }: any) => { const v = store.fitment.get(cache_key); return v ? [v] : [] }
-  svc.createWheelSizeFitments = async (row: any) => { store.fitment.set(row.cache_key, row); return row }
+  installFitmentKnexStub(svc, store)
   svc._quotaCount = 0
   svc.incrementAndCheckQuota = async () => { svc._quotaCount++; return svc._quotaCount <= (opts.ceiling ?? 5000) }
   return { svc, calls, store }
@@ -332,5 +363,73 @@ describe("WheelSizeService.incrementAndCheckQuota (WB-020)", () => {
   it("returns true when the atomic count exactly equals the ceiling", async () => {
     const { svc } = makeQuotaService(5000, 5000)
     expect(await svc.incrementAndCheckQuota()).toBe(true)
+  })
+})
+
+describe("WheelSizeService.refreshFitment atomic upsert (WB-072 B8)", () => {
+  // Bare service with a capturing knex_.raw stub (no store side-effects) so we can
+  // inspect the exact SQL/binds a single refreshFitment call issues.
+  function makeCapturingService(body: any, opts: any = {}) {
+    const svc = new (WheelSizeService as any)({ logger: { warn() {}, error() {} } }, { apiKey: "k", baseUrl: "b", defaultRegion: "usdm", ...opts })
+    svc.client_ = { byModel: async () => ({ status: 200, empty: false, body }) }
+    svc.incrementAndCheckQuota = async () => true
+    const calls: { sql: string; binds: any[] }[] = []
+    svc.knex_ = { raw: async (sql: string, binds: any[] = []) => { calls.push({ sql, binds }); return { rows: [] } } }
+    return { svc, calls }
+  }
+
+  const wheelBody = { data: [{ technical: { stud_holes: 5, pcd: 114.3, centre_bore: 64.1 }, wheels: [] }] }
+
+  it("issues a single atomic INSERT ... ON CONFLICT (cache_key) upsert — no separate list/create/update calls", async () => {
+    const { svc, calls } = makeCapturingService(wheelBody)
+    svc.listWheelSizeFitments = async () => { throw new Error("must not be called by refreshFitment") }
+    svc.createWheelSizeFitments = async () => { throw new Error("must not be called by refreshFitment") }
+    svc.updateWheelSizeFitments = async () => { throw new Error("must not be called by refreshFitment") }
+
+    await svc.refreshFitment({ make: "honda", model: "accord", modificationSlug: "m", region: "usdm" })
+
+    expect(calls).toHaveLength(1)
+    expect(calls[0].sql).toMatch(/insert into "wheel_size_fitment"[\s\S]*on conflict \("cache_key"\) where deleted_at is null[\s\S]*do update set/i)
+  })
+
+  it("generates a wsf_-prefixed id and JSON-stringifies the jsonb columns for the bind", async () => {
+    const { svc, calls } = makeCapturingService(wheelBody)
+    await svc.refreshFitment({ make: "honda", model: "accord", modificationSlug: "m", region: "usdm" })
+
+    const [
+      id, cache_key, region, raw, canonical_bolt_patterns, hub_bore_mm_x100,
+      diameter_window, width_window, offset_window, status, fetched_at,
+    ] = calls[0].binds
+    expect(id).toMatch(/^wsf_[0-9A-Z]{26}$/) // wsf_ + ULID, mirrors wsq_ convention
+    expect(cache_key).toBe("honda|accord||m|usdm")
+    expect(region).toBe("usdm")
+    expect(JSON.parse(raw)).toEqual(wheelBody) // arrays/objects must be pre-stringified for ::jsonb
+    expect(JSON.parse(canonical_bolt_patterns)).toEqual(["5x114.3"])
+    expect(hub_bore_mm_x100).toBe(6410) // plain integer bind, not JSON-encoded
+    expect(diameter_window).toBeNull()
+    expect(width_window).toBeNull()
+    expect(offset_window).toBeNull()
+    expect(status).toBe("ok")
+    expect(fetched_at).toBeInstanceOf(Date)
+  })
+
+  it("two concurrent cache misses on the same cache_key each resolve via their own atomic upsert instead of racing a unique-violation", async () => {
+    // Simulate the real race: both calls build a row for the same cache_key with no
+    // read in between (list-then-create is gone), so each independently calls
+    // knex_.raw once. A real ON CONFLICT DO UPDATE folds the loser in; here we assert
+    // the service-level behavior that made the race possible is gone — there is no
+    // shared "existing" read/branch between the two refreshFitment calls at all.
+    const store = new Map<string, any>()
+    const svc = new (WheelSizeService as any)({ logger: { warn() {}, error() {} } }, { apiKey: "k", baseUrl: "b", defaultRegion: "usdm" })
+    svc.client_ = { byModel: async () => ({ status: 200, empty: false, body: wheelBody }) }
+    svc.incrementAndCheckQuota = async () => true
+    installFitmentKnexStub(svc, { fitment: store })
+
+    const p = { make: "honda", model: "accord", modificationSlug: "m", region: "usdm" }
+    const [a, b] = await Promise.all([svc.refreshFitment(p), svc.refreshFitment(p)])
+
+    expect(a.status).toBe("ok")
+    expect(b.status).toBe("ok")
+    expect(store.size).toBe(1) // both upserts folded onto the single cache_key row
   })
 })

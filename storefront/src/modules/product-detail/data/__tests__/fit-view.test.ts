@@ -12,6 +12,20 @@ const size = (
     availability: avail, centerBoreMm: bore, loadRatingLb: null }],
 })
 
+// Multi-offset-variant size factory — for S3/S4 tests that need distinct
+// bore/offset combos per variant (the plain `size()` factory only makes one).
+const multiVariantSize = (
+  diameter: number, width: number, boltPattern: string,
+  variants: { value: number; bore: number | null }[]
+): SizeOption => ({
+  diameter, width, offsetMm: variants[0].value, defaultOffsetMm: variants[0].value,
+  boltPattern, weightLb: 25, availability: "in_stock",
+  offsetVariants: variants.map((v) => ({
+    value: v.value, backspaceIn: "", variantId: `v-${diameter}x${width}-${boltPattern}-${v.value}`,
+    availability: "in_stock", centerBoreMm: v.bore, loadRatingLb: null,
+  })),
+})
+
 const finish = (raw: string, sizes: SizeOption[]): FinishOption =>
   ({ raw, normalized: "black", imageUrl: null, sizeOptions: sizes })
 
@@ -71,5 +85,48 @@ describe("buildFitView", () => {
     const vehicle = { canonicalBoltPatterns: ["5x114.3"], hubBoreMm: 70 } // hub 70 > bore 60
     const fv = buildFitView(product, vehicle)
     expect(fv.hasFit).toBe(false) // the only size doesn't clear the hub → nothing bolt-compatible
+  })
+
+  it("pairs bore+offset per variant: a size only survives if ONE variant both clears the hub AND is in-window (S4)", () => {
+    // Variant A (ET40) is in-window but its bore (66) doesn't clear hub 73.
+    // Variant B (ET-10) clears the hub (bore 106) but its offset is out of window.
+    // No SINGLE variant satisfies both — the old two-independent-.some() code
+    // would wrongly keep this size (A satisfies the offset .some(), B satisfies
+    // the bore .some()).
+    const product = productOf(["5x114.3"], [
+      finish("Black", [
+        multiVariantSize(18, 8, "5x114.3", [
+          { value: 40, bore: 66 },
+          { value: -10, bore: 106 },
+        ]),
+      ]),
+    ])
+    const vehicle = {
+      canonicalBoltPatterns: ["5x114.3"], hubBoreMm: 73,
+      offsetWindow: { min: 35, max: 50 },
+    }
+    const fv = buildFitView(product, vehicle)
+    expect(fv.hasFit).toBe(false)
+    expect(fv.finishOptions).toBe(product.finishOptions) // identity → nothing fits, full fallback
+  })
+
+  it("trims a surviving size's offsetVariants to only the fitting ones (S3)", () => {
+    const product = productOf(["5x114.3"], [
+      finish("Black", [
+        multiVariantSize(18, 8, "5x114.3", [
+          { value: 40, bore: 80 }, // fits: in-window (35-50) AND clears hub 73
+          { value: 20, bore: 80 }, // clears hub but offset out of window
+          { value: 45, bore: 60 }, // in window but doesn't clear hub 73
+        ]),
+      ]),
+    ])
+    const vehicle = {
+      canonicalBoltPatterns: ["5x114.3"], hubBoreMm: 73,
+      offsetWindow: { min: 35, max: 50 },
+    }
+    const fv = buildFitView(product, vehicle)
+    expect(fv.hasFit).toBe(true)
+    const offsetVariants = fv.finishOptions[0].sizeOptions[0].offsetVariants
+    expect(offsetVariants?.map((o) => o.value)).toEqual([40])
   })
 })

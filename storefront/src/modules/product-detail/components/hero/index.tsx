@@ -112,7 +112,15 @@ const Hero = ({ product }: HeroProps) => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [visibleSizes])
 
-  const defaultOffsetMm = selectedSize.defaultOffsetMm ?? selectedSize.offsetMm
+  // In fit mode (useFilter true — fitActive AND "show all" hasn't been picked)
+  // selectedSize comes from fitView's ALREADY-trimmed offsetVariants (WB-072
+  // S3), so its first entry is guaranteed to be a fitting ET. Default to that
+  // instead of the wheel's own default, so a fit-flow shopper never defaults
+  // to an out-of-window offset under an "only options that fit" banner.
+  // Outside fit mode (useFilter false) this is unchanged.
+  const fittingDefaultOffsetMm = useFilter ? selectedSize.offsetVariants?.[0]?.value : undefined
+  const defaultOffsetMm =
+    fittingDefaultOffsetMm ?? selectedSize.defaultOffsetMm ?? selectedSize.offsetMm
   const [selectedOffsetMm, setSelectedOffsetMm] = useState<number>(defaultOffsetMm)
 
   // When the size changes, snap the offset back to the new size's default pick.

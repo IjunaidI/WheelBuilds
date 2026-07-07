@@ -1,5 +1,5 @@
 import { canonicalBoltPatterns } from "@lib/fitment/canonical-bolt-pattern"
-import type { FinishOption, ProductDetail, SizeOption } from "./types"
+import type { FinishOption, OffsetVariant, ProductDetail, SizeOption } from "./types"
 
 type Win = { min: number; max: number } | null | undefined
 
@@ -26,46 +26,68 @@ export type FitView = {
 
 const inWin = (v: number, w: Win): boolean => (!w ? true : v >= w.min && v <= w.max)
 
+const boreClearsHub = (bore: number | null, hub: number | null) =>
+  hub == null || bore == null || bore >= hub
+
 /**
- * HARD compatibility — the wheel physically mounts on the vehicle: its bolt
- * pattern is one the vehicle uses and (per offset variant) the bore clears the
- * hub. This is the PRIMARY fitment gate. A shopper who arrived via "fits my car"
- * must only ever see bolt-compatible options — bolt pattern is never relaxed.
+ * A single offset variant "fits" the vehicle when its OWN bore clears the hub
+ * AND its OWN offset falls in the window — bore and offset are checked on the
+ * SAME variant, never mixed across two different variants of the same size
+ * (that mismatch was the WB-072 S4 bug: a size could pass because variant A's
+ * bore cleared while variant B's ET was in-window, with no single variant
+ * satisfying both).
  */
-function boltCompatible(size: SizeOption, vehicle: FitVehicle): boolean {
+function offsetVariantFits(o: OffsetVariant, vehicle: FitVehicle): boolean {
+  return boreClearsHub(o.centerBoreMm, vehicle.hubBoreMm ?? null) && inWin(o.value, vehicle.offsetWindow)
+}
+
+/** This size's offset variants that individually satisfy bore-clears AND in-window. */
+function fittingOffsetVariants(size: SizeOption, vehicle: FitVehicle): OffsetVariant[] {
+  const offsets = size.offsetVariants ?? []
+  return offsets.filter((o) => offsetVariantFits(o, vehicle))
+}
+
+/**
+ * Single fitment predicate — bolt pattern (size-level, the HARD gate, never
+ * relaxed) AND diameter/width windows (size-level) AND at least one offset
+ * variant that PAIRS a clearing bore with an in-window offset on the same
+ * variant. When the size has no offsetVariants at all, fall back to the
+ * size-level offsetMm/bore (there's nothing else to check against).
+ */
+function sizeFits(size: SizeOption, vehicle: FitVehicle): boolean {
   const vPats = vehicle.canonicalBoltPatterns ?? []
   const boltOk =
     vPats.length > 0 && canonicalBoltPatterns(size.boltPattern).some((p) => vPats.includes(p))
   if (!boltOk) return false
 
-  const hub = vehicle.hubBoreMm ?? null
-  const boreClears = (bore: number | null) => hub == null || bore == null || bore >= hub
+  if (!inWin(size.diameter, vehicle.diameterWindow)) return false
+  if (!inWin(size.width, vehicle.widthWindow)) return false
+
   const offsets = size.offsetVariants ?? []
-  if (offsets.length === 0) return boreClears(null)
-  return offsets.some((o) => boreClears(o.centerBoreMm))
+  if (offsets.length === 0) {
+    return boreClearsHub(null, vehicle.hubBoreMm ?? null) && inWin(size.offsetMm, vehicle.offsetWindow)
+  }
+  return offsets.some((o) => offsetVariantFits(o, vehicle))
 }
 
 /**
- * SOFT refinement on top of bolt-compatible — the diameter/width/offset also
- * fall inside the vehicle's wheel-size spec window. A null window passes (we
- * only have this data for SOME vehicles), so when a vehicle has no windows this
- * is equivalent to bolt-compatible and filtering falls back to bolt pattern
- * alone. Never used to relax bolt pattern, only to narrow within it.
+ * Filters each finish's sizeOptions down to the fitting sizes (per `sizeFits`)
+ * AND — WB-072 S3 — trims each surviving size's `offsetVariants` to only the
+ * individually-fitting ones, so a fit-filtered PDP never surfaces an
+ * out-of-window/non-clearing ET under an "only options that fit" banner.
+ * Sizes that fit via the empty-offsetVariants fallback are left as-is (there's
+ * no variant list to trim).
  */
-function withinWindows(size: SizeOption, vehicle: FitVehicle): boolean {
-  if (!inWin(size.diameter, vehicle.diameterWindow)) return false
-  if (!inWin(size.width, vehicle.widthWindow)) return false
-  const offsets = size.offsetVariants ?? []
-  if (offsets.length === 0) return inWin(size.offsetMm, vehicle.offsetWindow)
-  return offsets.some((o) => inWin(o.value, vehicle.offsetWindow))
-}
-
-const trim = (
-  finishes: FinishOption[],
-  keep: (s: SizeOption) => boolean
-): FinishOption[] =>
+const trim = (finishes: FinishOption[], vehicle: FitVehicle): FinishOption[] =>
   finishes
-    .map((f) => ({ ...f, sizeOptions: f.sizeOptions.filter(keep) }))
+    .map((f) => ({
+      ...f,
+      sizeOptions: f.sizeOptions.filter((s) => sizeFits(s, vehicle)).map((s) => {
+        const offsets = s.offsetVariants ?? []
+        if (offsets.length === 0) return s
+        return { ...s, offsetVariants: fittingOffsetVariants(s, vehicle) }
+      }),
+    }))
     .filter((f) => f.sizeOptions.length > 0)
 
 export function buildFitView(product: ProductDetail, vehicle: FitVehicle): FitView {
@@ -87,10 +109,7 @@ export function buildFitView(product: ProductDetail, vehicle: FitVehicle): FitVi
   // as fitsVehicle, so the chip/section/filtering agree. hasFit:false when
   // nothing fits → the hero shows a "doesn't fit your car" state, never a silent
   // fall-through to every option.
-  const finishOptions = trim(
-    product.finishOptions,
-    (s) => boltCompatible(s, vehicle) && withinWindows(s, vehicle)
-  )
+  const finishOptions = trim(product.finishOptions, vehicle)
   if (finishOptions.length === 0) return noFit // nothing fits → hero shows a "doesn't fit" state
 
   const boltPatterns = Array.from(

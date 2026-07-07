@@ -41,6 +41,34 @@ export class RoutingGarage implements GarageProvider {
   // wired to the abandoned provider).
   private listenerBindings = new Map<() => void, () => void>()
   private merged = false
+  // True for the ENTIRE span of an in-flight authed load — from the instant
+  // syncAuth() commits to a fresh remote (a customerId just appeared or
+  // changed) until that remote's ready() has settled and setCurrent(remote)
+  // has run. Exists because `current` deliberately does NOT repoint at the
+  // new remote until AFTER ready() (and any merge) settles — see the
+  // setCurrent(remote) call sites below, which Task 1/T6 depend on staying
+  // exactly where they are — so for that whole window isLoaded()/
+  // loadError() reading `this.current` live would still see whatever was
+  // current BEFORE this identity change (typically `local`: always
+  // ready+empty). That produced a real, unconditional bug on the ordinary
+  // authed-page-load path: GarageManager rendered "No vehicles saved yet"
+  // for the full getCustomer()+listVehicles() round trip, then flipped to
+  // the real state once it arrived — the "loading" branch never rendered
+  // (WB-073 G6 review fix). isLoaded()/loadError() below check this flag
+  // FIRST, ahead of delegating to `this.current`, so the in-flight window is
+  // reported honestly WITHOUT touching the merge/current-switch timing
+  // itself. Set (and immediately emitted) only when the change is TO a
+  // truthy customerId — a logout needs no loading window (`local` is
+  // synchronous) and clears it via the plain else-branch below, on every
+  // identity change (not just the first) so a customer->customer swap also
+  // reports loading for the INCOMING customer rather than the outgoing
+  // one's stale settled state. Left untouched by a superseded syncAuth()'s
+  // bailed continuations — every post-await generation check below returns
+  // BEFORE reaching a `this.loading = false` write — so a stale generation
+  // can never clear a newer generation's in-flight loading state out from
+  // under it, the same discipline `generation` already enforces for
+  // `remote`/`current`/`merged`.
+  private loading = false
   private createRemote: () => RemoteGarage
   // Monotonic counter guarding syncAuth() against itself. syncAuth() is
   // called independently from the constructor AND from GarageAuthSync's
@@ -121,6 +149,17 @@ export class RoutingGarage implements GarageProvider {
       this.remote = customerId ? this.createRemote() : null
       this.remoteCustomerId = customerId
       this.merged = false
+      if (customerId != null) {
+        // A fresh remote's authed load just kicked off — report loading
+        // starting NOW, synchronously with the identity change, not only
+        // once remote.ready() eventually resolves (G6 review fix; see the
+        // `loading` field comment). Emit immediately so a subscriber
+        // transitions into "loading" right away instead of sitting on
+        // whatever `current` (still the old provider) reports until this
+        // whole syncAuth() call finishes.
+        this.loading = true
+        this.emit()
+      }
     }
 
     // Capture the remote THIS generation is responsible for. If a later
@@ -156,9 +195,11 @@ export class RoutingGarage implements GarageProvider {
         this.merged = ok
       }
       this.setCurrent(remote)
+      this.loading = false // load settled (success or failure) and `current` now reflects it directly
     } else {
       this.merged = false
       this.setCurrent(this.local)
+      this.loading = false // logout (or never-authed): local is synchronous, no loading window needed
     }
     this.emit()
   }
@@ -183,8 +224,15 @@ export class RoutingGarage implements GarageProvider {
   // `?? true`/`?? null` covers `this.local` (LocalStorageGarage implements
   // these directly, so this is currently just defensive) and any future
   // GarageProvider that omits the now-optional signal.
-  isLoaded(): boolean { return this.current.isLoaded?.() ?? true }
-  loadError(): string | null { return this.current.loadError?.() ?? null }
+  //
+  // `this.loading` is checked FIRST, ahead of `this.current` (WB-073 G6
+  // review fix — see the field's comment above): `current` is not
+  // repointed at a fresh remote until AFTER its load settles, so during
+  // that window delegating straight to `current` would still report
+  // whatever the OLD provider said (typically `local`: ready + empty),
+  // masking a real in-flight load as an already-empty garage.
+  isLoaded(): boolean { return this.loading ? false : (this.current.isLoaded?.() ?? true) }
+  loadError(): string | null { return this.loading ? null : (this.current.loadError?.() ?? null) }
   retryLoad(): void { this.current.retryLoad?.() }
   subscribe(l: () => void) {
     this.listenerBindings.set(l, this.current.subscribe(l))

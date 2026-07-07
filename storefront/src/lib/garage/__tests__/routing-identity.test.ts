@@ -369,3 +369,176 @@ describe("RoutingGarage — customer identity lifecycle (WB-073 G1/G2)", () => {
     expect(routing.loadError()).toBeNull()
   })
 })
+
+/**
+ * FakeRemoteGarage above resolves ready() SYNCHRONOUSLY (Promise.resolve()),
+ * with load state already seeded before the fake is even constructed — it
+ * can assert what isLoaded()/loadError() report AFTER a load settles, but it
+ * can never observe the MID-FLIGHT window, because there is no tick where
+ * the fake is "not yet ready." That's exactly the window the G6-review bug
+ * lived in: RoutingGarage.setCurrent(remote) only runs AFTER `await
+ * remote.ready()` resolves, so between remote construction and that await
+ * resolving, `current` was still whatever it was before (typically `local`
+ * — ready + empty) and isLoaded() reported a lie. A fake with a manually
+ * resolved promise is required to hold that window open long enough to
+ * assert against it.
+ */
+class DeferredRemoteGarage implements GarageProvider {
+  private vehicles: Vehicle[] = []
+  private activeId: string | null = null
+  private listeners = new Set<() => void>()
+  private resolveReady!: () => void
+  private readyPromise = new Promise<void>((resolve) => {
+    this.resolveReady = resolve
+  })
+
+  markSupersededCalls = 0
+  loadOk = false
+  loadErrorValue: string | null = null
+
+  // RoutingGarage.syncAuth() has no try/catch around `await remote.ready()`
+  // — because the REAL MedusaGarage.ready() never rejects; load()'s own
+  // catch block swallows the network error and records it via
+  // loadOk/loadErrorMessage instead of rejecting the `loaded` promise (see
+  // medusa-garage.ts's load()). So "the load fails" is modeled the same way
+  // here: ready() always RESOLVES, and resolveFailure() flips loadOk/
+  // loadErrorValue before resolving it, exactly mirroring the real contract
+  // rather than introducing a rejection path that doesn't exist in
+  // production.
+  ready(): Promise<void> { return this.readyPromise }
+  isLoaded(): boolean { return this.loadOk }
+  loadError(): string | null { return this.loadErrorValue }
+  retryLoad(): void { this.loadOk = true; this.loadErrorValue = null; this.emit() }
+  mergeFrom(): Promise<boolean> { return Promise.resolve(true) }
+  markSuperseded(): void { this.markSupersededCalls += 1 }
+
+  list(): Vehicle[] { return this.vehicles }
+  add(v: NewVehicle): Vehicle {
+    const vehicle: Vehicle = { ...v, id: `deferred_${this.vehicles.length}`, savedAt: "t" } as Vehicle
+    this.vehicles = [...this.vehicles, vehicle]
+    this.emit()
+    return vehicle
+  }
+  update(id: string, patch: Partial<NewVehicle>): Vehicle {
+    const idx = this.vehicles.findIndex((v) => v.id === id)
+    const updated = { ...this.vehicles[idx], ...patch } as Vehicle
+    this.vehicles = [...this.vehicles.slice(0, idx), updated, ...this.vehicles.slice(idx + 1)]
+    this.emit()
+    return updated
+  }
+  remove(id: string): void {
+    this.vehicles = this.vehicles.filter((v) => v.id !== id)
+    this.emit()
+  }
+  setActive(id: string | null): void { this.activeId = id; this.emit() }
+  getActive(): Vehicle | null { return this.vehicles.find((v) => v.id === this.activeId) ?? null }
+  subscribe(listener: () => void): () => void {
+    this.listeners.add(listener)
+    return () => this.listeners.delete(listener)
+  }
+  private emit() { this.listeners.forEach((l) => l()) }
+
+  /** Settles the deferred load as a SUCCESS. */
+  resolveSuccess(vehicles: Vehicle[] = []): void {
+    this.vehicles = vehicles
+    this.loadOk = true
+    this.loadErrorValue = null
+    this.resolveReady()
+  }
+  /** Settles the deferred load as a FAILURE (see the `ready()` doc comment above for why this resolves rather than rejects). */
+  resolveFailure(message = "boom"): void {
+    this.loadOk = false
+    this.loadErrorValue = message
+    this.resolveReady()
+  }
+}
+
+/** Flushes enough microtask ticks for syncAuth()'s synchronous continuation
+ * (past the mocked, already-resolved getCustomer()) to reach and park on
+ * `await remote.ready()` — without ever resolving DeferredRemoteGarage's own
+ * promise, which only settles when the test explicitly calls
+ * resolveSuccess()/resolveFailure(). Mirrors the flush pattern the existing
+ * (Fix 4) test above already uses for the same reason. */
+async function flushMicrotasks(): Promise<void> {
+  for (let i = 0; i < 5; i++) await Promise.resolve()
+}
+
+describe("RoutingGarage — in-flight authed load reports 'loading', not empty (WB-073 G6 review)", () => {
+  it("reports loading — not ready/empty — for the ENTIRE in-flight window of a real authed load, then flips to ready on success", async () => {
+    const remote = new DeferredRemoteGarage()
+    const routing = new RoutingGarage(() => remote)
+
+    mockedGetCustomer.mockResolvedValue({ id: "cust_a" } as any)
+    const sync = routing.syncAuth() // starts the authed load — deliberately not awaited yet
+
+    await flushMicrotasks()
+
+    // THE BUG this test targets: before the fix, `current` was still `local`
+    // (always ready+empty) for this entire window, because setCurrent(remote)
+    // only runs AFTER this await settles — so isLoaded() incorrectly reported
+    // true and GarageManager rendered "No vehicles saved yet" instead of
+    // "Loading your garage…" for the whole getCustomer()+listVehicles() round
+    // trip on every real authed page load.
+    expect(routing.isLoaded()).toBe(false)
+    expect(routing.loadError()).toBeNull()
+
+    remote.resolveSuccess([vehicle("a1", "Ford")])
+    await sync
+
+    expect(routing.isLoaded()).toBe(true)
+    expect(routing.loadError()).toBeNull()
+    expect(routing.list().map((v) => v.id)).toEqual(["a1"])
+  })
+
+  it("surfaces a failed in-flight load as loadError() once settled — loading beforehand, never a bare 'ready + empty'", async () => {
+    const remote = new DeferredRemoteGarage()
+    const routing = new RoutingGarage(() => remote)
+
+    mockedGetCustomer.mockResolvedValue({ id: "cust_a" } as any)
+    const sync = routing.syncAuth()
+
+    await flushMicrotasks()
+    expect(routing.isLoaded()).toBe(false) // still loading — not yet failed, not yet ready
+    expect(routing.loadError()).toBeNull()
+
+    remote.resolveFailure("Couldn't load your garage — please try again.")
+    await sync
+
+    expect(routing.isLoaded()).toBe(false)
+    expect(routing.loadError()).toBe("Couldn't load your garage — please try again.")
+  })
+
+  it("a customer swap reports LOADING for the incoming customer during its in-flight window, not the outgoing customer's settled state", async () => {
+    const remoteA = new DeferredRemoteGarage()
+    let active: DeferredRemoteGarage = remoteA
+    const createRemote = vi.fn(() => active)
+    const routing = new RoutingGarage(createRemote)
+
+    mockedGetCustomer.mockResolvedValue({ id: "cust_a" } as any)
+    const syncA = routing.syncAuth()
+    remoteA.resolveSuccess([vehicle("a1", "Ford")])
+    await syncA
+    expect(routing.isLoaded()).toBe(true) // A fully settled, ready
+
+    const remoteB = new DeferredRemoteGarage()
+    active = remoteB
+    mockedGetCustomer.mockResolvedValue({ id: "cust_b" } as any)
+    const syncB = routing.syncAuth() // swap starts — B's load is now in flight
+
+    await flushMicrotasks()
+
+    // Must report loading for B's in-flight window — NOT fall back to A's
+    // already-settled "ready" state just because `current` hasn't been
+    // repointed at B yet (same root cause as the first-login case above,
+    // now exercised across an identity change rather than a first load).
+    expect(routing.isLoaded()).toBe(false)
+    expect(routing.loadError()).toBeNull()
+
+    remoteB.resolveSuccess([vehicle("b1", "Toyota")])
+    await syncB
+
+    expect(routing.isLoaded()).toBe(true)
+    expect(routing.loadError()).toBeNull()
+    expect(routing.list().map((v) => v.id)).toEqual(["b1"])
+  })
+})

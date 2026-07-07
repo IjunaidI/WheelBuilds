@@ -49,6 +49,13 @@ export class MedusaGarage implements GarageProvider {
   private listeners = new Set<() => void>()
   private loaded: Promise<void>
   private loadOk = false
+  // Non-null exactly when the most recent load() attempt failed (WB-073
+  // G6). Distinct from loadOk being false, which is ALSO true while the
+  // first load is still in flight — this is what lets a consumer tell
+  // "loading" and "failed" apart (both otherwise look like isLoaded()===
+  // false with an empty vehicles array, i.e. indistinguishable from a
+  // genuinely-empty garage).
+  private loadErrorMessage: string | null = null
   // Tracks the in-flight createVehicle() network call for a vehicle added
   // THIS session, keyed by client_id. activateVehicle()/update() are fired
   // right after add() (often in the same tick — see ymm-pane.tsx), so
@@ -90,8 +97,23 @@ export class MedusaGarage implements GarageProvider {
 
   /** Resolves once the initial account load has settled (success or failure). */
   ready(): Promise<void> { return this.loaded }
-  /** True only if the initial account load actually succeeded. */
+  /** True only if the initial account load actually succeeded. False both while loading and after a failed load — pair with loadError() to tell those apart (WB-073 G6). */
   isLoaded(): boolean { return this.loadOk }
+  /** Non-null exactly when the most recent load attempt failed; null while loading or after a successful load (WB-073 G6). */
+  loadError(): string | null { return this.loadErrorMessage }
+  /**
+   * Re-attempts a failed initial load — the GarageManager "Retry" affordance
+   * (WB-073 G6). Clears the error and emits IMMEDIATELY (synchronously, before
+   * the new network call even starts) so a subscriber transitions straight
+   * back to the "loading" state rather than lingering on the stale error
+   * while the retry is in flight. `this.loaded` is repointed at the new
+   * attempt so ready() (used by RoutingGarage.syncAuth()) reflects it too.
+   */
+  retryLoad(): void {
+    this.loadErrorMessage = null
+    this.emit()
+    this.loaded = this.load()
+  }
   /**
    * Called by RoutingGarage right before this instance stops being the
    * current remote (identity-change branch of syncAuth()). Idempotent, and
@@ -118,8 +140,20 @@ export class MedusaGarage implements GarageProvider {
       const active = vehicles.find((v: any) => v.is_active)
       this.activeId = active ? (active.client_id ?? active.id) : (this.vehicles[0]?.id ?? null)
       this.loadOk = true
+      this.loadErrorMessage = null
       this.emit()
-    } catch { this.loadOk = false /* stay empty on failure; toast handled by callers */ }
+    } catch {
+      // Stay empty on failure — but (WB-073 G6) record it AND emit so
+      // subscribers (useGarage -> GarageManager) re-render into an explicit
+      // error state instead of silently sitting on the pre-load empty
+      // snapshot, which read identically to a genuinely-empty garage. The
+      // write-failure toast channel (onGarageError) is a separate concern
+      // for MUTATIONS; a failed READ has no optimistic state to roll back,
+      // so it gets its own signal here rather than routing through notify().
+      this.loadOk = false
+      this.loadErrorMessage = "Couldn't load your garage — please try again."
+      this.emit()
+    }
   }
 
   list(): Vehicle[] { return this.vehicles }

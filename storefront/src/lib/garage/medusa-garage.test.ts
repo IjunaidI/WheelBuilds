@@ -328,6 +328,82 @@ describe("MedusaGarage — update()/setActive() degrade gracefully on a vehicle 
   })
 })
 
+describe("MedusaGarage — load-state signal distinguishes a failed load from a genuinely-empty garage (WB-073 G6)", () => {
+  // Constructor only kicks off load() when `window` is defined (see the G3
+  // describe block's beforeEach comment) — vitest runs with
+  // environment: "node", so the constructor's own load() never fires here.
+  // retryLoad() is the public, window-independent entry point (it's also
+  // literally what the GarageManager "Retry" button calls), so it doubles as
+  // the test seam for exercising load()'s success/failure/emit behavior.
+
+  it("a successful empty load reports isLoaded() true, loadError() null, and an empty list", async () => {
+    mockedList.mockResolvedValueOnce({ vehicles: [] })
+    const garage = new MedusaGarage()
+
+    garage.retryLoad()
+    await flush()
+
+    expect(garage.isLoaded()).toBe(true)
+    expect(garage.loadError()).toBeNull()
+    expect(garage.list()).toEqual([])
+  })
+
+  it("a successful non-empty load reports isLoaded() true, loadError() null, and the loaded vehicles", async () => {
+    mockedList.mockResolvedValueOnce({
+      vehicles: [{ client_id: "v1", year: 2022, make: "Ford", model: "F-150", is_active: true }],
+    })
+    const garage = new MedusaGarage()
+
+    garage.retryLoad()
+    await flush()
+
+    expect(garage.isLoaded()).toBe(true)
+    expect(garage.loadError()).toBeNull()
+    expect(garage.list().map((v) => v.id)).toEqual(["v1"])
+  })
+
+  it("a failed load sets loadError() (not just isLoaded()=false) and emits, so subscribers can observe 'error' rather than mistaking it for 'empty'", async () => {
+    mockedList.mockRejectedValueOnce(new Error("network down"))
+    const listener = vi.fn()
+    const garage = new MedusaGarage()
+    garage.subscribe(listener)
+
+    garage.retryLoad()
+    await flush()
+
+    expect(garage.isLoaded()).toBe(false)
+    expect(garage.loadError()).not.toBeNull()
+    expect(garage.list()).toEqual([]) // still empty locally — the signal is what distinguishes this from real emptiness
+    // KEY regression check: the old load() caught the error silently with no
+    // emit() call, so a subscriber (e.g. useGarage's useSyncExternalStore)
+    // never re-rendered into the error state at all.
+    expect(listener).toHaveBeenCalled()
+  })
+
+  it("retryLoad() clears a previous error immediately (loading state) before the new attempt settles, so the UI doesn't linger on stale error text", async () => {
+    mockedList.mockRejectedValueOnce(new Error("first failure"))
+    const garage = new MedusaGarage()
+    garage.retryLoad()
+    await flush()
+    expect(garage.loadError()).not.toBeNull()
+
+    mockedList.mockResolvedValueOnce({ vehicles: [] })
+    const listener = vi.fn()
+    garage.subscribe(listener)
+
+    garage.retryLoad()
+
+    // Synchronously after calling retryLoad() — before the new listVehicles()
+    // call has resolved — the stale error must already be cleared.
+    expect(garage.loadError()).toBeNull()
+    expect(listener).toHaveBeenCalled() // emitted for the loading transition itself
+
+    await flush()
+    expect(garage.isLoaded()).toBe(true)
+    expect(garage.loadError()).toBeNull()
+  })
+})
+
 describe("MedusaGarage — a superseded instance never toasts into another session (WB-073 G5 review Fix 2)", () => {
   it("a superseded instance's rollback still corrects its own local state, but does not notify", async () => {
     mockedCreate.mockRejectedValue(new Error("network down"))

@@ -110,6 +110,13 @@ export class LocalStorageGarage implements GarageProvider {
     return readVehicles().find((v) => v.id === id) ?? null
   }
 
+  // Load-state signal (WB-073 G6). localStorage reads are synchronous, so
+  // there's no "loading" window and nothing that can fail the way a network
+  // fetch can — always ready, never an error, nothing to retry.
+  isLoaded(): boolean { return true }
+  loadError(): string | null { return null }
+  retryLoad(): void {}
+
   clear(): void {
     if (typeof window !== "undefined") {
       window.localStorage.removeItem(VEHICLES_KEY)

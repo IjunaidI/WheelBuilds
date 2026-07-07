@@ -175,6 +175,17 @@ export class RoutingGarage implements GarageProvider {
   remove(id: string) { return this.current.remove(id) }
   setActive(id: string | null) { return this.current.setActive(id) }
   getActive() { return this.current.getActive() }
+  // Load-state signal (WB-073 G6), proxied to whichever provider is
+  // CURRENT at call time — never cached — so an identity swap (login,
+  // logout, or a straight account-to-account change) is reflected
+  // immediately: a freshly-rebuilt `remote` reports not-loaded until its own
+  // load() settles, exactly like reading list()/getActive() already does.
+  // `?? true`/`?? null` covers `this.local` (LocalStorageGarage implements
+  // these directly, so this is currently just defensive) and any future
+  // GarageProvider that omits the now-optional signal.
+  isLoaded(): boolean { return this.current.isLoaded?.() ?? true }
+  loadError(): string | null { return this.current.loadError?.() ?? null }
+  retryLoad(): void { this.current.retryLoad?.() }
   subscribe(l: () => void) {
     this.listenerBindings.set(l, this.current.subscribe(l))
     return () => {

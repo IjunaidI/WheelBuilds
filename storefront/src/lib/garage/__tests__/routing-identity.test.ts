@@ -36,8 +36,16 @@ class FakeRemoteGarage implements GarageProvider {
   // structural type MedusaGarage itself implements.
   markSupersededCalls = 0
 
+  // Load-state signal (WB-073 G6) — settable per-instance so a test can
+  // simulate a remote whose initial load failed. Defaults preserve every
+  // existing test's assumption of an immediately-ready remote.
+  loadOk = true
+  loadErrorValue: string | null = null
+
   ready(): Promise<void> { return Promise.resolve() }
-  isLoaded(): boolean { return true }
+  isLoaded(): boolean { return this.loadOk }
+  loadError(): string | null { return this.loadErrorValue }
+  retryLoad(): void { this.loadOk = true; this.loadErrorValue = null; this.emit() }
   mergeFrom(): Promise<boolean> { return this.mergeImpl() }
   markSuperseded(): void { this.markSupersededCalls += 1 }
 
@@ -329,5 +337,35 @@ describe("RoutingGarage — customer identity lifecycle (WB-073 G1/G2)", () => {
     await routing.syncAuth() // B -> logout
 
     expect(instances[1].markSupersededCalls).toBe(1) // B's remote is superseded on logout too
+  })
+
+  it("(G6) isLoaded()/loadError() proxy to the CURRENT remote and stay identity-correct across a customer swap", async () => {
+    const failing = new FakeRemoteGarage([])
+    failing.loadOk = false
+    failing.loadErrorValue = "boom"
+    const ready = new FakeRemoteGarage([vehicle("b1", "Toyota")])
+
+    let which: "a" | "b" = "a"
+    const createRemote = vi.fn(() => (which === "a" ? failing : ready))
+    const routing = new RoutingGarage(createRemote)
+
+    // Unauthenticated (current == local, always ready) — the signal must
+    // report ready rather than undefined/loading before any remote exists.
+    expect(routing.isLoaded()).toBe(true)
+    expect(routing.loadError()).toBeNull()
+
+    mockedGetCustomer.mockResolvedValue({ id: "cust_a" } as any)
+    await routing.syncAuth() // current -> the FAILING remote for A
+
+    expect(routing.isLoaded()).toBe(false)
+    expect(routing.loadError()).toBe("boom")
+
+    which = "b"
+    mockedGetCustomer.mockResolvedValue({ id: "cust_b" } as any)
+    await routing.syncAuth() // current -> the READY remote for B
+
+    // The signal must reflect B's (current) state, not A's stale failure.
+    expect(routing.isLoaded()).toBe(true)
+    expect(routing.loadError()).toBeNull()
   })
 })

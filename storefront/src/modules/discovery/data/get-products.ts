@@ -27,6 +27,7 @@ import {
   DiscoveryQuery,
   DiscoveryResult,
   FacetCounts,
+  FIT_CANDIDATE_CAP,
   SortOption,
 } from "./types"
 import { Finish } from "@modules/common/components/wheel"
@@ -176,10 +177,11 @@ function emptyResult(pageSize: number): DiscoveryResult {
       boltPatterns: {},
       finishes: {},
     },
+    isCapped: false,
   }
 }
 
-async function fetchDiscoveryProducts(
+export async function fetchDiscoveryProducts(
   query: DiscoveryQuery
 ): Promise<DiscoveryResult> {
   const pageSize = DEFAULT_PAGE_SIZE
@@ -191,7 +193,6 @@ async function fetchDiscoveryProducts(
   // in-memory pagination.
   const vf = query.vehicleFitment
   if (vf?.canonicalBoltPatterns?.length) {
-    const FIT_CANDIDATE_CAP = 200
     const { results } = await meili.multiSearch({
       queries: [
         {
@@ -204,7 +205,18 @@ async function fetchDiscoveryProducts(
         },
       ],
     })
-    const hits = (results[0] as MultiSearchResult<Hit>).hits
+    const candidateRes = results[0] as MultiSearchResult<Hit>
+    const hits = candidateRes.hits
+    // Honest cap signal (WB-074 D2): Meili's real total for this candidate
+    // query, independent of the `limit: FIT_CANDIDATE_CAP` we actually
+    // fetched. When it exceeds the cap, some genuinely-fitting wheels may
+    // sit past the window we scanned, so `totalCount` below (a count of the
+    // capped candidates AFTER the real per-variant fit check) must not be
+    // presented as a precise total — callers gate on `isCapped` first.
+    // Deliberately NOT used to inflate `totalCount`/pagination — that would
+    // trade an honest small count for phantom pages past what was fetched.
+    const estimatedTotalHits = candidateRes.estimatedTotalHits
+    const isCapped = (estimatedTotalHits ?? 0) > FIT_CANDIDATE_CAP
     const ids = hits.map((h) => h.id)
 
     // Fetch the candidates' real variants (metadata only — no price/region needed).
@@ -235,6 +247,8 @@ async function fetchDiscoveryProducts(
       totalCount: fitting.length,
       pageSize,
       facets: facetsFromHits(fitting.map((c) => c.hit)),
+      isCapped,
+      estimatedTotalHits,
     }
   }
 
@@ -289,6 +303,9 @@ async function fetchDiscoveryProducts(
     totalCount: hitsRes.estimatedTotalHits ?? hitsRes.hits.length,
     pageSize,
     facets,
+    // Non-fit mode has no candidate cap — totalCount is Meili's real total,
+    // so it is never "capped" in the D2 sense. (WB-074 D2)
+    isCapped: false,
   }
 }
 

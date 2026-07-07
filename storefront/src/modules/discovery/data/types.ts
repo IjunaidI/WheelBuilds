@@ -107,9 +107,31 @@ export type DiscoveryResult = {
   totalCount: number
   pageSize: number
   facets: FacetCounts
+  /**
+   * True when fit mode's Meili `estimatedTotalHits` for the candidate query
+   * exceeded `FIT_CANDIDATE_CAP` — i.e. there may be more genuinely-fitting
+   * wheels than what actually got scanned. When true, `totalCount` is a
+   * count of the (capped) candidates that were checked, NOT a precise total
+   * — callers must not present it as one. Always `false` outside fit mode,
+   * where `totalCount` comes straight from Meili's real total. (WB-074 D2)
+   */
+  isCapped: boolean
+  /**
+   * Meili's `estimatedTotalHits` for the fit-mode candidate query. Only set
+   * in fit mode; `undefined` otherwise.
+   */
+  estimatedTotalHits?: number
 }
 
 export const DEFAULT_PAGE_SIZE = 12
+
+/**
+ * Fit mode's Meili candidate-fetch cap (see get-products.ts's fit branch).
+ * Defined here — not only in the server-side data module — so client
+ * components (e.g. the discovery header's "Top N matches" copy) can
+ * reference the same number without importing the Meilisearch adapter.
+ */
+export const FIT_CANDIDATE_CAP = 200
 
 /**
  * Read filter + sort + page state from URL search params. Kept here (not in

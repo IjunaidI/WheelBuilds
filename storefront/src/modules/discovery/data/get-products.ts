@@ -230,27 +230,44 @@ export async function fetchDiscoveryProducts(
         for (const p of products as any[]) variantsById[p.id] = p.variants ?? []
       } catch (e) {
         // WB-074 D4: do NOT degrade in place (variantsById={}) here. That
-        // used to make `!fetched || productHasFittingVariant(...)` below
-        // pass EVERY bolt-pattern candidate unverified — an over-claiming
-        // "these fit" list — and because this function would then return
-        // normally, the unstable_cache wrapper in getDiscoveryProducts
-        // CACHED that over-claim for 60s. Rethrow instead so the failure
-        // propagates past the cache exactly like a Meili failure does (see
-        // getDiscoveryProducts's doc comment below): the outer catch there
-        // degrades to an honest, UNCACHED empty result instead.
+        // used to feed a now-removed `!fetched || productHasFittingVariant(...)`
+        // short-circuit below that passed EVERY bolt-pattern candidate
+        // unverified — an over-claiming "these fit" list — and because this
+        // function would then return normally, the unstable_cache wrapper in
+        // getDiscoveryProducts CACHED that over-claim for 60s. Rethrow
+        // instead so the failure propagates past the cache exactly like a
+        // Meili failure does (see getDiscoveryProducts's doc comment below):
+        // the outer catch there degrades to an honest, UNCACHED empty result
+        // instead. (The sibling non-throw over-claim — a SUCCESSFUL but
+        // empty/partial response — is handled by the mandatory per-variant
+        // filter just below, no `!fetched` escape hatch anymore.)
         console.error("[discovery] variant fetch for fit filter failed:", e)
         throw e
       }
     }
 
-    // Candidate ids that simply weren't found in a (successful) Store API
-    // response fall back to the coarse candidates (never empty a valid fit
-    // result over a lookup miss). A genuine fetch FAILURE is handled above —
-    // it now throws instead of ever reaching this line.
-    const fetched = Object.keys(variantsById).length > 0
+    // Per-variant verification is MANDATORY for every candidate — no
+    // unverified pass-through (WB-074 D4 review: the non-throw over-claim).
+    // A genuine fetch FAILURE is handled above (it now throws, see the
+    // catch's comment). What's left here are two non-throw, technically-
+    // SUCCESSFUL response shapes from `sdk.store.product.list`:
+    //   (a) EMPTY/near-empty `products` (infra returned 200 with no
+    //       bodies) — `variantsById` stays `{}`, so `variantsById[id]` is
+    //       `undefined` for every candidate.
+    //   (b) PARTIAL `products` (some requested ids simply missing from an
+    //       otherwise-successful response) — `variantsById[id]` is
+    //       `undefined` only for the missing ones.
+    // `productHasFittingVariant(undefined, vf)` safely returns `false` (it
+    // guards `!variants?.length` before touching the array — never
+    // throws), so a plain `.filter` correctly and safely EXCLUDES any
+    // candidate whose variants never arrived — honest empty for (a),
+    // exclude-only-the-unverified for (b) — while candidates that DID
+    // resolve are still checked for real and pass/fail on their own
+    // merits. There is deliberately no "assume it fits" fallback: we never
+    // claim a wheel fits without having actually verified it.
     const candidates = hits.map((hit) => ({ hit, product: hitToProduct(hit) }))
-    const fitting = candidates.filter(
-      ({ product }) => !fetched || productHasFittingVariant(variantsById[product.id], vf)
+    const fitting = candidates.filter(({ product }) =>
+      productHasFittingVariant(variantsById[product.id], vf)
     )
 
     const start = (query.page - 1) * pageSize

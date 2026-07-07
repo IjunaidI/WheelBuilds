@@ -39,6 +39,20 @@ export class RoutingGarage implements GarageProvider {
   private listenerBindings = new Map<() => void, () => void>()
   private merged = false
   private createRemote: () => RemoteGarage
+  // Monotonic counter guarding syncAuth() against itself. syncAuth() is
+  // called independently from the constructor AND from GarageAuthSync's
+  // mount effect, with no serialization between calls, and has two await
+  // points (getCustomer(), remote.ready()) either of which can let a NEWER
+  // call race ahead and finish first. Without this guard an older call's
+  // continuation can resume after a newer one already rebuilt `remote` for a
+  // different identity, and go on to mutate `remote`/`current` (or merge
+  // local vehicles into a remote it didn't create) using stale data — a
+  // rapid logout-then-login-as-someone-else, or constructor+mount racing on
+  // an already-authenticated page load. Every identity-changing continuation
+  // captures `gen` up front and re-checks `gen === this.generation` after
+  // each await; a mismatch means a later call has already taken over, so the
+  // stale one bails without touching any shared state (WB-073 review Fix 1).
+  private generation = 0
 
   constructor(createRemote: () => RemoteGarage = () => new MedusaGarage()) {
     this.createRemote = createRemote
@@ -62,11 +76,29 @@ export class RoutingGarage implements GarageProvider {
 
   /** Called on boot and after the login/logout Server Actions complete. */
   async syncAuth(): Promise<void> {
-    let customerId: string | null = null
+    const gen = ++this.generation
+
+    let customerId: string | null
     try {
       const customer = await getCustomer()
       customerId = customer?.id ?? null
-    } catch { customerId = null }
+    } catch {
+      // Transient probe failure (network blip, etc.) — this is NOT new
+      // information about who's logged in, so don't act like a logout. The
+      // old (pre-WB-073) code preserved `remote` on failure; treating a
+      // caught error as `customerId = null` here would trip the
+      // identity-changed branch below and NULL an already-loaded account
+      // garage, forcing a reload+re-merge (empty-garage flicker) on a mere
+      // hiccup. Bail out leaving remote/local/current exactly as they were —
+      // a confirmed `null` from a SUCCESSFUL probe below still means logout
+      // (WB-073 review Fix 2).
+      return
+    }
+
+    // A newer syncAuth() call already resolved its own getCustomer() and
+    // (possibly) rebuilt `remote` while we were awaiting ours — defer to it
+    // rather than acting on now-stale identity info (Fix 1).
+    if (gen !== this.generation) return
 
     // Identity changed (fresh login, logout, or straight to a different
     // account): rebuild `remote` so the new customer never inherits state
@@ -78,12 +110,23 @@ export class RoutingGarage implements GarageProvider {
       this.merged = false
     }
 
-    if (customerId && this.remote) {
-      await this.remote.ready()                       // wait for the account to load before merging
-      if (!this.merged && this.remote.isLoaded()) {
-        this.merged = await this.mergeLocalIntoRemote() // retry on a later syncAuth if the merge failed
+    // Capture the remote THIS generation is responsible for. If a later
+    // syncAuth() reassigns `this.remote` while we're still awaiting below,
+    // we keep operating on (and only ever merge into) the instance we
+    // actually built/observed here — never whatever `this.remote` happens to
+    // point at by the time our await resolves.
+    const remote = this.remote
+
+    if (customerId && remote) {
+      await remote.ready()                             // wait for the account to load before merging
+      if (gen !== this.generation) return               // superseded while awaiting readiness (Fix 1)
+
+      if (!this.merged && remote.isLoaded()) {
+        const ok = await this.mergeLocalIntoRemote(remote) // retry on a later syncAuth if the merge failed
+        if (gen !== this.generation) return             // superseded mid-merge — don't stomp a newer generation's state (Fix 1)
+        this.merged = ok
       }
-      this.setCurrent(this.remote)
+      this.setCurrent(remote)
     } else {
       this.merged = false
       this.setCurrent(this.local)
@@ -91,11 +134,10 @@ export class RoutingGarage implements GarageProvider {
     this.emit()
   }
 
-  private async mergeLocalIntoRemote(): Promise<boolean> {
-    if (!this.remote) return false
-    const toAdd = planMerge(this.local.list(), this.remote.list(), this.remote.isLoaded())
-    const ok = await this.remote.mergeFrom(toAdd) // ONE idempotent request; false on failure
-    if (ok) this.local.clear()                    // drop local ONLY after the merge persisted
+  private async mergeLocalIntoRemote(remote: RemoteGarage): Promise<boolean> {
+    const toAdd = planMerge(this.local.list(), remote.list(), remote.isLoaded())
+    const ok = await remote.mergeFrom(toAdd)          // ONE idempotent request; false on failure
+    if (ok) this.local.clear()                         // drop local ONLY after the merge persisted
     return ok
   }
 

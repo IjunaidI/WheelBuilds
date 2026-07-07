@@ -47,6 +47,7 @@ const DiscoveryTemplate = ({
       <MobileFilterTrigger
         facets={result.facets}
         totalCount={result.totalCount}
+        isCapped={result.isCapped}
       />
       <div className="flex items-start gap-8">
         <FilterRail facets={result.facets} />

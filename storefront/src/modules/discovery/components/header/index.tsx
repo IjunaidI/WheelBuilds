@@ -24,7 +24,12 @@ type DiscoveryHeaderProps = {
    * True when fit mode's candidate cap may have hidden additional matches
    * (WB-074 D2) — `totalCount` in that case is a count of the capped
    * candidates checked, not a precise catalog total, so it must not be
-   * presented as one.
+   * presented as one. Note `isCapped` fires off the bolt-pattern candidate
+   * pool's `estimatedTotalHits`, BEFORE the real per-variant fit re-check —
+   * so the grid can show far fewer than `FIT_CANDIDATE_CAP` fit-checked
+   * wheels even while this is true. The copy below says "candidates", not
+   * "matches", so it never claims a precise fit-checked count (WB-074 D2
+   * review, Fix 2).
    */
   isCapped?: boolean
 }
@@ -48,7 +53,7 @@ const DiscoveryHeader = ({ totalCount, isCapped = false }: DiscoveryHeaderProps)
         <div className="min-w-0">
           <Label tone="muted" style={{ display: "block", marginBottom: 6 }}>
             {isCapped ? (
-              <>CATALOG · TOP {FIT_CANDIDATE_CAP.toLocaleString()} MATCHES — REFINE TO NARROW</>
+              <>CATALOG · TOP {FIT_CANDIDATE_CAP.toLocaleString()} CANDIDATES — REFINE TO NARROW</>
             ) : (
               <>
                 CATALOG ·{" "}

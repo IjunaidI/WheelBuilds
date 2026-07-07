@@ -1,8 +1,15 @@
 // backend/src/modules/customer-vehicle/service.ts
-import { MedusaService } from "@medusajs/framework/utils"
+import { MedusaService, ContainerRegistrationKeys, MedusaError } from "@medusajs/framework/utils"
 import CustomerVehicle from "./models/customer-vehicle"
 
 class CustomerVehicleService extends MedusaService({ CustomerVehicle }) {
+  protected knex_: any
+
+  constructor(container: any) {
+    super(...arguments as any)
+    this.knex_ = container?.[ContainerRegistrationKeys.PG_CONNECTION]
+  }
+
   /**
    * Resolve a customer's vehicle by its storefront `client_id`. The store
    * `[id]` routes address rows by client_id (the stable, storefront-known id),
@@ -15,12 +22,94 @@ class CustomerVehicleService extends MedusaService({ CustomerVehicle }) {
     return row
   }
 
+  /**
+   * Atomic active-vehicle switch (WB-073 G4). The old implementation was a
+   * non-transactional read-modify-write: list the customer's active vehicles,
+   * loop deactivating them, then activate the target — three-plus round trips
+   * with no isolation between them. Two near-simultaneous activate() calls for
+   * the same customer could both read the same "currently active" snapshot,
+   * each write their own target active, and race the partial unique index
+   * `UQ_customer_vehicle_one_active` (Migration20260602090000.ts, one active
+   * non-deleted row per customer_id) into an uncaught 500.
+   *
+   * This folds "deactivate everyone else" + "activate the target" into a
+   * SINGLE SQL statement via a data-modifying CTE. Postgres executes the whole
+   * statement atomically — an external reader (including a concurrent
+   * activate()) never observes a zero-active or two-active intermediate state,
+   * and the deactivate's WHERE is re-evaluated against the live rows at
+   * execution time, so a concurrent writer that mutated a row we're about to
+   * touch is naturally serialized via row-level locking rather than racing us.
+   *
+   * A conflicting concurrent writer can still surface as a 23505 unique-
+   * violation in the (already narrow) window where it activated a row we had
+   * no way to see yet — mirrors the ON CONFLICT atomic-write idiom used
+   * elsewhere in this codebase (WheelSizeService.incrementAndCheckQuota /
+   * upsertFitmentRow). Caught here and retried once: a retry re-runs against
+   * the now-committed state and always resolves cleanly, so the caller never
+   * sees the violation.
+   *
+   * Both halves are scoped to `customer_id` (WB-073 G4 review). The
+   * original version filtered the deactivate CTE by `customer_id` but
+   * matched the final activation UPDATE on `id` alone — so an `id` that
+   * didn't belong to `customerId` still deactivated that customer's real
+   * active vehicle (the deactivate CTE ran regardless, per Postgres CTE
+   * semantics — a data-modifying CTE executes once it's evaluated,
+   * independent of whether the main statement's WHERE later matches
+   * anything), while the activation half silently matched zero rows,
+   * leaving the customer with NO active vehicle and reporting success.
+   * Fixed by adding a `target` CTE that resolves `id` to a row this
+   * customer actually owns FIRST; the `deactivated` CTE is gated on
+   * `exists (select 1 from target)`, so if the id is unknown, soft-deleted,
+   * or belongs to another customer, `target` is empty, the EXISTS guard is
+   * false, and NOTHING is touched — not even the customer's own other
+   * vehicles. The final activation UPDATE sources its target row from the
+   * same `target` CTE rather than re-matching on a bare `id`. The legit
+   * caller (the store route) always passes an id already verified via
+   * `resolveOwned()`, so this is defense in depth, not a behavior change
+   * for the happy path.
+   *
+   * `RETURNING "id"` is inspected: if `target` was empty, the activation
+   * half matches zero rows and that is not a success — silently returning
+   * would report HTTP 200 while nothing activated. Throw a
+   * `MedusaError.Types.NOT_FOUND`, which the framework's error-handler
+   * middleware maps to an honest 404 (same convention the rest of this
+   * module leans on via `resolveOwned()` returning undefined for a
+   * missing/unowned row).
+   */
   async activate(id: string, customerId: string): Promise<void> {
-    const active = await this.listCustomerVehicles({ customer_id: customerId, is_active: true })
-    for (const v of active) {
-      if (v.id !== id) await this.updateCustomerVehicles({ id: v.id, is_active: false })
+    const exec = async () => {
+      return this.knex_.raw(
+        `with target as (
+           select "id" from "customer_vehicle"
+           where "customer_id" = ? and "id" = ? and "deleted_at" is null
+         ),
+         deactivated as (
+           update "customer_vehicle"
+           set "is_active" = false, "updated_at" = now()
+           where "customer_id" = ? and "id" <> ? and "is_active" = true and "deleted_at" is null
+             and exists (select 1 from target)
+         )
+         update "customer_vehicle"
+         set "is_active" = true, "updated_at" = now()
+         where "id" in (select "id" from target)
+         returning "id"`,
+        [customerId, id, customerId, id]
+      )
     }
-    await this.updateCustomerVehicles({ id, is_active: true })
+    let result: any
+    try {
+      result = await exec()
+    } catch (err: any) {
+      if (err?.code !== "23505") throw err
+      result = await exec() // one retry: the concurrent writer's commit is now visible
+    }
+    const activated = result?.rows ?? []
+    if (activated.length === 0) {
+      throw new MedusaError(
+        MedusaError.Types.NOT_FOUND,
+        `CustomerVehicle with id "${id}" not found for this customer`
+      )
+    }
   }
 
   /**

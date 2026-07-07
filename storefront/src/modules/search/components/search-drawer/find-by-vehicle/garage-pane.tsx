@@ -11,7 +11,7 @@ import { Button } from "@/components/ui/button"
 import { useGarage } from "@lib/garage/use-garage"
 import { fitmentDestinationUrl, FitmentTarget } from "./destination-url"
 import { getFitmentContext } from "@lib/stores/fitment-context"
-import { getFitmentByVehicle } from "@lib/data/fitment"
+import { resolveFitmentForVehicle } from "@lib/data/fitment-resolve"
 import { Vehicle, NewVehicle } from "@lib/garage/types"
 
 type GaragePaneProps = {
@@ -63,46 +63,64 @@ const GaragePane = ({ onClose, onAddNew }: GaragePaneProps) => {
     if (needsResolve) {
       setSelectingId(id)
       try {
-        const fitment = await getFitmentByVehicle(
+        // Only the fetch itself lives inside resolveFitmentForVehicle's try/catch —
+        // the update()/toast calls below run OUTSIDE it, so an unrelated throw from
+        // them is never misreported as a fitment-fetch failure (WB-073 G8 review).
+        const result = await resolveFitmentForVehicle(
           v.make,
           v.model,
           v.modificationSlug ?? "",
           String(v.year),
           "usdm"
         )
-        if (fitment && !("error" in fitment)) {
-          update(id, {
-            canonicalBoltPatterns: fitment.canonicalBoltPatterns,
-            hubBoreMm: fitment.hubBoreMm ?? undefined,
-            diameterWindow: fitment.diameterWindow,
-            widthWindow: fitment.widthWindow,
-            offsetWindow: fitment.offsetWindow,
-            oemTireSizes: fitment.oemTireSizes,
-            oemTires: fitment.oemTires,
-            fitmentStatus: fitment.status,
-          })
-          patterns = fitment.status === "ok" ? fitment.canonicalBoltPatterns : []
-          oemTireSizes = fitment.oemTireSizes ?? []
-          // Target-specific "did we find a fit?" — tires need OEM sizes, wheels
-          // need bolt patterns. Only warn about the RIGHT thing.
-          const hasFit = target === "tires" ? oemTireSizes.length > 0 : patterns.length > 0
-          if (!hasFit) {
-            toast(
-              target === "tires"
-                ? "No tire fitment for this vehicle yet"
-                : "No fitment data for this vehicle yet",
-              {
-                description:
-                  target === "tires"
-                    ? "We couldn't find factory tire sizes for it — showing all tires."
-                    : "We couldn't find wheel specs for it — showing the full catalog.",
-              }
-            )
+        switch (result.kind) {
+          case "ok": {
+            const fitment = result.fitment
+            update(id, {
+              canonicalBoltPatterns: fitment.canonicalBoltPatterns,
+              hubBoreMm: fitment.hubBoreMm ?? undefined,
+              diameterWindow: fitment.diameterWindow,
+              widthWindow: fitment.widthWindow,
+              offsetWindow: fitment.offsetWindow,
+              oemTireSizes: fitment.oemTireSizes,
+              oemTires: fitment.oemTires,
+              fitmentStatus: fitment.status,
+            })
+            patterns = fitment.status === "ok" ? fitment.canonicalBoltPatterns : []
+            oemTireSizes = fitment.oemTireSizes ?? []
+            // Target-specific "did we find a fit?" — tires need OEM sizes, wheels
+            // need bolt patterns. Only warn about the RIGHT thing.
+            const hasFit = target === "tires" ? oemTireSizes.length > 0 : patterns.length > 0
+            if (!hasFit) {
+              toast(
+                target === "tires"
+                  ? "No tire fitment for this vehicle yet"
+                  : "No fitment data for this vehicle yet",
+                {
+                  description:
+                    target === "tires"
+                      ? "We couldn't find factory tire sizes for it — showing all tires."
+                      : "We couldn't find wheel specs for it — showing the full catalog.",
+                }
+              )
+            }
+            break
           }
-        } else if (fitment && "error" in fitment) {
-          toast.error("Fitment temporarily unavailable", {
-            description: "Please contact support.",
-          })
+          case "unavailable":
+            toast.error("Fitment temporarily unavailable", {
+              description: "Please contact support.",
+            })
+            break
+          case "failed":
+            // A non-503 failure (network blip, unexpected 4xx/5xx) —
+            // resolveFitmentForVehicle already degrades a 503 to "unavailable" above;
+            // anything else lands here (WB-073 G8). The vehicle already exists in the
+            // garage (this pane only re-resolves STALE fitment on an existing vehicle,
+            // it never creates one), so there's nothing to roll back — keep the drawer
+            // open and let the user retry by selecting it again, rather than routing
+            // on stale/missing data or leaving the drawer silently stuck.
+            toast.error("Couldn't check fitment right now — please try again.")
+            return
         }
       } finally {
         setSelectingId(null)

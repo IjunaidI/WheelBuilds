@@ -79,7 +79,25 @@ export class LocalStorageGarage implements GarageProvider {
   update(id: string, patch: Partial<NewVehicle>): Vehicle {
     const list = this.list()
     const idx = list.findIndex((v) => v.id === id)
-    if (idx === -1) throw new Error(`vehicle ${id} not found`)
+    if (idx === -1) {
+      // Mirrors MedusaGarage.update()'s missing-id handling (WB-073 G8
+      // review; see medusa-garage.ts for the full race writeup). Reachable
+      // here via the same class of benign race, guest-garage flavor:
+      // garage-pane.tsx's selectVehicle() re-resolves stale fitment
+      // asynchronously, and that row's Remove (×) button is NOT gated during
+      // the resolve — the user can delete the vehicle before the resolve
+      // settles "ok" and this update() call lands. The old behavior (throwing
+      // here) propagated as an unhandled promise rejection out of
+      // selectVehicle's fire-and-forget update() call, with no user
+      // feedback. No known caller reads update()'s return value on this
+      // path; return a Vehicle-shaped placeholder so the (unchanged) return
+      // type stays honest without throwing. No write, no emit — a genuine
+      // no-op, same as the Medusa-backed provider.
+      if (process.env.NODE_ENV !== "production") {
+        console.debug(`[garage] update(${id}) skipped — vehicle not found (already removed)`)
+      }
+      return { id, year: 0, make: "", model: "", savedAt: new Date().toISOString(), ...patch } as Vehicle
+    }
     const updated = { ...list[idx], ...patch }
     const next = [...list.slice(0, idx), updated, ...list.slice(idx + 1)]
     writeVehicles(next) // module-level free function (NOT this.writeVehicles) — the same one add()/remove() call
@@ -110,10 +128,28 @@ export class LocalStorageGarage implements GarageProvider {
     return readVehicles().find((v) => v.id === id) ?? null
   }
 
-  clear(): void {
-    if (typeof window !== "undefined") {
-      window.localStorage.removeItem(VEHICLES_KEY)
-      window.localStorage.removeItem(ACTIVE_KEY)
+  // Load-state signal (WB-073 G6). localStorage reads are synchronous, so
+  // there's no "loading" window and nothing that can fail the way a network
+  // fetch can — always ready, never an error, nothing to retry.
+  isLoaded(): boolean { return true }
+  loadError(): string | null { return null }
+  retryLoad(): void {}
+
+  // Diff-clear (WB-073 G7 / T6): removes only the vehicles whose client_id
+  // (== Vehicle.id) is in `clientIds`, leaving everything else untouched.
+  // RoutingGarage.syncAuth() uses this instead of a blanket clear() after a
+  // successful merge, so a vehicle added to local DURING the in-flight merge
+  // request (after the pre-merge snapshot was taken, before this call lands)
+  // survives and syncs on a later tick instead of being silently wiped.
+  // Mirrors remove()'s active-id fallback: if the active vehicle was one of
+  // the ones just merged away, fall back to the first survivor (or null).
+  clearOnly(clientIds: string[]): void {
+    const ids = new Set(clientIds)
+    const next = readVehicles().filter((v) => !ids.has(v.id))
+    writeVehicles(next)
+    const activeId = readActiveId()
+    if (activeId !== null && ids.has(activeId)) {
+      writeActiveId(next[0]?.id ?? null)
     }
     this.emit()
   }

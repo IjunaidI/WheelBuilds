@@ -5,26 +5,42 @@ import { usePathname, useSearchParams } from "next/navigation"
 import { useRouter } from "@bprogress/next/app" // bprogress router → the window-param refinement shows the top progress bar
 import { useGarage } from "@lib/garage/use-garage"
 import { patternsToFitParam, winToParam } from "@modules/discovery/data/vehicle-constraint"
+import { FIT_PARAM_KEYS, shouldStripFit } from "./strip-fit"
 
 export default function FitmentSync() {
-  const { active } = useGarage()
+  const { active, isLoaded } = useGarage()
   const router = useRouter()
   const pathname = usePathname()
   const sp = useSearchParams()
 
   useEffect(() => {
-    if (sp.get("fit") === "0") return // explicit opt-out is authoritative — never overwrite
+    const isExplicitOptOut = sp.get("fit") === "0"
+    if (isExplicitOptOut) return // explicit opt-out is authoritative — never overwrite
 
     const activePatterns = active?.canonicalBoltPatterns ?? []
     const desiredFit = activePatterns.length ? patternsToFitParam(activePatterns) : null
 
-    // Never auto-STRIP a fit already in the URL: the garage loads asynchronously
-    // (and RoutingGarage swaps local→remote ~1s after boot), so the active
-    // vehicle's data is routinely unavailable for a beat — and permanently for a
-    // vehicle wheel-size has no data on. Only ACT once we have the vehicle's
-    // patterns; clearing fitment is an explicit user action (the "Fits: …" chip
-    // sets fit=0).
-    if (!desiredFit) return
+    // Never auto-STRIP a fit already in the URL just because desiredFit is
+    // momentarily null: the garage loads asynchronously (and RoutingGarage
+    // swaps local→remote ~1s after boot), so the active vehicle's data is
+    // routinely unavailable for a beat on ordinary page load. shouldStripFit
+    // (WB-073 Task 9 / G10) only allows a strip once `isLoaded` is genuinely
+    // true, so a real in-flight load can never flicker the URL clean. Once
+    // loaded-and-empty is real — no active vehicle (deleted, e.g. the last
+    // vehicle removed) OR an active vehicle wheel-size has no bolt-pattern
+    // data for — an orphaned fit param can never be satisfied and gets
+    // cleared. Clearing fitment is otherwise an explicit user action (the
+    // "Fits: …" chip sets fit=0, handled above).
+    if (!desiredFit) {
+      const hasFitParam = FIT_PARAM_KEYS.some((k) => sp.has(k))
+      if (shouldStripFit({ isLoaded, hasActive: false, hasFitParam, isExplicitOptOut })) {
+        const next = new URLSearchParams(Array.from(sp.entries()))
+        for (const k of FIT_PARAM_KEYS) next.delete(k)
+        next.delete("page") // reset pagination on filter change (mirrors useDiscoveryQuery)
+        router.replace(`${pathname}?${next.toString()}`)
+      }
+      return
+    }
 
     // Sync the FULL fitment (bolt patterns + the size windows discovery needs to
     // match the PDP), not just ?fit. The window params must land even when ?fit
@@ -55,6 +71,7 @@ export default function FitmentSync() {
     active?.canonicalBoltPatterns?.join(","),
     active?.hubBoreMm,
     JSON.stringify([active?.diameterWindow, active?.widthWindow, active?.offsetWindow]),
+    isLoaded,
     sp,
     pathname,
     router,

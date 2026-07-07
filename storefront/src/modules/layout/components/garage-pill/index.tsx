@@ -4,9 +4,17 @@ import { useGarage } from "@lib/garage/use-garage"
 import { openSearch } from "@lib/stores/search-store"
 
 const GaragePill = () => {
-  const { active } = useGarage()
+  const { active, isLoaded } = useGarage()
 
-  const label = active
+  // While an authed garage load is in flight (isLoaded === false, WB-073
+  // Task 5/G6), `active` reads null just like the genuinely-empty case —
+  // rendering "Select a vehicle" here would flash it for every returning
+  // customer with an active vehicle, then flip to their real one a beat
+  // later (the same empty-flash class G6 fixed for GarageManager). Show a
+  // neutral loading label instead until the load genuinely settles.
+  const label = !isLoaded
+    ? "Garage · …"
+    : active
     ? `Garage · ${active.year} ${active.make} ${active.model}${active.trim ? ` ${active.trim}` : ""}`
     : "Garage · Select a vehicle"
 
@@ -16,7 +24,9 @@ const GaragePill = () => {
       onClick={openSearch}
       className="inline-flex max-w-[320px] items-center gap-2 h-7 px-3 rounded-full border border-[var(--hairline)] bg-white text-[12px] font-semibold text-[var(--ink)] overflow-hidden whitespace-nowrap text-ellipsis transition-colors hover:bg-[var(--soft)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1"
       aria-label={
-        active
+        !isLoaded
+          ? "Loading your garage"
+          : active
           ? `Switch garage vehicle (currently ${label})`
           : "Pick a vehicle for fitment"
       }

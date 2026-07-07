@@ -8,7 +8,7 @@
 
 **Tech Stack:** MedusaJS 2.13.6 backend (MikroORM, knex, `test:fitment` jest), Next.js 15 / React 19 storefront (vitest).
 
-**Spec:** [docs/in-progress/specs/2026-07-06-fitment-truth-design.md](../specs/2026-07-06-fitment-truth-design.md)
+**Spec:** [docs/done/specs/2026-07-06-fitment-truth-design.md](../specs/2026-07-06-fitment-truth-design.md)
 
 ## Global Constraints
 

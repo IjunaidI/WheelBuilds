@@ -1,7 +1,7 @@
 # Fitment truth — correct, fresh, non-over-claiming fit (G9 cluster 3) — Design
 
-> Status: **in-progress** (spec). Session = epic **G9** (audit remediation), cluster **fitment-truth**.
-> Proposed backlog id: **WB-072** (under the WB-069 umbrella).
+> Status: **done** — implemented + merged to `main` 2026-07-07. Session = epic **G9** (audit remediation), cluster **fitment-truth**.
+> Backlog id: **WB-072** (under the WB-069 umbrella). Whole-branch review clean after fixing one Important (band bore-axis → per-variant `buildFitView`); residual nits tracked as follow-ups (see WB-072 backlog entry).
 > Remediates **17 findings** (8 backend B1–B8 + 9 storefront S1–S9), **all re-verified against current `main`
 > 2026-07-07 — all HOLD** (the tire arc WB-063–068 added `oem_*` columns only; it never touched cache-key
 > construction, quota gating, the catalog cache, vehicle-write validation, or the fit-verdict logic).

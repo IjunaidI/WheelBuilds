@@ -15,7 +15,7 @@ function toWire(v: Vehicle) {
 function fromWire(r: any): Vehicle {
   return { id: r.client_id ?? r.id, year: r.year, make: r.make, model: r.model, trim: r.trim ?? undefined,
     modificationSlug: r.modification_slug ?? undefined, canonicalBoltPatterns: r.canonical_bolt_patterns ?? undefined,
-    hubBoreMm: r.hub_bore_mm ?? undefined, diameterWindow: r.diameter_window ?? undefined,
+    hubBoreMm: r.hub_bore_mm_x100 == null ? undefined : r.hub_bore_mm_x100 / 100, diameterWindow: r.diameter_window ?? undefined,
     widthWindow: r.width_window ?? undefined, offsetWindow: r.offset_window ?? undefined,
     oemTireSizes: r.oem_tire_sizes ?? undefined,
     oemTires: r.oem_tires ?? undefined,

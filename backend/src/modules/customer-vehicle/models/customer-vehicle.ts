@@ -11,7 +11,7 @@ const CustomerVehicle = model.define("customer_vehicle", {
   modification_slug: model.text().nullable(),
   is_active: model.boolean().default(false),
   canonical_bolt_patterns: model.json().nullable(),
-  hub_bore_mm: model.number().nullable(),
+  hub_bore_mm_x100: model.number().nullable(),
   diameter_window: model.json().nullable(),
   width_window: model.json().nullable(),
   offset_window: model.json().nullable(),

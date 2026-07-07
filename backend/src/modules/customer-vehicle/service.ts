@@ -41,7 +41,7 @@ class CustomerVehicleService extends MedusaService({ CustomerVehicle }) {
       modification_slug: input.modificationSlug ?? null,
       is_active: false,
       canonical_bolt_patterns: input.canonicalBoltPatterns ?? null,
-      hub_bore_mm: input.hubBoreMm ?? null,
+      hub_bore_mm_x100: input.hubBoreMm == null ? null : Math.round(input.hubBoreMm * 100),
       diameter_window: input.diameterWindow ?? null,
       width_window: input.widthWindow ?? null,
       offset_window: input.offsetWindow ?? null,

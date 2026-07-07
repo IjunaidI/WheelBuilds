@@ -12,7 +12,7 @@ export async function POST(req: MedusaRequest, res: MedusaResponse): Promise<voi
   if (!row) { res.status(404).json({ error: "not_found" }); return }
   const vehicle = await svc.updateCustomerVehicles({
     id: row.id, modification_slug: b.modificationSlug, canonical_bolt_patterns: b.canonicalBoltPatterns,
-    hub_bore_mm: b.hubBoreMm, diameter_window: b.diameterWindow, width_window: b.widthWindow,
+    hub_bore_mm_x100: b.hubBoreMm == null ? null : Math.round(b.hubBoreMm * 100), diameter_window: b.diameterWindow, width_window: b.widthWindow,
     offset_window: b.offsetWindow, oem_tire_sizes: b.oemTireSizes, oem_tires: b.oemTires, fitment_status: b.fitmentStatus,
     trim: b.trim, notes: b.notes,
   })

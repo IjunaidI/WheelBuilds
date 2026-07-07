@@ -39,7 +39,7 @@ The result is a build that looks like a real storefront on the surface and reads
 | **Dual read-surface design** | A deliberate **dollars-in-the-catalog / integer-cents-in-the-index** unit convention, with lockstep normalizers (finish, bolt-pattern) guarded against drift by shared golden-fixture tests. |
 | **Conditional, env-driven modules** | Storage (MinIO/local), event bus + workflow engine (Redis/in-memory), payments (Stripe), email (Resend/SendGrid), search (Meilisearch), and the vendor pipeline all register **conditionally** based on which env vars are present — one config file, many deployment shapes. |
 | **Bespoke design system** | A custom "garage / blueprint" storefront aesthetic layered on **shadcn/ui headless primitives** (Radix + Vaul + cmdk) for accessibility and motion, skinned to a scoped token palette. |
-| **Discipline** | Plan-driven development, a multi-agent pre-deploy audit, and a green test suite (**194 backend + 31 storefront** unit tests at last count) across two independent test runners. |
+| **Discipline** | Plan-driven development, a multi-agent pre-deploy audit, and a green test suite (**452 backend + 312 storefront** unit tests at last count) across two independent test runners. |
 
 ### Architecture at a glance
 
@@ -84,16 +84,13 @@ The result is a build that looks like a real storefront on the surface and reads
 
 ## Roadmap & future goals
 
-The next milestone is the **combined live smoke test**: run the catalog-writing `apply` once to populate the production catalog, then verify the full loop end to end — *pick a vehicle → catalog filters to fitting wheels → FITS badges on matching cards → freshly imported stock*.
+The catalog is live in production — **~1,724 wheel groups / 29,445 variants** plus **~1,000 tire groups**, both indexed and shoppable end to end (*pick a vehicle → catalog filters to fitting wheels/tires → FITS badges on matching cards → live imported stock*). The combined smoke test (vehicle → filtered catalog → FITS badges → checkout) has already been run and passed.
 
 Beyond that, the deferred roadmap ("Plan 4+"):
 
-- **Admin dashboard UI for vendor-sync** — runs are API/CLI-only today; surface list/approve/cancel/replay in the Medusa admin, and make the manual trigger asynchronous.
-- **PDP reverse-fitment** — populate the "N confirmed models fit this wheel" list (needs a reverse-fitment dataset).
 - **Durable feed archiving** — persist pulled feeds to object storage instead of ephemeral local disk.
 - **Catalog cache warming / TTL** — read `fetched_at` for expiry so the first storefront visitor isn't the canary for a fitment-API outage.
-- **Tire grouping** — tires are one-product-per-row today; apply the wheel-style N-variant grouping.
-- **Checkout** — wire the checkout flow (currently out of scope) plus PDP add-to-cart / wishlist server actions.
+- **Wishlist** — PDP wishlist server actions (checkout itself is live and hardened, WB-071; this is the remaining commerce gap).
 - **Real product photography** — every photographic element is a placeholder today.
 
 ---
@@ -113,26 +110,27 @@ Completed work and what's still open:
 - [x] Wheels grouping (N variants per product) on Brand + Style + Finish
 - [x] 12-hour idempotent cron with per-vendor in-progress guard
 - [x] **Live SFTP feed** — pull newest remote file, delta-detect, skip unchanged *(dry-run verified)*
-- [x] First catalog-writing `apply` ran end-to-end (2026-06-16, ~248 wheels)
-- [ ] Tire grouping (currently one-product-per-row)
-- [ ] Admin dashboard UI for runs (API/CLI only today)
+- [x] First catalog-writing `apply` ran end-to-end (2026-06-16, ~248 wheels); catalog has since scaled to **~1,724 wheel groups / 29,445 variants** (live, WB-059 cutover 2026-06-27) plus **~1,000 tire groups** (live, WB-005 cutover 2026-07-03)
+- [x] Tire grouping — Brand+model, N-variant grouping, live in prod (WB-005)
+- [x] Admin dashboard UI for runs — Medusa admin console: list/approve/cancel/replay/trigger (WB-006)
 
 **Fitment & garage**
 - [x] `wheel-size` module + canonical bolt-pattern join key (golden-fixture drift guards)
 - [x] Customer **garage** — guest + logged-in, DB-enforced single-active vehicle, no duplicate rows on login
 - [x] Vehicle → catalog filtering with per-card FITS badges (response-envelope bug fixed)
-- [ ] PDP reverse-fitment "confirmed models" list
+- [x] PDP reverse-fitment "confirmed models" list — wheels (WB-009) + tires (WB-065)
 
 **Storefront**
 - [x] Custom "garage / blueprint" design system on shadcn headless primitives
 - [x] Home, nav, footer, search drawer (Cmd/Ctrl+K), fully responsive
 - [x] **Discovery** `/store` — live faceted Meilisearch with disjunctive facet counts
 - [x] **PDP** `/products/[handle]` — live from Medusa Store API (price + stock authoritative)
-- [ ] Checkout flow + PDP add-to-cart / wishlist server actions
+- [x] Checkout flow — live, hardened (WB-033/034/035/036/047, WB-071); PDP add-to-cart / Buy Now (WB-001)
+- [ ] Wishlist server actions
 - [ ] Real product photography
 
 **Quality**
-- [x] 194 backend + 31 storefront unit tests green (Jest + Vitest); Playwright e2e scaffold
+- [x] 452 backend + 312 storefront unit tests green (Jest + Vitest); Playwright e2e scaffold
 - [ ] Pre-deploy hardening pass (multi-agent audit findings) before first production deploy
 
 ---

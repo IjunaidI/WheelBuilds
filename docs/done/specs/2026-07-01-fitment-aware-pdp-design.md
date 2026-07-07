@@ -150,3 +150,28 @@ list when `useFilter`.
 - No backend / API / migration / re-index.
 - Not tied to "has an active vehicle" alone — full-catalog visitors with a vehicle set still see
   everything (the `?fit=1` flag is the gate).
+
+---
+
+## Addendum (2026-07-08) — superseded by WB-072; §2 no longer describes shipped behavior
+
+The `FitView` design in §2 above (the `defaults` object and the `hasFit: false` → "callers show
+everything" rule at line ~78) **does not match the code as shipped.** It was corrected by later work
+and is left here only as the historical record. Current behavior (`storefront/src/modules/product-detail/data/fit-view.ts`
++ `hero/index.tsx`):
+
+- **No `FitView.defaults` object exists.** The `FitView` type carries the filtered option lists and
+  `hasFit`; there is no separate `defaults` sub-object. The "default to a fitting variant" behavior is
+  handled in the hero, not via a `FitView.defaults` field.
+- **`hasFit: false` does NOT mean "show everything."** A vehicle with **no fit-window** still filters by
+  bolt pattern + hub bore, and when nothing fits the hero renders a red **"This wheel doesn't fit your
+  {vehicle} — shown for reference only"** banner (`noFitInMode`) rather than silently falling back to the
+  full option set. "Show all" (warned) remains the user's escape.
+- **WB-072 (fitment-truth, 2026-07-07)** further hardened `buildFitView`: bore and offset are now paired
+  **per variant** (a size/offset only counts as fitting if the SAME variant satisfies both the bore and
+  the offset window), and the offset axis is trimmed/defaulted to a fitting value. The PDP "Fits your X"
+  band now derives its verdict from per-variant `buildFitView().hasFit` so the band, hero, and fit-filter
+  agree on the bore axis.
+
+See the WB-072 spec/plan ([docs/done/plans/2026-07-06-fitment-truth.md](../plans/2026-07-06-fitment-truth.md))
+and the WB-072 backlog entry for the authoritative current design.

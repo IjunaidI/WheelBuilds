@@ -139,7 +139,7 @@ Loaded via `next/font/google` in [`app/layout.tsx`](src/app/layout.tsx): Antonio
 
 - `next.config.js` has `eslint.ignoreDuringBuilds: true` and `typescript.ignoreBuildErrors: true`. Type and lint errors will **not** fail the build.
 - Run `pnpm lint` and `npx tsc --noEmit` separately to catch them.
-- Pre-existing TS errors live in `lib/data/customer.ts`, `lib/data/collections.ts`, `lib/data/onboarding.ts`, `lib/data/orders.ts`, `modules/order/templates/order-completed-template.tsx`, `modules/products/components/product-onboarding-cta/index.tsx`, `modules/products/components/related-products/index.tsx`. They're Medusa SDK type drift — don't try to "fix" them as part of unrelated work.
+- Pre-existing TS errors (**12-error baseline**, re-measured WB-075 after DOC1 deleted the dead `resolve-variant.ts` + its test, which had carried 2 of the prior 14): `lib/data/collections.ts` (1), `lib/data/customer.ts` (5), `lib/data/onboarding.ts` (1), `lib/data/orders.ts` (2), `modules/products/components/product-onboarding-cta/index.tsx` (1), `modules/products/components/related-products/index.tsx` (2). `modules/order/templates/order-completed-template.tsx` no longer errors — drop it if you see it referenced elsewhere. They're Medusa SDK type drift — don't try to "fix" them as part of unrelated work.
 - A pre-existing eslint warning lives in `modules/checkout/components/shipping-address/index.tsx`. Same advice.
 - Backend must be running for `pnpm dev` to unblock (the `await-backend` shim polls port 9000). For storefront-only iteration, use `pnpm build:next` to skip the wait.
 

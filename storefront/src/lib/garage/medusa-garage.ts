@@ -28,6 +28,17 @@ export class MedusaGarage implements GarageProvider {
   private listeners = new Set<() => void>()
   private loaded: Promise<void>
   private loadOk = false
+  // Tracks the in-flight createVehicle() network call for a vehicle added
+  // THIS session, keyed by client_id. activateVehicle()/update() are fired
+  // right after add() (often in the same tick — see ymm-pane.tsx), so
+  // without this they raced the server and could 404 against a vehicle it
+  // hadn't created yet (WB-073 G3). Callers stay fire-and-forget; only the
+  // underlying network calls get sequenced. Settles to undefined either way
+  // (success or failure) — this only guarantees ORDER, each network call
+  // still swallows its own failure independently, same as before. Absent
+  // for any id not added this session (e.g. loaded from the account), so
+  // those calls fire immediately as before.
+  private pendingCreate = new Map<string, Promise<void>>()
 
   constructor() {
     this.loaded = typeof window !== "undefined" ? this.load() : Promise.resolve()
@@ -81,7 +92,19 @@ export class MedusaGarage implements GarageProvider {
     this.vehicles = [...this.vehicles, vehicle]
     if (this.activeId == null) this.activeId = vehicle.id // mirror LocalStorageGarage auto-active
     this.emit()
-    void api.createVehicle(toWire(vehicle)).catch(() => {/* retry/toast */})
+    // .then(ok, err) rather than .catch() so the settled type is always
+    // Promise<void> — downstream awaiters only care that the network call
+    // has settled, not what it resolved to.
+    const created: Promise<void> = api.createVehicle(toWire(vehicle)).then(
+      () => undefined,
+      () => {/* retry/toast */}
+    )
+    this.pendingCreate.set(vehicle.id, created)
+    void created.finally(() => {
+      // Only clear our own entry — a later add() reusing this id (can't
+      // happen with genId(), but keep the map consistent regardless).
+      if (this.pendingCreate.get(vehicle.id) === created) this.pendingCreate.delete(vehicle.id)
+    })
     return vehicle
   }
   update(id: string, patch: Partial<NewVehicle>): Vehicle {
@@ -90,9 +113,14 @@ export class MedusaGarage implements GarageProvider {
     const updated = { ...this.vehicles[idx], ...patch }
     this.vehicles = [...this.vehicles.slice(0, idx), updated, ...this.vehicles.slice(idx + 1)]
     this.emit()
-    void api.updateVehicle(id, { modificationSlug: updated.modificationSlug, canonicalBoltPatterns: updated.canonicalBoltPatterns,
-      hubBoreMm: updated.hubBoreMm, diameterWindow: updated.diameterWindow, widthWindow: updated.widthWindow,
-      offsetWindow: updated.offsetWindow, oemTireSizes: updated.oemTireSizes, oemTires: updated.oemTires, fitmentStatus: updated.fitmentStatus, trim: updated.trim, notes: updated.notes } as any).catch(() => {})
+    const createdFirst = this.pendingCreate.get(id) ?? Promise.resolve()
+    void createdFirst
+      .then(() =>
+        api.updateVehicle(id, { modificationSlug: updated.modificationSlug, canonicalBoltPatterns: updated.canonicalBoltPatterns,
+          hubBoreMm: updated.hubBoreMm, diameterWindow: updated.diameterWindow, widthWindow: updated.widthWindow,
+          offsetWindow: updated.offsetWindow, oemTireSizes: updated.oemTireSizes, oemTires: updated.oemTires, fitmentStatus: updated.fitmentStatus, trim: updated.trim, notes: updated.notes } as any)
+      )
+      .catch(() => {})
     return updated
   }
   remove(id: string): void {
@@ -104,7 +132,10 @@ export class MedusaGarage implements GarageProvider {
   setActive(id: string | null): void {
     this.activeId = id
     this.emit()
-    if (id) void api.activateVehicle(id).catch(() => {})
+    if (id) {
+      const createdFirst = this.pendingCreate.get(id) ?? Promise.resolve()
+      void createdFirst.then(() => api.activateVehicle(id)).catch(() => {})
+    }
   }
   subscribe(listener: () => void): () => void { this.listeners.add(listener); return () => this.listeners.delete(listener) }
 }

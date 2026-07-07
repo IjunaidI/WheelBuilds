@@ -136,11 +136,37 @@ const Fitment = ({ product }: FitmentProps) => {
           so the final row doubles as the section's bottom frame. */}
       <div className="grid grid-cols-1 small:grid-cols-2 gap-x-8 gap-y-0 border-t border-[var(--hairline)]">
         {product.fitment.map((f, i) => {
+          // Helper: check if entry.year matches active.year (handles year ranges like "2013–2017")
+          const yearMatches = () => {
+            if (!active) return false
+            // entry.year is a string (e.g., "2021" or "2013–2017")
+            // active.year is a number (e.g., 2021)
+            const parts = f.year.match(/^(\d+)\s*[–-]\s*(\d+)$/)
+            if (parts) {
+              // Year range: check if active.year falls within [start, end]
+              const start = parseInt(parts[1], 10)
+              const end = parseInt(parts[2], 10)
+              return active.year >= start && active.year <= end
+            }
+            // Single year: exact match
+            return String(active.year) === f.year
+          }
+
+          // Helper: check if trims match (case-insensitive, only if both present)
+          const trimMatches = () => {
+            if (!active) return false
+            // Only require trim match if BOTH have a trim value
+            if (!active.trim || !f.trim) return true
+            return active.trim.toLowerCase() === f.trim.toLowerCase()
+          }
+
           const isActive =
             Boolean(activeFits) &&
             active &&
             f.make.toLowerCase() === active.make.toLowerCase() &&
-            f.model.toLowerCase() === active.model.toLowerCase()
+            f.model.toLowerCase() === active.model.toLowerCase() &&
+            yearMatches() &&
+            trimMatches()
           return (
             <FitmentRow
               key={`${f.make}-${f.model}-${i}`}

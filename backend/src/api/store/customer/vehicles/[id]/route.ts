@@ -1,12 +1,16 @@
 import { MedusaRequest, MedusaResponse } from "@medusajs/framework"
 import { CUSTOMER_VEHICLE_MODULE } from "../../../../../modules/customer-vehicle"
+import { parseVehicleUpdate } from "../validators"
 // NOTE: the [id] path segment is the storefront client_id, not the Medusa PK.
 // resolveOwned maps (client_id, customer_id) -> row; we mutate by row.id (real PK).
 const actor = (req: MedusaRequest) => (req as any).auth_context?.actor_id as string | undefined
 
 export async function POST(req: MedusaRequest, res: MedusaResponse): Promise<void> {
   const customerId = actor(req); if (!customerId) { res.status(401).json({ error: "unauthorized" }); return }
-  const { id } = req.params; const b = req.body as any
+  const { id } = req.params
+  const parsed = parseVehicleUpdate(req.body)
+  if (parsed.ok === false) { res.status(400).json({ error: "invalid_vehicle", details: parsed.error }); return }
+  const b = parsed.data
   const svc = req.scope.resolve(CUSTOMER_VEHICLE_MODULE) as any
   const row = await svc.resolveOwned(customerId, id)
   if (!row) { res.status(404).json({ error: "not_found" }); return }

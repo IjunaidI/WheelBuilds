@@ -35,6 +35,27 @@ export function parseVehicleCreate(body: unknown): ParseResult {
   return { ok: true, data: r.data }
 }
 
+/**
+ * Body accepted by POST /store/customer/vehicles/[id]. A partial update — every
+ * field is optional so callers can patch e.g. just `hubBoreMm` without resending
+ * the whole vehicle. `client_id`/`year`/`make`/`model` are updatable in principle
+ * via this schema but the route itself only maps the fitment/notes fields through
+ * to `updateCustomerVehicles` (see route.ts).
+ */
+export const VehicleUpdateSchema = VehicleCreateSchema.partial()
+
+export type VehicleUpdateInput = z.infer<typeof VehicleUpdateSchema>
+
+export type UpdateParseResult =
+  | { ok: true; data: VehicleUpdateInput }
+  | { ok: false; error: string }
+
+export function parseVehicleUpdate(body: unknown): UpdateParseResult {
+  const r = VehicleUpdateSchema.safeParse(body)
+  if (!r.success) return { ok: false, error: r.error.issues.map((i) => `${i.path.join(".")}: ${i.message}`).join("; ") }
+  return { ok: true, data: r.data }
+}
+
 export const VehicleMergeSchema = z.object({
   vehicles: z.array(VehicleCreateSchema),
 })

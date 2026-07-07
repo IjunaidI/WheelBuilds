@@ -190,20 +190,53 @@ export class RoutingGarage implements GarageProvider {
         // post-await mutation already uses — guarantees only the
         // still-current generation ever clears local.
         //
-        // `ids` is the client_ids of the PRE-merge snapshot (`toAdd`) that
-        // was actually sent to remote.mergeFrom() — not a fresh
-        // `this.local.list()` read taken after the await. A blanket
-        // `clear()` here would also wipe a vehicle added to local during the
-        // mergeFrom() await (a TOCTOU: `current` is still `local` for this
-        // entire window — setCurrent(remote) below hasn't run yet — so an
-        // "add vehicle" UI action lands in local, not remote). clearOnly(ids)
-        // removes exactly the merged vehicles and nothing else, so that
-        // mid-merge addition survives and gets picked up by planMerge() on
-        // the next syncAuth() tick (WB-073 G7 / T6). WB-022's "one idempotent
-        // merge request, stable client_ids" contract is unaffected — ids
-        // still comes from the same single mergeFrom() call.
+        // `ids` is the client_ids of the FULL PRE-merge local snapshot (every
+        // vehicle in local at the instant mergeLocalIntoRemote() started) —
+        // not just `toAdd`'s subset (WB-073 G7 review Fix 2). `toAdd`
+        // deliberately EXCLUDES any local vehicle whose content (year|make|
+        // model|trim) already matches a remote one (see vehiclesToMerge in
+        // merge.ts) — those are considered already represented on the
+        // account, but they were never actually cleared out of local by a
+        // toAdd-only id list, so they'd resurface as zombie duplicates on
+        // every future logout (guest re-adds a vehicle already on their
+        // account, logs back in: toAdd=[], nothing clears, the duplicate
+        // lives in local forever). Clearing the full snapshot instead removes
+        // every vehicle that existed at snapshot time — merged or
+        // content-duplicate alike, both are safe to drop since both are
+        // represented on the remote — while STILL preserving anything added
+        // to local AFTER the snapshot (a TOCTOU: `current` is still `local`
+        // for this entire mergeFrom() await window — setCurrent(remote) below
+        // hasn't run yet — so an "add vehicle" UI action mid-merge lands in
+        // local, not remote, and postdates the snapshot so it's absent from
+        // `ids`). WB-022's "one idempotent merge request, stable client_ids"
+        // contract is unaffected — `mergeFrom()` still only ever sees `toAdd`;
+        // only what gets *cleared* afterward changed.
         if (ok) this.local.clearOnly(ids)
         this.merged = ok
+
+        // Drain window-adds (WB-073 G7 review Fix 3): a vehicle added to
+        // local during the mergeFrom() await above survives the clearOnly()
+        // just above (Fix 2), but it's about to become invisible the instant
+        // setCurrent(remote) flips `current` from local to remote a few
+        // lines down — from the UI's perspective it "appears then vanishes"
+        // until the NEXT syncAuth() tick re-merges it (next login/reload).
+        // Drain it into remote right now, still behind the same generation
+        // guard as everything else in this block, so it actually syncs
+        // instead of just surviving-then-vanishing. Bounded (a small fixed
+        // number of rounds) so a steady trickle of adds arriving faster than
+        // the network round-trip can't turn this into an unbounded loop —
+        // whatever's still left in local after the bound simply survives to
+        // the next syncAuth() tick (no data loss, same as the ordinary
+        // toAdd-failure retry path already relies on).
+        if (ok) {
+          const MAX_DRAIN_ROUNDS = 3
+          for (let round = 0; round < MAX_DRAIN_ROUNDS && this.local.list().length > 0; round++) {
+            const drain = await this.mergeLocalIntoRemote(remote)
+            if (gen !== this.generation) return // superseded mid-drain — bail before touching local/current (Fix 1 discipline)
+            if (!drain.ok) break // network failure — leave the leftover in local, it retries on the next syncAuth
+            this.local.clearOnly(drain.ids)
+          }
+        }
       }
       this.setCurrent(remote)
       this.loading = false // load settled (success or failure) and `current` now reflects it directly
@@ -216,12 +249,27 @@ export class RoutingGarage implements GarageProvider {
   }
 
   private async mergeLocalIntoRemote(remote: RemoteGarage): Promise<{ ok: boolean; ids: string[] }> {
-    const toAdd = planMerge(this.local.list(), remote.list(), remote.isLoaded())
+    // Snapshot ALL of local — not just what's about to be sent — in the same
+    // synchronous tick as the `toAdd` computation below, i.e. still BEFORE
+    // the `await remote.mergeFrom(...)` below. This is what lets the caller
+    // diff-clear the FULL pre-merge snapshot afterward (WB-073 G7 review Fix
+    // 2) instead of only `toAdd`'s subset: `toAdd` excludes local vehicles
+    // whose content already matches something on the remote (see
+    // vehiclesToMerge in merge.ts) — those are safe to clear too (they're
+    // represented on the remote already) but were never being cleared by a
+    // toAdd-only id list, so they persisted as zombie duplicates. Capturing
+    // the snapshot here, before the await, is exactly what keeps a vehicle
+    // added to local DURING the mergeFrom() await out of `ids` — it postdates
+    // this read, so it's absent from the snapshot and survives whatever the
+    // caller clears afterward.
+    const localSnapshot = this.local.list()
+    const snapshotIds = localSnapshot.map((v) => v.id)
+    const toAdd = planMerge(localSnapshot, remote.list(), remote.isLoaded())
     const ok = await remote.mergeFrom(toAdd) // ONE idempotent request; false on failure (WB-022). Clearing local on
     // success is the caller's (syncAuth's) job, gated behind its post-merge generation guard — see the comment there
-    // (Fix 4 / T6). `ids` are toAdd's client_ids — the exact snapshot that was sent — so the caller can diff-clear
-    // only what was actually merged instead of a blanket clear.
-    return { ok, ids: toAdd.map((v) => v.id) }
+    // (Fix 4 / T6). `ids` is the full pre-merge snapshot (Fix 2 above), not just what was sent, so the caller can
+    // diff-clear zombie duplicates too instead of a blanket clear.
+    return { ok, ids: snapshotIds }
   }
 
   list() { return this.current.list() }

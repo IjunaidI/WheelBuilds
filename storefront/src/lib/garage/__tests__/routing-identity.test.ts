@@ -265,11 +265,19 @@ describe("RoutingGarage — customer identity lifecycle (WB-073 G1/G2)", () => {
     // helper, i.e. before syncAuth()'s post-merge `gen !== this.generation`
     // guard ever runs. A superseded generation's stale merge could therefore
     // still wipe `local` out from under whatever generation is actually
-    // current by the time it finally resolves — and because
-    // LocalStorageGarage.clear() emits straight to its own listener set,
-    // any component still subscribed through `local` would see a spurious
-    // "everything's gone" flicker for a request that logically lost the race.
-    const clearSpy = vi.spyOn(LocalStorageGarage.prototype, "clear")
+    // current by the time it finally resolves — and because a blanket local
+    // clear emits straight to its own listener set, any component still
+    // subscribed through `local` would see a spurious "everything's gone"
+    // flicker for a request that logically lost the race.
+    //
+    // Production now calls `local.clearOnly(ids)` (WB-073 G7 / T6), not
+    // `local.clear()` (removed — see WB-073 G7 review Fix 4, dead code once
+    // nothing called it) — spying on `clear` would pass VACUOUSLY (it's
+    // simply never called on this path), proving nothing about the
+    // generation guard actually protecting the real clear call. Spy on
+    // `clearOnly` (the real path) so this test still catches a regression
+    // where a superseded generation reaches the clear call.
+    const clearOnlySpy = vi.spyOn(LocalStorageGarage.prototype, "clearOnly")
 
     // Gen 1 (login as cust_a): let mergeFrom() park indefinitely until the
     // test explicitly resolves it, so gen 2 can complete first.
@@ -306,11 +314,11 @@ describe("RoutingGarage — customer identity lifecycle (WB-073 G1/G2)", () => {
     resolveMergeA(true) // let gen 1's stale, already-superseded merge resolve now
     await syncA
 
-    expect(clearSpy).not.toHaveBeenCalled() // local was NEVER cleared by the superseded generation
+    expect(clearOnlySpy).not.toHaveBeenCalled() // local was NEVER cleared by the superseded generation
     expect(listener).not.toHaveBeenCalled() // no stale emit reached the still-local-bound listener
     expect(routing.list()).toEqual([]) // still local, untouched — still logged out
 
-    clearSpy.mockRestore()
+    clearOnlySpy.mockRestore()
   })
 
   it("(WB-073 G5 review Fix 2) supersedes the OLD remote before replacing it on an identity change, so its abandoned writes can no longer toast", async () => {
@@ -404,16 +412,81 @@ function installFakeWindow(): { uninstall: () => void } {
 }
 
 describe("RoutingGarage — merge diff-clear preserves a vehicle added mid-merge (WB-073 G7 / T6)", () => {
-  it("clears only the merged snapshot, so a vehicle added to local DURING the in-flight merge survives the post-merge clear", async () => {
+  it("(Fix 2) clears the FULL pre-merge snapshot — a content-duplicate zombie is cleared even though it was never sent, while a genuinely-new mid-merge add survives an on-its-own-failing drain attempt", async () => {
+    const fakeWindow = installFakeWindow()
+    try {
+      // Seed the guest's local garage BEFORE login:
+      //  - v1: SAME content (year|make|model|trim) as a vehicle the account
+      //    already has. vehiclesToMerge() (merge.ts) excludes any local
+      //    vehicle whose content already matches a remote one, so v1 is
+      //    NEVER part of `toAdd`. Clearing only `toAdd`'s ids (the pre-Fix-2
+      //    behavior) would never remove it from local — a zombie duplicate
+      //    that resurfaces on every future logout.
+      //  - v3: genuinely new content — IS part of `toAdd`, merged normally.
+      const seedGarage = new LocalStorageGarage()
+      const v1 = seedGarage.add({ year: 2021, make: "Ford", model: "F-150", trim: "XLT" } as NewVehicle)
+      const v3 = seedGarage.add({ year: 2018, make: "Honda", model: "Civic" } as NewVehicle)
+
+      // remote already owns a vehicle with the SAME content as v1 (e.g. added
+      // in a previous session from a different device).
+      const r1 = { id: "r_1", year: 2021, make: "Ford", model: "F-150", trim: "XLT", savedAt: "t" } as Vehicle
+
+      // Custom mergeFrom: call #1 (the main merge, expected payload [v3]) is
+      // PARKED so the test can add a vehicle mid-merge, then resolves true.
+      // Call #2 onward (the Fix-3 drain attempt) always resolves FALSE — this
+      // isolates Fix 2's "zombie cleared, genuine add survives" property from
+      // Fix 3's "genuine add gets synced", which gets its own dedicated test
+      // below with a drain that succeeds.
+      let callCount = 0
+      let resolveFirst!: (ok: boolean) => void
+      const firstPending = new Promise<boolean>((resolve) => { resolveFirst = resolve })
+      const mergeImpl = () => {
+        callCount += 1
+        return callCount === 1 ? firstPending : Promise.resolve(false)
+      }
+      const remote = new FakeRemoteGarage([r1], mergeImpl)
+      const routing = new RoutingGarage(() => remote)
+
+      mockedGetCustomer.mockResolvedValue({ id: "cust_a" } as any)
+      const sync = routing.syncAuth() // captures the FULL snapshot [v1, v3], sends toAdd=[v3] (v1 excluded as a content-dup)
+
+      await flushMicrotasks() // let syncAuth reach & park inside the main mergeFrom() await
+
+      // TOCTOU: add a genuinely new vehicle WHILE the main merge is in
+      // flight. `current` is still `local` at this point.
+      const v2 = routing.add({ year: 2019, make: "Toyota", model: "Tacoma" } as NewVehicle)
+
+      resolveFirst(true)
+      await sync
+
+      // Main merge sent only v3 — v1 was a content-duplicate, excluded from toAdd (WB-022 unaffected).
+      expect(remote.mergeCalls[0]).toEqual([v3])
+      // The Fix-3 drain then attempted v2 (the mid-merge add) as its own call, and it was made to fail.
+      expect(remote.mergeCalls[1]).toEqual([v2])
+
+      const survivors = new LocalStorageGarage().list()
+      // v1 (zombie duplicate, never sent) is cleared — no longer persists in
+      // local (Fix 2, the "no zombie" property). v3 is cleared too (merged
+      // normally). v2 (genuinely new, added mid-merge) survives, because its
+      // own drain attempt failed — proving it is NOT silently lost, just
+      // retried on a later syncAuth tick.
+      expect(survivors.map((v) => v.id)).toEqual([v2.id])
+    } finally {
+      fakeWindow.uninstall()
+    }
+  })
+
+  it("(Fix 3) a vehicle added mid-merge is drained into remote and cleared from local within the SAME syncAuth call — it doesn't just survive to vanish", async () => {
     const fakeWindow = installFakeWindow()
     try {
       // Seed the guest's local garage BEFORE login — this is what gets
-      // snapshotted into the merge request.
+      // snapshotted into the main merge request.
       const seedGarage = new LocalStorageGarage()
       const v1 = seedGarage.add({ year: 2021, make: "Ford", model: "F-150", trim: "XLT" } as NewVehicle)
 
       // Park mergeFrom() mid-flight so the test can act while it's pending —
-      // same technique as the (Fix 4) race test above.
+      // same technique as the (Fix 4) race test above. EVERY call — the main
+      // merge AND the follow-up drain round — resolves true this time.
       let resolveMerge!: (ok: boolean) => void
       const pendingMerge = new Promise<boolean>((resolve) => { resolveMerge = resolve })
       const remote = new FakeRemoteGarage([], () => pendingMerge)
@@ -426,22 +499,26 @@ describe("RoutingGarage — merge diff-clear preserves a vehicle added mid-merge
 
       // TOCTOU: add a vehicle WHILE the merge is in flight. `current` is
       // still `local` at this point (setCurrent(remote) only runs after the
-      // merge settles — see syncAuth()), so this goes through the exact same
-      // path a real "add vehicle" UI action would take during this window.
+      // merge — and now the drain — settle), so this goes through the exact
+      // same path a real "add vehicle" UI action would take during this
+      // window.
       const v2 = routing.add({ year: 2019, make: "Toyota", model: "Tacoma" } as NewVehicle)
 
       resolveMerge(true)
       await sync
 
-      // WB-022 unaffected: still exactly one merge request, still only the
-      // pre-merge snapshot — v2 (added after the snapshot was taken) was
-      // never sent.
-      expect(remote.mergeCalls).toEqual([[v1]])
+      // Two merge requests happened within this SINGLE syncAuth() call: the
+      // main merge (v1) and the Fix-3 drain round (v2) — proving the
+      // mid-merge add gets synced into the account immediately rather than
+      // merely surviving in local to "appear then vanish" until some future
+      // login re-merges it.
+      expect(remote.mergeCalls).toEqual([[v1], [v2]])
 
-      // The old blanket `clear()` would wipe v2 here too. The diff-clear must
-      // remove only what was actually merged (v1) and leave v2 in place.
+      // Both cleared from local — v2 is now represented on the remote, not
+      // sitting in local waiting to disappear the instant `current` flips to
+      // remote.
       const survivors = new LocalStorageGarage().list()
-      expect(survivors.map((v) => v.id)).toEqual([v2.id])
+      expect(survivors).toEqual([])
     } finally {
       fakeWindow.uninstall()
     }

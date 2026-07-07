@@ -117,14 +117,6 @@ export class LocalStorageGarage implements GarageProvider {
   loadError(): string | null { return null }
   retryLoad(): void {}
 
-  clear(): void {
-    if (typeof window !== "undefined") {
-      window.localStorage.removeItem(VEHICLES_KEY)
-      window.localStorage.removeItem(ACTIVE_KEY)
-    }
-    this.emit()
-  }
-
   // Diff-clear (WB-073 G7 / T6): removes only the vehicles whose client_id
   // (== Vehicle.id) is in `clientIds`, leaving everything else untouched.
   // RoutingGarage.syncAuth() uses this instead of a blanket clear() after a

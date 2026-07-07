@@ -79,7 +79,25 @@ export class LocalStorageGarage implements GarageProvider {
   update(id: string, patch: Partial<NewVehicle>): Vehicle {
     const list = this.list()
     const idx = list.findIndex((v) => v.id === id)
-    if (idx === -1) throw new Error(`vehicle ${id} not found`)
+    if (idx === -1) {
+      // Mirrors MedusaGarage.update()'s missing-id handling (WB-073 G8
+      // review; see medusa-garage.ts for the full race writeup). Reachable
+      // here via the same class of benign race, guest-garage flavor:
+      // garage-pane.tsx's selectVehicle() re-resolves stale fitment
+      // asynchronously, and that row's Remove (×) button is NOT gated during
+      // the resolve — the user can delete the vehicle before the resolve
+      // settles "ok" and this update() call lands. The old behavior (throwing
+      // here) propagated as an unhandled promise rejection out of
+      // selectVehicle's fire-and-forget update() call, with no user
+      // feedback. No known caller reads update()'s return value on this
+      // path; return a Vehicle-shaped placeholder so the (unchanged) return
+      // type stays honest without throwing. No write, no emit — a genuine
+      // no-op, same as the Medusa-backed provider.
+      if (process.env.NODE_ENV !== "production") {
+        console.debug(`[garage] update(${id}) skipped — vehicle not found (already removed)`)
+      }
+      return { id, year: 0, make: "", model: "", savedAt: new Date().toISOString(), ...patch } as Vehicle
+    }
     const updated = { ...list[idx], ...patch }
     const next = [...list.slice(0, idx), updated, ...list.slice(idx + 1)]
     writeVehicles(next) // module-level free function (NOT this.writeVehicles) — the same one add()/remove() call

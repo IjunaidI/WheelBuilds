@@ -174,14 +174,22 @@ export class RoutingGarage implements GarageProvider {
       // a confirmed `null` from a SUCCESSFUL probe below still means logout
       // (WB-073 review Fix 2).
       //
-      // Still clear the boot-probe loading flag set above, if this WAS the
-      // boot probe AND no newer call has since superseded it (same
+      // Still clear `loading` if THIS generation is still current (same
       // `gen === this.generation` discipline every other post-await mutation
-      // in this method already uses) — otherwise a network hiccup on the
-      // very first load would strand every isLoaded() consumer in "loading"
-      // forever, even though `local` (what `current` still points at) is
-      // synchronous and genuinely ready.
-      if (isInitialProbe && gen === this.generation) {
+      // in this method already uses) — unconditionally, not just when this
+      // was the boot probe (WB-073 G10 review fix). A second syncAuth() can
+      // race ahead of the boot probe (constructor + GarageAuthSync's mount
+      // effect both call syncAuth with no serialization), superseding it
+      // before it settles; if the failure then lands on THAT (non-initial)
+      // generation instead, it still needs to release `loading` — the old
+      // `isInitialProbe`-gated version only ever cleared it for gen 1, so a
+      // failure on any later-but-still-current generation left every
+      // isLoaded() consumer stranded in "loading" forever, even though
+      // `local` (what `current` still points at) is synchronous and
+      // genuinely ready. Mirrors the unconditional terminal clears further
+      // down this method (the authed-load and logout branches) — this is
+      // just the third terminal path finally matching them.
+      if (gen === this.generation) {
         this.loading = false
         this.emit()
       }

@@ -802,4 +802,53 @@ describe("RoutingGarage — isLoaded() during the pre-getCustomer() boot window 
     expect(routing.isLoaded()).toBe(true)
     expect(createRemote).not.toHaveBeenCalled()
   })
+
+  it("(WB-073 G10 review fix) a getCustomer() failure on the CURRENT generation clears loading even when it isn't the initial probe — a second racing probe doesn't strand isLoaded() forever", async () => {
+    const createRemote = vi.fn(() => new FakeRemoteGarage([]))
+    const routing = new RoutingGarage(createRemote)
+
+    // Gen 1 (the boot probe): parked on a getCustomer() that will reject,
+    // still pending when gen 2 starts — the constructor-vs-GarageAuthSync
+    // mount-effect race this file's other tests already document.
+    let rejectGen1!: (err: Error) => void
+    const pendingGen1 = new Promise<{ id: string } | null>((_resolve, reject) => {
+      rejectGen1 = reject
+    })
+    mockedGetCustomer.mockReturnValueOnce(pendingGen1 as any)
+    const sync1 = routing.syncAuth() // gen 1 — the initial probe, sets loading=true synchronously
+
+    expect(routing.isLoaded()).toBe(false)
+
+    // Gen 2: a second syncAuth() call races ahead of gen 1 before it settles,
+    // ALSO parked on a getCustomer() that will reject — modeling a transient
+    // network blip that hits both concurrent requests.
+    let rejectGen2!: (err: Error) => void
+    const pendingGen2 = new Promise<{ id: string } | null>((_resolve, reject) => {
+      rejectGen2 = reject
+    })
+    mockedGetCustomer.mockReturnValueOnce(pendingGen2 as any)
+    const sync2 = routing.syncAuth() // gen 2 — NOT the initial probe (gen !== 1)
+
+    // Reject gen 1 first: it's already superseded (gen 1 !== this.generation
+    // 2), so its catch block correctly declines to touch `loading` and bails.
+    rejectGen1(new Error("network blip 1"))
+    await sync1
+
+    // Reject gen 2: it IS the current generation (gen 2 === this.generation
+    // 2). Its catch block must clear `loading` — the CURRENT generation
+    // failing is exactly the case that needs a clear, whether or not it
+    // happens to be the very first call ever made on this instance.
+    rejectGen2(new Error("network blip 2"))
+    await sync2
+
+    // THE BUG: gating the catch-block clear on `isInitialProbe` meant only
+    // gen 1 (which was already superseded and correctly declined) could ever
+    // ATTEMPT the clear. Gen 2 — the generation actually still current — was
+    // never the initial probe, so its clear was skipped too, and `loading`
+    // stayed true forever: isLoaded() stuck reporting false for the rest of
+    // the session, with no future syncAuth() call left to clear it
+    // (GarageAuthSync only re-fires on a customerId change, not a retry).
+    expect(routing.isLoaded()).toBe(true)
+    expect(createRemote).not.toHaveBeenCalled() // neither probe ever resolved an identity
+  })
 })

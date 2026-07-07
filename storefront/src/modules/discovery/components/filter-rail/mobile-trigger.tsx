@@ -14,10 +14,19 @@ import Icon from "@modules/common/components/icon"
 import { useDiscoveryQuery } from "../../data/use-discovery-query"
 import { FacetCounts } from "../../data/types"
 import FilterSections from "./filter-sections"
+import { mobileTriggerLabel, mobileDrawerCta } from "./mobile-trigger-copy"
 
 type MobileFilterTriggerProps = {
   facets: FacetCounts
   totalCount: number
+  /**
+   * True when fit mode's candidate cap may have hidden additional matches
+   * (WB-074 D2 review) — mirrors `DiscoveryHeaderProps.isCapped`. This
+   * component renders on the same screen as the header on viewports under
+   * `small`, so it must show the same honest signal instead of the raw
+   * (possibly wrong) `totalCount`.
+   */
+  isCapped?: boolean
 }
 
 /**
@@ -28,6 +37,7 @@ type MobileFilterTriggerProps = {
 const MobileFilterTrigger = ({
   facets,
   totalCount,
+  isCapped = false,
 }: MobileFilterTriggerProps) => {
   const [open, setOpen] = useState(false)
   const { filters, isAnyFilterActive, clearAll } = useDiscoveryQuery()
@@ -58,7 +68,7 @@ const MobileFilterTrigger = ({
           )}
         </span>
         <span className="text-[11px] font-[var(--mono)] text-[var(--ink-soft)] uppercase tracking-[0.06em]">
-          {totalCount} {totalCount === 1 ? "result" : "results"}
+          {mobileTriggerLabel(totalCount, isCapped)}
         </span>
       </Button>
 
@@ -111,7 +121,7 @@ const MobileFilterTrigger = ({
               </Button>
             )}
             <Button onClick={() => setOpen(false)} className="flex-[2]">
-              View {totalCount} {totalCount === 1 ? "result" : "results"}
+              {mobileDrawerCta(totalCount, isCapped)}
             </Button>
           </div>
         </DrawerContent>

@@ -27,6 +27,7 @@ import {
   DiscoveryQuery,
   DiscoveryResult,
   FacetCounts,
+  FIT_CANDIDATE_CAP,
   SortOption,
 } from "./types"
 import { Finish } from "@modules/common/components/wheel"
@@ -35,6 +36,7 @@ import { unstable_cache } from "next/cache"
 import { discoveryCacheKey } from "./cache-key"
 import { sdk } from "@lib/config"
 import { productHasFittingVariant } from "@lib/fitment/product-has-fitting-variant"
+import { isRealBoltPattern } from "@modules/product-detail/data/group-sizes"
 
 // Re-export so any existing imports from this file keep working.
 export { parseQueryFromSearchParams } from "./types"
@@ -88,7 +90,7 @@ function sortExpr(sort: SortOption): string[] {
   }
 }
 
-type Hit = {
+export type Hit = {
   id: string
   handle: string
   title: string
@@ -104,8 +106,13 @@ type Hit = {
   created_at: string | null
 }
 
-function hitToProduct(h: Hit): DiscoveryProduct {
+export function hitToProduct(h: Hit): DiscoveryProduct {
   const createdMs = h.created_at ? Date.parse(h.created_at) : NaN
+  // Gated through isRealBoltPattern so the WB-048 "BLANK" placeholder never
+  // reaches the flagship discovery grid card (WB-074 D6/D7 review — the
+  // backend transformer indexes bolt_pattern_raw into Meili unfiltered; this
+  // mirrors the same gate already applied at toFeatured/mapToDetail).
+  const rawBoltPattern = h.bolt_patterns?.[0]
   return {
     id: h.id,
     handle: h.handle,
@@ -116,27 +123,51 @@ function hitToProduct(h: Hit): DiscoveryProduct {
     finishes: (h.finishes as Finish[]) ?? [],
     diameter: h.diameters?.[0] ?? 0,
     width: h.widths?.[0] ?? 0,
-    boltPattern: h.bolt_patterns?.[0] ?? "",
+    boltPattern: isRealBoltPattern(rawBoltPattern) ? (rawBoltPattern as string) : "",
     boltPatternsCanonical: h.bolt_patterns_canonical ?? [],
     isNew: Number.isFinite(createdMs) ? Date.now() - createdMs < NEW_MS : false,
   }
 }
 
 /**
- * Rebuild disjunctive-ish facet counts from an in-memory product list (used
- * only in fit mode, where results are post-filtered client-side after the
- * bolt-pattern search — Meili's own facetDistribution would still reflect the
- * coarse, pre-fit-filter candidate set).
+ * Rebuild fit-mode facet counts from the RAW Meili hit arrays (WB-074 D1) —
+ * not the `[0]`-collapsed `DiscoveryProduct.diameter`/`.boltPattern` fields,
+ * which silently dropped a multi-diameter or multi-bolt-pattern wheel from
+ * every value but its first. Every element of `diameters` / `bolt_patterns`
+ * / `finishes` is tallied, so a hit with `diameters:[18,20]` now contributes
+ * to both the 18 and 20 buckets. Mirrors the tire twin's
+ * `facetsFromTireHits` (tire-discovery/data/get-tire-products.ts).
+ *
+ * NOT disjunctive (D3 deferred — see WB-074 Task 1 report for the full
+ * analysis). The fit branch's single Meili candidate query already applies
+ * EVERY active sidebar filter (`buildFilters(query.filters, query)`, no
+ * `skip`), so by the time hits reach this function, any product excluded by
+ * e.g. the diameter filter is already absent from the candidate list —
+ * there is no in-memory way to recover "what would diameter=20 show if the
+ * diameter filter weren't applied" from data we never fetched. Making this
+ * genuinely disjunctive would need either N extra Meili round-trips (one
+ * per dimension, still gated by the real per-variant fit check — violates
+ * the "cheap, no extra round-trips" budget) or re-scoping the single
+ * candidate query to the fit constraint only, which risks truncating the
+ * sidebar-filtered set under the 200-candidate cap and silently
+ * under-counting `totalCount`/pagination for the PRODUCT LIST — a worse bug
+ * than an honest non-disjunctive facet count. So: counts here are complete
+ * per-dimension (D1) but scoped "within your vehicle's fitment + your
+ * other active filters" — selecting a value can still hide its own
+ * siblings until D3 lands.
+ * TODO(D3): true disjunctive fit-mode facets need a redesigned fetch (e.g.
+ * a fit-only candidate query for facet purposes, separate from the
+ * sidebar-filtered query that drives the product list + pagination).
  */
-function facetsFromProducts(products: DiscoveryProduct[]): FacetCounts {
+export function facetsFromHits(hits: Hit[]): FacetCounts {
   const tally = (m: Record<string, number>, k: string) => { m[k] = (m[k] ?? 0) + 1 }
   const brands: Record<string, number> = {}, diameters: Record<string, number> = {}
   const boltPatterns: Record<string, number> = {}, finishes: Record<string, number> = {}
-  for (const p of products) {
-    if (p.brand) tally(brands, p.brand)
-    if (p.diameter) tally(diameters, String(p.diameter))
-    if (p.boltPattern) tally(boltPatterns, p.boltPattern)
-    for (const f of p.finishes ?? []) tally(finishes, f)
+  for (const h of hits) {
+    if (h.brand) tally(brands, h.brand)
+    for (const d of h.diameters ?? []) tally(diameters, String(d))
+    for (const bp of h.bolt_patterns ?? []) tally(boltPatterns, bp)
+    for (const f of h.finishes ?? []) tally(finishes, f)
   }
   return { brands, diameters, boltPatterns, finishes }
 }
@@ -152,10 +183,11 @@ function emptyResult(pageSize: number): DiscoveryResult {
       boltPatterns: {},
       finishes: {},
     },
+    isCapped: false,
   }
 }
 
-async function fetchDiscoveryProducts(
+export async function fetchDiscoveryProducts(
   query: DiscoveryQuery
 ): Promise<DiscoveryResult> {
   const pageSize = DEFAULT_PAGE_SIZE
@@ -167,7 +199,6 @@ async function fetchDiscoveryProducts(
   // in-memory pagination.
   const vf = query.vehicleFitment
   if (vf?.canonicalBoltPatterns?.length) {
-    const FIT_CANDIDATE_CAP = 200
     const { results } = await meili.multiSearch({
       queries: [
         {
@@ -180,7 +211,18 @@ async function fetchDiscoveryProducts(
         },
       ],
     })
-    const hits = (results[0] as MultiSearchResult<Hit>).hits
+    const candidateRes = results[0] as MultiSearchResult<Hit>
+    const hits = candidateRes.hits
+    // Honest cap signal (WB-074 D2): Meili's real total for this candidate
+    // query, independent of the `limit: FIT_CANDIDATE_CAP` we actually
+    // fetched. When it exceeds the cap, some genuinely-fitting wheels may
+    // sit past the window we scanned, so `totalCount` below (a count of the
+    // capped candidates AFTER the real per-variant fit check) must not be
+    // presented as a precise total — callers gate on `isCapped` first.
+    // Deliberately NOT used to inflate `totalCount`/pagination — that would
+    // trade an honest small count for phantom pages past what was fetched.
+    const estimatedTotalHits = candidateRes.estimatedTotalHits
+    const isCapped = (estimatedTotalHits ?? 0) > FIT_CANDIDATE_CAP
     const ids = hits.map((h) => h.id)
 
     // Fetch the candidates' real variants (metadata only — no price/region needed).
@@ -193,23 +235,55 @@ async function fetchDiscoveryProducts(
         )
         for (const p of products as any[]) variantsById[p.id] = p.variants ?? []
       } catch (e) {
+        // WB-074 D4: do NOT degrade in place (variantsById={}) here. That
+        // used to feed a now-removed `!fetched || productHasFittingVariant(...)`
+        // short-circuit below that passed EVERY bolt-pattern candidate
+        // unverified — an over-claiming "these fit" list — and because this
+        // function would then return normally, the unstable_cache wrapper in
+        // getDiscoveryProducts CACHED that over-claim for 60s. Rethrow
+        // instead so the failure propagates past the cache exactly like a
+        // Meili failure does (see getDiscoveryProducts's doc comment below):
+        // the outer catch there degrades to an honest, UNCACHED empty result
+        // instead. (The sibling non-throw over-claim — a SUCCESSFUL but
+        // empty/partial response — is handled by the mandatory per-variant
+        // filter just below, no `!fetched` escape hatch anymore.)
         console.error("[discovery] variant fetch for fit filter failed:", e)
-        variantsById = {} // degrade to coarse (bolt-pattern) results below
+        throw e
       }
     }
 
-    // If the fetch failed entirely, fall back to the coarse candidates (never empty a valid fit result).
-    const fetched = Object.keys(variantsById).length > 0
-    const fitting = hits
-      .map(hitToProduct)
-      .filter((p) => !fetched || productHasFittingVariant(variantsById[p.id], vf))
+    // Per-variant verification is MANDATORY for every candidate — no
+    // unverified pass-through (WB-074 D4 review: the non-throw over-claim).
+    // A genuine fetch FAILURE is handled above (it now throws, see the
+    // catch's comment). What's left here are two non-throw, technically-
+    // SUCCESSFUL response shapes from `sdk.store.product.list`:
+    //   (a) EMPTY/near-empty `products` (infra returned 200 with no
+    //       bodies) — `variantsById` stays `{}`, so `variantsById[id]` is
+    //       `undefined` for every candidate.
+    //   (b) PARTIAL `products` (some requested ids simply missing from an
+    //       otherwise-successful response) — `variantsById[id]` is
+    //       `undefined` only for the missing ones.
+    // `productHasFittingVariant(undefined, vf)` safely returns `false` (it
+    // guards `!variants?.length` before touching the array — never
+    // throws), so a plain `.filter` correctly and safely EXCLUDES any
+    // candidate whose variants never arrived — honest empty for (a),
+    // exclude-only-the-unverified for (b) — while candidates that DID
+    // resolve are still checked for real and pass/fail on their own
+    // merits. There is deliberately no "assume it fits" fallback: we never
+    // claim a wheel fits without having actually verified it.
+    const candidates = hits.map((hit) => ({ hit, product: hitToProduct(hit) }))
+    const fitting = candidates.filter(({ product }) =>
+      productHasFittingVariant(variantsById[product.id], vf)
+    )
 
     const start = (query.page - 1) * pageSize
     return {
-      products: fitting.slice(start, start + pageSize),
+      products: fitting.slice(start, start + pageSize).map((c) => c.product),
       totalCount: fitting.length,
       pageSize,
-      facets: facetsFromProducts(fitting),
+      facets: facetsFromHits(fitting.map((c) => c.hit)),
+      isCapped,
+      estimatedTotalHits,
     }
   }
 
@@ -264,16 +338,26 @@ async function fetchDiscoveryProducts(
     totalCount: hitsRes.estimatedTotalHits ?? hitsRes.hits.length,
     pageSize,
     facets,
+    // Non-fit mode has no candidate cap — totalCount is Meili's real total,
+    // so it is never "capped" in the D2 sense. (WB-074 D2)
+    isCapped: false,
   }
 }
 
 /**
- * Cached discovery read. Wraps the Meilisearch multiSearch in Next's
- * unstable_cache (60s TTL, tag "discovery") keyed by the effective query, so
- * repeated discovery/home loads within the window don't re-hit Meili. On a
- * Meili failure the inner fn throws — unstable_cache does NOT cache a throw —
- * and we degrade to an empty result here (never cached, so it self-heals on the
- * next request once Meili recovers). A future re-sync can revalidateTag("discovery").
+ * Cached discovery read. Wraps the Meilisearch multiSearch — and, in fit
+ * mode, the Store-API per-variant re-check inside fetchDiscoveryProducts's
+ * fit branch — in Next's unstable_cache (60s TTL, tag "discovery") keyed by
+ * the effective query, so repeated discovery/home loads within the window
+ * don't re-hit Meili or the Store API. On a Meili failure OR a fit-mode
+ * Store-API failure the inner fn throws — unstable_cache does NOT cache a
+ * throw — and we degrade to an empty result here (never cached, so it
+ * self-heals on the next request once the upstream recovers). The fit-mode
+ * Store-API case matters specifically because that failure must NOT degrade
+ * to a coarse, unverified "these fit" list (WB-074 D4): every bolt-pattern
+ * candidate would pass the fit gate unverified, and returning normally would
+ * let unstable_cache serve that over-claim for 60s. A future re-sync can
+ * revalidateTag("discovery").
  */
 export async function getDiscoveryProducts(
   query: DiscoveryQuery

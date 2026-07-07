@@ -16,13 +16,25 @@ import { openSearch } from "@lib/stores/search-store"
 import Icon from "@modules/common/components/icon"
 
 import { useDiscoveryQuery } from "../../data/use-discovery-query"
-import { SORT_LABELS, SortOption } from "../../data/types"
+import { FIT_CANDIDATE_CAP, SORT_LABELS, SortOption } from "../../data/types"
 
 type DiscoveryHeaderProps = {
   totalCount: number
+  /**
+   * True when fit mode's candidate cap may have hidden additional matches
+   * (WB-074 D2) — `totalCount` in that case is a count of the capped
+   * candidates checked, not a precise catalog total, so it must not be
+   * presented as one. Note `isCapped` fires off the bolt-pattern candidate
+   * pool's `estimatedTotalHits`, BEFORE the real per-variant fit re-check —
+   * so the grid can show far fewer than `FIT_CANDIDATE_CAP` fit-checked
+   * wheels even while this is true. The copy below says "candidates", not
+   * "matches", so it never claims a precise fit-checked count (WB-074 D2
+   * review, Fix 2).
+   */
+  isCapped?: boolean
 }
 
-const DiscoveryHeader = ({ totalCount }: DiscoveryHeaderProps) => {
+const DiscoveryHeader = ({ totalCount, isCapped = false }: DiscoveryHeaderProps) => {
   const { active } = useGarage()
   const { sort, setSort } = useDiscoveryQuery()
   const sp = useSearchParams()
@@ -40,8 +52,14 @@ const DiscoveryHeader = ({ totalCount }: DiscoveryHeaderProps) => {
       <div className="flex flex-col small:flex-row small:items-end small:justify-between gap-4">
         <div className="min-w-0">
           <Label tone="muted" style={{ display: "block", marginBottom: 6 }}>
-            CATALOG ·{" "}
-            {totalCount.toLocaleString()} {totalCount === 1 ? "RESULT" : "RESULTS"}
+            {isCapped ? (
+              <>CATALOG · TOP {FIT_CANDIDATE_CAP.toLocaleString()} CANDIDATES — REFINE TO NARROW</>
+            ) : (
+              <>
+                CATALOG ·{" "}
+                {totalCount.toLocaleString()} {totalCount === 1 ? "RESULT" : "RESULTS"}
+              </>
+            )}
           </Label>
           <Display size={32} as="h1" className="small:!text-[48px]">
             All wheels

@@ -30,6 +30,10 @@ const DiscoveryTemplate = ({
   currentPage,
   fit = false,
 }: DiscoveryTemplateProps) => {
+  // result.totalCount already reflects only the candidates that were
+  // fetched/checked (bounded by FIT_CANDIDATE_CAP in fit mode — see
+  // get-products.ts), so this pagination math never produces phantom pages
+  // beyond what was actually loaded, capped or not. (WB-074 D2)
   const totalPages = Math.max(
     1,
     Math.ceil(result.totalCount / (result.pageSize || DEFAULT_PAGE_SIZE))
@@ -38,11 +42,12 @@ const DiscoveryTemplate = ({
   return (
     <section className="px-5 pt-6 pb-16 xsmall:px-8 small:px-20 small:pt-8 small:pb-20">
       <FitmentSync />
-      <DiscoveryHeader totalCount={result.totalCount} />
+      <DiscoveryHeader totalCount={result.totalCount} isCapped={result.isCapped} />
       <ActiveChips />
       <MobileFilterTrigger
         facets={result.facets}
         totalCount={result.totalCount}
+        isCapped={result.isCapped}
       />
       <div className="flex items-start gap-8">
         <FilterRail facets={result.facets} />

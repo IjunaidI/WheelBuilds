@@ -9,6 +9,7 @@ import { Separator } from "@/components/ui/separator"
 import { useGarage } from "@lib/garage/use-garage"
 import { openSearch } from "@lib/stores/search-store"
 import { fitsVehicle } from "@lib/fitment/fits-vehicle"
+import { buildFitView } from "../../data/fit-view"
 import { FitmentEntry, ProductDetail } from "../../data/types"
 
 type FitmentProps = {
@@ -29,10 +30,25 @@ const Fitment = ({ product }: FitmentProps) => {
   // Parametric fitment check against the active vehicle's wheel-size.com spec
   // (bolt pattern + hub bore hard gates, plus the diameter/width/offset window).
   const verdict = active ? fitsVehicle(product, active) : null
-  const activeFits = verdict?.fits ?? null
   // S5: no bolt-pattern data on file for this vehicle — informational, not a
   // "doesn't fit" mismatch claim.
   const activeUnknown = verdict?.status === "unknown"
+  // WB-072 review: fitsVehicle checks hub bore at PRODUCT level
+  // (variants[0].metadata.center_bore_mm — an arbitrary single variant), while
+  // the hero (?fit=1) and fit-mode filtering use buildFitView/variantFitsVehicle,
+  // which check bore PER VARIANT paired with the in-window offset. For a
+  // multi-bore wheel those two checks can disagree — in either direction: the
+  // band could over-claim (product-level clears, no real variant does) or
+  // under-claim (product-level fails on an arbitrary variant, while the
+  // in-window variant's own bore actually clears). Deriving the band's FITS
+  // boolean from buildFitView — the per-variant-correct check the hero already
+  // uses — resolves both directions so the band and hero always agree. Skip
+  // the (non-free) computation when there's no active vehicle or the verdict
+  // is already "unknown".
+  const fitView =
+    active && verdict && verdict.status !== "unknown" ? buildFitView(product, active) : null
+  const activeFits = !activeUnknown && !!fitView?.hasFit
+  const activeNoFit = Boolean(active) && !activeUnknown && !activeFits
 
   return (
     <section className="border-t border-[var(--hairline)] py-16 small:py-20">
@@ -49,9 +65,9 @@ const Fitment = ({ product }: FitmentProps) => {
         style={{
           borderColor: activeFits
             ? "var(--orange)"
-            : active && activeUnknown
+            : activeUnknown
               ? "var(--hairline)"
-              : active && !activeFits
+              : activeNoFit
                 ? "var(--ink-soft)"
                 : "var(--hairline)",
           background: activeFits ? "rgba(255,106,0,0.04)" : "white",
@@ -108,7 +124,7 @@ const Fitment = ({ product }: FitmentProps) => {
                 </div>
                 <div className="text-[12px] text-[var(--ink-soft)] mt-0.5">
                   {verdict?.reasons[0] ??
-                    "This wheel might still fit with the right offset. Talk to fitment support before ordering."}
+                    "This wheel's size or bore is outside your vehicle's spec for a fitting variant."}
                 </div>
               </>
             )

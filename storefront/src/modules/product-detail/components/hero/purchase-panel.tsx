@@ -149,8 +149,12 @@ const PurchasePanel = ({
         {product.description}
       </p>
 
-      {/* Fitment chip — the shared fitsVehicle verdict (same one the fitment
-          section + the option filtering use), so they can never disagree. */}
+      {/* Fitment chip — uses variantFitsVehicle on the CURRENTLY SELECTED
+          variant (per-variant bore + offset, paired), not fitsVehicle. The
+          fitment band (fitment/index.tsx) derives its "fits" state from
+          buildFitView, which applies the same per-variant bore+offset gate —
+          so the chip and the band agree on the bore/window axes even though
+          they call different functions. */}
       <div className="mt-5">
         {active ? (
           fits ? (

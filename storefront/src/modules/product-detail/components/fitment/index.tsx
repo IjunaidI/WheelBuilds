@@ -39,7 +39,7 @@ const Fitment = ({ product }: FitmentProps) => {
       <SectionHeader
         eyebrow={`FITMENT · ${product.fitment.length} CONFIRMED MODELS`}
         title="Will it fit your build?"
-        description="Every fitment below has been bench-verified for offset, hub bore, and brake clearance. The list is non-exhaustive — submit your build for spec confirmation."
+        description="Each vehicle below matches this wheel's bolt pattern and hub bore, per wheel-size.com data. We also check the wheel's size against typical size windows for your vehicle."
         marginBottom={32}
       />
 
@@ -150,17 +150,6 @@ const Fitment = ({ product }: FitmentProps) => {
           )
         })}
       </div>
-
-      <p className="mt-6 text-[12px] text-[var(--ink-soft)] font-[var(--mono)] leading-relaxed">
-        Don't see your vehicle?{" "}
-        <a
-          href="#"
-          className="text-[var(--orange)] font-semibold no-underline hover:underline"
-        >
-          Submit your build for fitment
-        </a>{" "}
-        — we usually confirm within 24 hours.
-      </p>
     </section>
   )
 }

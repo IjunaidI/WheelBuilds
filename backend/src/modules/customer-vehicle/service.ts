@@ -1,8 +1,15 @@
 // backend/src/modules/customer-vehicle/service.ts
-import { MedusaService } from "@medusajs/framework/utils"
+import { MedusaService, ContainerRegistrationKeys } from "@medusajs/framework/utils"
 import CustomerVehicle from "./models/customer-vehicle"
 
 class CustomerVehicleService extends MedusaService({ CustomerVehicle }) {
+  protected knex_: any
+
+  constructor(container: any) {
+    super(...arguments as any)
+    this.knex_ = container?.[ContainerRegistrationKeys.PG_CONNECTION]
+  }
+
   /**
    * Resolve a customer's vehicle by its storefront `client_id`. The store
    * `[id]` routes address rows by client_id (the stable, storefront-known id),
@@ -15,12 +22,53 @@ class CustomerVehicleService extends MedusaService({ CustomerVehicle }) {
     return row
   }
 
+  /**
+   * Atomic active-vehicle switch (WB-073 G4). The old implementation was a
+   * non-transactional read-modify-write: list the customer's active vehicles,
+   * loop deactivating them, then activate the target — three-plus round trips
+   * with no isolation between them. Two near-simultaneous activate() calls for
+   * the same customer could both read the same "currently active" snapshot,
+   * each write their own target active, and race the partial unique index
+   * `UQ_customer_vehicle_one_active` (Migration20260602090000.ts, one active
+   * non-deleted row per customer_id) into an uncaught 500.
+   *
+   * This folds "deactivate everyone else" + "activate the target" into a
+   * SINGLE SQL statement via a data-modifying CTE. Postgres executes the whole
+   * statement atomically — an external reader (including a concurrent
+   * activate()) never observes a zero-active or two-active intermediate state,
+   * and the deactivate's WHERE is re-evaluated against the live rows at
+   * execution time, so a concurrent writer that mutated a row we're about to
+   * touch is naturally serialized via row-level locking rather than racing us.
+   *
+   * A conflicting concurrent writer can still surface as a 23505 unique-
+   * violation in the (already narrow) window where it activated a row we had
+   * no way to see yet — mirrors the ON CONFLICT atomic-write idiom used
+   * elsewhere in this codebase (WheelSizeService.incrementAndCheckQuota /
+   * upsertFitmentRow). Caught here and retried once: a retry re-runs against
+   * the now-committed state and always resolves cleanly, so the caller never
+   * sees the violation.
+   */
   async activate(id: string, customerId: string): Promise<void> {
-    const active = await this.listCustomerVehicles({ customer_id: customerId, is_active: true })
-    for (const v of active) {
-      if (v.id !== id) await this.updateCustomerVehicles({ id: v.id, is_active: false })
+    const exec = async () => {
+      await this.knex_.raw(
+        `with deactivated as (
+           update "customer_vehicle"
+           set "is_active" = false, "updated_at" = now()
+           where "customer_id" = ? and "id" <> ? and "is_active" = true and "deleted_at" is null
+         )
+         update "customer_vehicle"
+         set "is_active" = true, "updated_at" = now()
+         where "id" = ? and "deleted_at" is null
+         returning "id"`,
+        [customerId, id, id]
+      )
     }
-    await this.updateCustomerVehicles({ id, is_active: true })
+    try {
+      await exec()
+    } catch (err: any) {
+      if (err?.code !== "23505") throw err
+      await exec() // one retry: the concurrent writer's commit is now visible
+    }
   }
 
   /**

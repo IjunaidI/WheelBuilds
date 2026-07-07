@@ -5,6 +5,27 @@ import * as api from "@lib/data/customer-vehicles"
 const genId = (): string =>
   typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : `v_${Math.random().toString(36).slice(2)}`
 
+// --- Write-failure error channel (WB-073 G5) --------------------------
+// A tiny module-level pub/sub so a thin React layer (use-garage.ts) can turn
+// a failed network write into a toast without this file importing a UI
+// toast library — keeps MedusaGarage unit-testable in plain Node/vitest
+// (no DOM/sonner dependency) while still giving the storefront a seam to
+// show one. Module-level rather than per-instance: RoutingGarage can swap
+// which MedusaGarage instance is "current" mid-flight (e.g. a logout races
+// an in-flight write), but a failure from ANY instance is still real
+// feedback the user should see.
+type GarageErrorListener = (message: string) => void
+const errorListeners = new Set<GarageErrorListener>()
+const DEFAULT_FAILURE_MESSAGE = "Couldn't save your garage change — please try again."
+/** Subscribe to garage write-failure notifications. Returns an unsubscribe fn. */
+export function onGarageError(listener: GarageErrorListener): () => void {
+  errorListeners.add(listener)
+  return () => { errorListeners.delete(listener) }
+}
+function notifyError(message: string = DEFAULT_FAILURE_MESSAGE) {
+  errorListeners.forEach((l) => l(message))
+}
+
 function toWire(v: Vehicle) {
   return { client_id: v.id, year: v.year, make: v.make, model: v.model, trim: v.trim,
     modificationSlug: v.modificationSlug, canonicalBoltPatterns: v.canonicalBoltPatterns,
@@ -34,11 +55,21 @@ export class MedusaGarage implements GarageProvider {
   // without this they raced the server and could 404 against a vehicle it
   // hadn't created yet (WB-073 G3). Callers stay fire-and-forget; only the
   // underlying network calls get sequenced. Settles to undefined either way
-  // (success or failure) — this only guarantees ORDER, each network call
-  // still swallows its own failure independently, same as before. Absent
-  // for any id not added this session (e.g. loaded from the account), so
-  // those calls fire immediately as before.
+  // (success or failure) — this only guarantees ORDER; a failed create is
+  // now ALSO surfaced (rolled back + toasted) via failedCreateIds below
+  // (WB-073 G5). Absent for any id not added this session (e.g. loaded from
+  // the account), so those calls fire immediately as before.
   private pendingCreate = new Map<string, Promise<void>>()
+  // ids whose createVehicle() rejected THIS session (WB-073 G5). Once a
+  // create fails, add() has already rolled the vehicle out of local state
+  // and toasted — so update()/setActive() queued behind the same
+  // pendingCreate entry must skip their own network call rather than firing
+  // against a vehicle that never reached the server (and rolling back +
+  // toasting a SECOND time for the same root failure). Never populated for
+  // vehicles not created this session, so the "existing account vehicle"
+  // path is unaffected. Not cleaned up — bounded by failed adds per
+  // session, same lifetime tradeoff as the rest of this in-memory instance.
+  private failedCreateIds = new Set<string>()
 
   constructor() {
     this.loaded = typeof window !== "undefined" ? this.load() : Promise.resolve()
@@ -93,11 +124,21 @@ export class MedusaGarage implements GarageProvider {
     if (this.activeId == null) this.activeId = vehicle.id // mirror LocalStorageGarage auto-active
     this.emit()
     // .then(ok, err) rather than .catch() so the settled type is always
-    // Promise<void> — downstream awaiters only care that the network call
-    // has settled, not what it resolved to.
+    // Promise<void> — downstream awaiters (update/setActive) only care that
+    // the network call has settled, not what it resolved to; a failed
+    // create still unblocks them (WB-073 G3 ordering preserved). The
+    // failure itself is now surfaced here: mark it, roll back the
+    // optimistic add, and notify (WB-073 G5).
     const created: Promise<void> = api.createVehicle(toWire(vehicle)).then(
       () => undefined,
-      () => {/* retry/toast */}
+      () => {
+        this.failedCreateIds.add(vehicle.id)
+        // Only toast if there was actually something to undo — if the user
+        // already removed this vehicle themselves before the create
+        // settled, rollbackMissing is a no-op and a toast would just be
+        // confusing noise about a change they don't perceive as pending.
+        if (this.rollbackMissing(vehicle.id)) notifyError()
+      }
     )
     this.pendingCreate.set(vehicle.id, created)
     void created.finally(() => {
@@ -110,32 +151,88 @@ export class MedusaGarage implements GarageProvider {
   update(id: string, patch: Partial<NewVehicle>): Vehicle {
     const idx = this.vehicles.findIndex((v) => v.id === id)
     if (idx === -1) throw new Error(`vehicle ${id} not found`)
-    const updated = { ...this.vehicles[idx], ...patch }
+    const previous = this.vehicles[idx]
+    const updated = { ...previous, ...patch }
     this.vehicles = [...this.vehicles.slice(0, idx), updated, ...this.vehicles.slice(idx + 1)]
     this.emit()
     const createdFirst = this.pendingCreate.get(id) ?? Promise.resolve()
     void createdFirst
-      .then(() =>
-        api.updateVehicle(id, { modificationSlug: updated.modificationSlug, canonicalBoltPatterns: updated.canonicalBoltPatterns,
+      .then(() => {
+        // The create this update was queued behind already failed — add()
+        // has rolled the vehicle back and toasted. Don't fire a write for a
+        // vehicle that never reached the server, and don't toast twice.
+        if (this.failedCreateIds.has(id)) return undefined
+        return api.updateVehicle(id, { modificationSlug: updated.modificationSlug, canonicalBoltPatterns: updated.canonicalBoltPatterns,
           hubBoreMm: updated.hubBoreMm, diameterWindow: updated.diameterWindow, widthWindow: updated.widthWindow,
           offsetWindow: updated.offsetWindow, oemTireSizes: updated.oemTireSizes, oemTires: updated.oemTires, fitmentStatus: updated.fitmentStatus, trim: updated.trim, notes: updated.notes } as any)
-      )
-      .catch(() => {})
+      })
+      .catch(() => {
+        if (this.rollbackUpdate(id, previous)) notifyError()
+      })
     return updated
   }
   remove(id: string): void {
+    const previous = this.vehicles.find((v) => v.id === id)
+    const wasActive = this.activeId === id
     this.vehicles = this.vehicles.filter((v) => v.id !== id)
-    if (this.activeId === id) this.activeId = this.vehicles[0]?.id ?? null
+    if (wasActive) this.activeId = this.vehicles[0]?.id ?? null
     this.emit()
-    void api.deleteVehicle(id).catch(() => {})
+    void api.deleteVehicle(id).catch(() => {
+      if (!previous) return // wasn't present locally to begin with — nothing to restore
+      this.rollbackRemove(previous, wasActive)
+      notifyError()
+    })
   }
   setActive(id: string | null): void {
+    const previous = this.activeId
     this.activeId = id
     this.emit()
     if (id) {
       const createdFirst = this.pendingCreate.get(id) ?? Promise.resolve()
-      void createdFirst.then(() => api.activateVehicle(id)).catch(() => {})
+      void createdFirst
+        .then(() => {
+          // Same guard as update() — a vehicle whose create failed was
+          // already rolled back; don't try to activate it server-side.
+          if (this.failedCreateIds.has(id)) return undefined
+          return api.activateVehicle(id)
+        })
+        .catch(() => {
+          if (this.activeId === id) { this.activeId = previous; this.emit() }
+          notifyError()
+        })
     }
   }
   subscribe(listener: () => void): () => void { this.listeners.add(listener); return () => this.listeners.delete(listener) }
+
+  /**
+   * Removes `id` from local state if still present, falling back the active
+   * vehicle to the next one remaining (same rule the happy-path remove()
+   * uses). Shared by the create-failure rollback (add) and the user-facing
+   * remove()-failure rollback below — both mean "this vehicle doesn't exist,
+   * undo whatever pointed at it." No-ops if `id` is already gone (e.g. the
+   * user removed it themselves before the network call settled) so rollback
+   * stays idempotent instead of re-emitting a no-op change (WB-022).
+   */
+  private rollbackMissing(id: string): boolean {
+    if (!this.vehicles.some((v) => v.id === id)) return false
+    this.vehicles = this.vehicles.filter((v) => v.id !== id)
+    if (this.activeId === id) this.activeId = this.vehicles[0]?.id ?? null
+    this.emit()
+    return true
+  }
+  /** Reverts vehicle `id` back to `previous` if it's still present; no-op (returns false) if it was removed since (e.g. rolled back by a failed create). */
+  private rollbackUpdate(id: string, previous: Vehicle): boolean {
+    const idx = this.vehicles.findIndex((v) => v.id === id)
+    if (idx === -1) return false
+    this.vehicles = [...this.vehicles.slice(0, idx), previous, ...this.vehicles.slice(idx + 1)]
+    this.emit()
+    return true
+  }
+  /** Re-inserts a vehicle removed by remove() once its deleteVehicle() call fails, restoring it as active if it was before the removal. */
+  private rollbackRemove(vehicle: Vehicle, wasActive: boolean) {
+    if (this.vehicles.some((v) => v.id === vehicle.id)) return // re-added since (fresh uuid makes this unlikely, but stay idempotent)
+    this.vehicles = [...this.vehicles, vehicle]
+    if (wasActive) this.activeId = vehicle.id
+    this.emit()
+  }
 }

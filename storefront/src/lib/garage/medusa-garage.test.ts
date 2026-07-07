@@ -13,13 +13,21 @@ vi.mock("@lib/data/customer-vehicles", () => ({
 }))
 
 import * as api from "@lib/data/customer-vehicles"
-import { MedusaGarage } from "./medusa-garage"
+import { MedusaGarage, onGarageError } from "./medusa-garage"
 import type { NewVehicle } from "./types"
 
 const mockedCreate = vi.mocked(api.createVehicle)
 const mockedActivate = vi.mocked(api.activateVehicle)
 const mockedUpdate = vi.mocked(api.updateVehicle)
+const mockedDelete = vi.mocked(api.deleteVehicle)
 const mockedList = vi.mocked(api.listVehicles)
+
+const FAILURE_MESSAGE = "Couldn't save your garage change — please try again."
+
+/** Flushes `n` microtask turns — same convention the G3 tests above use. */
+const flush = async (n = 6) => {
+  for (let i = 0; i < n; i++) await Promise.resolve()
+}
 
 const newVehicle: NewVehicle = { year: 2022, make: "Ford", model: "F-150", savedAt: "t" } as any
 
@@ -115,5 +123,125 @@ describe("MedusaGarage — authed add orders create before activate/update (WB-0
     await Promise.resolve()
 
     expect(mockedActivate).toHaveBeenCalledWith("existing-id")
+  })
+})
+
+describe("MedusaGarage — surfaces write failures with toast + rollback, not .catch(()=>{}) (WB-073 G5)", () => {
+  it("create failure rolls back the optimistic add and notifies once, even with setActive() queued right after add() (pendingCreate path)", async () => {
+    mockedCreate.mockRejectedValue(new Error("network down"))
+    mockedActivate.mockResolvedValue({ active: true } as any)
+    const errors: string[] = []
+    const unsubscribe = onGarageError((msg) => errors.push(msg))
+
+    const garage = new MedusaGarage()
+    const vehicle = garage.add(newVehicle)
+    garage.setActive(vehicle.id)
+
+    // Optimistic state applied synchronously, same as the G3 tests above.
+    expect(garage.list().map((v) => v.id)).toEqual([vehicle.id])
+    expect(garage.getActive()?.id).toBe(vehicle.id)
+
+    await flush()
+
+    // Rolled back to the pre-add snapshot.
+    expect(garage.list()).toEqual([])
+    expect(garage.getActive()).toBeNull()
+    expect(errors).toEqual([FAILURE_MESSAGE]) // exactly one toast for the one real failure
+    // setActive's queued network call must not fire for a vehicle whose
+    // create failed — it never existed server-side.
+    expect(mockedActivate).not.toHaveBeenCalled()
+
+    unsubscribe()
+  })
+
+  it("create failure rolls back the optimistic add and notifies once, even with update() queued right after add() (pendingCreate path)", async () => {
+    mockedCreate.mockRejectedValue(new Error("network down"))
+    mockedUpdate.mockResolvedValue({ vehicle: {} } as any)
+    const errors: string[] = []
+    const unsubscribe = onGarageError((msg) => errors.push(msg))
+
+    const garage = new MedusaGarage()
+    const vehicle = garage.add(newVehicle)
+    garage.update(vehicle.id, { canonicalBoltPatterns: ["5x114.3"] })
+
+    await flush()
+
+    expect(garage.list()).toEqual([])
+    expect(garage.getActive()).toBeNull()
+    expect(errors).toEqual([FAILURE_MESSAGE])
+    expect(mockedUpdate).not.toHaveBeenCalled()
+
+    unsubscribe()
+  })
+
+  it("update() failure restores the pre-update fields and notifies", async () => {
+    mockedCreate.mockResolvedValue({ vehicle: {} } as any)
+    mockedUpdate.mockRejectedValue(new Error("network down"))
+    const errors: string[] = []
+    const unsubscribe = onGarageError((msg) => errors.push(msg))
+
+    const garage = new MedusaGarage()
+    const vehicle = garage.add(newVehicle)
+    await flush() // let create settle so update's network call actually fires
+
+    const before = garage.list()[0]
+    garage.update(vehicle.id, { notes: "lowered" })
+    expect(garage.list()[0].notes).toBe("lowered") // optimistic
+
+    await flush()
+
+    expect(garage.list()[0]).toEqual(before) // rolled back to the pre-update snapshot
+    expect(errors).toEqual([FAILURE_MESSAGE])
+
+    unsubscribe()
+  })
+
+  it("remove() failure re-inserts the vehicle, restores it as active, and notifies", async () => {
+    mockedCreate.mockResolvedValue({ vehicle: {} } as any)
+    mockedDelete.mockRejectedValue(new Error("network down"))
+    const errors: string[] = []
+    const unsubscribe = onGarageError((msg) => errors.push(msg))
+
+    const garage = new MedusaGarage()
+    const vehicle = garage.add(newVehicle)
+    await flush()
+    expect(garage.getActive()?.id).toBe(vehicle.id) // auto-activated as the only vehicle
+
+    garage.remove(vehicle.id)
+    expect(garage.list()).toEqual([])
+    expect(garage.getActive()).toBeNull()
+
+    await flush()
+
+    expect(garage.list().map((v) => v.id)).toEqual([vehicle.id]) // re-inserted
+    expect(garage.getActive()?.id).toBe(vehicle.id) // restored as active
+    expect(errors).toEqual([FAILURE_MESSAGE])
+
+    unsubscribe()
+  })
+
+  it("setActive() failure restores the prior active vehicle and notifies", async () => {
+    mockedCreate.mockResolvedValue({ vehicle: {} } as any)
+    mockedActivate.mockRejectedValue(new Error("network down"))
+    const errors: string[] = []
+    const unsubscribe = onGarageError((msg) => errors.push(msg))
+
+    const garage = new MedusaGarage()
+    const first = garage.add({ ...newVehicle, model: "Explorer" })
+    await flush()
+    const second = garage.add({ ...newVehicle, model: "Ranger" })
+    await flush()
+
+    expect(garage.getActive()?.id).toBe(first.id) // auto-activated on first add
+
+    garage.setActive(second.id)
+    expect(garage.getActive()?.id).toBe(second.id) // optimistic
+
+    await flush()
+
+    expect(garage.getActive()?.id).toBe(first.id) // rolled back
+    expect(errors).toEqual([FAILURE_MESSAGE])
+
+    unsubscribe()
   })
 })

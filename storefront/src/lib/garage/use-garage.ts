@@ -1,8 +1,23 @@
 "use client"
 
 import { useSyncExternalStore } from "react"
+import { toast } from "sonner"
 import { garage } from "./index"
+import { onGarageError } from "./medusa-garage"
 import { Vehicle, NewVehicle } from "./types"
+
+// Wire garage write-failures to a toast once, at module scope rather than
+// inside the hook body (WB-073 G5). useGarage() is called from several
+// components at once (Nav, GaragePane, ...) — subscribing per-hook-instance
+// would fire one toast per mounted consumer for the SAME failure. The
+// module only ever evaluates this once per page load. Guarded by
+// `typeof window` because "use client" modules still execute at module
+// scope during SSR (client components are rendered server-side for the
+// initial HTML before hydration) — same guard MedusaGarage/RoutingGarage
+// already use for their own client-only startup work.
+if (typeof window !== "undefined") {
+  onGarageError((message) => toast.error(message))
+}
 
 type GarageSnapshot = {
   vehicles: Vehicle[]

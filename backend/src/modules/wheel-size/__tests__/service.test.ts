@@ -147,6 +147,32 @@ describe("WheelSizeService.getFitment region fallback", () => {
   })
 })
 
+describe("WheelSizeService.resolveByModel quota exhaustion mid-lookup (WB-072 B4)", () => {
+  it("throws QuotaOutageError (not a cached not_found) when quota runs out on the same-region trim-retry", async () => {
+    // Primary (usdm + trim) comes back empty, so the trim-retry fires; the quota
+    // check for THAT retry is the one exhausted (ceiling: 1 — primary's own check
+    // already consumed the only unit).
+    const empty = { status: 200, empty: false, body: { data: [] } }
+    const { svc, store } = makeService([empty], { ceiling: 1 })
+    await expect(
+      svc.getFitment({ make: "honda", model: "accord", modificationSlug: "m", region: "usdm" })
+    ).rejects.toThrow(/outage/i)
+    expect(store.fitment.size).toBe(0) // no persisted not_found sentinel — this was an outage, not a no-match
+  })
+
+  it("throws QuotaOutageError (not a cached not_found) when quota runs out during the region-probe loop", async () => {
+    const { svc, calls, store } = makeRegionService(
+      { usdm: emptyWithRegions({ eudm: 3 }) },
+      { ceiling: 1 } // primary check consumes the only unit; the eudm probe's check fails
+    )
+    await expect(
+      svc.getFitment({ make: "bmw", model: "3-series", year: "2022", region: "usdm" })
+    ).rejects.toThrow(/outage/i)
+    expect(calls.map((c) => c.region)).toEqual(["usdm"]) // never reached the eudm probe
+    expect(store.fitment.size).toBe(0)
+  })
+})
+
 describe("WheelSizeService.reverseFitment", () => {
   function makeReverseService(rows: any[]) {
     const svc = new (WheelSizeService as any)({ logger: { warn() {}, error() {} } }, { apiKey: "k", baseUrl: "b", defaultRegion: "usdm" })

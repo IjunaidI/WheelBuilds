@@ -171,7 +171,7 @@ class WheelSizeService extends MedusaService({ WheelSizeCatalog, WheelSizeFitmen
     // meta.regions, a better fallback hint than the trim-narrowed one.
     let emptyBody = primary.body
     if (p.modificationSlug) {
-      if (!(await this.incrementAndCheckQuota())) return { body: emptyBody, regionUsed: p.region }
+      if (!(await this.incrementAndCheckQuota())) throw new QuotaOutageError()
       const broad = await this.client_.byModel({ make: p.make, model: p.model, year: p.year, region: p.region })
       if (broad.status < 300 && this.hasData(broad.body)) return { body: broad.body, regionUsed: p.region }
       if (broad.status < 300) emptyBody = broad.body
@@ -179,7 +179,7 @@ class WheelSizeService extends MedusaService({ WheelSizeCatalog, WheelSizeFitmen
 
     let firstWithData: { body: any; regionUsed: string } | null = null
     for (const region of this.otherRegionsWithData(emptyBody, p.region)) {
-      if (!(await this.incrementAndCheckQuota())) break // out of daily quota — stop probing
+      if (!(await this.incrementAndCheckQuota())) throw new QuotaOutageError() // out of daily quota mid-lookup — outage, not no-match
       let res: any
       try {
         // Drop the modification slug — it is region-specific (a usdm trim slug won't

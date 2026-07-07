@@ -66,7 +66,10 @@ const DiscoveryProductCard = ({ product, fit = false }: DiscoveryProductCardProp
       </Display>
 
       <div className="flex items-center gap-1.5 mt-2">
-        {(product.finishes.length ? product.finishes : ["black"]).slice(0, 3).map((f, i) => (
+        {/* Omit dots entirely for a genuinely finish-less product — do not
+            re-assert the "defaults to black" claim D6 removed at the mapper
+            (WB-074 D6/D7 review). */}
+        {product.finishes.slice(0, 3).map((f, i) => (
           <span
             key={`${f}-${i}`}
             aria-hidden
@@ -78,7 +81,7 @@ const DiscoveryProductCard = ({ product, fit = false }: DiscoveryProductCardProp
           tone="muted"
           style={{ fontSize: 10, marginLeft: 4, letterSpacing: "0.06em" }}
         >
-          {product.diameter}" · {product.boltPattern}
+          {product.diameter}"{product.boltPattern ? ` · ${product.boltPattern}` : ""}
         </Label>
       </div>
 

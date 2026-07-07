@@ -36,6 +36,7 @@ import { unstable_cache } from "next/cache"
 import { discoveryCacheKey } from "./cache-key"
 import { sdk } from "@lib/config"
 import { productHasFittingVariant } from "@lib/fitment/product-has-fitting-variant"
+import { isRealBoltPattern } from "@modules/product-detail/data/group-sizes"
 
 // Re-export so any existing imports from this file keep working.
 export { parseQueryFromSearchParams } from "./types"
@@ -107,6 +108,11 @@ export type Hit = {
 
 export function hitToProduct(h: Hit): DiscoveryProduct {
   const createdMs = h.created_at ? Date.parse(h.created_at) : NaN
+  // Gated through isRealBoltPattern so the WB-048 "BLANK" placeholder never
+  // reaches the flagship discovery grid card (WB-074 D6/D7 review — the
+  // backend transformer indexes bolt_pattern_raw into Meili unfiltered; this
+  // mirrors the same gate already applied at toFeatured/mapToDetail).
+  const rawBoltPattern = h.bolt_patterns?.[0]
   return {
     id: h.id,
     handle: h.handle,
@@ -117,7 +123,7 @@ export function hitToProduct(h: Hit): DiscoveryProduct {
     finishes: (h.finishes as Finish[]) ?? [],
     diameter: h.diameters?.[0] ?? 0,
     width: h.widths?.[0] ?? 0,
-    boltPattern: h.bolt_patterns?.[0] ?? "",
+    boltPattern: isRealBoltPattern(rawBoltPattern) ? (rawBoltPattern as string) : "",
     boltPatternsCanonical: h.bolt_patterns_canonical ?? [],
     isNew: Number.isFinite(createdMs) ? Date.now() - createdMs < NEW_MS : false,
   }

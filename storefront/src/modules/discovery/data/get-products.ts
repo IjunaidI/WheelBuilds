@@ -88,7 +88,7 @@ function sortExpr(sort: SortOption): string[] {
   }
 }
 
-type Hit = {
+export type Hit = {
   id: string
   handle: string
   title: string
@@ -104,7 +104,7 @@ type Hit = {
   created_at: string | null
 }
 
-function hitToProduct(h: Hit): DiscoveryProduct {
+export function hitToProduct(h: Hit): DiscoveryProduct {
   const createdMs = h.created_at ? Date.parse(h.created_at) : NaN
   return {
     id: h.id,
@@ -123,20 +123,44 @@ function hitToProduct(h: Hit): DiscoveryProduct {
 }
 
 /**
- * Rebuild disjunctive-ish facet counts from an in-memory product list (used
- * only in fit mode, where results are post-filtered client-side after the
- * bolt-pattern search — Meili's own facetDistribution would still reflect the
- * coarse, pre-fit-filter candidate set).
+ * Rebuild fit-mode facet counts from the RAW Meili hit arrays (WB-074 D1) —
+ * not the `[0]`-collapsed `DiscoveryProduct.diameter`/`.boltPattern` fields,
+ * which silently dropped a multi-diameter or multi-bolt-pattern wheel from
+ * every value but its first. Every element of `diameters` / `bolt_patterns`
+ * / `finishes` is tallied, so a hit with `diameters:[18,20]` now contributes
+ * to both the 18 and 20 buckets. Mirrors the tire twin's
+ * `facetsFromTireHits` (tire-discovery/data/get-tire-products.ts).
+ *
+ * NOT disjunctive (D3 deferred — see WB-074 Task 1 report for the full
+ * analysis). The fit branch's single Meili candidate query already applies
+ * EVERY active sidebar filter (`buildFilters(query.filters, query)`, no
+ * `skip`), so by the time hits reach this function, any product excluded by
+ * e.g. the diameter filter is already absent from the candidate list —
+ * there is no in-memory way to recover "what would diameter=20 show if the
+ * diameter filter weren't applied" from data we never fetched. Making this
+ * genuinely disjunctive would need either N extra Meili round-trips (one
+ * per dimension, still gated by the real per-variant fit check — violates
+ * the "cheap, no extra round-trips" budget) or re-scoping the single
+ * candidate query to the fit constraint only, which risks truncating the
+ * sidebar-filtered set under the 200-candidate cap and silently
+ * under-counting `totalCount`/pagination for the PRODUCT LIST — a worse bug
+ * than an honest non-disjunctive facet count. So: counts here are complete
+ * per-dimension (D1) but scoped "within your vehicle's fitment + your
+ * other active filters" — selecting a value can still hide its own
+ * siblings until D3 lands.
+ * TODO(D3): true disjunctive fit-mode facets need a redesigned fetch (e.g.
+ * a fit-only candidate query for facet purposes, separate from the
+ * sidebar-filtered query that drives the product list + pagination).
  */
-function facetsFromProducts(products: DiscoveryProduct[]): FacetCounts {
+export function facetsFromHits(hits: Hit[]): FacetCounts {
   const tally = (m: Record<string, number>, k: string) => { m[k] = (m[k] ?? 0) + 1 }
   const brands: Record<string, number> = {}, diameters: Record<string, number> = {}
   const boltPatterns: Record<string, number> = {}, finishes: Record<string, number> = {}
-  for (const p of products) {
-    if (p.brand) tally(brands, p.brand)
-    if (p.diameter) tally(diameters, String(p.diameter))
-    if (p.boltPattern) tally(boltPatterns, p.boltPattern)
-    for (const f of p.finishes ?? []) tally(finishes, f)
+  for (const h of hits) {
+    if (h.brand) tally(brands, h.brand)
+    for (const d of h.diameters ?? []) tally(diameters, String(d))
+    for (const bp of h.bolt_patterns ?? []) tally(boltPatterns, bp)
+    for (const f of h.finishes ?? []) tally(finishes, f)
   }
   return { brands, diameters, boltPatterns, finishes }
 }
@@ -200,16 +224,17 @@ async function fetchDiscoveryProducts(
 
     // If the fetch failed entirely, fall back to the coarse candidates (never empty a valid fit result).
     const fetched = Object.keys(variantsById).length > 0
-    const fitting = hits
-      .map(hitToProduct)
-      .filter((p) => !fetched || productHasFittingVariant(variantsById[p.id], vf))
+    const candidates = hits.map((hit) => ({ hit, product: hitToProduct(hit) }))
+    const fitting = candidates.filter(
+      ({ product }) => !fetched || productHasFittingVariant(variantsById[product.id], vf)
+    )
 
     const start = (query.page - 1) * pageSize
     return {
-      products: fitting.slice(start, start + pageSize),
+      products: fitting.slice(start, start + pageSize).map((c) => c.product),
       totalCount: fitting.length,
       pageSize,
-      facets: facetsFromProducts(fitting),
+      facets: facetsFromHits(fitting.map((c) => c.hit)),
     }
   }
 

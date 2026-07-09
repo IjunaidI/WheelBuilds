@@ -37,9 +37,12 @@ const EmptyCart = () => (
               <Icon name="arrow-right" size={16} color="white" />
             </LocalizedClientLink>
           </Button>
+          {/* GARAGE-DISABLED (WB-076): was "Open my Garage" -> /account. The
+              search drawer isn't mounted on checkout routes, so route home to
+              the hero's vehicle selector instead. */}
           <Button asChild variant="outline" size="lg">
-            <LocalizedClientLink href="/account">
-              Open my Garage
+            <LocalizedClientLink href="/">
+              Select your vehicle
             </LocalizedClientLink>
           </Button>
         </div>

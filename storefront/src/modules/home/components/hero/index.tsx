@@ -12,14 +12,11 @@ import { openSearch } from "@lib/stores/search-store"
 import { useGarage } from "@lib/garage/use-garage"
 
 const Hero = ({ brandCount }: { brandCount?: number }) => {
-  const { active, vehicles } = useGarage()
+  const { active } = useGarage()
 
-  const garageCountLabel =
-    vehicles.length === 0
-      ? "BUILD YOUR GARAGE"
-      : vehicles.length === 1
-        ? "USE MY GARAGE (1 SAVED)"
-        : `USE MY GARAGE (${vehicles.length} SAVED)`
+  // GARAGE-DISABLED (WB-076): was "USE MY GARAGE (N SAVED)" / "BUILD YOUR
+  // GARAGE" off the saved-vehicles list — the cache now holds one vehicle.
+  const vehicleCtaLabel = active ? "CHANGE VEHICLE" : "SELECT VEHICLE"
 
   const primaryCtaText = active
     ? `Find My Fit · See wheels for your ${active.make}`
@@ -138,7 +135,7 @@ const Hero = ({ brandCount }: { brandCount?: number }) => {
             className="font-[var(--mono)] tracking-[0.06em]"
           >
             <Icon name="garage" size={14} strokeWidth={1.6} />
-            {garageCountLabel}
+            {vehicleCtaLabel}
           </Button>
         </div>
 

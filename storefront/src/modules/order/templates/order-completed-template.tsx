@@ -121,9 +121,10 @@ export default function OrderCompletedTemplate({
             <div className="grid grid-cols-1 xsmall:grid-cols-3 gap-3">
               {[
                 {
+                  // GARAGE-DISABLED (WB-076): was "Add to your Garage".
                   i: "garage" as const,
-                  h: "Add to your Garage",
-                  s: "Track this build, get install tips",
+                  h: "Shop for your vehicle",
+                  s: "Wheels and tires matched to your ride",
                 },
                 {
                   i: "user" as const,

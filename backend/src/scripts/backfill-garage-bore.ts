@@ -1,3 +1,6 @@
+// GARAGE-DISABLED (WB-076): this manual script requires the customer-vehicle
+// module to be re-registered in medusa-config.js before it can run — the
+// module resolve below will throw while the garage is retired.
 import { ExecArgs } from "@medusajs/framework/types"
 import { ContainerRegistrationKeys } from "@medusajs/framework/utils"
 import { CUSTOMER_VEHICLE_MODULE } from "../modules/customer-vehicle"

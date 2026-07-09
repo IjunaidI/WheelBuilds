@@ -1,4 +1,15 @@
 import { MedusaRequest, MedusaResponse } from "@medusajs/framework"
+
+// GARAGE-DISABLED (WB-076): see ../route.ts for the full note. 410 stub;
+// original preserved below for restoration.
+const gone = (_req: MedusaRequest, res: MedusaResponse): void => {
+  res.status(410).json({ error: "garage_retired" })
+}
+export const POST = gone
+
+/* GARAGE-DISABLED (WB-076) — original handler:
+
+import { MedusaRequest, MedusaResponse } from "@medusajs/framework"
 import { CUSTOMER_VEHICLE_MODULE } from "../../../../../modules/customer-vehicle"
 import { parseVehicleMerge } from "../validators"
 
@@ -15,3 +26,4 @@ export async function POST(req: MedusaRequest, res: MedusaResponse): Promise<voi
   const vehicles = await svc.mergeForCustomer(customerId, parsed.data.vehicles)
   res.status(200).json({ vehicles })
 }
+*/

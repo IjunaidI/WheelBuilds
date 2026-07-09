@@ -229,7 +229,12 @@ const medusaConfig = {
         warmBatchSize: WHEEL_SIZE_WARM_BATCH ? Number(WHEEL_SIZE_WARM_BATCH) : 200,
       },
     }] : []),
-    { resolve: './src/modules/customer-vehicle' },
+    // GARAGE-DISABLED (WB-076, 2026-07-09): the account garage is retired —
+    // the storefront keeps one active vehicle in the browser cache instead.
+    // Module source/tests/migrations are intact and its DB tables were NOT
+    // dropped; the store routes under src/api/store/customer/vehicles are 410
+    // stubs. Uncomment to restore (and see the other GARAGE-DISABLED seams).
+    // { resolve: './src/modules/customer-vehicle' },
     { resolve: './src/modules/newsletter' },
   ],
   plugins: [

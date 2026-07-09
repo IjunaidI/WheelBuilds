@@ -1,4 +1,16 @@
 import { MedusaRequest, MedusaResponse } from "@medusajs/framework"
+
+// GARAGE-DISABLED (WB-076): see ../route.ts for the full note. 410 stubs;
+// originals preserved below for restoration.
+const gone = (_req: MedusaRequest, res: MedusaResponse): void => {
+  res.status(410).json({ error: "garage_retired" })
+}
+export const POST = gone
+export const DELETE = gone
+
+/* GARAGE-DISABLED (WB-076) — original handlers:
+
+import { MedusaRequest, MedusaResponse } from "@medusajs/framework"
 import { CUSTOMER_VEHICLE_MODULE } from "../../../../../modules/customer-vehicle"
 import { parseVehicleUpdate } from "../validators"
 // NOTE: the [id] path segment is the storefront client_id, not the Medusa PK.
@@ -32,3 +44,4 @@ export async function DELETE(req: MedusaRequest, res: MedusaResponse): Promise<v
   await svc.deleteCustomerVehicles(row.id)
   res.status(200).json({ id, deleted: true })
 }
+*/

@@ -7,7 +7,10 @@ import { describe, it, expect, vi, beforeEach } from "vitest"
 vi.mock("@lib/data/customer", () => ({ getCustomer: vi.fn() }))
 
 import { getCustomer } from "@lib/data/customer"
-import { RoutingGarage } from "../index"
+// GARAGE-DISABLED (WB-076): RoutingGarage moved out of ../index (the app
+// singleton is now the cache-only SingleVehicleGarage); these tests keep the
+// mothballed sync machinery verified from its new home.
+import { RoutingGarage } from "../routing-garage"
 import { LocalStorageGarage } from "../local-storage-garage"
 import type { GarageProvider } from "../provider"
 import type { NewVehicle, Vehicle } from "../types"

@@ -95,13 +95,15 @@ Patterns established by this work:
 
 All Medusa API calls go through `lib/data/*`. Server components call those directly (they're async). Client components call them through Server Actions in `modules/<feature>/actions.ts`. Don't import the Medusa SDK directly from a component.
 
-## Garage abstraction
+## Vehicle store (garage retired — WB-076)
 
-`lib/garage/` defines a `GarageProvider` interface ([provider.ts](src/lib/garage/provider.ts)) and exports a singleton `garage` ([index.ts](src/lib/garage/index.ts)). Today the singleton is a `LocalStorageGarage` ([local-storage-garage.ts](src/lib/garage/local-storage-garage.ts)); when Phase 2.2 (customer-vehicle backend) lands, swap that one line to a `MedusaGarage` implementation. The `Vehicle` type already carries optional fitment fields so the type doesn't shift on swap.
+**The garage feature is retired** (client decision 2026-07-09: shoppers pick their car as guests; the account garage was never used). The storefront keeps **exactly one active vehicle in the browser's localStorage cache**, identical for guests and logged-in customers, and every fitment surface (Discovery `?fit=`, tire discovery, PDP fit view, checkout fit card) reads it.
 
-Components read via the `useGarage()` hook ([use-garage.ts](src/lib/garage/use-garage.ts)). Don't read `localStorage` directly anywhere else.
+`lib/garage/` still defines the `GarageProvider` interface ([provider.ts](src/lib/garage/provider.ts)); the singleton `garage` ([index.ts](src/lib/garage/index.ts)) is a `SingleVehicleGarage` ([single-vehicle-garage.ts](src/lib/garage/single-vehicle-garage.ts)) — a `LocalStorageGarage` subclass whose `add()` **replaces** the stored vehicle (same `garage:*` storage keys, so pre-retirement active vehicles survived). Components read via the `useGarage()` hook ([use-garage.ts](src/lib/garage/use-garage.ts)); don't read `localStorage` directly anywhere else.
 
-The static Year/Make/Model lookup data is at [`vehicle-data.ts`](src/lib/garage/vehicle-data.ts) and gets replaced by the wheel-size.com dataset when Phase 2.1 lands.
+**Mothballed, not deleted** — grep `GARAGE-DISABLED` for every seam. `RoutingGarage` (localStorage ⇄ account sync + login merge) lives in [routing-garage.ts](src/lib/garage/routing-garage.ts), outside the app import graph but still compiled and unit-tested (`routing-identity.test.ts`), alongside `medusa-garage.ts`, `merge.ts`, `garage-auth-sync.tsx` (unmounted from `(main)/layout.tsx`), `lib/data/customer-vehicles.ts`, the drawer's `garage-pane.tsx`/`tab.tsx`, and the account `GarageManager` (its `/account/garage` route 404s). The backend `customer-vehicle` module is unregistered in `medusa-config.js` and its store routes return 410 — restoration steps are in [the WB-076 spec](../docs/done/specs/2026-07-09-retire-garage-single-vehicle-design.md).
+
+The static Year/Make/Model lookup data is at [`vehicle-data.ts`](src/lib/garage/vehicle-data.ts); live fitment resolution comes from the wheel-size.com module via `lib/data/fitment.ts`.
 
 ## Client stores
 

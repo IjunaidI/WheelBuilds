@@ -1,11 +1,15 @@
 "use client"
 
 import { useSyncExternalStore } from "react"
-import { toast } from "sonner"
 import { garage } from "./index"
-import { onGarageError } from "./medusa-garage"
 import { Vehicle, NewVehicle } from "./types"
 
+// GARAGE-DISABLED (WB-076): the write-failure toast channel below fed off
+// MedusaGarage's network writes (WB-073 G5). The cache-only provider has no
+// network writes, so the wiring is dormant — re-enable with the garage.
+// import { toast } from "sonner"
+// import { onGarageError } from "./medusa-garage"
+//
 // Wire garage write-failures to a toast once, at module scope rather than
 // inside the hook body (WB-073 G5). useGarage() is called from several
 // components at once (Nav, GaragePane, ...) — subscribing per-hook-instance
@@ -15,9 +19,9 @@ import { Vehicle, NewVehicle } from "./types"
 // scope during SSR (client components are rendered server-side for the
 // initial HTML before hydration) — same guard MedusaGarage/RoutingGarage
 // already use for their own client-only startup work.
-if (typeof window !== "undefined") {
-  onGarageError((message) => toast.error(message))
-}
+// if (typeof window !== "undefined") {
+//   onGarageError((message) => toast.error(message))
+// }
 
 type GarageSnapshot = {
   vehicles: Vehicle[]

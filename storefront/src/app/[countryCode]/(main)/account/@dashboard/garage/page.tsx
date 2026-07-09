@@ -1,3 +1,15 @@
+import { notFound } from "next/navigation"
+
+// GARAGE-DISABLED (WB-076): the account garage is retired — the active
+// vehicle lives only in the browser cache, so this route 404s. The original
+// page is preserved below; the GarageManager component
+// (@modules/account/components/garage) is kept intact for restoration.
+export default function Garage() {
+  notFound()
+}
+
+/* GARAGE-DISABLED (WB-076) — original page:
+
 import { Metadata } from "next"
 import { notFound } from "next/navigation"
 
@@ -28,3 +40,4 @@ export default async function Garage() {
     </div>
   )
 }
+*/

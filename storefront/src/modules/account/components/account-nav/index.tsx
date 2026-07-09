@@ -76,6 +76,8 @@ const AccountNav = ({
                     </>
                   </LocalizedClientLink>
                 </li>
+                {/* GARAGE-DISABLED (WB-076): the account garage is retired —
+                    the active vehicle lives only in the browser cache.
                 <li>
                   <LocalizedClientLink
                     href="/account/garage"
@@ -91,6 +93,7 @@ const AccountNav = ({
                     </>
                   </LocalizedClientLink>
                 </li>
+                */}
                 <li>
                   <LocalizedClientLink
                     href="/account/orders"
@@ -157,6 +160,7 @@ const AccountNav = ({
                   Addresses
                 </AccountNavLink>
               </li>
+              {/* GARAGE-DISABLED (WB-076):
               <li>
                 <AccountNavLink
                   href="/account/garage"
@@ -166,6 +170,7 @@ const AccountNav = ({
                   Garage
                 </AccountNavLink>
               </li>
+              */}
               <li>
                 <AccountNavLink
                   href="/account/orders"

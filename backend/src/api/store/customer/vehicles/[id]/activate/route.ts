@@ -1,4 +1,15 @@
 import { MedusaRequest, MedusaResponse } from "@medusajs/framework"
+
+// GARAGE-DISABLED (WB-076): see ../../route.ts for the full note. 410 stub;
+// original preserved below for restoration.
+const gone = (_req: MedusaRequest, res: MedusaResponse): void => {
+  res.status(410).json({ error: "garage_retired" })
+}
+export const POST = gone
+
+/* GARAGE-DISABLED (WB-076) — original handler:
+
+import { MedusaRequest, MedusaResponse } from "@medusajs/framework"
 import { CUSTOMER_VEHICLE_MODULE } from "../../../../../../modules/customer-vehicle"
 // NOTE: the [id] path segment is the storefront client_id, not the Medusa PK.
 const actor = (req: MedusaRequest) => (req as any).auth_context?.actor_id as string | undefined
@@ -12,3 +23,4 @@ export async function POST(req: MedusaRequest, res: MedusaResponse): Promise<voi
   await svc.activate(row.id, customerId)
   res.json({ id, active: true })
 }
+*/

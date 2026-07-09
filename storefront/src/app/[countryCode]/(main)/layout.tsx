@@ -4,8 +4,10 @@ import Footer from "@modules/layout/templates/footer"
 import Nav from "@modules/layout/templates/nav"
 import SearchMount from "@modules/search/components/search-mount"
 import { getBaseURL } from "@lib/util/env"
-import { getCustomer } from "@lib/data/customer"
-import GarageAuthSync from "@lib/garage/garage-auth-sync"
+// GARAGE-DISABLED (WB-076): account garage sync unmounted — the active
+// vehicle lives only in the browser cache now.
+// import { getCustomer } from "@lib/data/customer"
+// import GarageAuthSync from "@lib/garage/garage-auth-sync"
 import { TooltipProvider } from "@/components/ui/tooltip"
 import { Toaster } from "@/components/ui/sonner"
 
@@ -14,11 +16,11 @@ export const metadata: Metadata = {
 }
 
 export default async function PageLayout(props: { children: React.ReactNode }) {
-  const customer = await getCustomer()
+  // GARAGE-DISABLED (WB-076): const customer = await getCustomer()
   return (
     <TooltipProvider delayDuration={150} skipDelayDuration={300}>
       <div className="frame">
-        <GarageAuthSync customerId={customer?.id ?? null} />
+        {/* GARAGE-DISABLED (WB-076): <GarageAuthSync customerId={customer?.id ?? null} /> */}
         <Nav />
         {props.children}
         <Footer />

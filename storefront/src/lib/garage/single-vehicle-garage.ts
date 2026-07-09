@@ -9,7 +9,7 @@ import type { NewVehicle, Vehicle } from "./types"
  * any legacy multi-vehicle list). Same storage keys as LocalStorageGarage,
  * so pre-existing active vehicles survive the cutover. To restore the full
  * garage, follow the GARAGE-DISABLED seams listed in
- * docs/in-progress/specs/2026-07-09-retire-garage-single-vehicle-design.md.
+ * docs/done/specs/2026-07-09-retire-garage-single-vehicle-design.md.
  */
 export class SingleVehicleGarage extends LocalStorageGarage {
   add(v: NewVehicle): Vehicle {

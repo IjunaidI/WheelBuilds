@@ -37,6 +37,15 @@ Small subclass of `LocalStorageGarage` enforcing "the cache holds at most one ve
 
 ### Commented out (`GARAGE-DISABLED` markers at every seam)
 
+> **As executed (2026-07-09):** the seams below are literal comment-outs, but the garage-only
+> LIBRARY files were disconnected rather than mass-commented — vitest fails a test file with
+> zero tests, and disconnected-but-compiled code can't rot. `RoutingGarage` moved verbatim to
+> `lib/garage/routing-garage.ts` (imported only by `routing-identity.test.ts`); `medusa-garage.ts`,
+> `merge.ts`, `garage-auth-sync.tsx`, `customer-vehicles.ts`, `garage-pane.tsx`, `tab.tsx`, and
+> `GarageManager` stay intact with no app-graph importers, and their unit suites still run.
+> Backend routes became deliberate **410 `garage_retired` stubs** (originals commented in-file)
+> instead of empty files, so the route loader and any stale clients stay well-behaved.
+
 Storefront:
 - `lib/garage/index.ts` — `RoutingGarage` class + `MedusaGarage`/`merge`/`getCustomer` imports.
 - `lib/garage/medusa-garage.ts`, `lib/garage/merge.ts`, `lib/garage/garage-auth-sync.tsx`,

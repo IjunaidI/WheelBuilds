@@ -12,51 +12,64 @@ function makeService() {
 }
 
 /**
- * Fake `knex_.raw` for activate()'s atomic target-gated deactivate-others +
- * activate-target statement (WB-073 G4 + review fix). Mirrors the real
- * SQL's phases against an in-memory `rows` array:
- *   1. resolve `target` — the row matching (customer_id, id), not deleted.
- *      If it doesn't exist (unknown id / soft-deleted / belongs to another
- *      customer), the real SQL's `deactivated` CTE is gated on
- *      `exists (select 1 from target)` and never fires — so this returns
- *      `{ rows: [] }` immediately, touching NOTHING, before any deactivation.
- *   2. snapshot the customer's other currently-active rows,
- *   3. yield (an explicit await — the window a concurrent statement's row
- *      lock / commit would occupy in real Postgres),
- *   4. deactivate that snapshotted set,
- *   5. activate the target — UNLESS some other row for this customer is
- *      (by now) active that our snapshot didn't know about, in which case a
- *      real partial-unique-index write would raise 23505; we throw the same
- *      shape here so activate()'s catch+retry path is exercised for real.
- * Two Promise.all'd activate() calls each invoke this once per attempt with
- * no synchronous work between their own start and their `await tick`, so the
- * yield point genuinely interleaves them (JS runs each call synchronously up
- * to its first await) — a faithful proxy for concurrent-transaction races
- * without a real database.
+ * Fake knex for activate()'s TRANSACTION-based deactivate-then-activate (WB-073
+ * G4 + the live-Postgres fix). The real code opens ONE transaction and issues
+ * THREE ordered raw statements: (1) resolve `target` (customer_id, id, not
+ * deleted); (2) deactivate the customer's OTHER active rows; (3) activate the
+ * target, `returning "id"`. Running the deactivate as its own statement BEFORE
+ * the activate is the whole point of the fix — it keeps the non-deferrable
+ * PARTIAL index `UQ_customer_vehicle_one_active` from ever seeing two active
+ * rows at once, which a single combined statement / data-modifying CTE could,
+ * raising 23505 on a real Postgres.
  *
- * binds mirror the real SQL's positional order: [customerId, id, customerId, id].
+ * This stub models `transaction(cb)` by handing the callback a `trx.raw` that
+ * dispatches on the SQL text (select / is_active=false / is_active=true) over an
+ * in-memory `rows` array. The deactivate phase awaits a tick so two Promise.all'd
+ * activate() calls genuinely interleave (a proxy for concurrent transactions):
+ * whichever activates second finds the other already active and throws a 23505,
+ * exercising activate()'s catch+retry — the retry re-runs against the now-settled
+ * state and resolves. An unknown/unowned/soft-deleted id makes phase (1) return
+ * no rows, so activate() early-returns 0 WITHOUT deactivating anything (the
+ * customer's real active vehicle is never touched) and reports NOT_FOUND.
+ *
+ * binds mirror the real SQL's positional order for every statement: [customerId, id].
  */
 function installActivateKnexStub(svc: any, rows: any[]) {
   const tick = () => new Promise((r) => setTimeout(r, 0))
-  svc.knex_ = {
-    raw: async (_sql: string, binds: any[] = []) => {
+  const makeTrx = () => ({
+    raw: async (sql: string, binds: any[] = []) => {
       const [customerId, targetId] = binds
-      const target = rows.find((r) => r.id === targetId && r.customer_id === customerId && !r.deleted_at)
-      if (!target) return { rows: [] } // target CTE empty -> deactivated's EXISTS guard is false -> full no-op
-      const toDeactivate = rows.filter(
+      if (/^\s*select/i.test(sql)) {
+        const target = rows.find((r) => r.id === targetId && r.customer_id === customerId && !r.deleted_at)
+        return { rows: target ? [{ id: target.id }] : [] }
+      }
+      if (/"is_active"\s*=\s*false/i.test(sql)) {
+        const toDeactivate = rows.filter(
+          (r) => r.customer_id === customerId && r.id !== targetId && r.is_active && !r.deleted_at
+        )
+        await tick() // yield — the window a concurrent transaction can interleave through
+        for (const r of toDeactivate) r.is_active = false
+        return { rows: [] }
+      }
+      // activate target — if a concurrent transaction activated another of this
+      // customer's rows between our deactivate and now, a real partial-unique
+      // index write raises 23505; mirror that so the retry path is exercised.
+      const othersStillActive = rows.some(
         (r) => r.customer_id === customerId && r.id !== targetId && r.is_active && !r.deleted_at
       )
-      await tick()
-      for (const r of toDeactivate) r.is_active = false
-      const othersStillActive = rows.some((r) => r.customer_id === customerId && r.id !== targetId && r.is_active)
       if (othersStillActive) {
         const err: any = new Error('duplicate key value violates unique constraint "UQ_customer_vehicle_one_active"')
         err.code = "23505"
         throw err
       }
+      const target = rows.find((r) => r.id === targetId && r.customer_id === customerId && !r.deleted_at)
+      if (!target) return { rows: [] }
       target.is_active = true
       return { rows: [{ id: target.id }] }
     },
+  })
+  svc.knex_ = {
+    transaction: async (cb: (trx: any) => Promise<any>) => cb(makeTrx()),
   }
 }
 
@@ -71,31 +84,46 @@ describe("activate enforces single-active", () => {
     expect(rows.find(r => r.id === "z").is_active).toBe(true) // other customer untouched
   })
 
-  it("issues a single atomic SQL statement (deactivate-others + activate-target) — no separate list/update calls", async () => {
+  it("runs inside ONE transaction, resolves target then deactivates BEFORE activating — no MedusaService list/update calls", async () => {
     const { svc, rows } = makeService()
     rows.push({ id: "a", customer_id: "c1", is_active: true }, { id: "b", customer_id: "c1", is_active: false })
     svc.listCustomerVehicles = async () => { throw new Error("must not be called by activate()") }
     svc.updateCustomerVehicles = async () => { throw new Error("must not be called by activate()") }
-    const calls: { sql: string; binds: any[] }[] = []
+    const order: string[] = []
     svc.knex_ = {
-      raw: async (sql: string, binds: any[] = []) => {
-        calls.push({ sql, binds })
-        const [customerId, targetId] = binds
-        const target = rows.find((r) => r.id === targetId && r.customer_id === customerId)
-        if (!target) return { rows: [] }
-        rows.forEach((r) => { if (r.customer_id === customerId && r.id !== targetId) r.is_active = false })
-        target.is_active = true
-        return { rows: [{ id: target.id }] }
+      transaction: async (cb: (trx: any) => Promise<any>) => {
+        order.push("begin")
+        const trx = {
+          raw: async (sql: string, binds: any[] = []) => {
+            const [customerId, targetId] = binds
+            // Every statement is scoped by BOTH customer_id and the target id
+            // (WB-073 G4 review) so a foreign/unknown id touches nothing.
+            expect(binds).toEqual(["c1", "b"])
+            if (/^\s*select/i.test(sql)) {
+              order.push("select")
+              const t = rows.find((r) => r.id === targetId && r.customer_id === customerId)
+              return { rows: t ? [{ id: t.id }] : [] }
+            }
+            if (/"is_active"\s*=\s*false/i.test(sql)) {
+              order.push("deactivate")
+              rows.forEach((r) => { if (r.customer_id === customerId && r.id !== targetId) r.is_active = false })
+              return { rows: [] }
+            }
+            order.push("activate")
+            rows.find((r) => r.id === targetId)!.is_active = true
+            return { rows: [{ id: targetId }] }
+          },
+        }
+        return cb(trx)
       },
     }
     await svc.activate("b", "c1")
-    expect(calls).toHaveLength(1)
-    expect(calls[0].sql).toMatch(/with target as[\s\S]*deactivated as[\s\S]*update "customer_vehicle"[\s\S]*"is_active" = false[\s\S]*exists \(select 1 from target\)[\s\S]*update "customer_vehicle"[\s\S]*"is_active" = true[\s\S]*where "id" in \(select "id" from target\)/i)
-    // binds mirror the real SQL's positional order: [customerId, id, customerId, id] —
-    // the target CTE and the deactivate CTE are each independently scoped by
-    // customer_id (WB-073 G4 review) so a foreign/unknown id resolves to an
-    // empty `target` and the whole statement is a no-op.
-    expect(calls[0].binds).toEqual(["c1", "b", "c1", "b"])
+    // The crux of the live-Postgres fix: one transaction, and the deactivate MUST
+    // land before the activate so the partial unique index never sees two active
+    // rows. (The old single-CTE version could interleave them and 23505.)
+    expect(order).toEqual(["begin", "select", "deactivate", "activate"])
+    expect(rows.find((r) => r.id === "a").is_active).toBe(false)
+    expect(rows.find((r) => r.id === "b").is_active).toBe(true)
   })
 
   it("two near-simultaneous activate calls for the same customer leave EXACTLY ONE active and do not throw", async () => {
@@ -114,24 +142,29 @@ describe("activate enforces single-active", () => {
     const { svc, rows } = makeService()
     rows.push({ id: "a", customer_id: "c1", is_active: true }, { id: "b", customer_id: "c1", is_active: false })
     let attempt = 0
-    const calls: any[] = []
     svc.knex_ = {
-      raw: async (_sql: string, binds: any[]) => {
-        calls.push(binds)
+      transaction: async (cb: (trx: any) => Promise<any>) => {
         attempt++
         if (attempt === 1) {
+          // First whole transaction fails the way a real concurrent-activate race would.
           const err: any = new Error('duplicate key value violates unique constraint "UQ_customer_vehicle_one_active"')
           err.code = "23505"
           throw err
         }
-        const targetId = binds[1] // binds = [customerId, id, customerId, id]
-        rows.forEach((r) => { if (r.id !== targetId) r.is_active = false })
-        rows.find((r) => r.id === targetId)!.is_active = true
-        return { rows: [{ id: targetId }] }
+        const trx = {
+          raw: async (sql: string, binds: any[] = []) => {
+            const targetId = binds[1] // binds = [customerId, id]
+            if (/^\s*select/i.test(sql)) return { rows: [{ id: targetId }] }
+            if (/"is_active"\s*=\s*false/i.test(sql)) { rows.forEach((r) => { if (r.id !== targetId) r.is_active = false }); return { rows: [] } }
+            rows.find((r) => r.id === targetId)!.is_active = true
+            return { rows: [{ id: targetId }] }
+          },
+        }
+        return cb(trx)
       },
     }
     await expect(svc.activate("b", "c1")).resolves.toBeUndefined()
-    expect(calls).toHaveLength(2) // one failed attempt + one retry
+    expect(attempt).toBe(2) // one failed attempt + one retry
     expect(rows.find((r) => r.id === "b").is_active).toBe(true)
     expect(rows.find((r) => r.id === "a").is_active).toBe(false)
   })
@@ -140,7 +173,7 @@ describe("activate enforces single-active", () => {
     const { svc, rows } = makeService()
     rows.push({ id: "a", customer_id: "c1", is_active: true })
     let calls = 0
-    svc.knex_ = { raw: async () => { calls++; throw new Error("connection reset") } }
+    svc.knex_ = { transaction: async () => { calls++; throw new Error("connection reset") } }
     await expect(svc.activate("a", "c1")).rejects.toThrow(/connection reset/)
     expect(calls).toBe(1) // no retry for a non-23505 error
   })

@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { useParams } from "next/navigation"
+import { useParams, usePathname } from "next/navigation"
 import { useRouter } from "@bprogress/next/app" // bprogress router → the fit navigation shows the top progress bar
 import { toast } from "sonner"
 import Icon from "@modules/common/components/icon"
@@ -36,6 +36,7 @@ const formatSpecs = (v: Vehicle): string => {
 const GaragePane = ({ onClose, onAddNew }: GaragePaneProps) => {
   const router = useRouter()
   const { countryCode } = useParams() as { countryCode: string }
+  const pathname = usePathname()
   const { vehicles, active, setActive, remove, add, update } = useGarage()
   const [selectingId, setSelectingId] = useState<string | null>(null)
   // Route by the surface the drawer was opened from: on a tire surface (/tires or
@@ -128,7 +129,12 @@ const GaragePane = ({ onClose, onAddNew }: GaragePaneProps) => {
     }
 
     onClose()
-    router.push(fitmentDestinationUrl({ countryCode, target, boltPatterns: patterns, oemTireSizes }))
+    const dest = fitmentDestinationUrl({ countryCode, target, boltPatterns: patterns, oemTireSizes })
+    // See ymm-pane: if we're already on the destination discovery page, FitmentSync
+    // owns the ?fit URL from the now-active vehicle, so pushing the same route here
+    // races its router.replace and deadlocks the navigation (stuck bar, no commit).
+    // Only navigate for a cross-page jump.
+    if (dest.split("?")[0] !== pathname) router.push(dest)
   }
 
   const removeVehicle = (v: Vehicle) => {

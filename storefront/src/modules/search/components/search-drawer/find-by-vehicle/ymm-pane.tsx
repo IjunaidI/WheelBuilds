@@ -1,7 +1,7 @@
 "use client"
 
 import { FormEvent, useEffect, useState } from "react"
-import { useParams } from "next/navigation"
+import { useParams, usePathname } from "next/navigation"
 import { useRouter } from "@bprogress/next/app" // bprogress router → the fit navigation shows the top progress bar
 import { toast } from "sonner"
 import Icon from "@modules/common/components/icon"
@@ -69,6 +69,7 @@ const trimSeed = (model: string): Option[] =>
 const YmmPane = ({ onClose }: YmmPaneProps) => {
   const router = useRouter()
   const { countryCode } = useParams() as { countryCode: string }
+  const pathname = usePathname()
   const { add, setActive, update } = useGarage()
 
   const [make, setMake] = useState("")
@@ -269,7 +270,15 @@ const YmmPane = ({ onClose }: YmmPaneProps) => {
           return
       }
       onClose()
-      router.push(fitmentDestinationUrl({ countryCode, target, boltPatterns, oemTireSizes }))
+      const dest = fitmentDestinationUrl({ countryCode, target, boltPatterns, oemTireSizes })
+      // If we're ALREADY on the destination discovery page, FitmentSync owns the
+      // ?fit params and updates them from the now-active vehicle. Pushing the same
+      // route here races FitmentSync's router.replace (which writes the FULL
+      // windowed fit URL), and the two concurrent conflicting navigations deadlock
+      // the App Router — the progress bar starts but never commits and the URL
+      // never changes. Only navigate for a genuine cross-page jump (home->store,
+      // store->tires); a same-page car switch is handled entirely by FitmentSync.
+      if (dest.split("?")[0] !== pathname) router.push(dest)
     } finally {
       setSubmitting(false)
     }

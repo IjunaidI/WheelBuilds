@@ -77,34 +77,57 @@ class CustomerVehicleService extends MedusaService({ CustomerVehicle }) {
    * missing/unowned row).
    */
   async activate(id: string, customerId: string): Promise<void> {
-    const exec = async () => {
-      return this.knex_.raw(
-        `with target as (
-           select "id" from "customer_vehicle"
+    // Deactivate the customer's other active vehicles and activate the target as
+    // TWO ORDERED statements inside a single transaction — deliberately NOT one
+    // data-modifying CTE. `UQ_customer_vehicle_one_active` (one is_active row per
+    // customer) is a NON-DEFERRABLE PARTIAL unique index, so Postgres enforces it
+    // per-row as tuples are written, not at statement/commit end (a partial index
+    // can't be a deferrable constraint). A single statement that both clears the
+    // old active row and sets a new one — the previous CTE included — can
+    // transiently hold TWO active rows: Postgres runs the CTE's sub-updates in an
+    // UNPREDICTABLE order and their effects aren't visible to each other, so the
+    // activation half can write the new active tuple while the old one is still
+    // indexed → 23505 → surfaced by the framework as a 422 "...already exists" on
+    // a live Postgres (the exact staging-verify risk flagged when WB-073 T3
+    // landed; the unit tests passed only because they run against a JS stub of
+    // knex, not real Postgres). Ordering deactivate-BEFORE-activate within a
+    // transaction guarantees the old row has left the partial index before the
+    // new one enters it, while the transaction keeps the switch atomic (a failure
+    // rolls back rather than leaving the customer with zero active vehicles).
+    //
+    // `target` still resolves (customer_id, id, not-deleted) FIRST so an unknown/
+    // unowned/soft-deleted id touches nothing (defense in depth — the store route
+    // already passes an id verified via resolveOwned) and reports NOT_FOUND.
+    const exec = async (): Promise<number> => {
+      return this.knex_.transaction(async (trx: any) => {
+        const target = await trx.raw(
+          `select "id" from "customer_vehicle"
+           where "customer_id" = ? and "id" = ? and "deleted_at" is null`,
+          [customerId, id]
+        )
+        if (!(target.rows?.length)) return 0
+        await trx.raw(
+          `update "customer_vehicle" set "is_active" = false, "updated_at" = now()
+           where "customer_id" = ? and "id" <> ? and "is_active" = true and "deleted_at" is null`,
+          [customerId, id]
+        )
+        const activated = await trx.raw(
+          `update "customer_vehicle" set "is_active" = true, "updated_at" = now()
            where "customer_id" = ? and "id" = ? and "deleted_at" is null
-         ),
-         deactivated as (
-           update "customer_vehicle"
-           set "is_active" = false, "updated_at" = now()
-           where "customer_id" = ? and "id" <> ? and "is_active" = true and "deleted_at" is null
-             and exists (select 1 from target)
-         )
-         update "customer_vehicle"
-         set "is_active" = true, "updated_at" = now()
-         where "id" in (select "id" from target)
-         returning "id"`,
-        [customerId, id, customerId, id]
-      )
+           returning "id"`,
+          [customerId, id]
+        )
+        return activated.rows?.length ?? 0
+      })
     }
-    let result: any
+    let activatedCount = 0
     try {
-      result = await exec()
+      activatedCount = await exec()
     } catch (err: any) {
       if (err?.code !== "23505") throw err
-      result = await exec() // one retry: the concurrent writer's commit is now visible
+      activatedCount = await exec() // one retry for a genuine concurrent-activate race (a rival txn committed its own active between our two statements)
     }
-    const activated = result?.rows ?? []
-    if (activated.length === 0) {
+    if (activatedCount === 0) {
       throw new MedusaError(
         MedusaError.Types.NOT_FOUND,
         `CustomerVehicle with id "${id}" not found for this customer`

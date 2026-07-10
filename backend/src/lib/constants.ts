@@ -103,6 +103,12 @@ export const EMAIL_REPLY_TO = process.env.EMAIL_REPLY_TO;
 export const STOREFRONT_URL = process.env.STOREFRONT_URL || 'http://localhost:8000';
 
 /**
+ * (optional) Ops inbox for vendor-sync failure alerts + the daily stale-sync
+ * watchdog (WB-081). Unset = the watchdog job no-ops (failures stay logs-only).
+ */
+export const OPS_ALERT_EMAIL = process.env.OPS_ALERT_EMAIL;
+
+/**
  * (optionl) SendGrid API Key and from Email - do not set if using Resend
  */
 export const SENDGRID_API_KEY = process.env.SENDGRID_API_KEY;

@@ -25,24 +25,22 @@ const FOOTER_COLUMNS: { h: string; items: { label: string; href: string }[] }[] 
       { label: "All Brands", href: "/collections" },
     ],
   },
+  // WB-081: every footer link now points at a real route — the Help/Company
+  // columns were ten dead `#` anchors. Company links (About/Press/Careers…)
+  // are gone until those pages exist; Legal carries the policy pages.
   {
     h: "Help",
     items: [
-      { label: "Fitment Guide", href: "#" },
-      { label: "Bolt Pattern", href: "#" },
-      { label: "Returns", href: "#" },
-      { label: "Shipping", href: "#" },
-      { label: "Contact", href: "#" },
+      { label: "Contact", href: "/contact" },
+      { label: "Returns & Exchanges", href: "/returns" },
+      { label: "Shipping", href: "/shipping" },
     ],
   },
   {
-    h: "Company",
+    h: "Legal",
     items: [
-      { label: "About", href: "#" },
-      { label: "Build Gallery", href: "#" },
-      { label: "Press", href: "#" },
-      { label: "Careers", href: "#" },
-      { label: "Dealers", href: "#" },
+      { label: "Terms of Service", href: "/terms" },
+      { label: "Privacy Policy", href: "/privacy" },
     ],
   },
 ]
@@ -111,18 +109,33 @@ export default async function Footer() {
           className="leading-relaxed"
         >
           © {new Date().getFullYear()} WHEEL/BUILDS, INC. · ALL RIGHTS
-          RESERVED · TERMS · PRIVACY
+          RESERVED ·{" "}
+          <LocalizedClientLink
+            href="/terms"
+            style={{ color: "inherit", textDecoration: "underline", textUnderlineOffset: 2 }}
+          >
+            TERMS
+          </LocalizedClientLink>{" "}
+          ·{" "}
+          <LocalizedClientLink
+            href="/privacy"
+            style={{ color: "inherit", textDecoration: "underline", textUnderlineOffset: 2 }}
+          >
+            PRIVACY
+          </LocalizedClientLink>
         </Label>
         <div className="flex gap-3.5 items-center text-[var(--ink)]">
+          {/* WB-081: decorative until real profile URLs exist — a dead `#`
+              anchor scrolled to top and read as broken. Give SOCIALS an
+              `href` field and restore <a> when the accounts are live. */}
           {SOCIALS.map((s) => (
-            <a
+            <span
               key={s.name}
-              href="#"
-              aria-label={s.label}
+              aria-hidden="true"
               style={{ color: "inherit", display: "inline-flex" }}
             >
               <Icon name={s.name} size={16} />
-            </a>
+            </span>
           ))}
         </div>
       </div>

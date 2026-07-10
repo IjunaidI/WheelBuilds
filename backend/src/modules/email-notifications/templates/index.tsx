@@ -4,12 +4,14 @@ import { InviteUserEmail, INVITE_USER, isInviteUserData } from './invite-user'
 import { OrderPlacedTemplate, ORDER_PLACED, isOrderPlacedTemplateData } from './order-placed'
 import { ShippingConfirmationTemplate, SHIPPING_CONFIRMATION, isShippingConfirmationData } from './shipping-confirmation'
 import { PasswordResetTemplate, PASSWORD_RESET, isPasswordResetData } from './password-reset'
+import { VendorSyncAlertTemplate, VENDOR_SYNC_ALERT, isVendorSyncAlertData } from './vendor-sync-alert'
 
 export const EmailTemplates = {
   INVITE_USER,
   ORDER_PLACED,
   SHIPPING_CONFIRMATION,
-  PASSWORD_RESET
+  PASSWORD_RESET,
+  VENDOR_SYNC_ALERT
 } as const
 
 export type EmailTemplateType = keyof typeof EmailTemplates
@@ -52,6 +54,15 @@ export function generateEmailTemplate(templateKey: string, data: unknown): React
       }
       return <PasswordResetTemplate {...data} />
 
+    case EmailTemplates.VENDOR_SYNC_ALERT:
+      if (!isVendorSyncAlertData(data)) {
+        throw new MedusaError(
+          MedusaError.Types.INVALID_DATA,
+          `Invalid data for template "${EmailTemplates.VENDOR_SYNC_ALERT}"`
+        )
+      }
+      return <VendorSyncAlertTemplate {...data} />
+
     default:
       throw new MedusaError(
         MedusaError.Types.INVALID_DATA,
@@ -60,4 +71,4 @@ export function generateEmailTemplate(templateKey: string, data: unknown): React
   }
 }
 
-export { InviteUserEmail, OrderPlacedTemplate, ShippingConfirmationTemplate, PasswordResetTemplate }
+export { InviteUserEmail, OrderPlacedTemplate, ShippingConfirmationTemplate, PasswordResetTemplate, VendorSyncAlertTemplate }

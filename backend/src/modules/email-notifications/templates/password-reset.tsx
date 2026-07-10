@@ -2,18 +2,21 @@ import { Button, Link, Section, Text, Hr } from '@react-email/components'
 import { Base } from './base'
 
 /**
- * The key for the InviteUserEmail template, used to identify it
+ * The key for the PasswordResetTemplate, used to identify it
  */
-export const INVITE_USER = 'invite-user'
+export const PASSWORD_RESET = 'password-reset'
 
 /**
- * The props for the InviteUserEmail template
+ * The props for the PasswordResetTemplate. `emailOptions` is part of the
+ * shape sent to `createNotifications` (read directly by the notification
+ * provider — see `services/resend.ts`), not consumed by the component itself.
  */
-export interface InviteUserEmailProps {
+export interface PasswordResetData {
+  emailOptions: Record<string, unknown>
   /**
-   * The link that the user can click to accept the invitation
+   * The storefront link the customer clicks to set a new password.
    */
-  inviteLink: string
+  resetLink: string
   /**
    * The preview text for the email, appears next to the subject
    * in mail providers like Gmail
@@ -22,19 +25,19 @@ export interface InviteUserEmailProps {
 }
 
 /**
- * Type guard for checking if the data is of type InviteUserEmailProps
+ * Type guard for checking if the data is of type PasswordResetData
  * @param data - The data to check
  */
-export const isInviteUserData = (data: any): data is InviteUserEmailProps =>
-  typeof data.inviteLink === 'string' && (typeof data.preview === 'string' || !data.preview)
+export const isPasswordResetData = (data: any): data is PasswordResetData =>
+  data && typeof data === 'object' && typeof data.resetLink === 'string'
 
 /**
- * The InviteUserEmail template component built with react-email
+ * The PasswordResetTemplate component built with react-email
  */
-export const InviteUserEmail = ({
-  inviteLink,
-  preview = `You've been invited to Wheel Builds`,
-}: InviteUserEmailProps) => {
+export const PasswordResetTemplate = ({
+  resetLink,
+  preview = 'Reset your Wheel Builds password',
+}: PasswordResetData) => {
   return (
     <Base preview={preview}>
       <Section className="mt-[32px] text-center">
@@ -44,14 +47,14 @@ export const InviteUserEmail = ({
       </Section>
       <Section className="text-center">
         <Text className="text-black text-[14px] leading-[24px]">
-          You&apos;ve been invited to be an administrator on <strong>Wheel Builds</strong>.
+          We received a request to reset your Wheel Builds password.
         </Text>
         <Section className="mt-4 mb-[32px]">
           <Button
             className="bg-[#000000] rounded text-white text-[12px] font-semibold no-underline px-5 py-3"
-            href={inviteLink}
+            href={resetLink}
           >
-            Accept Invitation
+            Reset password
           </Button>
         </Section>
         <Text className="text-black text-[14px] leading-[24px]">
@@ -63,25 +66,25 @@ export const InviteUserEmail = ({
           overflowWrap: 'break-word'
         }}>
           <Link
-            href={inviteLink}
+            href={resetLink}
             className="text-blue-600 no-underline"
           >
-            {inviteLink}
+            {resetLink}
           </Link>
         </Text>
       </Section>
       <Hr className="border border-solid border-[#eaeaea] my-[26px] mx-0 w-full" />
       <Text className="text-[#666666] text-[12px] leading-[24px]">
-        If you were not expecting this invitation, you can ignore this email, as the
-        invitation will expire in 24 hours. If you are concerned about your account's safety,
-        please reply to this email to get in touch with us.
+        If you didn't request this, you can safely ignore this email — your password will
+        not be changed. This link expires shortly.
       </Text>
     </Base>
   )
 }
 
-InviteUserEmail.PreviewProps = {
-  inviteLink: 'https://mywebsite.com/app/invite?token=abc123ddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd'
-} as InviteUserEmailProps
+PasswordResetTemplate.PreviewProps = {
+  resetLink: 'https://example.com/us/reset-password?token=abc&email=test%40example.com',
+  preview: 'Reset your Wheel Builds password',
+} as PasswordResetData
 
-export default InviteUserEmail
+export default PasswordResetTemplate

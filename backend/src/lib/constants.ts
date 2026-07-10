@@ -91,6 +91,18 @@ export const RESEND_API_KEY = process.env.RESEND_API_KEY;
 export const RESEND_FROM_EMAIL = process.env.RESEND_FROM_EMAIL || process.env.RESEND_FROM;
 
 /**
+ * (optional) Reply-To address for transactional emails. When unset, no Reply-To
+ * header is added (drops the legacy info@example.com literal).
+ */
+export const EMAIL_REPLY_TO = process.env.EMAIL_REPLY_TO;
+
+/**
+ * Public storefront origin, used to build customer-facing links (e.g. password
+ * reset). Falls back to localhost for dev.
+ */
+export const STOREFRONT_URL = process.env.STOREFRONT_URL || 'http://localhost:8000';
+
+/**
  * (optionl) SendGrid API Key and from Email - do not set if using Resend
  */
 export const SENDGRID_API_KEY = process.env.SENDGRID_API_KEY;

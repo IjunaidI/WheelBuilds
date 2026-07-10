@@ -1,74 +1,39 @@
 "use client"
 
-import React, { useEffect } from "react"
-
-import Input from "@modules/common/components/input"
-
-import AccountInfo from "../account-info"
+import React from "react"
 import { useFormState } from "react-dom"
+
+import { SubmitButton } from "@modules/checkout/components/submit-button"
+import { forgotPassword } from "@lib/data/customer"
 import { HttpTypes } from "@medusajs/types"
 
 type MyInformationProps = {
   customer: HttpTypes.StoreCustomer
 }
 
-const ProfileName: React.FC<MyInformationProps> = ({ customer }) => {
-  const [successState, setSuccessState] = React.useState(false)
-
-  // TODO: Add support for password updates
-  const [state, formAction] = useFormState((() => {}) as any, {
-    customer,
-    success: false,
-    error: null,
-  })
-
-  const clearState = () => {
-    setSuccessState(false)
-  }
-
-  useEffect(() => {
-    setSuccessState(state.success)
-  }, [state])
+const ProfilePassword: React.FC<MyInformationProps> = ({ customer }) => {
+  const [state, formAction] = useFormState(forgotPassword, null)
 
   return (
-    <form action={formAction} onReset={() => clearState()} className="w-full">
-      <AccountInfo
-        label="Password"
-        currentInfo={
-          <span>The password is not shown for security reasons</span>
-        }
-        isSuccess={successState}
-        isError={!!state.error}
-        errorMessage={state.error ?? undefined}
-        clearState={clearState}
-        data-testid="account-password-editor"
-      >
-        <div className="grid grid-cols-2 gap-4">
-          <Input
-            label="Old password"
-            name="old_password"
-            required
-            type="password"
-            data-testid="old-password-input"
-          />
-          <Input
-            label="New password"
-            type="password"
-            name="new_password"
-            required
-            data-testid="new-password-input"
-          />
-          <Input
-            label="Confirm password"
-            type="password"
-            name="confirm_password"
-            required
-            data-testid="confirm-password-input"
-          />
-        </div>
-      </AccountInfo>
-    </form>
+    <div className="w-full" data-testid="account-password-editor">
+      <h3 className="text-large-semi">Password</h3>
+      {state === "SENT" ? (
+        <p className="text-base-regular mt-2">
+          We&apos;ve emailed {customer.email} a link to reset your password.
+        </p>
+      ) : (
+        <form action={formAction} className="mt-2 flex items-center gap-4">
+          <input type="hidden" name="email" value={customer.email} />
+          <p className="text-base-regular">
+            Send a password reset link to {customer.email}.
+          </p>
+          <SubmitButton data-testid="send-reset-email-button">
+            Send reset email
+          </SubmitButton>
+        </form>
+      )}
+    </div>
   )
 }
 
-export default ProfileName
+export default ProfilePassword

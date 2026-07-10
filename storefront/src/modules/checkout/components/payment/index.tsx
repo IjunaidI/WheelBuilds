@@ -93,9 +93,13 @@ const Payment = ({
       // active session's provider — otherwise switching methods leaves the old
       // session and the order is charged by the previous provider.
       if (!activeSession || activeSession.provider_id !== selectedPaymentMethod) {
-        await initiatePaymentSession(cart, {
+        const res = await initiatePaymentSession(cart, {
           provider_id: selectedPaymentMethod,
         })
+        if (res?.error) {
+          setError(res.error)
+          return
+        }
       }
 
       if (!shouldInputCard) {

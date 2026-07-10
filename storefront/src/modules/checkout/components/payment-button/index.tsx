@@ -100,14 +100,19 @@ const StripePaymentButton = ({
   const [submitting, setSubmitting] = useState(false)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
 
+  // WB-079 B2: placeOrder() no longer throws user-facing errors — it RETURNS
+  // { error } on failure (Next.js redacts thrown Server Action messages in
+  // production). On success it calls redirect() internally, which throws the
+  // framework's NEXT_REDIRECT signal; that must propagate untouched, so this
+  // handler does NOT wrap the call in .catch()/try-catch.
   const onPaymentCompleted = async () => {
-    await placeOrder()
-      .catch((err) => {
-        setErrorMessage(err.message)
-      })
-      .finally(() => {
-        setSubmitting(false)
-      })
+    const res = await placeOrder()
+    if (res?.error) {
+      setErrorMessage(res.error)
+      setSubmitting(false)
+      return
+    }
+    // Success: placeOrder() already redirected. Nothing else to do.
   }
 
   const stripe = useStripe()
@@ -207,14 +212,17 @@ const PayPalPaymentButton = ({
   const [submitting, setSubmitting] = useState(false)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
 
+  // WB-079 B2: see the Stripe button above — read the returned `.error`
+  // instead of catching, so the NEXT_REDIRECT thrown by a successful
+  // placeOrder() isn't swallowed and stringified into the error banner.
   const onPaymentCompleted = async () => {
-    await placeOrder()
-      .catch((err) => {
-        setErrorMessage(err.message)
-      })
-      .finally(() => {
-        setSubmitting(false)
-      })
+    const res = await placeOrder()
+    if (res?.error) {
+      setErrorMessage(res.error)
+      setSubmitting(false)
+      return
+    }
+    // Success: placeOrder() already redirected. Nothing else to do.
   }
 
   const session = cart.payment_collection?.payment_sessions?.find(
@@ -269,14 +277,17 @@ const ManualTestPaymentButton = ({ notReady }: { notReady: boolean }) => {
   const [submitting, setSubmitting] = useState(false)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
 
+  // WB-079 B2: see the Stripe button above — read the returned `.error`
+  // instead of catching, so the NEXT_REDIRECT thrown by a successful
+  // placeOrder() isn't swallowed and stringified into the error banner.
   const onPaymentCompleted = async () => {
-    await placeOrder()
-      .catch((err) => {
-        setErrorMessage(err.message)
-      })
-      .finally(() => {
-        setSubmitting(false)
-      })
+    const res = await placeOrder()
+    if (res?.error) {
+      setErrorMessage(res.error)
+      setSubmitting(false)
+      return
+    }
+    // Success: placeOrder() already redirected. Nothing else to do.
   }
 
   const handlePayment = () => {

@@ -1,0 +1,9 @@
+[
+  { "bore": 78.0, "hub": 78.1, "clears": true },
+  { "bore": 78.1, "hub": 78.1, "clears": true },
+  { "bore": 66.1, "hub": 78.1, "clears": false },
+  { "bore": 77.8, "hub": 78.1, "clears": false },
+  { "bore": null, "hub": 78.1, "clears": true },
+  { "bore": 78.0, "hub": null, "clears": true },
+  { "bore": null, "hub": null, "clears": true }
+]

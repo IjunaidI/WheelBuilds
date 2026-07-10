@@ -1,4 +1,5 @@
 import { ReverseFitmentVehicle, Window } from "./types"
+import { boreClears } from "./bore-clearance"
 
 type FitmentRow = {
   raw?: any
@@ -75,7 +76,7 @@ export function matchedPattern(
   const hit = productPatterns.find((p) => rowPats.includes(p))
   if (!hit) return null
   const hub = typeof row.hub_bore_mm_x100 === "number" ? row.hub_bore_mm_x100 / 100 : null
-  const boreOk = hub == null || wheelBoreMm == null ? true : wheelBoreMm >= hub
+  const boreOk = boreClears(wheelBoreMm, hub)
   return boreOk ? hit : null
 }
 

@@ -17,7 +17,8 @@ type CheckoutSummaryProps = {
  * card and totals stay visible while the user scrolls through the form.
  *
  * Composition (top → bottom):
- *   1. FitmentVerifiedCard (only when a garage vehicle is set)
+ *   1. FitmentVerifiedCard (only when a garage vehicle is set AND at least
+ *      one cart item genuinely fits/check-fits it — B12)
  *   2. Line items + add-on placeholders + discount input + totals
  *   3. Trust strip (free shipping / fitment guarantee / 30-day returns)
  */
@@ -27,7 +28,7 @@ const CheckoutSummary = ({ cart }: CheckoutSummaryProps) => {
 
   return (
     <div className="sticky top-6 flex flex-col gap-5">
-      <FitmentVerifiedCard />
+      <FitmentVerifiedCard items={cart.items} />
 
       <div
         className="rounded-lg bg-white px-5"

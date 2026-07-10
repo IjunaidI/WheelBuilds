@@ -54,7 +54,7 @@ const DiscoveryProductCard = ({ product, fit = false }: DiscoveryProductCardProp
           </Chip>
         </div>
       )}
-      <FitBadge patterns={product.boltPatternsCanonical} fit={fit} />
+      <FitBadge patterns={product.boltPatternsCanonical} fit={fit} tier={product.fitTier} />
     </div>
 
     <div className="p-3 flex flex-col gap-1">

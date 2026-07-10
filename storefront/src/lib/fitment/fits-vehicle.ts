@@ -1,4 +1,7 @@
 // storefront/src/lib/fitment/fits-vehicle.ts
+import { FitTier } from "./fit-tier"
+import { boreClears } from "./bore-clearance"
+
 type Win = { min: number; max: number } | null | undefined
 type ProductLike = {
   boltPatternsCanonical?: string[]
@@ -11,7 +14,7 @@ type VehicleLike = {
   diameterWindow?: Win; widthWindow?: Win; offsetWindow?: Win
 }
 export type FitVerdict = {
-  status: "fits" | "no-fit" | "unknown"
+  status: FitTier
   fits: boolean
   hardGatesPass: boolean
   withinWindow: boolean
@@ -36,13 +39,24 @@ export function fitsVehicle(product: ProductLike, vehicle: VehicleLike): FitVerd
     }
   }
 
+  // F5: product has no parseable bolt pattern → unknown, not a false mismatch.
+  if (pPats.length === 0) {
+    return {
+      status: "unknown",
+      fits: false,
+      hardGatesPass: false,
+      withinWindow: false,
+      reasons: ["We don't have fitment data for this wheel yet."],
+    }
+  }
+
   const reasons: string[] = []
   const boltOk = pPats.some((p) => vPats.includes(p))
   if (!boltOk) reasons.push("Bolt pattern does not match your vehicle.")
 
   const hub = vehicle.hubBoreMm ?? null
   const wheelBore = product.specs?.centerBoreMm ?? null
-  const boreOk = hub == null || wheelBore == null ? boltOk : wheelBore >= hub
+  const boreOk = boltOk && boreClears(wheelBore, hub)
   if (boltOk && !boreOk) reasons.push("Wheel bore is smaller than your vehicle's hub.")
 
   const hardGatesPass = boltOk && boreOk
@@ -66,9 +80,9 @@ export function fitsVehicle(product: ProductLike, vehicle: VehicleLike): FitVerd
     )
 
   if (hardGatesPass && !withinWindow)
-    reasons.push("This wheel's size or offset is outside your vehicle's spec range.")
+    reasons.push("Aggressive fitment — outside the typical range for your vehicle. Verify clearance before ordering.")
 
-  const status: FitVerdict["status"] = !hardGatesPass ? "no-fit" : withinWindow ? "fits" : "no-fit"
+  const status: FitTier = !hardGatesPass ? "no-fit" : withinWindow ? "fits" : "check"
   const fits = status === "fits"
 
   return { status, fits, hardGatesPass, withinWindow, reasons }

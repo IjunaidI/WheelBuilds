@@ -36,6 +36,15 @@ export type DiscoveryProduct = {
   boltPatternsCanonical: string[]
   /** "NEW" tag in the product card. */
   isNew?: boolean
+  /**
+   * Fit mode only (WB-077 D1): the product's best per-variant fit tier vs the
+   * active vehicle — "fits" (genuinely fits, sorted first) or "check" (bolt
+   * pattern + bore clear but at least one size window misses, so it's kept
+   * in the results but badged CHECK FIT instead of FITS). Undefined outside
+   * fit mode. Set in get-products.ts's fit branch via `productFitTier`; read
+   * by the discovery card to choose `<FitBadge tier>` copy.
+   */
+  fitTier?: "fits" | "check"
 }
 
 export type SortOption =

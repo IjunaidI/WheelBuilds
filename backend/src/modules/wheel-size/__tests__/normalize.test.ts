@@ -28,20 +28,67 @@ describe("normalizeByModel", () => {
     expect(f.canonicalBoltPatterns).toEqual([])
   })
 
-  it("skips null rear rim values when building windows", () => {
+  it("skips null rear rim values when building windows (F2: stock + aftermarket both count)", () => {
     const raw = { data: [{ technical: { stud_holes: 5, pcd: 114.3, centre_bore: 64.1 },
       wheels: [{ is_stock: true, front: { rim_diameter: 17, rim_width: 7, rim_offset: 45 }, rear: { rim_diameter: null, rim_width: null, rim_offset: null } },
                { is_stock: false, front: { rim_diameter: 19, rim_width: 8.5, rim_offset: 35 }, rear: null }] }] }
     const f = normalizeByModel(raw as any, { modificationSlug: "x", region: "usdm" })
-    expect(f.diameterWindow).toEqual({ min: 19, max: 19 }) // only is_stock:false entries form the aftermarket window
-    expect(f.widthWindow).toEqual({ min: 8.5, max: 8.5 })
-    expect(f.offsetWindow).toEqual({ min: 35, max: 35 })
+    // F2: the is_stock:true row's null rear rim is skipped, but its non-null front rim now
+    // participates in the window alongside the is_stock:false row (pre-F2 this window was
+    // aftermarket-only and would have read {min:19,max:19}).
+    expect(f.diameterWindow).toEqual({ min: 17, max: 19 })
+    expect(f.widthWindow).toEqual({ min: 7, max: 8.5 })
+    expect(f.offsetWindow).toEqual({ min: 35, max: 45 })
   })
 
-  it("returns null windows when only OEM rows exist", () => {
+  it("F2: OEM-only rows now produce a real window (was null pre-F2)", () => {
     const raw = { data: [{ technical: { stud_holes: 5, pcd: 120, centre_bore: 72.6 },
       wheels: [{ is_stock: true, front: { rim_diameter: 18, rim_width: 8, rim_offset: 30 }, rear: null }] }] }
     const f = normalizeByModel(raw as any, { modificationSlug: "x", region: "usdm" })
-    expect(f.diameterWindow).toBeNull()
+    expect(f.diameterWindow).toEqual({ min: 18, max: 18 })
+  })
+
+  it("F1: unions bolt patterns and widens windows across ALL trims, not data[0]", () => {
+    const raw = { data: [
+      { technical: { stud_holes: 5, pcd: 114.3, centre_bore: "60.1" },
+        wheels: [{ is_stock: false, front: { rim_diameter: 17, rim_width: 7, rim_offset: 40 }, rear: null }] },
+      { technical: { stud_holes: 6, pcd: 139.7, centre_bore: "78.1" },
+        wheels: [{ is_stock: false, front: { rim_diameter: 22, rim_width: 10, rim_offset: -12 }, rear: null }] },
+    ] } as any
+    const f = normalizeByModel(raw, { modificationSlug: "", region: "usdm" })
+    expect(f.canonicalBoltPatterns.sort()).toEqual(["5x114.3", "6x139.7"])
+    expect(f.diameterWindow).toEqual({ min: 17, max: 22 })
+    expect(f.offsetWindow).toEqual({ min: -12, max: 40 })
+  })
+
+  it("F1: verdict is order-independent (reversing data[] yields the same merge)", () => {
+    const a = { data: [ { technical: { stud_holes: 5, pcd: 114.3 }, wheels: [{ is_stock: false, front: { rim_diameter: 17, rim_width: 7, rim_offset: 40 }, rear: null }] },
+                         { technical: { stud_holes: 5, pcd: 114.3 }, wheels: [{ is_stock: false, front: { rim_diameter: 20, rim_width: 9, rim_offset: 18 }, rear: null }] } ] } as any
+    const b = { data: [...a.data].reverse() } as any
+    expect(normalizeByModel(a, { modificationSlug: "", region: "usdm" }).diameterWindow)
+      .toEqual(normalizeByModel(b, { modificationSlug: "", region: "usdm" }).diameterWindow)
+  })
+
+  it("F2: windows include is_stock:true (factory) rims", () => {
+    const raw = { data: [ { technical: { stud_holes: 6, pcd: 139.7, centre_bore: "78.1" },
+      wheels: [
+        { is_stock: true,  front: { rim_diameter: 17, rim_width: 7.5, rim_offset: 44 }, rear: null },
+        { is_stock: false, front: { rim_diameter: 20, rim_width: 9,   rim_offset: 18 }, rear: null },
+      ] } ] } as any
+    const f = normalizeByModel(raw, { modificationSlug: "", region: "usdm" })
+    expect(f.diameterWindow).toEqual({ min: 17, max: 20 })
+    expect(f.offsetWindow).toEqual({ min: 18, max: 44 })
+  })
+
+  it("F1: hub bore is null when trims disagree beyond 0.05mm", () => {
+    const raw = { data: [ { technical: { stud_holes: 5, pcd: 114.3, centre_bore: "60.1" }, wheels: [] },
+                          { technical: { stud_holes: 5, pcd: 114.3, centre_bore: "66.1" }, wheels: [] } ] } as any
+    expect(normalizeByModel(raw, { modificationSlug: "", region: "usdm" }).hubBoreMm).toBeNull()
+  })
+
+  it("F1: hub bore is the agreed value when trims agree within 0.05mm", () => {
+    const raw = { data: [ { technical: { stud_holes: 5, pcd: 114.3, centre_bore: "60.10" }, wheels: [] },
+                          { technical: { stud_holes: 5, pcd: 114.3, centre_bore: "60.13" }, wheels: [] } ] } as any
+    expect(normalizeByModel(raw, { modificationSlug: "", region: "usdm" }).hubBoreMm).toBeCloseTo(60.1, 2)
   })
 })

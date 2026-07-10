@@ -17,7 +17,13 @@ export const getProductsById = cache(async function ({
       {
         id: ids,
         region_id: regionId,
-        fields: "*variants.calculated_price,+variants.inventory_quantity",
+        // +variants.metadata is load-bearing (WB-077 I2): enrichLineItems (in
+        // ./cart.ts) OVERWRITES each cart/order line item's `variant` with the
+        // variant returned here, so the checkout + order-confirmation
+        // FitmentVerifiedCard reads its fitment facets (bolt_pattern_raw,
+        // center_bore_mm, wheel_diameter_in/width_in, offset_mm) from THIS
+        // variant.metadata. Additive `+` — widens, never narrows the field set.
+        fields: "*variants.calculated_price,+variants.inventory_quantity,+variants.metadata",
       },
       { next: { tags: ["products"] } }
     )

@@ -54,6 +54,8 @@ export type SizeOption = {
   availability: "in_stock" | "low_stock" | "out_of_stock"
   /** Override price for this size, in cents. Falls back to product priceCents. */
   priceCentsOverride?: number
+  /** Fit-mode tier this size lands in relative to the active vehicle — only present on FitView-trimmed output (WB-077). */
+  tier?: "fits" | "check"
 }
 
 /** One finish a wheel is offered in, with its own image + size matrix. */

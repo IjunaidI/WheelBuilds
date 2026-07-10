@@ -22,29 +22,39 @@ export function normalizeByModel(
   raw: RawByModel | null | undefined,
   source: { modificationSlug: string; region: string }
 ): VehicleFitment {
-  const entry = raw?.data?.[0]
-  if (!entry) {
+  const entries = raw?.data ?? []
+  if (!entries.length) {
     return { status: "not_found", canonicalBoltPatterns: [], hubBoreMm: null,
       diameterWindow: null, widthWindow: null, offsetWindow: null, oemTireSizes: [], oemTires: [], source }
   }
 
-  const tech = entry.technical ?? {}
-  const studs = num(tech.stud_holes)
-  const pcd = num(tech.pcd)
-  const canonical = studs != null && pcd != null
-    ? Array.from(new Set(canonicalBoltPatterns(`${studs}x${pcd}`)))
-    : []
+  // Bolt patterns: union across every trim (deduped).
+  const canonical = Array.from(new Set(
+    entries.flatMap((entry) => {
+      const tech = entry.technical ?? {}
+      const studs = num(tech.stud_holes)
+      const pcd = num(tech.pcd)
+      return studs != null && pcd != null ? canonicalBoltPatterns(`${studs}x${pcd}`) : []
+    })
+  ))
 
-  // Defensive hub-bore read: technical.centre_bore, falling back to a top-level centre_bore.
-  const hubBoreMm = numLoose(tech.centre_bore) ?? numLoose(entry.centre_bore)
-  if (hubBoreMm == null) {
-    // eslint-disable-next-line no-console
+  // Hub bore: agree within 0.05mm across trims → that value; disagree → null (uncheckable, not wrong).
+  const bores = entries
+    .map((entry) => numLoose(entry.technical?.centre_bore) ?? numLoose(entry.centre_bore))
+    .filter((v): v is number => v != null)
+  let hubBoreMm: number | null = null
+  if (bores.length) {
+    const min = Math.min(...bores), max = Math.max(...bores)
+    if (max - min <= 0.05) hubBoreMm = bores[0]
+    else console.warn("[wheel-size] trims disagree on centre_bore; bore axis uncheckable", { ...source, bores })
+  } else {
     console.warn("[wheel-size] centre_bore absent on by_model response", source)
   }
 
-  // Aftermarket window = is_stock:false entries (front+rear merged), null rims skipped.
-  const opt = (entry.wheels ?? []).filter((w: RawWheelEntry) => w.is_stock === false)
-  const rims = opt.flatMap((w) => [w.front, w.rear]).filter(Boolean) as { rim_diameter: number | null; rim_width: number | null; rim_offset: number | null }[]
+  // Windows: min/max over EVERY trim's rims, stock AND aftermarket (F2 — drop the is_stock filter).
+  const rims = entries.flatMap((entry) =>
+    (entry.wheels ?? []).flatMap((w: RawWheelEntry) => [w.front, w.rear]).filter(Boolean)
+  ) as { rim_diameter: number | null; rim_width: number | null; rim_offset: number | null }[]
 
   return {
     status: "ok",

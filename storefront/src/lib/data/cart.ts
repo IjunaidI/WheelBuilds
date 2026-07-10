@@ -349,7 +349,15 @@ export async function placeOrder(): Promise<{ error: string } | undefined> {
   if (cartRes?.type === "order") {
     const countryCode =
       cartRes.order.shipping_address?.country_code?.toLowerCase()
-    await removeCartId()
+    // Best-effort: the card is already charged and the order already
+    // created at this point, so a cookie-clear failure must never block
+    // the confirmation redirect (that would strand the customer on a
+    // stuck spinner after a successful, charged order).
+    try {
+      await removeCartId()
+    } catch (e) {
+      console.error("placeOrder: removeCartId failed post-order:", e)
+    }
     redirect(`/${countryCode}/order/confirmed/${cartRes?.order.id}`)
   }
 

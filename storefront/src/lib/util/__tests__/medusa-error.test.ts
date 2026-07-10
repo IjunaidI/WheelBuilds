@@ -7,7 +7,20 @@ describe("medusaError", () => {
       .toThrow("Boom.")
   })
   it("does not throw TypeError when response.data is an object without .message", () => {
-    expect(() => medusaError({ response: { data: { code: "E" }, status: 400, config: { url: "/x", baseURL: "http://h" }, headers: {} } }))
-      .toThrow() // a real Error, not 'message.charAt is not a function'
+    let caught: unknown
+    try {
+      medusaError({ response: { data: { code: "E" }, status: 400, config: { url: "/x", baseURL: "http://h" }, headers: {} } })
+    } catch (e) {
+      caught = e
+    }
+    // Pins the fix: JSON.stringify({code:"E"}) = '{"code":"E"}', then
+    // charAt(0).toUpperCase() + slice(1) + "." (charAt(0) is "{", a no-op
+    // under toUpperCase) yields '{"code":"E"}.'. Before the fix, `raw` was
+    // the object itself and `message.charAt` threw a masking TypeError —
+    // asserting the exact Error subtype + message (not just "any throw")
+    // is what pins that regression.
+    expect(caught).toBeInstanceOf(Error)
+    expect(caught).not.toBeInstanceOf(TypeError)
+    expect((caught as Error).message).toBe('{"code":"E"}.')
   })
 })

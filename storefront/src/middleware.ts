@@ -11,15 +11,24 @@ const regionMapCache = {
   regionMapUpdated: Date.now(),
 }
 
-async function getRegionMap() {
+async function getRegionMap(): Promise<Map<
+  string,
+  HttpTypes.StoreRegion
+> | null> {
   const { regionMap, regionMapUpdated } = regionMapCache
 
-  if (
-    !regionMap.keys().next().value ||
-    regionMapUpdated < Date.now() - 3600 * 1000
-  ) {
-    // Fetch regions from Medusa. We can't use the JS client here because middleware is running on Edge and the client needs a Node environment.
-    const { regions } = await fetch(`${BACKEND_URL}/store/regions`, {
+  const cacheIsUsable =
+    !!regionMap.keys().next().value &&
+    regionMapUpdated >= Date.now() - 3600 * 1000
+
+  if (cacheIsUsable) {
+    return regionMapCache.regionMap
+  }
+
+  // Fetch regions from Medusa. We can't use the JS client here because middleware is running on Edge and the client needs a Node environment.
+  let regions: HttpTypes.StoreRegion[] | undefined
+  try {
+    const res = await fetch(`${BACKEND_URL}/store/regions`, {
       headers: {
         "x-publishable-api-key": PUBLISHABLE_API_KEY!,
       },
@@ -27,21 +36,38 @@ async function getRegionMap() {
         revalidate: 3600,
         tags: ["regions"],
       },
-    }).then((res) => res.json())
-
-    if (!regions?.length) {
-      notFound()
-    }
-
-    // Create a map of country codes to regions.
-    regions.forEach((region: HttpTypes.StoreRegion) => {
-      region.countries?.forEach((c) => {
-        regionMapCache.regionMap.set(c.iso_2 ?? "", region)
-      })
     })
-
-    regionMapCache.regionMapUpdated = Date.now()
+    regions = (await res.json()).regions
+  } catch (e) {
+    // WB-081: backend unreachable (or returned non-JSON). Without this guard a
+    // cold edge instance 500'd EVERY page for the duration of a backend blip.
+    // Serve the stale cache when we have one; otherwise signal the caller to
+    // fail open on the default region.
+    if (regionMap.keys().next().value) {
+      return regionMapCache.regionMap
+    }
+    console.error(
+      "Middleware.ts: region fetch failed and no cached region map exists — failing open on the default region.",
+      e
+    )
+    return null
   }
+
+  // A healthy backend with zero regions is a real configuration error — 404.
+  // (Kept OUTSIDE the try/catch so notFound()'s control-flow throw isn't
+  // swallowed by the network-failure fallback above.)
+  if (!regions?.length) {
+    notFound()
+  }
+
+  // Create a map of country codes to regions.
+  regions.forEach((region: HttpTypes.StoreRegion) => {
+    region.countries?.forEach((c) => {
+      regionMapCache.regionMap.set(c.iso_2 ?? "", region)
+    })
+  })
+
+  regionMapCache.regionMapUpdated = Date.now()
 
   return regionMapCache.regionMap
 }
@@ -90,6 +116,24 @@ export async function middleware(request: NextRequest) {
   const cartIdCookie = request.cookies.get("_medusa_cart_id")
 
   const regionMap = await getRegionMap()
+
+  // WB-081 fail-open: backend down + cold cache. Pass through anything that
+  // already looks country-coded (2-letter first segment) and send the rest to
+  // the default region — pages own their data errors; the site keeps serving.
+  // Self-corrects on the next request once the backend is reachable again.
+  if (!regionMap) {
+    const seg = request.nextUrl.pathname.split("/")[1]?.toLowerCase()
+    if (seg && seg.length === 2) {
+      return NextResponse.next()
+    }
+    const redirectPath =
+      request.nextUrl.pathname === "/" ? "" : request.nextUrl.pathname
+    const queryString = request.nextUrl.search ?? ""
+    return NextResponse.redirect(
+      `${request.nextUrl.origin}/${DEFAULT_REGION}${redirectPath}${queryString}`,
+      307
+    )
+  }
 
   const countryCode = regionMap && (await getCountryCode(request, regionMap))
 

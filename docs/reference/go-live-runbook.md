@@ -21,6 +21,8 @@
 1. Railway backend env: set `RESEND_API_KEY`, `RESEND_FROM_EMAIL` (a verified sender on your
    Resend domain), optionally `EMAIL_REPLY_TO` (support inbox), and `STOREFRONT_URL`
    (e.g. `https://<storefront-domain>`) — password-reset links are built from it.
+2. Railway storefront env: `NEXT_PUBLIC_SUPPORT_EMAIL` = the same support inbox, so the
+   `/contact` page shows a mailto (rebuild required; page degrades gracefully without it).
 4. Verify: place a test order → confirmation email; fulfill + ship it in admin → shipping
    email; "Forgot password?" → reset email → new password logs in; reply-to is your inbox.
 
@@ -101,6 +103,14 @@ Money is **captured automatically at authorization** now (`capture: true` in
    revisit when a vendor account exists.
 3. Verify: `https://<storefront>/robots.txt` and `/sitemap.xml` serve; a forced error page
    shows the styled boundary, not the Next default.
+
+## 9. Policy copy review (WB-081)
+
+The static pages at `/contact`, `/returns`, `/shipping`, `/privacy`, `/terms` ship with
+conservative DRAFT copy (`storefront/src/modules/policies/content.ts`). The shipping
+thresholds are real (free ≥ $199 / else $10 — WB-071); the returns window, terms, and
+privacy processor list are drafts the merchant must read, adjust, and own before launch —
+they are customer-facing promises.
 
 ## Quick-reference: what breaks if you skip a step
 

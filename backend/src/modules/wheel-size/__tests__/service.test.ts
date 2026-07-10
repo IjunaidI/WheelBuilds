@@ -60,7 +60,7 @@ describe("WheelSizeService.getFitment", () => {
     const { svc, store } = makeService([empty, empty])
     const f = await svc.getFitment({ make: "honda", model: "accord", modificationSlug: "m", region: "usdm" })
     expect(f.status).toBe("not_found")
-    expect(store.fitment.get("honda|accord||m|usdm").status).toBe("not_found")
+    expect(store.fitment.get("honda|accord||m|usdm|v2").status).toBe("not_found")
   })
 
   it("returns the cached row on the second call without hitting the client", async () => {
@@ -221,7 +221,7 @@ describe("WheelSizeService.resolveByModel quota exhaustion mid-lookup (WB-072 B4
     expect(f.source.region).toBe("chdm")
     expect(f.canonicalBoltPatterns).toEqual([]) // firstWithData had no bolt pattern
     expect(calls.map((c) => c.region)).toEqual(["usdm", "chdm"]) // never reached jdm
-    expect(store.fitment.get("arcfox|as6|2025||usdm").status).toBe("ok") // persisted, not an outage
+    expect(store.fitment.get("arcfox|as6|2025||usdm|v2").status).toBe("ok") // persisted, not an outage
   })
 })
 
@@ -251,7 +251,7 @@ describe("WheelSizeService.getFitment hub bore scaling (WB-007)", () => {
     ])
     const f = await svc.getFitment({ make: "honda", model: "accord", modificationSlug: "m", region: "usdm" })
     expect(f.hubBoreMm).toBe(67.1)
-    expect(store.fitment.get("honda|accord||m|usdm").hub_bore_mm_x100).toBe(6710)
+    expect(store.fitment.get("honda|accord||m|usdm|v2").hub_bore_mm_x100).toBe(6710)
     const again = await svc.getFitment({ make: "honda", model: "accord", modificationSlug: "m", region: "usdm" })
     expect(again.hubBoreMm).toBe(67.1) // served from cache, exact
   })
@@ -401,7 +401,7 @@ describe("WheelSizeService.refreshFitment atomic upsert (WB-072 B8)", () => {
       diameter_window, width_window, offset_window, status, fetched_at,
     ] = calls[0].binds
     expect(id).toMatch(/^wsf_[0-9A-Z]{26}$/) // wsf_ + ULID, mirrors wsq_ convention
-    expect(cache_key).toBe("honda|accord||m|usdm")
+    expect(cache_key).toBe("honda|accord||m|usdm|v2")
     expect(region).toBe("usdm")
     expect(JSON.parse(raw)).toEqual(wheelBody) // arrays/objects must be pre-stringified for ::jsonb
     expect(JSON.parse(canonical_bolt_patterns)).toEqual(["5x114.3"])

@@ -9,6 +9,7 @@ import {
   resolveLeafVariant,
   isRealBoltPattern,
   availabilityOf,
+  boltPatternsForFinish,
 } from "./group-sizes"
 
 // Minimal variant factory mirroring the Medusa Store API shape the loader reads.
@@ -118,6 +119,28 @@ describe("pickDefaultSize", () => {
       28
     )
     expect(pickDefaultSize(sizes)!.width).toBe(9)
+  })
+  it("returns null (not undefined) for an empty size list", () => {
+    expect(pickDefaultSize([])).toBeNull()
+  })
+})
+
+describe("boltPatternsForFinish", () => {
+  it("distinct patterns from a finish's sizes", () => {
+    const sizes = [
+      { boltPattern: "6x139.7", diameter: 20, width: 9, offsetMm: 18 },
+      { boltPattern: "6x139.7", diameter: 22, width: 9, offsetMm: 12 },
+      { boltPattern: "5x127", diameter: 20, width: 9, offsetMm: 18 },
+    ] as any
+    expect(boltPatternsForFinish(sizes)).toEqual(["6x139.7", "5x127"])
+  })
+
+  it("drops a placeholder ('') bolt pattern mixed with a real one (WB-048 regression)", () => {
+    const sizes = [
+      { boltPattern: "6x139.7", diameter: 20, width: 9, offsetMm: 18 },
+      { boltPattern: "", diameter: 20, width: 10, offsetMm: 20 },
+    ] as any
+    expect(boltPatternsForFinish(sizes)).toEqual(["6x139.7"])
   })
 })
 

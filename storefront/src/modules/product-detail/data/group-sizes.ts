@@ -126,7 +126,9 @@ export function pickDefaultSize(sizes: SizeOption[]): SizeOption | null {
  * chip once that finish is no longer selected.
  */
 export function boltPatternsForFinish(finishSizeOptions: SizeOption[]): string[] {
-  return Array.from(new Set(finishSizeOptions.map((s) => s.boltPattern)))
+  return Array.from(
+    new Set(finishSizeOptions.map((s) => s.boltPattern).filter(isRealBoltPattern))
+  )
 }
 
 const candidatesFor = (variants: OffsetVariant[], offsetMm: number) =>

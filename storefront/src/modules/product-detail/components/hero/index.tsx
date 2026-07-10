@@ -70,10 +70,14 @@ const Hero = ({ product }: HeroProps) => {
 
   // Scoped to the ACTIVE finish (not the product-wide set, B4) so switching
   // finish re-drives the bolt re-snap effect below and the selected pattern
-  // stays one the visible grid actually offers.
-  const boltPatternOptions = useFilter
-    ? fitView!.boltPatterns
-    : boltPatternsForFinish(finishSizeOptions)
+  // stays one the visible grid actually offers. Memoized so the reference is
+  // stable across re-renders — the effect below keys off this array's identity
+  // and must not fire on every Hero re-render, only when the finish's sizes change.
+  const finishBoltPatterns = useMemo(
+    () => boltPatternsForFinish(finishSizeOptions),
+    [finishSizeOptions]
+  )
+  const boltPatternOptions = useFilter ? fitView!.boltPatterns : finishBoltPatterns
 
   const [selectedBoltPattern, setSelectedBoltPattern] = useState<string>(
     boltPatternOptions[0] ?? product.boltPattern

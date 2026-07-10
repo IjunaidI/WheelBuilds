@@ -5,6 +5,8 @@ import { usePathname, useSearchParams } from "next/navigation"
 import { useRouter } from "@bprogress/next/app" // bprogress router → the window-param refinement shows the top progress bar
 import { useGarage } from "@lib/garage/use-garage"
 import { oemTiresToFitParams } from "../../data/types"
+import { shouldStripFit } from "@modules/discovery/components/fitment-sync/strip-fit"
+import { TIRE_FIT_PARAM_KEYS } from "./tire-strip-fit"
 
 /**
  * Tire-discovery counterpart to `modules/discovery/components/fitment-sync`
@@ -13,26 +15,33 @@ import { oemTiresToFitParams } from "../../data/types"
  * speed, WB-068 — was `fit`-only, sizes) — no `fitb/fitd/fitw/fito` (those
  * windows are wheel-only concepts) — sourced from the active vehicle's
  * `oemTires` via `oemTiresToFitParams` instead of the wheel's
- * `canonicalBoltPatterns` via `patternsToFitParam`/`winToParam`.
+ * `canonicalBoltPatterns` via `patternsToFitParam`/`winToParam`. It also
+ * reuses the wheel twin's `shouldStripFit` (WB-079 B1) for the orphan-strip
+ * decision — that helper is param-set-agnostic, so only the tire key tuple
+ * (`TIRE_FIT_PARAM_KEYS`) differs.
  */
 export default function TireFitmentSync() {
-  const { active } = useGarage()
+  const { active, isLoaded } = useGarage()
   const router = useRouter()
   const pathname = usePathname()
   const sp = useSearchParams()
 
   useEffect(() => {
-    if (sp.get("fit") === "0") return // explicit opt-out is authoritative — never overwrite
+    const isExplicitOptOut = sp.get("fit") === "0"
+    if (isExplicitOptOut) return // explicit opt-out is authoritative — never overwrite
 
     const desired = oemTiresToFitParams(active?.oemTires ?? [])
 
-    // Never auto-STRIP a fit already in the URL: the garage loads asynchronously
-    // (and RoutingGarage swaps local→remote ~1s after boot), so the active
-    // vehicle's data is routinely unavailable for a beat — and permanently for
-    // a vehicle wheel-size has no OEM tire data for. Only ACT once we have the
-    // vehicle's sizes; clearing fitment is an explicit user action (the
-    // "Fits: …" chip sets fit=0).
-    if (!desired.fit) return
+    if (!desired.fit) {
+      const hasFitParam = TIRE_FIT_PARAM_KEYS.some((k) => sp.has(k))
+      if (shouldStripFit({ isLoaded, hasActive: false, hasFitParam, isExplicitOptOut })) {
+        const next = new URLSearchParams(Array.from(sp.entries()))
+        for (const k of TIRE_FIT_PARAM_KEYS) next.delete(k)
+        next.delete("page") // reset pagination on filter change (mirrors useTireQuery)
+        router.replace(`${pathname}?${next.toString()}`)
+      }
+      return
+    }
 
     // Tires sync `fit`+`fitl`+`fits` — no size-window params to thread
     // through (unlike wheels, which also sync bore/diameter/width/offset).
@@ -51,6 +60,7 @@ export default function TireFitmentSync() {
   }, [
     active?.id,
     JSON.stringify(active?.oemTires ?? []),
+    isLoaded,
     sp,
     pathname,
     router,

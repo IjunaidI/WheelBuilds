@@ -33,7 +33,12 @@ const TireActiveChips = () => {
   const { active } = useGarage()
   const sp = useSearchParams()
 
-  const fitActive = active != null && sp.get("fit") !== null && sp.get("fit") !== "0"
+  // WB-079 B1: a fit param can be present with no active vehicle (garage
+  // cleared/switched after the param was written) — show the chip whenever
+  // the param is present, not only while `active` is set, so a stale filter
+  // is always removable rather than lingering invisibly.
+  const hasFitParam = sp.get("fit") !== null && sp.get("fit") !== "0"
+  const fitActive = hasFitParam
 
   if (!isAnyFilterActive && !fitActive) return null
 
@@ -45,10 +50,10 @@ const TireActiveChips = () => {
 
   const chips: ChipRow[] = []
 
-  if (fitActive && active) {
+  if (fitActive) {
     chips.push({
       key: "fit",
-      label: `Fits: ${active.year} ${active.make} ${active.model}`,
+      label: active ? `Fits: ${active.year} ${active.make} ${active.model}` : "Fits: your vehicle",
       onRemove: clearFit,
     })
   }

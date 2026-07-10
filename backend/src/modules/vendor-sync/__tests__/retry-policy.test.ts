@@ -3,6 +3,7 @@ import {
   shouldShortCircuitFeed,
   nextAttemptNumber,
   uniqueGroupKeys,
+  terminalStatusForFeed,
 } from "../pipeline/retry-policy"
 
 describe("decideTerminalStatus", () => {
@@ -49,4 +50,9 @@ describe("uniqueGroupKeys", () => {
       uniqueGroupKeys([{ groupKey: "a" }, { groupKey: "a" }, { groupKey: "b" }, {}])
     ).toEqual(["a", "b"])
   })
+})
+
+describe("terminalStatusForFeed", () => {
+  it("empty feed → failed (fail-loud)", () => expect(terminalStatusForFeed("empty")).toBe("failed"))
+  it("unchanged feed → completed", () => expect(terminalStatusForFeed("unchanged")).toBe("completed"))
 })

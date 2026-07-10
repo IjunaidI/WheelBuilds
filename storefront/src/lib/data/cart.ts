@@ -34,7 +34,11 @@ export async function getOrSetCart(countryCode: string) {
   }
 
   if (!cart) {
-    const cartResp = await sdk.store.cart.create({ region_id: region.id })
+    const cartResp = await sdk.store.cart.create(
+      { region_id: region.id },
+      {},
+      await getAuthHeaders()
+    )
     cart = cartResp.cart
     await setCartId(cart.id)
     revalidateTag("cart")
@@ -51,6 +55,22 @@ export async function getOrSetCart(countryCode: string) {
   }
 
   return cart
+}
+
+// WB-079 B3: guest carts are created without an authenticated customer
+// attached. On login/signup, transfer the cart cookie's cart to the newly
+// authenticated customer so it (and the resulting order) links to their
+// account instead of staying tied to a guest customer record. Non-fatal by
+// design — a cart hiccup here must never block login/signup.
+export async function transferCartToCustomer() {
+  const cartId = await getCartId()
+  if (!cartId) return
+  try {
+    await sdk.store.cart.transferCart(cartId, {}, await getAuthHeaders())
+    revalidateTag("cart")
+  } catch (e) {
+    console.error("transferCartToCustomer:", e)
+  }
 }
 
 export async function updateCart(data: HttpTypes.StoreUpdateCart) {
@@ -192,13 +212,33 @@ export async function enrichLineItems(
   return enrichedItems
 }
 
+// Extracts a readable message from an SDK/axios-style error WITHOUT throwing —
+// mirrors medusaError's message-extraction so prod-redacted Server Action
+// throws (Next.js strips thrown error messages from client responses) don't
+// mask the real reason. Server Actions must RETURN error strings, not throw
+// user-facing copy.
+function errText(error: any): string {
+  if (error?.response) {
+    const raw = error.response.data?.message ?? error.response.data
+    const message =
+      typeof raw === "string" ? raw : raw?.message ?? JSON.stringify(raw)
+    if (typeof message === "string" && message.length > 0) {
+      return message.charAt(0).toUpperCase() + message.slice(1) + "."
+    }
+  }
+  if (error?.request) {
+    return "No response received. Please try again."
+  }
+  return error?.message || "An unexpected error occurred. Please try again."
+}
+
 export async function setShippingMethod({
   cartId,
   shippingMethodId,
 }: {
   cartId: string
   shippingMethodId: string
-}) {
+}): Promise<{ error?: string }> {
   return sdk.store.cart
     .addShippingMethod(
       cartId,
@@ -208,8 +248,9 @@ export async function setShippingMethod({
     )
     .then(() => {
       revalidateTag("cart")
+      return {}
     })
-    .catch(medusaError)
+    .catch((e) => ({ error: errText(e) }))
 }
 
 export async function initiatePaymentSession(
@@ -218,14 +259,14 @@ export async function initiatePaymentSession(
     provider_id: string
     context?: Record<string, unknown>
   }
-) {
+): Promise<{ error?: string; session?: HttpTypes.StorePaymentCollectionResponse }> {
   return sdk.store.payment
     .initiatePaymentSession(cart, data, {}, await getAuthHeaders())
     .then((resp) => {
       revalidateTag("cart")
-      return resp
+      return { session: resp }
     })
-    .catch(medusaError)
+    .catch((e) => ({ error: errText(e) }))
 }
 
 export async function applyPromotions(codes: string[]) {
@@ -306,35 +347,49 @@ export async function setAddresses(currentState: unknown, formData: FormData) {
   )
 }
 
-export async function placeOrder() {
+export async function placeOrder(): Promise<{ error: string } | undefined> {
   const cartId = await getCartId()
   if (!cartId) {
-    throw new Error("No existing cart found when placing an order")
+    // WB-079 B2: Next.js redacts thrown Server Action error messages in
+    // production, so any throw here reaches the customer as a generic
+    // masked error. Return instead — the button components read `.error`.
+    return { error: "No existing cart found when placing an order." }
   }
 
-  const cartRes = await sdk.store.cart
-    .complete(cartId, {}, await getAuthHeaders())
-    .then((cartRes) => {
-      revalidateTag("cart")
-      return cartRes
-    })
-    .catch(medusaError)
+  let cartRes: HttpTypes.StoreCompleteCartResponse
+  try {
+    cartRes = await sdk.store.cart.complete(cartId, {}, await getAuthHeaders())
+    revalidateTag("cart")
+  } catch (e) {
+    return { error: errText(e) }
+  }
 
+  // redirect() throws NEXT_REDIRECT by design and MUST stay outside any
+  // try/catch above so Next.js can handle the navigation, not us.
   if (cartRes?.type === "order") {
     const countryCode =
       cartRes.order.shipping_address?.country_code?.toLowerCase()
-    await removeCartId()
+    // Best-effort: the card is already charged and the order already
+    // created at this point, so a cookie-clear failure must never block
+    // the confirmation redirect (that would strand the customer on a
+    // stuck spinner after a successful, charged order).
+    try {
+      await removeCartId()
+    } catch (e) {
+      console.error("placeOrder: removeCartId failed post-order:", e)
+    }
     redirect(`/${countryCode}/order/confirmed/${cartRes?.order.id}`)
   }
 
   // WB-071 F-C: Medusa returns the cart + an error object with HTTP 200 when
   // completion fails AFTER the card is authorized (e.g. inventory reservation).
-  // .catch(medusaError) never fires for this, so surface it explicitly rather
+  // The try/catch above never fires for this, so surface it explicitly rather
   // than returning silently and leaving the customer on a stopped spinner.
-  throw new Error(
-    (cartRes as any)?.error?.message ||
-      "We couldn't complete your order. If you were charged, it will be reversed. Please try again."
-  )
+  return {
+    error:
+      (cartRes as any)?.error?.message ||
+      "We couldn't complete your order. If you were charged, it will be reversed. Please try again.",
+  }
 }
 
 /**

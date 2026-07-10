@@ -46,13 +46,11 @@ const Shipping: React.FC<ShippingProps> = ({
 
   const set = async (id: string) => {
     setIsLoading(true)
-    await setShippingMethod({ cartId: cart.id, shippingMethodId: id })
-      .catch((err) => {
-        setError(err.message)
-      })
-      .finally(() => {
-        setIsLoading(false)
-      })
+    const res = await setShippingMethod({ cartId: cart.id, shippingMethodId: id })
+    if (res?.error) {
+      setError(res.error)
+    }
+    setIsLoading(false)
   }
 
   useEffect(() => {

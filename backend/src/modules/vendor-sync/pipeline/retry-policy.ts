@@ -46,3 +46,16 @@ export function uniqueGroupKeys(errors: Array<{ groupKey?: string }>): string[] 
   for (const e of errors) if (e.groupKey) set.add(e.groupKey)
   return [...set]
 }
+
+/**
+ * WB-079 B5: terminal status for a resolved feed's short-circuit kind.
+ * A zero-files SFTP match ("empty") must FAIL LOUD rather than report
+ * "completed" — a broken vendor connection should not look green
+ * (consistent with the WB-041 fail-loud guard). "unchanged" is a legit
+ * completed short-circuit (delta match, nothing new to apply).
+ */
+export function terminalStatusForFeed(
+  kind: "empty" | "unchanged" | "data"
+): "failed" | "completed" {
+  return kind === "empty" ? "failed" : "completed"
+}

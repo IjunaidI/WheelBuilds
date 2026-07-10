@@ -1,6 +1,7 @@
 import { MedusaRequest, MedusaResponse } from "@medusajs/framework"
 import { ContainerRegistrationKeys, Modules } from "@medusajs/framework/utils"
 import { deleteProductsWorkflow } from "@medusajs/medusa/core-flows"
+import { confirmMatches, hostFromDatabaseUrl } from "./confirm-host"
 
 const VENDORS = ["wheelpros-wheels", "wheelpros-tires"]
 
@@ -16,7 +17,10 @@ const VENDORS = ["wheelpros-wheels", "wheelpros-tires"]
  * Work is bounded by a wall-clock budget per call so a single request can never
  * exceed the HTTP gateway timeout. Call it repeatedly until `remaining === 0`.
  *
- * Body (all optional):
+ * Body:
+ *   - confirm: REQUIRED. Must equal the hostname parsed out of this
+ *     process's DATABASE_URL (mirrors vendor-sync-dev-wipe.ts's
+ *     --confirm-host contract). Mismatch or missing = 400, no deletes.
  *   - vendor_code: restrict to one vendor (default: both wheelpros vendors)
  *   - max_seconds: per-call delete budget, clamped to [5, 60] (default 25)
  *
@@ -26,10 +30,21 @@ export async function POST(req: MedusaRequest, res: MedusaResponse) {
   const logger = req.scope.resolve(ContainerRegistrationKeys.LOGGER)
   const productService = req.scope.resolve(Modules.PRODUCT)
 
-  const { vendor_code, max_seconds = 25 } = (req.body ?? {}) as {
+  const body = (req.body ?? {}) as {
     vendor_code?: string
     max_seconds?: number
+    confirm?: string
   }
+  if (!confirmMatches(body)) {
+    return res.status(400).json({
+      error: "confirm required",
+      message: `This purges the live catalog. Re-send with { confirm: "${
+        hostFromDatabaseUrl(process.env.DATABASE_URL) ?? "<DATABASE_URL host>"
+      }" }.`,
+    })
+  }
+
+  const { vendor_code, max_seconds = 25 } = body
   const vendors = vendor_code ? [vendor_code] : VENDORS
   const vendorSet = new Set(vendors)
   const budgetMs = Math.min(Math.max(Number(max_seconds) || 25, 5), 60) * 1000

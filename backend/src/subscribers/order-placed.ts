@@ -2,6 +2,7 @@ import { Modules } from '@medusajs/framework/utils'
 import { INotificationModuleService, IOrderModuleService } from '@medusajs/framework/types'
 import { SubscriberArgs, SubscriberConfig } from '@medusajs/medusa'
 import { EmailTemplates } from '../modules/email-notifications/templates'
+import { EMAIL_REPLY_TO } from '../lib/constants'
 
 export default async function orderPlacedHandler({
   event: { data },
@@ -20,7 +21,7 @@ export default async function orderPlacedHandler({
       template: EmailTemplates.ORDER_PLACED,
       data: {
         emailOptions: {
-          replyTo: 'info@example.com',
+          replyTo: EMAIL_REPLY_TO || undefined,
           subject: 'Your order has been placed'
         },
         order,

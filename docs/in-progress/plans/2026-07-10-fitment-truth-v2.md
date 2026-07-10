@@ -836,7 +836,7 @@ git commit -m "feat(wb-077): checkout fitment card gated on real tier + honest c
 ## Deploy (ops — after merge)
 
 1. **Backend first** (normalize + cache-key v2 + reverse tolerance). Redeploy the backend service.
-2. Optional: truncate `wheel_size_fitment` for cleanliness (cached v1 rows are already orphaned by the v2 key and re-warm on next lookup; the daily warm cron also refreshes). No migration.
+2. **REQUIRED: truncate `wheel_size_fitment` immediately after the backend deploy.** Every pre-existing row carries a v1 key; getFitment now looks up (and writes) under the v2 key, so the v1 rows are orphaned. They must be cleared — otherwise they linger as dead rows. The warm cron will re-warm live vehicles under v2 keys on next lookup. No migration; a `TRUNCATE wheel_size_fitment` (or the module's clear path) is sufficient. Safety net if this is forgotten: the warm cron now SKIPS non-`|v2` keys (`filterWarmableRows` in `wheel-size-warm.ts`), so orphaned v1 rows no longer burn the nightly warm budget — but they still sit dead in the table until truncated.
 3. **Storefront rebuild** (verdict + surfaces). No Meili change — windows travel via `fitb/fitd/fitw/fito` URL params, unchanged.
 4. Quota note: one wheel-size API call per active vehicle on next lookup (bounded; daily ceiling 5000 dwarfs it).
 

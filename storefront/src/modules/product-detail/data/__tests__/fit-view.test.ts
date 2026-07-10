@@ -145,6 +145,29 @@ describe("buildFitView", () => {
     expect(fv.finishOptions[0].sizeOptions[0].offsetVariants?.map((o) => o.value)).toEqual([-10])
   })
 
+  it("orders a size's surviving offsetVariants fits-first so offsetVariants[0] is a fitting ET when one exists (WB-077 I1)", () => {
+    // The product lists the CHECK offset (ET15, out of the 35-50 window) BEFORE
+    // the FITS offset (ET40, in-window); both clear hub 73. After trim, the
+    // genuinely-fitting ET must be reordered to the front so the hero's default
+    // offset pick (offsetVariants[0]) lands on a fit, not the aggressive ET.
+    const product = productOf(["5x114.3"], [
+      finish("Black", [
+        multiVariantSize(18, 8, "5x114.3", [
+          { value: 15, bore: 80 }, // check: clears hub 73 but offset out of window
+          { value: 40, bore: 80 }, // fits: in-window (35-50) AND clears hub
+        ]),
+      ]),
+    ])
+    const vehicle = {
+      canonicalBoltPatterns: ["5x114.3"], hubBoreMm: 73,
+      offsetWindow: { min: 35, max: 50 },
+    }
+    const fv = buildFitView(product, vehicle)
+    const offsets = fv.finishOptions[0].sizeOptions[0].offsetVariants
+    expect(offsets?.map((o) => o.value)).toEqual([40, 15]) // FITS (40) first, CHECK (15) after
+    expect(offsets?.[0].value).toBe(40)
+  })
+
   it("trims a surviving size's offsetVariants to drop only the non-clearing (no-tier) ones — check-tier offsets stay visible (S3, updated for WB-077)", () => {
     const product = productOf(["5x114.3"], [
       finish("Black", [

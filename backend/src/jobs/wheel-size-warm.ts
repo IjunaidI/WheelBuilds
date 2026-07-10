@@ -14,7 +14,14 @@ export default async function wheelSizeWarm(container: MedusaContainer) {
   const batch = (svc as any).options_?.warmBatchSize ?? 200
 
   const rows = await (svc as any).listWheelSizeFitments({})
-  const stale = selectStaleForWarm(rows as any[], ttlDays, new Date(), batch)
+  // WB-077 I3: on the v2 cache-key cutover, every pre-existing row carries a v1
+  // key. getFitment now looks up (and writes) under the v2 key, so those v1 rows
+  // are dead — but they'd otherwise be re-warmed every night forever, burning
+  // API quota. Skip them here so only live v2 rows consume the warm budget. The
+  // required cleanup is truncating wheel_size_fitment post-deploy (see the plan's
+  // Deploy section); this filter is the safety net if that's forgotten.
+  const warmable = filterWarmableRows(rows as any[])
+  const stale = selectStaleForWarm(warmable, ttlDays, new Date(), batch)
   logger.info(`[wheel-size-warm] ${stale.length} stale entr${stale.length === 1 ? "y" : "ies"} to refresh (batch ${batch})`)
 
   let refreshed = 0
@@ -45,6 +52,24 @@ export function parseCacheKey(
     modificationSlug: modificationSlug || undefined,
     region,
   }
+}
+
+/**
+ * A cache key is v2 (WB-077) iff it carries the trailing "|v2" version slot.
+ * Rows without it are legacy single-trim rows written before the multi-trim
+ * merge; getFitment looks them up under a v2 key and writes a fresh v2 row, so
+ * the v1 row is orphaned. Exported for unit tests.
+ */
+export function isV2CacheKey(key: string): boolean {
+  return String(key).endsWith("|v2")
+}
+
+/**
+ * Keep only v2-keyed rows for warming — orphaned v1 rows are dead and must not
+ * consume the nightly warm budget (WB-077 I3). Exported for unit tests.
+ */
+export function filterWarmableRows<T extends { cache_key: string }>(rows: T[]): T[] {
+  return rows.filter((r) => isV2CacheKey(r.cache_key))
 }
 
 export const config = {

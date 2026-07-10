@@ -90,8 +90,12 @@ function sizeTier(size: SizeOption, vehicle: FitVehicle): "fits" | "check" | "no
  * surviving size's `offsetVariants` to drop only the non-clearing ("no")
  * ones; "check" offsets stay visible (only the bore-failing ones vanish) so
  * a shopper can eyeball an aggressive-but-plausible ET instead of it being
- * silently hidden. Each surviving size is tagged with its own `tier` for the
- * PDP badge.
+ * silently hidden. Surviving offsets are then ordered fits-before-check
+ * (stable) so `offsetVariants[0]` is a genuinely-fitting ET whenever the size
+ * has one — the hero defaults the selected offset to `offsetVariants[0]`
+ * (WB-077 I1). A check-only size has no fitting ET; its aggressive banner
+ * tells the shopper to verify clearance. Each surviving size is tagged with
+ * its own `tier` for the PDP badge.
  */
 function trim(finishOptions: FinishOption[], vehicle: FitVehicle): FinishOption[] {
   return finishOptions
@@ -103,7 +107,13 @@ function trim(finishOptions: FinishOption[], vehicle: FitVehicle): FinishOption[
         .map(({ s, tier }) => ({
           ...s,
           tier,
-          offsetVariants: (s.offsetVariants ?? []).filter((o) => offsetTier(o, vehicle) !== "no"),
+          offsetVariants: (s.offsetVariants ?? [])
+            .map((o) => ({ o, t: offsetTier(o, vehicle) }))
+            .filter((x) => x.t !== "no")
+            // Array.prototype.sort is stable (Node 11+/V8) — equal-tier offsets
+            // keep their original product order; only fits jump ahead of check.
+            .sort((a, b) => (a.t === b.t ? 0 : a.t === "fits" ? -1 : 1))
+            .map((x) => x.o),
         })),
     }))
     .filter((f) => f.sizeOptions.length > 0)

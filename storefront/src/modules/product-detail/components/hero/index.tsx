@@ -43,6 +43,11 @@ const Hero = ({ product }: HeroProps) => {
     [fitParam, active, product]
   )
   const fitActive = !!fitView?.hasFit
+  // WB-077 I1: hasFit is true for BOTH fits and check tiers, so distinguish the
+  // aggressive (check-only) case — every surviving size is bolt+bore-OK but
+  // OUTSIDE the vehicle's spec window. The banner keys off this to render honest
+  // "verify clearance" copy instead of claiming the shown options fit.
+  const aggressive = fitView?.bestTier === "check"
   // Fit mode = arrived via "fits my car" with a vehicle set. fitActive = fit mode
   // AND this wheel has a fitting variant. noFitInMode = fit mode but nothing fits.
   const inFitMode = fitParam && !!active
@@ -113,11 +118,13 @@ const Hero = ({ product }: HeroProps) => {
   }, [visibleSizes])
 
   // In fit mode (useFilter true — fitActive AND "show all" hasn't been picked)
-  // selectedSize comes from fitView's ALREADY-trimmed offsetVariants (WB-072
-  // S3), so its first entry is guaranteed to be a fitting ET. Default to that
-  // instead of the wheel's own default, so a fit-flow shopper never defaults
-  // to an out-of-window offset under an "only options that fit" banner.
-  // Outside fit mode (useFilter false) this is unchanged.
+  // selectedSize comes from fitView's trimmed offsetVariants, which WB-077 I1
+  // now orders fits-before-check: offsetVariants[0] is a genuinely-fitting ET
+  // whenever the size has one. Default to that first entry so a fit-flow shopper
+  // lands on a fitting offset, not an arbitrary one. For a check-only size no ET
+  // fits at all — offsetVariants[0] is then the least-aggressive available ET and
+  // the FitBanner's amber "verify clearance" copy owns the honesty. Outside fit
+  // mode (useFilter false) this is unchanged.
   const fittingDefaultOffsetMm = useFilter ? selectedSize.offsetVariants?.[0]?.value : undefined
   const defaultOffsetMm =
     fittingDefaultOffsetMm ?? selectedSize.defaultOffsetMm ?? selectedSize.offsetMm
@@ -190,6 +197,7 @@ const Hero = ({ product }: HeroProps) => {
         {fitActive && active && (
           <FitBanner
             filtered={useFilter}
+            aggressive={aggressive}
             vehicleLabel={`${active.year} ${active.make} ${active.model}`}
             onShowAll={() => setShowAll(true)}
             onOnlyFit={() => setShowAll(false)}

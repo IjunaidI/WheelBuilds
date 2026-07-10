@@ -35,7 +35,7 @@ import { lit } from "./escape"
 import { unstable_cache } from "next/cache"
 import { discoveryCacheKey } from "./cache-key"
 import { sdk } from "@lib/config"
-import { productHasFittingVariant } from "@lib/fitment/product-has-fitting-variant"
+import { productFitTier } from "@lib/fitment/product-has-fitting-variant"
 import { isRealBoltPattern } from "@modules/product-detail/data/group-sizes"
 
 // Re-export so any existing imports from this file keep working.
@@ -263,18 +263,28 @@ export async function fetchDiscoveryProducts(
     //   (b) PARTIAL `products` (some requested ids simply missing from an
     //       otherwise-successful response) — `variantsById[id]` is
     //       `undefined` only for the missing ones.
-    // `productHasFittingVariant(undefined, vf)` safely returns `false` (it
-    // guards `!variants?.length` before touching the array — never
-    // throws), so a plain `.filter` correctly and safely EXCLUDES any
-    // candidate whose variants never arrived — honest empty for (a),
-    // exclude-only-the-unverified for (b) — while candidates that DID
-    // resolve are still checked for real and pass/fail on their own
-    // merits. There is deliberately no "assume it fits" fallback: we never
-    // claim a wheel fits without having actually verified it.
-    const candidates = hits.map((hit) => ({ hit, product: hitToProduct(hit) }))
-    const fitting = candidates.filter(({ product }) =>
-      productHasFittingVariant(variantsById[product.id], vf)
-    )
+    // `productFitTier(undefined, vf)` safely returns `"no"` (it guards
+    // `!variants?.length` before touching the array — never throws), so the
+    // `.filter` below correctly and safely EXCLUDES any candidate whose
+    // variants never arrived — honest empty for (a), exclude-only-the-
+    // unverified for (b) — while candidates that DID resolve are still
+    // checked for real and tiered on their own merits. There is
+    // deliberately no "assume it fits" fallback: we never claim a wheel
+    // fits without having actually verified it.
+    //
+    // WB-077 D1: unlike the earlier strict-only filter, both "fits" and
+    // "check" tiers are KEPT (only "no" is dropped) — a "check" wheel
+    // clears bolt pattern + bore but misses a size window, so it's still a
+    // plausible fit worth surfacing, just badged CHECK FIT instead of FITS
+    // (see fit-badge.tsx). "fits" results sort first so the confident
+    // matches lead the grid.
+    const candidates = hits
+      .map((hit) => ({ hit, product: hitToProduct(hit) }))
+      .map((c) => ({ ...c, tier: productFitTier(variantsById[c.product.id], vf) }))
+      .filter((c) => c.tier !== "no") // D1: keep fits AND check
+      .sort((a, b) => (a.tier === b.tier ? 0 : a.tier === "fits" ? -1 : 1)) // fits first
+      .map((c) => ({ ...c, product: { ...c.product, fitTier: c.tier as "fits" | "check" } }))
+    const fitting = candidates
 
     const start = (query.page - 1) * pageSize
     return {

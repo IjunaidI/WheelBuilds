@@ -34,7 +34,11 @@ export async function getOrSetCart(countryCode: string) {
   }
 
   if (!cart) {
-    const cartResp = await sdk.store.cart.create({ region_id: region.id })
+    const cartResp = await sdk.store.cart.create(
+      { region_id: region.id },
+      {},
+      await getAuthHeaders()
+    )
     cart = cartResp.cart
     await setCartId(cart.id)
     revalidateTag("cart")
@@ -51,6 +55,22 @@ export async function getOrSetCart(countryCode: string) {
   }
 
   return cart
+}
+
+// WB-079 B3: guest carts are created without an authenticated customer
+// attached. On login/signup, transfer the cart cookie's cart to the newly
+// authenticated customer so it (and the resulting order) links to their
+// account instead of staying tied to a guest customer record. Non-fatal by
+// design — a cart hiccup here must never block login/signup.
+export async function transferCartToCustomer() {
+  const cartId = await getCartId()
+  if (!cartId) return
+  try {
+    await sdk.store.cart.transferCart(cartId, {}, await getAuthHeaders())
+    revalidateTag("cart")
+  } catch (e) {
+    console.error("transferCartToCustomer:", e)
+  }
 }
 
 export async function updateCart(data: HttpTypes.StoreUpdateCart) {

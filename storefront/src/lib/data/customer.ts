@@ -6,6 +6,7 @@ import { HttpTypes } from "@medusajs/types"
 import { revalidateTag } from "next/cache"
 import { redirect } from "next/navigation"
 import { cache } from "react"
+import { transferCartToCustomer } from "./cart"
 import { getAuthHeaders, removeAuthToken, setAuthToken } from "./cookies"
 
 export const getCustomer = cache(async function () {
@@ -57,6 +58,7 @@ export async function signup(_currentState: unknown, formData: FormData) {
     })
 
     await setAuthToken(typeof loginToken === 'string' ? loginToken : loginToken.location)
+    await transferCartToCustomer()
 
     revalidateTag("customer")
   } catch (error: any) {
@@ -78,6 +80,7 @@ export async function login(_currentState: unknown, formData: FormData) {
   try {
     const token = await sdk.auth.login("customer", "emailpass", { email, password })
     await setAuthToken(typeof token === "string" ? token : token.location)
+    await transferCartToCustomer()
     revalidateTag("customer")
   } catch (error: any) {
     return error.toString()

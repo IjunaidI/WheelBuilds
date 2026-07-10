@@ -166,7 +166,7 @@ const VendorSyncPage = () => {
             </Table.Row>
           ))}
           {!loading && runs.length === 0 && (
-            <Table.Row><Table.Cell colSpan={5}>No runs.</Table.Cell></Table.Row>
+            <Table.Row><Table.Cell {...({ colSpan: 5 } as any)}>No runs.</Table.Cell></Table.Row>
           )}
         </Table.Body>
       </Table>

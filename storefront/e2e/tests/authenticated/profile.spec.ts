@@ -162,32 +162,27 @@ test.describe("Account profile tests", () => {
     })
   })
 
-  test("Verifies password changes work correctly", async ({
-    loginPage,
+  test("Sends a password reset email instead of changing the password inline", async ({
     accountProfilePage: profilePage,
     accountOverviewPage: overviewPage,
   }) => {
+    // D4 replaced the inline old/new/confirm password form with a single
+    // "send reset email" action (account is passwordless from the UI's
+    // perspective — the actual reset happens via the emailed link). There is
+    // no live-email assertion here; the Server Action always resolves to the
+    // same "SENT" sentinel regardless of outcome (no account enumeration —
+    // see forgotPassword in lib/data/customer.ts), so this only needs to
+    // confirm the button click flips the editor into its sent state.
     await test.step("Navigate to the account Profile page", async () => {
       await overviewPage.goto()
       await profilePage.profileLink.click()
+      await expect(profilePage.profileWrapper).toBeVisible()
     })
 
-    await test.step("Update the password", async () => {
-      await profilePage.passwordEditButton.click()
-      await profilePage.oldPasswordInput.fill("password")
-      await profilePage.newPasswordInput.fill("updated-password")
-      await profilePage.confirmPasswordInput.fill("updated-password")
-      await profilePage.passwordSaveButton.click()
-      await expect(profilePage.passwordSuccessMessage).toBeVisible()
-    })
-
-    await test.step("logout and log back in", async () => {
-      await profilePage.logoutLink.click()
-      await expect(loginPage.container).toBeVisible()
-      await loginPage.emailInput.fill("test@example.com")
-      await loginPage.passwordInput.fill("updated-password")
-      await loginPage.signInButton.click()
-      await expect(overviewPage.container).toBeVisible()
+    await test.step("Send the reset email", async () => {
+      await expect(profilePage.sendResetEmailButton).toBeVisible()
+      await profilePage.sendResetEmailButton.click()
+      await expect(profilePage.passwordSentMessage).toBeVisible()
     })
   })
 

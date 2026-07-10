@@ -28,13 +28,13 @@ export default async function shipmentCreatedHandler({
     entity: 'fulfillment',
     fields: [
       'id',
+      'items.title',
+      'items.quantity',
       'labels.tracking_number',
       'labels.tracking_url',
       'order.id',
       'order.display_id',
       'order.email',
-      'order.items.title',
-      'order.items.quantity',
       'order.shipping_address.first_name',
       'order.shipping_address.last_name',
       'order.shipping_address.address_1',
@@ -53,6 +53,16 @@ export default async function shipmentCreatedHandler({
     return
   }
 
+  // Use THIS fulfillment's items, not the whole order — an order that ships in
+  // multiple fulfillments (e.g. wheels then tires) must only list what shipped
+  // in this shipment. FulfillmentItem carries `title`/`quantity` directly
+  // (verified against installed @medusajs/fulfillment 2.13.6 — see
+  // dist/models/fulfillment-item.js), so no join against order.items is needed.
+  const shippedItems = (fulfillment?.items ?? []).map((item: any) => ({
+    title: item.title,
+    quantity: item.quantity,
+  }))
+
   try {
     await notificationModuleService.createNotifications({
       to: order.email,
@@ -63,7 +73,7 @@ export default async function shipmentCreatedHandler({
           replyTo: EMAIL_REPLY_TO || undefined,
           subject: 'Your order has shipped'
         },
-        order,
+        order: { ...order, items: shippedItems },
         shippingAddress: order.shipping_address,
         trackingLinks: (fulfillment?.labels ?? []).map((l: any) => ({
           url: l.tracking_url,

@@ -1,7 +1,20 @@
 import type { SubscriberArgs, SubscriberConfig } from '@medusajs/framework'
-import { Modules } from '@medusajs/framework/utils'
+import { ContainerRegistrationKeys, Modules } from '@medusajs/framework/utils'
 import { EmailTemplates } from '../modules/email-notifications/templates'
-import { EMAIL_REPLY_TO, STOREFRONT_URL } from '../lib/constants'
+import { EMAIL_REPLY_TO, IS_PRODUCTION, STOREFRONT_URL } from '../lib/constants'
+
+/**
+ * True when `url` resolves to a loopback host (localhost/127.0.0.1) — i.e. the
+ * `STOREFRONT_URL` default from lib/constants.ts, which only makes sense in dev.
+ */
+function isLocalhostUrl(url: string): boolean {
+  try {
+    const { hostname } = new URL(url)
+    return hostname === 'localhost' || hostname === '127.0.0.1'
+  } catch {
+    return false
+  }
+}
 
 /**
  * Fires on `auth.password_reset`, emitted by `generateResetPasswordTokenWorkflow`
@@ -29,6 +42,19 @@ export default async function passwordResetHandler({
 
   const notificationModuleService = container.resolve(Modules.NOTIFICATION)
   const email = data.entity_id
+
+  // STOREFRONT_URL silently defaults to http://localhost:8000 (lib/constants.ts)
+  // when unset. That's fine in dev, but in production it means reset emails go
+  // out with a dead link and nothing ever surfaces the misconfiguration. Don't
+  // hard-fail the send — just make it loud in the logs.
+  if (IS_PRODUCTION && isLocalhostUrl(STOREFRONT_URL)) {
+    const logger = container.resolve(ContainerRegistrationKeys.LOGGER)
+    logger.error(
+      `STOREFRONT_URL is unset/localhost ("${STOREFRONT_URL}") in production — ` +
+        'password-reset links will be broken for customers. Set STOREFRONT_URL to the public storefront origin.'
+    )
+  }
+
   const resetLink = `${STOREFRONT_URL}/us/reset-password?token=${encodeURIComponent(data.token)}&email=${encodeURIComponent(email)}`
 
   try {

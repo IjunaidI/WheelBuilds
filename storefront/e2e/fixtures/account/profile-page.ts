@@ -13,31 +13,26 @@ export class ProfilePage extends AccountPage {
   nameEditButton: Locator
   emailEditButton: Locator
   phoneEditButton: Locator
-  passwordEditButton: Locator
   billingAddressEditButton: Locator
 
   nameSaveButton: Locator
   emailSaveButton: Locator
   phoneSaveButton: Locator
-  passwordSaveButton: Locator
   billingAddressSaveButton: Locator
 
   savedName: Locator
   savedEmail: Locator
   savedPhone: Locator
-  savedPassword: Locator
   savedBillingAddress: Locator
 
   nameSuccessMessage: Locator
   emailSuccessMessage: Locator
   phoneSuccessMessage: Locator
-  passwordSuccessMessage: Locator
   billingAddressSuccessMessage: Locator
 
   nameErrorMessage: Locator
   emailErrorMessage: Locator
   phoneErrorMessage: Locator
-  passwordErrorMessage: Locator
   billingAddressErrorMessage: Locator
 
   emailInput: Locator
@@ -46,9 +41,11 @@ export class ProfilePage extends AccountPage {
 
   phoneInput: Locator
 
-  oldPasswordInput: Locator
-  newPasswordInput: Locator
-  confirmPasswordInput: Locator
+  // Password is no longer an inline edit/save form (D4 — replaced by a single
+  // "send reset email" action). See sendResetEmailButton / passwordSentMessage
+  // below, sourced from account-password-editor's own testids.
+  sendResetEmailButton: Locator
+  passwordSentMessage: Locator
 
   billingAddress1Input: Locator
   billingAddress2Input: Locator
@@ -76,23 +73,18 @@ export class ProfilePage extends AccountPage {
     this.nameEditButton = this.accountNameEditor.getByTestId("edit-button")
     this.emailEditButton = this.accountEmailEditor.getByTestId("edit-button")
     this.phoneEditButton = this.accountPhoneEditor.getByTestId("edit-button")
-    this.passwordEditButton =
-      this.accountPasswordEditor.getByTestId("edit-button")
     this.billingAddressEditButton =
       this.accountBillingAddressEditor.getByTestId("edit-button")
 
     this.nameSaveButton = this.accountNameEditor.getByTestId("save-button")
     this.emailSaveButton = this.accountEmailEditor.getByTestId("save-button")
     this.phoneSaveButton = this.accountPhoneEditor.getByTestId("save-button")
-    this.passwordSaveButton =
-      this.accountPasswordEditor.getByTestId("save-button")
     this.billingAddressSaveButton =
       this.accountBillingAddressEditor.getByTestId("save-button")
 
     this.savedName = this.accountNameEditor.getByTestId("current-info")
     this.savedEmail = this.accountEmailEditor.getByTestId("current-info")
     this.savedPhone = this.accountPhoneEditor.getByTestId("current-info")
-    this.savedPassword = this.accountPasswordEditor.getByTestId("current-info")
     this.savedBillingAddress =
       this.accountBillingAddressEditor.getByTestId("current-info")
     this.nameSuccessMessage =
@@ -101,8 +93,6 @@ export class ProfilePage extends AccountPage {
       this.accountEmailEditor.getByTestId("success-message")
     this.phoneSuccessMessage =
       this.accountPhoneEditor.getByTestId("success-message")
-    this.passwordSuccessMessage =
-      this.accountPasswordEditor.getByTestId("success-message")
     this.billingAddressSuccessMessage =
       this.accountBillingAddressEditor.getByTestId("success-message")
     this.nameErrorMessage = this.accountNameEditor.getByTestId("error-message")
@@ -110,18 +100,24 @@ export class ProfilePage extends AccountPage {
       this.accountEmailEditor.getByTestId("error-message")
     this.phoneErrorMessage =
       this.accountPhoneEditor.getByTestId("error-message")
-    this.passwordErrorMessage =
-      this.accountPasswordEditor.getByTestId("error-message")
     this.billingAddressErrorMessage =
       this.accountBillingAddressEditor.getByTestId("error-message")
+
+    // Password editor (D4): a single "send reset email" button, no inline
+    // edit/save form. `send-reset-email-button` is the only testid the
+    // component renders; the confirmation copy has no dedicated testid, so we
+    // match on its text within the editor's own wrapper.
+    this.sendResetEmailButton = this.accountPasswordEditor.getByTestId(
+      "send-reset-email-button"
+    )
+    this.passwordSentMessage = this.accountPasswordEditor.getByText(
+      /we've emailed/i
+    )
 
     this.firstNameInput = page.getByTestId("first-name-input")
     this.lastNameInput = page.getByTestId("last-name-input")
     this.emailInput = page.getByTestId("email-input")
     this.phoneInput = page.getByTestId("phone-input")
-    this.oldPasswordInput = page.getByTestId("old-password-input")
-    this.newPasswordInput = page.getByTestId("new-password-input")
-    this.confirmPasswordInput = page.getByTestId("confirm-password-input")
 
     this.billingAddress1Input = page.getByTestId("billing-address-1-input")
     this.billingAddress2Input = page.getByTestId("billing-address-2-input")

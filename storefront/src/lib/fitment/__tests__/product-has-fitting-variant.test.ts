@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest"
-import { variantFitsVehicle, productHasFittingVariant } from "../product-has-fitting-variant"
+import { variantFitsVehicle, productHasFittingVariant, variantFitTier } from "../product-has-fitting-variant"
 
 const v = (bolt: string, dia: number, width: number, offset: number, bore = 72) => ({
   metadata: {
@@ -23,6 +23,26 @@ describe("variantFitsVehicle", () => {
   })
   it("does not fit when the bore is smaller than the hub", () => {
     expect(variantFitsVehicle({ boltPatternRaw: "5x130", diameterIn: 20, widthIn: 9, offsetMm: 55, centerBoreMm: 60 }, porsche)).toBe(false)
+  })
+  it("strict wrapper is fits-only (check-tier is NOT strict-fits)", () => {
+    const check = { boltPatternRaw: "6x139.7", centerBoreMm: 78.1, diameterIn: 20, widthIn: 10, offsetMm: -19 }
+    const vehicle = { canonicalBoltPatterns: ["6x139.7"], hubBoreMm: 78.1, diameterWindow: { min: 17, max: 20 }, widthWindow: { min: 8, max: 9 }, offsetWindow: { min: 0, max: 31 } }
+    expect(variantFitsVehicle(check, vehicle)).toBe(false)
+  })
+})
+
+describe("variantFitTier", () => {
+  it("bolt+bore pass, out of window → check", () => {
+    expect(variantFitTier(
+      { boltPatternRaw: "6x139.7", centerBoreMm: 78.1, diameterIn: 20, widthIn: 10, offsetMm: -19 },
+      { canonicalBoltPatterns: ["6x139.7"], hubBoreMm: 78.1, diameterWindow: { min: 17, max: 20 }, widthWindow: { min: 8, max: 9 }, offsetWindow: { min: 0, max: 31 } }
+    )).toBe("check")
+  })
+  it("bolt mismatch → no", () => {
+    expect(variantFitTier(
+      { boltPatternRaw: "5x114.3", centerBoreMm: 66, diameterIn: 18, widthIn: 8, offsetMm: 35 },
+      { canonicalBoltPatterns: ["6x139.7"], hubBoreMm: null, diameterWindow: null, widthWindow: null, offsetWindow: null }
+    )).toBe("no")
   })
 })
 

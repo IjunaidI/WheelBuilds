@@ -42,6 +42,7 @@
 - **G7 · Account & garage** `[S–M]` — ✅ **DONE 2026-06-26** (WB-032 account Garage tab/route + GarageManager, WB-022 atomic guest→login merge w/ stable idempotent client_ids, WB-045 removed license-plate stub). Follow-up: WB-058 (real plate→YMM provider). **⚠️ Superseded 2026-07-09 by WB-076: the garage (account tab, merge, multi-vehicle list) is RETIRED per client decision — one cached vehicle only; the G7 code is mothballed behind `GARAGE-DISABLED` seams, not deleted. WB-058 is moot while retired.**
 - **G8 · Admin & ops tooling** `[S]` — admin UI + ops slice ✅ **DONE 2026-06-28** (WB-006 vendor-sync admin console, WB-044 rename `teraflex` fixtures, WB-052 scale-safe dev-wipe). Remaining: WB-031 (seed shipping options + reply-to — general commerce, not wheel; deferred). → WB-031
 - **G9 · Audit remediation — honest state & silent-failure elimination** `[L–XL · multi-session]` — remediate the 2026-07-06 full done-specs audit: **76 unique findings (9 CONFIRMED high, all vendor-sync lifecycle; 47 pending verification)**. Theme + raw logs: [future/plans/2026-07-06-audit-remediation-theme.md](plans/2026-07-06-audit-remediation-theme.md) (+ 4 finding-log docs). Convert per-cluster (sync-lifecycle-integrity, fitment-truth, checkout-money-honesty, garage-session-integrity, discovery-honest-signals, docs-truth-sweep) into specs/plans before implementing. **Cluster 1 `sync-lifecycle-integrity` (WB-070) ✅ DONE 2026-07-06** (the 9 confirmed + folded #11/#16). **Cluster 2 `checkout-money-honesty` (WB-071) ✅ DONE 2026-07-06** (9 findings F-A…F-I). **Cluster 3 `fitment-truth` (WB-072) ✅ DONE 2026-07-07** (17 findings B1–B8/S1–S9, re-verified vs current main first via 2 parallel verifiers; 16-commit branch + review fix, opus whole-branch review). **Cluster 4 `garage-session-integrity` (WB-073) ✅ DONE 2026-07-07** (10 findings G1–G10, re-verified first; 19-commit branch, per-task review + fix loops + opus whole-branch review MERGE-READY). **Cluster 5 `discovery-honest-signals` (WB-074) ✅ DONE 2026-07-08** (8 findings D1–D8, re-verified first; storefront-only, per-task review + fix loops + opus whole-branch review MERGE-READY; D3 disjunctive deferred via sanctioned fallback). **Cluster 6 `docs-truth-sweep` (WB-075) ✅ DONE 2026-07-08** (5 DOC findings + doc-drift, re-verified first; ran LAST to re-baseline the tsc/test counts — deleted dead code (tsc 14→12), atomic newsletter subscribe, module-status truthiness, corrected STATUS/README/CLAUDE; opus whole-branch review MERGE-READY). **✅ EPIC COMPLETE — all 6 clusters shipped + merged (WB-070…WB-075); WB-069 umbrella DONE.** → WB-069…WB-075
+- **G10 · Launch readiness — fitment truth v2 + P0 completeness** `[L · multi-session]` — remediate the 2026-07-10 audit ([future/plans/2026-07-10-launch-readiness-audit.md](plans/2026-07-10-launch-readiness-audit.md)): the user-confirmed fitment FALSE NEGATIVES (three-tier verdict + multi-trim/stock-inclusive windows, WB-077), transactional email + password reset (WB-078), the B1–B11 bug batch (WB-079), Stripe capture + US tax + live cutover (WB-080), ops hardening (WB-081), SEO/observability (WB-082), docs sweep #2 (WB-083, runs last). Consolidated design: [in-progress/specs/2026-07-10-launch-readiness-fixes-design.md](../in-progress/specs/2026-07-10-launch-readiness-fixes-design.md). Build order: WB-077 → 078 → 079 → 080 → 081 → 082 → 083. **WB-077 ✅ DONE + merged 2026-07-10** (merge `39c273a`; SDD + opus whole-branch review). Decisions D1 (include+badge) & D4 (reset-email button) resolved as defaults; D2/D3 (Stripe capture / US tax) belong to WB-080. → WB-078…WB-083 remaining
 
 ---
 
@@ -866,3 +867,67 @@
 - fix: keep exactly ONE active vehicle in the browser localStorage cache (`SingleVehicleGarage extends LocalStorageGarage`, `add()` replaces; same `garage:*` keys so live actives survived), identical for guests + logged-in; fitment surfaces unchanged (they read `active` via `useGarage()`). Everything garage is mothballed, NOT deleted — grep `GARAGE-DISABLED`: `RoutingGarage` → `routing-garage.ts` (out of the app graph, still compiled + unit-tested), `medusa-garage`/`merge`/`garage-auth-sync`/`customer-vehicles` data layer disconnected, drawer garage pane + tabs collapsed to YMM + a "Current vehicle · CLEAR" row, pill reads "Vehicle · …", hero CTA "SELECT/CHANGE VEHICLE", account Garage nav+route disabled (404), backend `customer-vehicle` module unregistered + store routes 410 stubs (DB tables intact). Restoration recipe in the spec.
 - verify: storefront vitest 317 (51 files, +5 `single-vehicle-garage`) / tsc 5-baseline / `build:next` clean; backend test:fitment 109 + test:config 16 + test:sync 312 + test:newsletter 8 + `medusa build` clean; Playwright live smoke PASS (incl. legacy 3-vehicle cache collapsing to 1 on next pick).
 - refs: spec [docs/done/specs/2026-07-09-retire-garage-single-vehicle-design.md](../done/specs/2026-07-09-retire-garage-single-vehicle-design.md) ; plan [docs/done/plans/2026-07-09-retire-garage-single-vehicle.md](../done/plans/2026-07-09-retire-garage-single-vehicle.md)
+
+### WB-077 · Fitment truth v2 — three-tier verdict + window integrity (false negatives)   [HIGH]
+- status: done
+- area: backend `wheel-size/normalize.ts` + `cache-key.ts` + `reverse-fitment.ts`; storefront `lib/fitment/*` + PDP/discovery fit surfaces
+- evidence: backend/src/modules/wheel-size/normalize.ts:25 (`data[0]` only), :46 (`is_stock === false` only); storefront/src/lib/fitment/fits-vehicle.ts:71 (window-miss = hard no-fit), :45 (knife-edge bore), :40 (empty product patterns → false "bolt pattern does not match")
+- problem: user-confirmed false negatives — wheels that fit in real life read "doesn't fit". Windows come from ONE arbitrary trim ("Any trim" default), exclude factory/stock sizes (an OE-replica reads no-fit), and outside-window renders as disproven instead of "aggressive — verify"; plus 0.1mm bore data noise → no-fit, and BLANK-pattern products claim a pattern mismatch. Repro'd with 9 unit-test scenarios 2026-07-10.
+- fix: `normalizeByModel` merges ALL `data[]` trims (pattern union, window min/max incl. stock rims, bore null-on-disagreement) + cache-key v2 re-warm; a shared `FitTier` (`fits`/`check`/`no-fit`/`unknown`) with `check` = bolt+bore pass but out-of-window ("Aggressive fitment — verify clearance"), bore tolerance 0.2mm (golden-guarded), symmetric `unknown` for pattern-less products; discovery fit-mode includes + badges `check` (decision D1), reverse list stays strict.
+- verify: the 9 audit scenarios re-added asserting FIXED behavior (20x10 ET-19 Silverado → `check` + visible in fit mode; OE-replica → `fits`; trim-order flip → same verdict); backend test:fitment + storefront vitest green
+- done: 2026-07-10 — merged to `main` (merge `39c273a`, branch `feat/fitment-truth-v2`, 13 commits). SDD-executed (10 tasks, per-task spec+quality review + fix loops) + opus whole-branch review (caught 3 integration issues — PDP `?fit=1` hero over-claim, checkout-card metadata hydration, cache-key v2 warm-orphan quota treadmill — all fixed + re-verified). Decisions D1 (include+badge) & D4 (reset-email button) resolved as defaults. Gate: backend wheel-size+warm jest 106 pass/1 skip; storefront vitest 337/337; tsc baselines held (backend 1 = B11, storefront 5). **Deploy (pending): backend-first → MANDATORY `wheel_size_fitment` truncate (orphaned v1 rows) → storefront rebuild; no migration. Deferred live smoke: Silverado 20x10 ET-19 → CHECK FIT / OE-size → FITS / 5x114.3-only → DOESN'T FIT + confirm checkout "FITMENT CHECKED" card renders.** Plan [docs/in-progress/plans/2026-07-10-fitment-truth-v2.md](../in-progress/plans/2026-07-10-fitment-truth-v2.md) (→ move to done/ in WB-083 sweep).
+- refs: spec [docs/in-progress/specs/2026-07-10-launch-readiness-fixes-design.md](../in-progress/specs/2026-07-10-launch-readiness-fixes-design.md) §1 ; findings [docs/future/plans/2026-07-10-launch-readiness-audit.md](plans/2026-07-10-launch-readiness-audit.md) §1
+
+### WB-078 · Transactional email + account recovery (no emails send; no password reset exists)   [HIGH]
+- status: todo
+- area: backend `email-notifications` templates + subscribers; storefront account/auth pages
+- evidence: backend/src/subscribers/order-placed.ts:24 (`replyTo info@example.com`); templates/index.tsx (only 2 templates); storefront/src/modules/account/components/profile-password/index.tsx:19 (no-op form); zero reset/forgot matches repo-wide
+- problem: prod sends NO emails (Resend env unset + missing from .env.template); no shipping confirmation; no password-reset flow anywhere (forgotten password = permanent lockout); change-password form does nothing; invite email says "Medusa".
+- fix: set + template-document `RESEND_*`; `EMAIL_REPLY_TO` env (drop the literal); shipping-confirmation template + `shipment.created` subscriber (global-container rule); password reset — `auth.password_reset` subscriber + template + `STOREFRONT_URL` env, storefront forgot/reset pages via `sdk.auth.resetPassword`/`updateProvider` (actions return strings, never throw); change-password → reset-email button (decision D4).
+- verify: live roundtrips — order → confirmation email; ship → shipping email; forgot → reset → login; reply-to correct
+- refs: spec [docs/in-progress/specs/2026-07-10-launch-readiness-fixes-design.md](../in-progress/specs/2026-07-10-launch-readiness-fixes-design.md) §2 (supersedes the reply-to half of WB-031)
+
+### WB-079 · Bug batch — B1–B11 from the 2026-07-10 audit   [HIGH]
+- status: todo
+- area: storefront tire-discovery/checkout/cart/PDP/middleware; backend vendor-sync service/admin route
+- evidence: per-bug file:line table in the spec (B1 tire orphaned-`?fit` HIGH; B2 prod-redacted checkout errors; B3 cart never linked to customer → orders missing from /account/orders; B4 finish-switch bolt/grid desync HIGH; B5 SFTP zero-files run "completed"; B6 purge-products unguarded; B7–B11 lows)
+- problem: eleven verified bugs — the worst: clearing/switching a vehicle on /tires leaves an invisible stale fit filter; logged-in customers' orders never appear in their account; checkout failure copy is redacted in prod right after a card auth; a finish switch can put a wrong-bolt-pattern variant in the cart.
+- fix: one branch, one commit per bug, failing-test-first where a pure seam exists — full table in the spec §3.
+- verify: per-bug verify column in the spec; storefront tsc stays 5-baseline (backend reaches 0 via B11)
+- refs: spec [docs/in-progress/specs/2026-07-10-launch-readiness-fixes-design.md](../in-progress/specs/2026-07-10-launch-readiness-fixes-design.md) §3 ; findings audit §2
+
+### WB-080 · Money integrity — Stripe capture decision, live cutover, US tax   [BLOCKER]
+- status: todo
+- area: backend `medusa-config.js` Stripe options + admin tax setup + ops runbook
+- evidence: `@medusajs/payment-stripe` defaults `capture_method: "manual"` (no `capture: true` passed); seed.ts:154-161 creates tax regions for 7 EU countries only; STATUS pending: `strip-manual-payment.ts` + `update-shipping-prices.ts` unrun on prod
+- problem: every order is authorize-only (money never captured unless done manually in admin within ~7 days); US orders compute $0 sales tax; manual payment still placeable until the script runs.
+- fix: `capture: true` (decision D2) + live-mode cutover runbook (live keys, live webhook, storefront rebuild) + US tax region/rates in admin (decision D3, nexus states from merchant) + run both guarded prod scripts.
+- verify: live test order captures (not just authorizes), taxes correctly, shipping $150→$10/$250→$0, Manual absent
+- refs: spec [docs/in-progress/specs/2026-07-10-launch-readiness-fixes-design.md](../in-progress/specs/2026-07-10-launch-readiness-fixes-design.md) §4
+
+### WB-081 · Ops hardening — vendor-sync alerting, middleware fallback, provisioning, legal pages   [MEDIUM]
+- status: todo
+- area: backend subscribers/jobs + env templates; storefront middleware + static pages
+- evidence: vendor-sync failures are `logger.error` only (vendor-sync-tick.ts:26); middleware.ts:22-30 region fetch has no try/catch (backend blip → every page 500s); `/contact` linked from order-Help but has no route; `NEXT_PUBLIC_MEDUSA_PUBLISHABLE_KEY`/`NEXT_PUBLIC_STRIPE_KEY` absent from the storefront template
+- problem: a dead feed is invisible for days; a cold edge instance 500s the whole site on a backend blip; provisioning from templates is broken; no contact/returns/privacy/terms pages (Stripe live + ads expect them); demo apparel products still in prod.
+- fix: failure-alert subscriber + 24h watchdog job (email via Notification module, `OPS_ALERT_EMAIL`); middleware fallback to `DEFAULT_REGION`; template drift fixed; legal/support static pages + dead links wired; demo purge + drop demo S3 hosts.
+- verify: forced failed run → alert email; backend down → storefront serves; fresh-clone template boot; `/contact` renders
+- refs: spec [docs/in-progress/specs/2026-07-10-launch-readiness-fixes-design.md](../in-progress/specs/2026-07-10-launch-readiness-fixes-design.md) §5
+
+### WB-082 · SEO + observability — robots/sitemap, error pages, Sentry/analytics   [MEDIUM]
+- status: todo
+- area: storefront `app/` (robots.ts, sitemap.ts, error boundaries); both apps (telemetry, env-gated)
+- evidence: no robots/sitemap/error.tsx/analytics/error-tracking matches anywhere in storefront/src or public/
+- problem: a ~2,700-product catalog invisible to crawlers; unstyled Next default on any prod error; zero telemetry on failures or traffic.
+- fix: `robots.ts` + Meili-fed `sitemap.ts` (wheels + tires, country-prefixed); WB-styled `error.tsx`/(checkout)/`global-error.tsx`; Sentry + lightweight analytics, all env-gated OFF by default (client picks vendors).
+- verify: `/robots.txt` + `/sitemap.xml` serve (spot-check a wheel + tire URL); forced error → styled boundary; DSN set → event lands
+- refs: spec [docs/in-progress/specs/2026-07-10-launch-readiness-fixes-design.md](../in-progress/specs/2026-07-10-launch-readiness-fixes-design.md) §6
+
+### WB-083 · Docs truth sweep #2 — post-WB-076/G9 drift   [LOW]
+- status: todo
+- area: docs/ + storefront/CLAUDE.md
+- evidence: docs/in-progress/ = 9 stale shipped-tire-arc files; STATUS "unpushed" claims stale; WB-069 "all 76 fixed" over-claim (~16 unreferenced, 3 re-verified present); WB-072 deploy step mooted by WB-076; storefront/CLAUDE.md contradicts shipped reality in 3 places
+- problem: the dashboards no longer describe the repo; the over-claim hides open findings.
+- fix: move tire specs/plans to done/, fix refs, strike stale claims, annotate WB-069 + WB-072, correct storefront/CLAUDE.md; run /doc-review as the gate. Runs LAST (re-baselines counts the other clusters move).
+- verify: /doc-review clean; no `in-progress/` refs to shipped work
+- refs: spec [docs/in-progress/specs/2026-07-10-launch-readiness-fixes-design.md](../in-progress/specs/2026-07-10-launch-readiness-fixes-design.md) §7

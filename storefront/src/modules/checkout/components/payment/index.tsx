@@ -147,7 +147,7 @@ const Payment = ({
       </div>
       <div>
         <div className={isOpen ? "block" : "hidden"}>
-          {!paidByGiftcard && availablePaymentMethods?.length && (
+          {!paidByGiftcard && (availablePaymentMethods?.length ?? 0) > 0 && (
             <>
               <RadioGroup
                 value={selectedPaymentMethod}

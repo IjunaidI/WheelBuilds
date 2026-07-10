@@ -13,7 +13,7 @@ import { resolveApplyContainer } from "./pipeline/resolve-apply-container"
 import { resolveFeed, isSampleFeedPath } from "./feed-source/resolve-feed"
 import { SftpConfig } from "./feed-source/types"
 import { finalizeApply } from "./pipeline/finalize-apply"
-import { shouldShortCircuitFeed } from "./pipeline/retry-policy"
+import { shouldShortCircuitFeed, terminalStatusForFeed } from "./pipeline/retry-policy"
 import { uploadArchive } from "./utils/archive"
 import { shouldUploadArchive } from "./utils/archive-policy"
 import { selectStockPartNumbers } from "./pipeline/stock-select"
@@ -205,9 +205,16 @@ class VendorSyncService extends MedusaService({
       }
 
       if (feed.kind === "empty") {
-        this.logger_.warn(`[vendor-sync] [${runId}] no feed file found for ${vendorCode}`)
+        const pattern = vendorOpts.sftp?.filePattern
+        const errorMessage = pattern
+          ? `no feed file matched pattern: ${pattern}`
+          : "no feed file matched"
+        this.logger_.warn(`[vendor-sync] [${runId}] ${errorMessage} for ${vendorCode}`)
         await (this as any).updateVendorFeedRuns({
-          id: runId, status: "completed", error_message: "no feed file found", finished_at: new Date(),
+          id: runId,
+          status: terminalStatusForFeed("empty"),
+          error_message: errorMessage,
+          finished_at: new Date(),
         })
         return
       }
@@ -510,9 +517,16 @@ class VendorSyncService extends MedusaService({
         { allowSample: this.options_.allowSampleFeed ?? false, vendorCode }
       )
       if (feed.kind === "empty" || feed.kind === "unchanged") {
+        const pattern = vendorOpts.sftp?.filePattern
+        const errorMessage = pattern
+          ? `no feed file matched pattern: ${pattern}`
+          : "no feed file matched"
+        if (feed.kind === "empty") {
+          this.logger_.warn(`[vendor-sync] [${runId}] ${errorMessage} for ${vendorCode}`)
+        }
         await (this as any).updateVendorFeedRuns({
           id: runId,
-          status: "completed",
+          status: terminalStatusForFeed(feed.kind),
           finished_at: new Date(),
           // Persist the same (name, modifyTime) pair executeRun's unchanged
           // branch persists, so the NEXT stock tick's lastStock lookup still
@@ -521,7 +535,7 @@ class VendorSyncService extends MedusaService({
           // chain and force a redundant download every other tick.
           ...(feed.kind === "unchanged"
             ? { source_filename: feed.sourceName, source_modify_time: String(feed.modifyTime) }
-            : {}),
+            : { error_message: errorMessage }),
         })
         return { runId }
       }

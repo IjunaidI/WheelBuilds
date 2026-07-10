@@ -106,6 +106,39 @@ export async function forgotPassword(_currentState: unknown, formData: FormData)
   return "SENT"
 }
 
+export async function resetPassword(_currentState: unknown, formData: FormData) {
+  const token = formData.get("token") as string
+  const email = formData.get("email") as string
+  const password = formData.get("password") as string
+  const confirm = formData.get("confirm") as string
+  const countryCode = (formData.get("countryCode") as string) || "us"
+
+  if (!token || !email) {
+    return "This reset link is invalid or has expired."
+  }
+
+  if (password !== confirm) {
+    return "Passwords do not match."
+  }
+
+  try {
+    await sdk.auth.updateProvider(
+      "customer",
+      "emailpass",
+      { email, password },
+      token
+    )
+  } catch (error: any) {
+    return error?.toString?.() ?? "Could not reset your password. The link may have expired."
+  }
+
+  // Redirect OUTSIDE the try/catch (see login()/signup()): redirect() throws
+  // NEXT_REDIRECT, which the catch would otherwise swallow and stringify.
+  // updateProvider does not establish a session, so the customer lands back
+  // on the login form (?reset=1 triggers the confirmation toast there).
+  redirect(`/${countryCode}/account?reset=1`)
+}
+
 export async function signout(countryCode: string) {
   await sdk.auth.logout()
   removeAuthToken()

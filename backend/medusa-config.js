@@ -187,6 +187,11 @@ const medusaConfig = {
             options: {
               apiKey: STRIPE_API_KEY,
               webhookSecret: STRIPE_WEBHOOK_SECRET,
+              // WB-080 D2: capture at authorization. The provider defaults to
+              // capture_method "manual", which leaves every order authorize-only;
+              // an auth that nobody captures in admin expires after ~7 days and
+              // the money is never taken.
+              capture: true,
             },
           },
         ],

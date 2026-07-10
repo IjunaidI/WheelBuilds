@@ -152,8 +152,11 @@ export default async function seedDemoData({ container }: ExecArgs) {
   logger.info("Finished seeding regions.");
 
   logger.info("Seeding tax regions...");
+  // WB-080 D3: include the US — this is a US store; without a US tax region
+  // every US order computes $0 tax. Rates (per nexus state) are entered in
+  // admin; the region existing is what makes that possible.
   await createTaxRegionsWorkflow(container).run({
-    input: countries.map((country_code) => ({
+    input: [...countries, "us"].map((country_code) => ({
       country_code,
       provider_id: "tp_system",
     })),

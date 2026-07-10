@@ -5,7 +5,7 @@
 > then removed) + 3 parallel audit passes (docs completeness, deployment readiness, general bug sweep;
 > storefront `tsc` re-run at 5-error baseline, backend `tsc` 1 error, all 629 unit tests passing).
 > Prior art: [2026-07-06 audit findings](2026-07-06-audit-remediation-theme.md) (G9/WB-069).
-> Governing dashboard: [docs/STATUS.md](../../STATUS.md) · Backlog: [docs/future/BACKLOG.md](BACKLOG.md)
+> Governing dashboard: [docs/STATUS.md](../../STATUS.md) · Backlog: [docs/future/BACKLOG.md](../BACKLOG.md)
 
 ---
 

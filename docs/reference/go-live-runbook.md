@@ -1,7 +1,7 @@
 # Go-live runbook — Wheel Builds
 
 > Ops checklist for taking the store from "code-complete on `main`" to "really selling".
-> Written 2026-07-11 (WB-080; spec: [launch-readiness-fixes-design §4–§5](../in-progress/specs/2026-07-10-launch-readiness-fixes-design.md)).
+> Written 2026-07-11 (WB-080; spec: [launch-readiness-fixes-design §4–§5](../done/specs/2026-07-10-launch-readiness-fixes-design.md)).
 > Everything here is a HUMAN/ops step — the code side ships with G10. Do the steps in order;
 > each has a verify. Prod DB host: check `DATABASE_URL` in the Railway backend service
 > (the `--confirm-host` guards echo it back to you).

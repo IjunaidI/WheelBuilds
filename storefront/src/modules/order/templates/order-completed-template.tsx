@@ -158,7 +158,7 @@ export default function OrderCompletedTemplate({
         </div>
 
         <aside className="flex flex-col gap-5">
-          <FitmentVerifiedCard />
+          <FitmentVerifiedCard items={order.items ?? undefined} />
           <div
             className="rounded-lg bg-white px-5 py-4"
             style={{ border: "1px solid var(--hairline)" }}

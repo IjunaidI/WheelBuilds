@@ -44,6 +44,20 @@ describe("variantFitTier", () => {
       { canonicalBoltPatterns: ["6x139.7"], hubBoreMm: null, diameterWindow: null, widthWindow: null, offsetWindow: null }
     )).toBe("no")
   })
+
+  // Audit 2026-07-10 §1.3 scenario 5: same Silverado windows as scenario 4
+  // (17-20 / 8-9 / ET0..31) but a DIFFERENT real-world dealer-installed size
+  // — 22x9 ET28 — where only the diameter axis fails (width and offset are
+  // both in-window). Distinct combination from scenario 4 (which fails on
+  // width + offset together): proves a single out-of-window axis alone is
+  // enough to demote the tier from "fits" to "check", never all the way to
+  // "no" now that bolt+bore clear.
+  it("audit scenario 5: 22x9 ET28 (dealer 22s) — diameter alone out of window → check, not no-fit", () => {
+    expect(variantFitTier(
+      { boltPatternRaw: "6x139.7", centerBoreMm: 78.1, diameterIn: 22, widthIn: 9, offsetMm: 28 },
+      { canonicalBoltPatterns: ["6x139.7"], hubBoreMm: 78.1, diameterWindow: { min: 17, max: 20 }, widthWindow: { min: 8, max: 9 }, offsetWindow: { min: 0, max: 31 } }
+    )).toBe("check")
+  })
 })
 
 describe("productHasFittingVariant", () => {

@@ -13,4 +13,12 @@ describe("parseCacheKey (WB-008 warm cron, WB-072 B3)", () => {
   it("returns null for a malformed key (<5 parts)", () => {
     expect(parseCacheKey("a|b|c")).toBeNull()
   })
+  it("parses a v2 6-slot key", () => {
+    expect(parseCacheKey("bmw|3-series|2020||usdm|v2"))
+      .toEqual({ make: "bmw", model: "3-series", year: "2020", modificationSlug: undefined, region: "usdm" })
+  })
+  it("still parses a legacy 5-slot key (no version)", () => {
+    expect(parseCacheKey("bmw|3-series|2020||usdm"))
+      .toEqual({ make: "bmw", model: "3-series", year: "2020", modificationSlug: undefined, region: "usdm" })
+  })
 })

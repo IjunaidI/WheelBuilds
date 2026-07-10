@@ -29,18 +29,18 @@ export default async function wheelSizeWarm(container: MedusaContainer) {
   logger.info(`[wheel-size-warm] refreshed ${refreshed}/${stale.length}`)
 }
 
-// Exported for unit tests. cache_key = make|model|year|modificationSlug|region (5 slots, WB-072 B1).
-// The year is always present (as "" if not set), and the modificationSlug is in its own slot.
+// Exported for unit tests. cache_key = make|model|year|modificationSlug|region (5 slots, WB-072 B1),
+// optionally followed by a WB-077 "v2" version slot (6 slots). The year is always present (as ""
+// if not set), and the modificationSlug is in its own slot.
 // This fixes B3: trim-keyed rows now carry the year, so the warm refresh no longer 400s.
 export function parseCacheKey(
   key: string
 ): { make: string; model: string; modificationSlug?: string; year?: string; region: string } | null {
   const parts = String(key).split("|")
-  if (parts.length < 5) return null
-  const [make, model, year, modificationSlug, region] = parts
+  if (parts.length < 5) return null // pre-B1 4-slot keys
+  const [make, model, year, modificationSlug, region] = parts // ignore parts[5] ("v2") if present
   return {
-    make,
-    model,
+    make, model,
     year: year || undefined,
     modificationSlug: modificationSlug || undefined,
     region,

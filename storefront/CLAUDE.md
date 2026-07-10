@@ -10,7 +10,7 @@ A MedusaJS 2.x Next.js 15 (App Router, React 19) storefront for **Wheel Builds**
 
 ## Design coverage
 
-Every screen from the original Wheel Builds design bundle is built. As of Spec 1 the work is **chrome-complete and data-live**: Discovery reads from Meilisearch (vendor-sync-indexed wheel docs) and PDP reads from the Medusa Store API. Home catalog sections (NEW THIS WEEK, SHOP BY STYLE, TRUSTED BRANDS) are wired to live Meilisearch data via getHomeCatalog; FEATURED BLOCKS / BUILD GALLERY / NEWSLETTER remain editorial/placeholder. Search drawer, nav, footer, and cart were already wired against real data; Spec 2 layers on the wheel-size.com fitment join.
+Every screen from the original Wheel Builds design bundle is built and **data-live end-to-end**: Discovery reads from Meilisearch (vendor-sync-indexed wheel docs), PDP reads from the Medusa Store API, and the wheel-size.com fitment join is live on every fitment surface. Home catalog sections (NEW THIS WEEK, SHOP BY STYLE, TRUSTED BRANDS) are wired via getHomeCatalog; FEATURED BLOCKS render real curated products, BUILD GALLERY is a real product mosaic, and the NEWSLETTER persists via the backend newsletter module (G4 — no fabricated content remains). Static policy/support pages (`/contact`, `/returns`, `/shipping`, `/privacy`, `/terms`) live in `modules/policies/` (WB-081); `robots.ts`/`sitemap.ts` + route error boundaries ship with WB-082.
 
 | Surface | Route | Status | Notes |
 |---|---|---|---|
@@ -28,7 +28,7 @@ Every screen from the original Wheel Builds design bundle is built. As of Spec 1
 **Engineering follow-up that doesn't affect the design contract** (see also DESIGN.md §10):
 - Real product photography (every photographic element is an `<ImgPlaceholder>` today).
 - PDP add-to-cart + Buy Now are wired to the cart server action (WB-001). Wishlist save is still toast-only (no wishlist backend yet).
-- Phase 2.1 vehicle fitment data — Spec 1 wired the substrate (`bolt_patterns_canonical` index field + `DiscoveryQuery.vehicleConstraint` seam + the canonical bolt-pattern normalizer); Spec 2 lands the wheel-size.com client + matcher + persistent garage.
+- Vehicle fitment is fully shipped: the wheel-size.com client + matcher live on the backend (`wheel-size` module), the storefront verdict is the WB-077 three-tier `FitTier` (`fits`/`check`/`no-fit`/`unknown`), and the vehicle store is the single cached `SingleVehicleGarage` (the account-backed garage was retired — WB-076, see below).
 
 ## Layout
 
@@ -120,7 +120,7 @@ Same pattern (module-level state + emitter set + `useSyncExternalStore`). If you
 - Triggers: the nav search icon ([`SearchTrigger`](src/modules/search/components/search-trigger/index.tsx)), the [`GaragePill`](src/modules/layout/components/garage-pill/index.tsx) in the nav, and the hero's vehicle tiles + "USE MY GARAGE" button.
 - Text submit → `/<countryCode>/store?q=<encoded query>`. Discovery's server-component adapter reads `q` into Meilisearch full-text search (`searchableAttributes: title, brand, skus`). Recent-search and trending chips route the same way.
 - Popular-search chips route to facet filter URL params (`?finishes=black`, `?diameters=20`) rather than free-text `q`, because chip values are facet axes. (The legacy `search()` Server Action and `SearchResultsTemplate` were retired in Task 9.)
-- The Year/Make/Model pane writes the new vehicle to the garage, sets it active, then routes to `/store`. Spec 2 appends the fitment query param via `DiscoveryQuery.vehicleConstraint` — no change to [`ymm-pane.tsx`](src/modules/search/components/search-drawer/find-by-vehicle/ymm-pane.tsx) or [`garage-pane.tsx`](src/modules/search/components/search-drawer/find-by-vehicle/garage-pane.tsx) beyond appending a search-param tail.
+- The Year/Make/Model pane ([`ymm-pane.tsx`](src/modules/search/components/search-drawer/find-by-vehicle/ymm-pane.tsx)) saves the vehicle, resolves its wheel-size.com fitment, then routes to the right discovery surface pre-filtered (`fitmentDestinationUrl`: wheels → `/store?fit=…`, tires → `/tires?fit=…`); `FitmentSync` keeps the full windowed fit params in the URL from then on. (`garage-pane.tsx` is mothballed — WB-076.)
 
 ## Fonts
 
@@ -128,7 +128,7 @@ Loaded via `next/font/google` in [`app/layout.tsx`](src/app/layout.tsx): Antonio
 
 ## Routing — `[countryCode]` is mandatory
 
-`src/middleware.ts` enforces a country code on every URL. Resolution order: URL segment → `NEXT_PUBLIC_DEFAULT_REGION` → first region returned by the backend. In components:
+`src/middleware.ts` enforces a country code on every URL. Resolution order: URL segment → `NEXT_PUBLIC_DEFAULT_REGION` → first region returned by the backend. It is fail-open (WB-081): a backend outage serves a stale region cache (or passes 2-letter-prefixed paths through) instead of 500ing every page, and `/robots.txt` + `/sitemap.xml` are excluded from the matcher so they serve at the domain root (WB-082). In components:
 
 - Server: get it from `params` (`{ params: Promise<{ countryCode: string }> }` in Next 15).
 - Client: `const { countryCode } = useParams() as { countryCode: string }`.
@@ -243,12 +243,12 @@ src/modules/discovery/
 1. One `meili.multiSearch` batch: a hits query + N facet queries (`FACET_FIELDS = [brand, diameters, bolt_patterns, finishes]`), each facet query counted with the OTHER filters applied via the `buildFilters` `skip` arg so disjunctive counts stay correct within a dimension. `finishes` is multi-valued in the index — a wheel product appears under each normalized bucket it offers (e.g. `["black", "silver"]`), so filtering by "black" returns any product that has at least one black-finish variant.
 2. Hits → `DiscoveryProduct` via `hitToProduct` (price_min is integer cents, read directly into `priceCents`).
 3. The indexed doc is produced by [`backend/src/modules/vendor-sync/search/build-search-document.ts`](../backend/src/modules/vendor-sync/search/build-search-document.ts) (per-product transformer; returns `null` for non-wheels, which `medusa-config.js` coalesces into `{id, product_type:"non-wheel"}`). Index settings — `filterableAttributes`, `sortableAttributes`, `searchableAttributes`, `displayedAttributes` — are wired in [`backend/medusa-config.js`](../backend/medusa-config.js) on the `@rokmohar/medusa-plugin-meilisearch` plugin block.
-4. `vehicleConstraint?: string[]` on `DiscoveryQuery` is the Spec 2 seam — empty in Spec 1. Spec 2 appends extra Meilisearch filter clauses derived from the active vehicle's wheel-size.com spec.
+4. `vehicleConstraint?: string[]` on `DiscoveryQuery` is LIVE: fit mode appends bolt-pattern Meilisearch clauses, then post-filters candidates through the real per-variant check (`productFitTier` — WB-060/WB-074/WB-077; windows travel via the `fitb/fitd/fitw/fito` URL params).
 5. `useDiscoveryQuery` only manipulates URL params — no change there.
 
 `modules/store/` is **retained** (not deleted) because `SortOptions`, `RefinementList`, and `PaginatedProducts` are still imported by the categories page, collections page, `lib/data/products.ts`, `lib/util/sort-products.ts`, `modules/categories/templates`, and `modules/collections/templates`.
 
-`TODO(integration)` comments in the rail still mark follow-ups: the Vehicle band's "only show wheels that fit" toggle is now wired for Spec 2 to feed `DiscoveryQuery.vehicleConstraint`; the Price section's TextInputs should become a `<Slider>` once a real min/max range is surfaced from Meilisearch.
+The Vehicle band's fit toggle is live (feeds `DiscoveryQuery.vehicleConstraint`). Remaining rail follow-up: the Price section's TextInputs should become a `<Slider>` once a real min/max range is surfaced from Meilisearch.
 
 ## Product Detail (PDP)
 
@@ -307,13 +307,12 @@ src/modules/product-detail/
 2. `notFound()` in the adapter propagates through both `generateMetadata` and the page component — bogus handles 404 cleanly.
 3. `mapToDetail`: calls `buildFinishOptions(variants, weightLb)` → `FinishOption[]` (one entry per raw finish, each with its own image + size matrix); derives `DiscoveryProduct.finishes` as the union of `f.normalized` across those entries; the flat `sizeOptions` (all variants, finish-agnostic) is still present for consumers that don't need the per-finish split. Sibling offsets accumulate as `offsetVariants`; availability uses best-of-siblings ranking (`in_stock` > `low_stock` > `out_of_stock`) so the size cell shows `in_stock` when ANY offset is available; `priceCentsOverride` = min non-zero across siblings. Per-offset `priceCents` on `OffsetVariant` lets the panel price the selected offset, not the size minimum.
 4. `getRelatedProducts`: queries the same brand `collection_id`, capped at 6, excludes self.
-5. `fitment`: `[]` (Spec 2). The Fitment section degrades gracefully on empty.
+5. `fitment`: populated live by `getFitmentByProduct` (reverse fitment over the wheel-size cache — WB-009, size-gated per WB-072 S2). The Fitment section degrades gracefully on empty.
 6. Specs grid (WB-029): `construction` / `countryOfOrigin` / `warranty` are typed `string | null` and read admin-set product metadata (`metadata.construction` / `country_of_origin` / `warranty`) if present, else `null` — and `specs/index.tsx` HIDES a null row (no fabricated `"—"`; the wheel feed has no source for these). PDP display defaults (qty default, low-stock threshold, ship/trust copy) live in [`pdp-config.ts`](src/modules/product-detail/data/pdp-config.ts), env-overridable via `NEXT_PUBLIC_PDP_*`. `weightLb = product.weight / 453.592` (Medusa stores grams).
 7. The finish normalization rule lives in [`lib/fitment/normalize-finish.ts`](src/lib/fitment/normalize-finish.ts), a lockstep twin of the backend [`normalize-finish.ts`](../backend/src/modules/vendor-sync/search/normalize-finish.ts) (WB-030). `normalizeFinish` is called by `buildFinishOptions` to produce `FinishOption.normalized` (the `<Wheel>` fallback color) and by `mapToDetail` to derive `DiscoveryProduct.finishes` (the union of normalized buckets across all finish options). The shared [`fixtures/finish-normalize-golden.json`](../fixtures/finish-normalize-golden.json) test (one in each app) guards drift — change the golden + both copies together; don't hand-sync silently.
 8. [`lib/fitment/canonical-bolt-pattern.ts`](src/lib/fitment/canonical-bolt-pattern.ts) is a lockstep twin of the backend [`canonicalBoltPatterns`](../backend/src/modules/vendor-sync/search/bolt-pattern-canonical.ts); the shared [`fixtures/bolt-pattern-canonical-golden.json`](../fixtures/bolt-pattern-canonical-golden.json) test guards drift — keep them in sync.
 
-One `TODO(integration)` anchor remains in the code (Add-to-cart + Buy Now are now wired — WB-001):
-- `fitment/index.tsx` — Spec 2 will replace the substring heuristic with a wheel-size.com fitment match
+No `TODO(integration)` anchors remain on the PDP (add-to-cart/Buy Now wired — WB-001; the fitment section reads the real wheel-size.com verdict — WB-009/WB-072/WB-077).
 
 Save-to-wishlist on `purchase-panel.tsx` stays a plain toast (no wishlist backend yet — not tagged `TODO(integration)`).
 

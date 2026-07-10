@@ -1,6 +1,11 @@
 # Launch-readiness fixes — Design (G10: WB-077 … WB-083)
 
-> Status: **draft — awaiting client decisions D1–D4, then per-cluster plans**. Date: 2026-07-10.
+> Status: **done — all seven clusters executed and merged** (WB-077/078/079 on 2026-07-10, WB-080/081/082/083 on 2026-07-11).
+> Decisions D1–D4 were resolved at the recommended defaults ("Go with recommended on all", 2026-07-11).
+> Deviations from this spec as written: §6 Sentry was deliberately NOT wired (needs a vendor
+> account/DSN decision — analytics shipped env-gated as specced); WB-080's live-cutover/US-tax-rates/
+> prod-script steps are OPS work, scripted in [docs/reference/go-live-runbook.md](../../reference/go-live-runbook.md).
+> Original date: 2026-07-10.
 > Findings source: [future/plans/2026-07-10-launch-readiness-audit.md](../../future/plans/2026-07-10-launch-readiness-audit.md)
 > (§1 fitment F1–F5, §2 bugs B1–B12, §3 P0–P2). Governing dashboard: [docs/STATUS.md](../../STATUS.md)
 > · Backlog: [docs/future/BACKLOG.md](../../future/BACKLOG.md) (group **G10**).

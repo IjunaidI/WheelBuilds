@@ -112,9 +112,9 @@ export function sizesForBoltPattern(
   return matching.length > 0 ? matching : sizes
 }
 
-/** Default size pick: first in-stock, else the first. */
-export function pickDefaultSize(sizes: SizeOption[]): SizeOption {
-  return sizes.find((s) => s.availability !== "out_of_stock") ?? sizes[0]
+/** Default size pick: first in-stock, else the first, else null (total — never crashes on an empty list). */
+export function pickDefaultSize(sizes: SizeOption[]): SizeOption | null {
+  return sizes.find((s) => s.availability !== "out_of_stock") ?? sizes[0] ?? null
 }
 
 const candidatesFor = (variants: OffsetVariant[], offsetMm: number) =>

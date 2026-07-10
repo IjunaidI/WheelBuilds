@@ -99,18 +99,20 @@ const Hero = ({ product }: HeroProps) => {
   )
 
   // Default to the first in-stock size in the visible (pattern-scoped) set.
-  const defaultSize = useMemo<SizeOption>(
+  // null when the product (or the selected bolt pattern) has no sizes at all —
+  // a variant-less product must not crash the hero (B8).
+  const defaultSize = useMemo<SizeOption | null>(
     () => pickDefaultSize(visibleSizes),
     [visibleSizes]
   )
-  const [selectedSize, setSelectedSize] = useState<SizeOption>(defaultSize)
+  const [selectedSize, setSelectedSize] = useState<SizeOption | null>(defaultSize)
 
   // When the bolt pattern changes, the previously-selected size belongs to the
   // old pattern and is no longer in visibleSizes — re-snap to a valid size.
   // visibleSizes is filtered from product.sizeOptions, so element references are
   // preserved and includes() is a reliable membership check.
   useEffect(() => {
-    if (!visibleSizes.includes(selectedSize)) {
+    if (!selectedSize || !visibleSizes.includes(selectedSize)) {
       setSelectedSize(pickDefaultSize(visibleSizes))
     }
     // selectedSize intentionally omitted: re-snap only when the pattern changes.
@@ -125,9 +127,9 @@ const Hero = ({ product }: HeroProps) => {
   // fits at all — offsetVariants[0] is then the least-aggressive available ET and
   // the FitBanner's amber "verify clearance" copy owns the honesty. Outside fit
   // mode (useFilter false) this is unchanged.
-  const fittingDefaultOffsetMm = useFilter ? selectedSize.offsetVariants?.[0]?.value : undefined
+  const fittingDefaultOffsetMm = useFilter ? selectedSize?.offsetVariants?.[0]?.value : undefined
   const defaultOffsetMm =
-    fittingDefaultOffsetMm ?? selectedSize.defaultOffsetMm ?? selectedSize.offsetMm
+    fittingDefaultOffsetMm ?? selectedSize?.defaultOffsetMm ?? selectedSize?.offsetMm ?? 0
   const [selectedOffsetMm, setSelectedOffsetMm] = useState<number>(defaultOffsetMm)
 
   // When the size changes, snap the offset back to the new size's default pick.
@@ -138,7 +140,7 @@ const Hero = ({ product }: HeroProps) => {
   const isDefault = selectedOffsetMm === defaultOffsetMm
 
   const offsetVariants = useMemo<OffsetVariant[]>(
-    () => selectedSize.offsetVariants ?? [],
+    () => selectedSize?.offsetVariants ?? [],
     [selectedSize]
   )
 
@@ -159,7 +161,8 @@ const Hero = ({ product }: HeroProps) => {
   // Snap bore to the best-availability leaf whenever (size, offset) changes.
   useEffect(() => {
     setSelectedBore(
-      resolveLeafVariant(selectedSize, selectedOffsetMm)?.centerBoreMm ?? null
+      (selectedSize &&
+        resolveLeafVariant(selectedSize, selectedOffsetMm)?.centerBoreMm) ?? null
     )
   }, [selectedSize, selectedOffsetMm])
 
@@ -167,10 +170,23 @@ const Hero = ({ product }: HeroProps) => {
   // when bore changes so the selection always points at a real variant.
   useEffect(() => {
     setSelectedLoad(
-      resolveLeafVariant(selectedSize, selectedOffsetMm, selectedBore)
-        ?.loadRatingLb ?? null
+      (selectedSize &&
+        resolveLeafVariant(selectedSize, selectedOffsetMm, selectedBore)
+          ?.loadRatingLb) ?? null
     )
   }, [selectedSize, selectedOffsetMm, selectedBore])
+
+  // Variant-less product (or a bolt pattern with no sizes at all) — nothing to
+  // sell. Placed after every hook above so hook call order/count never varies
+  // across renders; everything below this line may safely dereference
+  // selectedSize as non-null.
+  if (visibleSizes.length === 0 || !selectedSize) {
+    return (
+      <div className="p-6 text-base-regular">
+        This product has no purchasable options right now.
+      </div>
+    )
+  }
 
   // Fallback chain: never leave currentOffset null when the (size, offset) has
   // any variant — drop the load constraint, then the bore constraint, in turn.

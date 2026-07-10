@@ -109,15 +109,15 @@ describe("pickDefaultSize", () => {
       ],
       28
     )
-    expect(pickDefaultSize(sizes).diameter).toBe(20)
-    expect(pickDefaultSize(sizes).width).toBe(10)
+    expect(pickDefaultSize(sizes)!.diameter).toBe(20)
+    expect(pickDefaultSize(sizes)!.width).toBe(10)
   })
   it("falls back to the first when all are out of stock", () => {
     const sizes = groupVariantsIntoSizes(
       [variant("v_oos", 20, 9, 18, "5x114.3", 0, 300)],
       28
     )
-    expect(pickDefaultSize(sizes).width).toBe(9)
+    expect(pickDefaultSize(sizes)!.width).toBe(9)
   })
 })
 

@@ -2,6 +2,7 @@ import { getBaseURL } from "@lib/util/env"
 import { Metadata } from "next"
 import { Antonio, JetBrains_Mono, Inter } from "next/font/google"
 import ProgressBar from "@/components/progress-bar"
+import Analytics from "@modules/common/components/analytics"
 import "styles/globals.css"
 
 const antonio = Antonio({
@@ -40,6 +41,7 @@ export default function RootLayout(props: { children: React.ReactNode }) {
         <ProgressBar>
           <main className="relative">{props.children}</main>
         </ProgressBar>
+        <Analytics />
       </body>
     </html>
   )

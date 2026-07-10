@@ -37,6 +37,13 @@ async function getRegionMap(): Promise<Map<
         tags: ["regions"],
       },
     })
+    // Medusa reports 4xx/5xx with a JSON body — res.json() would "succeed"
+    // with no regions and skip the catch, landing in notFound() below and
+    // bypassing the stale-cache fallback (review fix). Throw into the catch
+    // instead: an erroring backend is the same outage as an unreachable one.
+    if (!res.ok) {
+      throw new Error(`region fetch responded ${res.status}`)
+    }
     regions = (await res.json()).regions
   } catch (e) {
     // WB-081: backend unreachable (or returned non-JSON). Without this guard a
@@ -122,6 +129,12 @@ export async function middleware(request: NextRequest) {
   // the default region — pages own their data errors; the site keeps serving.
   // Self-corrects on the next request once the backend is reachable again.
   if (!regionMap) {
+    // The redirect target's first segment MUST satisfy the 2-letter
+    // passthrough above, or a misconfigured NEXT_PUBLIC_DEFAULT_REGION
+    // (e.g. "usa") would 307 into itself forever (review fix).
+    const fallbackRegion = /^[a-z]{2}$/.test(DEFAULT_REGION)
+      ? DEFAULT_REGION
+      : "us"
     const seg = request.nextUrl.pathname.split("/")[1]?.toLowerCase()
     if (seg && seg.length === 2) {
       return NextResponse.next()
@@ -130,7 +143,7 @@ export async function middleware(request: NextRequest) {
       request.nextUrl.pathname === "/" ? "" : request.nextUrl.pathname
     const queryString = request.nextUrl.search ?? ""
     return NextResponse.redirect(
-      `${request.nextUrl.origin}/${DEFAULT_REGION}${redirectPath}${queryString}`,
+      `${request.nextUrl.origin}/${fallbackRegion}${redirectPath}${queryString}`,
       307
     )
   }
@@ -180,5 +193,10 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/((?!api|_next/static|favicon.ico|.*\\.png|.*\\.jpg|.*\\.gif|.*\\.svg).*)"], // prevents redirecting on static files
+  // prevents redirecting on static files + the root metadata routes —
+  // robots.txt/sitemap.xml must serve at the domain root, NOT get
+  // country-prefixed into /us/robots.txt (a 404) (WB-082 review fix)
+  matcher: [
+    "/((?!api|_next/static|favicon.ico|robots\\.txt|sitemap\\.xml|.*\\.png|.*\\.jpg|.*\\.gif|.*\\.svg).*)",
+  ],
 }

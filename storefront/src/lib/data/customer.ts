@@ -92,6 +92,20 @@ export async function login(_currentState: unknown, formData: FormData) {
   redirect(`/${countryCode}/account`)
 }
 
+export async function forgotPassword(_currentState: unknown, formData: FormData) {
+  const email = formData.get("email") as string
+
+  try {
+    await sdk.auth.resetPassword("customer", "emailpass", { identifier: email })
+  } catch (error: any) {
+    // Swallow — never reveal whether the account exists (no enumeration).
+    // The form renders the same neutral copy regardless of outcome.
+    console.error("forgotPassword:", error?.toString?.())
+  }
+
+  return "SENT"
+}
+
 export async function signout(countryCode: string) {
   await sdk.auth.logout()
   removeAuthToken()

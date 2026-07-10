@@ -9,6 +9,7 @@ import { Separator } from "@/components/ui/separator"
 import { useGarage } from "@lib/garage/use-garage"
 import { openSearch } from "@lib/stores/search-store"
 import { fitsVehicle } from "@lib/fitment/fits-vehicle"
+import { FitTier } from "@lib/fitment/fit-tier"
 import { buildFitView } from "../../data/fit-view"
 import { FitmentEntry, ProductDetail } from "../../data/types"
 
@@ -47,8 +48,18 @@ const Fitment = ({ product }: FitmentProps) => {
   // is already "unknown".
   const fitView =
     active && verdict && verdict.status !== "unknown" ? buildFitView(product, active) : null
-  const activeFits = !activeUnknown && !!fitView?.hasFit
-  const activeNoFit = Boolean(active) && !activeUnknown && !activeFits
+  // WB-077: reconcile buildFitView's per-variant-correct bestTier ("fits" |
+  // "check" | "no") with fitsVehicle's "unknown" gate (no bolt-pattern data on
+  // file at all, for either side) into the single four-tier value every band
+  // branch below switches on. "no-fit" absorbs fitView's "no" — a real
+  // physical mismatch (bolt pattern or bore), not a missing-data case.
+  const tier: FitTier = activeUnknown
+    ? "unknown"
+    : fitView
+      ? fitView.bestTier === "no"
+        ? "no-fit"
+        : fitView.bestTier
+      : "no-fit"
 
   return (
     <section className="border-t border-[var(--hairline)] py-16 small:py-20">
@@ -63,37 +74,44 @@ const Fitment = ({ product }: FitmentProps) => {
       <div
         className="rounded-[var(--radius)] border p-5 mb-8 flex items-center gap-4"
         style={{
-          borderColor: activeFits
-            ? "var(--orange)"
-            : activeUnknown
-              ? "var(--hairline)"
-              : activeNoFit
-                ? "var(--ink-soft)"
-                : "var(--hairline)",
-          background: activeFits ? "rgba(255,106,0,0.04)" : "white",
+          borderColor:
+            tier === "fits"
+              ? "var(--orange)"
+              : tier === "check"
+                ? "rgba(184,134,11,0.35)"
+                : tier === "no-fit"
+                  ? "var(--ink-soft)"
+                  : "var(--hairline)",
+          background:
+            tier === "fits"
+              ? "rgba(255,106,0,0.04)"
+              : tier === "check"
+                ? "rgba(184,134,11,0.06)"
+                : "white",
         }}
       >
         <div
           className="h-10 w-10 rounded-full flex items-center justify-center shrink-0"
           style={{
-            background: activeFits
-              ? "var(--orange)"
-              : active
-                ? "var(--soft)"
-                : "var(--soft)",
-            color: activeFits ? "white" : "var(--ink)",
+            background:
+              tier === "fits"
+                ? "var(--orange)"
+                : tier === "check"
+                  ? "rgba(184,134,11,0.12)"
+                  : "var(--soft)",
+            color: tier === "fits" ? "white" : "var(--ink)",
           }}
         >
           <Icon
-            name={activeFits ? "check" : "garage"}
+            name={tier === "fits" ? "check" : tier === "check" ? "shield" : "garage"}
             size={18}
-            color={activeFits ? "white" : "#0F0F10"}
+            color={tier === "fits" ? "white" : tier === "check" ? "#B8860B" : "#0F0F10"}
             strokeWidth={1.8}
           />
         </div>
         <div className="flex-1 min-w-0">
           {active ? (
-            activeFits ? (
+            tier === "fits" ? (
               <>
                 <div className="text-[14px] font-semibold text-[var(--ink)]">
                   Fits your{" "}
@@ -106,7 +124,18 @@ const Fitment = ({ product }: FitmentProps) => {
                     : "Add this wheel to cart — we'll verify final offset against your build at order review."}
                 </div>
               </>
-            ) : activeUnknown ? (
+            ) : tier === "check" ? (
+              <>
+                <div className="text-[14px] font-semibold text-[var(--ink)]">
+                  CHECK FIT — aggressive fitment for your {active.year} {active.make} {active.model}
+                  {active.trim ? ` ${active.trim}` : ""}.
+                </div>
+                <div className="text-[12px] text-[var(--ink-soft)] mt-0.5">
+                  {verdict?.reasons[0] ??
+                    "Bolt pattern and hub bore clear, but this size is outside the typical window for your vehicle. Verify clearance before ordering."}
+                </div>
+              </>
+            ) : tier === "unknown" ? (
               <>
                 <div className="text-[14px] font-semibold text-[var(--ink)]">
                   We don't have fitment data for your {active.year} {active.make} {active.model}
@@ -177,7 +206,7 @@ const Fitment = ({ product }: FitmentProps) => {
           }
 
           const isActive =
-            Boolean(activeFits) &&
+            tier === "fits" &&
             active &&
             f.make.toLowerCase() === active.make.toLowerCase() &&
             f.model.toLowerCase() === active.model.toLowerCase() &&

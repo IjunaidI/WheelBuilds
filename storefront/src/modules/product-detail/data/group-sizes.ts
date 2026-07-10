@@ -117,6 +117,18 @@ export function pickDefaultSize(sizes: SizeOption[]): SizeOption | null {
   return sizes.find((s) => s.availability !== "out_of_stock") ?? sizes[0] ?? null
 }
 
+/**
+ * Distinct bolt patterns present in a finish's size options, order-stable
+ * (first-seen order, not sorted). Scoping this to the ACTIVE finish — instead
+ * of the product-wide bolt-pattern set — keeps the bolt-pattern chip row and
+ * the visible size grid in sync when the shopper switches finish (B4): a
+ * pattern only offered under a different finish stops being offered as a
+ * chip once that finish is no longer selected.
+ */
+export function boltPatternsForFinish(finishSizeOptions: SizeOption[]): string[] {
+  return Array.from(new Set(finishSizeOptions.map((s) => s.boltPattern)))
+}
+
 const candidatesFor = (variants: OffsetVariant[], offsetMm: number) =>
   variants.filter((o) => o.value === offsetMm)
 

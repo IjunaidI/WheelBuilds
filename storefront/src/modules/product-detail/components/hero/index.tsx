@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react"
 import { OffsetVariant, ProductDetail, SizeOption } from "../../data/types"
-import { sizesForBoltPattern, pickDefaultSize, boresFor, loadsForBore, resolveLeafVariant } from "../../data/group-sizes"
+import { sizesForBoltPattern, pickDefaultSize, boresFor, loadsForBore, resolveLeafVariant, boltPatternsForFinish } from "../../data/group-sizes"
 import Gallery from "./gallery"
 import VariantPicker from "./variant-picker"
 import PurchasePanel from "./purchase-panel"
@@ -68,7 +68,12 @@ const Hero = ({ product }: HeroProps) => {
   )
   const finishSizeOptions = activeFinish?.sizeOptions ?? product.sizeOptions
 
-  const boltPatternOptions = useFilter ? fitView!.boltPatterns : product.boltPatternOptions
+  // Scoped to the ACTIVE finish (not the product-wide set, B4) so switching
+  // finish re-drives the bolt re-snap effect below and the selected pattern
+  // stays one the visible grid actually offers.
+  const boltPatternOptions = useFilter
+    ? fitView!.boltPatterns
+    : boltPatternsForFinish(finishSizeOptions)
 
   const [selectedBoltPattern, setSelectedBoltPattern] = useState<string>(
     boltPatternOptions[0] ?? product.boltPattern

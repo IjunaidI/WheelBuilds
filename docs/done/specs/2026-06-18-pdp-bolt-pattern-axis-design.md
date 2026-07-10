@@ -93,8 +93,8 @@ and the grid behaves exactly as today.
   - `sizesForBoltPattern`: returns only the matching pattern's sizes; returns **all** sizes when the
     pattern is absent/unknown (fallback).
   - `pickDefaultSize`: returns the first in-stock size; falls back to the first when all are out.
-- [resolve-variant.test.ts](../../../storefront/src/modules/product-detail/data/resolve-variant.test.ts)
-  stays green (signature unchanged).
+- `resolve-variant.test.ts` stays green (signature unchanged). *(File since deleted with its
+  dead subject by WB-075 DOC1, 2026-07-08.)*
 
 Run: `npx vitest run src/modules/product-detail`.
 

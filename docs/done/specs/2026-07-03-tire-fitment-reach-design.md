@@ -151,5 +151,5 @@ Funnel (WB-066):
 
 - Mirror sources (wheels): `reverse-fitment.ts` + `service.reverseFitment` + `by-product/route.ts` +
   `getFitmentByProduct` + `components/fitment/`; the YMM/garage panes.
-- Prior tire fitment: [WB-063 design](../../in-progress/specs/2026-07-03-tire-fitment-design.md) — `extractOemTireSizes`,
+- Prior tire fitment: [WB-063 design](2026-07-03-tire-fitment-design.md) — `extractOemTireSizes`,
   `tireFitsVehicle`, `canonicalizeTireSize`, `TireFitmentSync`.

@@ -5,6 +5,7 @@ import { OnApproveActions, OnApproveData } from "@paypal/paypal-js"
 import { PayPalButtons, usePayPalScriptReducer } from "@paypal/react-paypal-js"
 import { useElements, useStripe } from "@stripe/react-stripe-js"
 import React, { useState } from "react"
+import { unstable_rethrow } from "next/navigation"
 import ErrorMessage from "../error-message"
 import Spinner from "@modules/common/icons/spinner"
 import { placeOrder } from "@lib/data/cart"
@@ -100,19 +101,26 @@ const StripePaymentButton = ({
   const [submitting, setSubmitting] = useState(false)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
 
-  // WB-079 B2: placeOrder() no longer throws user-facing errors — it RETURNS
-  // { error } on failure (Next.js redacts thrown Server Action messages in
-  // production). On success it calls redirect() internally, which throws the
-  // framework's NEXT_REDIRECT signal; that must propagate untouched, so this
-  // handler does NOT wrap the call in .catch()/try-catch.
   const onPaymentCompleted = async () => {
-    const res = await placeOrder()
-    if (res?.error) {
-      setErrorMessage(res.error)
+    // WB-079 B2: placeOrder() RETURNS { error } on failure (Next redacts thrown
+    // Server Action messages in prod) and navigates on success. F14: a genuine
+    // transport/framework failure (e.g. a network drop mid-RPC) would otherwise
+    // reject unhandled and leave the spinner stuck on a real payment — catch it,
+    // but re-throw NEXT_REDIRECT/NEXT_NOT_FOUND untouched so the happy path is
+    // unaffected.
+    try {
+      const res = await placeOrder()
+      if (res?.error) {
+        setErrorMessage(res.error)
+        setSubmitting(false)
+        return
+      }
+      // Success: placeOrder() already redirected. Nothing else to do.
+    } catch (err) {
+      unstable_rethrow(err)
+      setErrorMessage("Something went wrong reaching our server. Please try again.")
       setSubmitting(false)
-      return
     }
-    // Success: placeOrder() already redirected. Nothing else to do.
   }
 
   const stripe = useStripe()
@@ -212,17 +220,26 @@ const PayPalPaymentButton = ({
   const [submitting, setSubmitting] = useState(false)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
 
-  // WB-079 B2: see the Stripe button above — read the returned `.error`
-  // instead of catching, so the NEXT_REDIRECT thrown by a successful
-  // placeOrder() isn't swallowed and stringified into the error banner.
   const onPaymentCompleted = async () => {
-    const res = await placeOrder()
-    if (res?.error) {
-      setErrorMessage(res.error)
+    // WB-079 B2: placeOrder() RETURNS { error } on failure (Next redacts thrown
+    // Server Action messages in prod) and navigates on success. F14: a genuine
+    // transport/framework failure (e.g. a network drop mid-RPC) would otherwise
+    // reject unhandled and leave the spinner stuck on a real payment — catch it,
+    // but re-throw NEXT_REDIRECT/NEXT_NOT_FOUND untouched so the happy path is
+    // unaffected.
+    try {
+      const res = await placeOrder()
+      if (res?.error) {
+        setErrorMessage(res.error)
+        setSubmitting(false)
+        return
+      }
+      // Success: placeOrder() already redirected. Nothing else to do.
+    } catch (err) {
+      unstable_rethrow(err)
+      setErrorMessage("Something went wrong reaching our server. Please try again.")
       setSubmitting(false)
-      return
     }
-    // Success: placeOrder() already redirected. Nothing else to do.
   }
 
   const session = cart.payment_collection?.payment_sessions?.find(
@@ -277,17 +294,26 @@ const ManualTestPaymentButton = ({ notReady }: { notReady: boolean }) => {
   const [submitting, setSubmitting] = useState(false)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
 
-  // WB-079 B2: see the Stripe button above — read the returned `.error`
-  // instead of catching, so the NEXT_REDIRECT thrown by a successful
-  // placeOrder() isn't swallowed and stringified into the error banner.
   const onPaymentCompleted = async () => {
-    const res = await placeOrder()
-    if (res?.error) {
-      setErrorMessage(res.error)
+    // WB-079 B2: placeOrder() RETURNS { error } on failure (Next redacts thrown
+    // Server Action messages in prod) and navigates on success. F14: a genuine
+    // transport/framework failure (e.g. a network drop mid-RPC) would otherwise
+    // reject unhandled and leave the spinner stuck on a real payment — catch it,
+    // but re-throw NEXT_REDIRECT/NEXT_NOT_FOUND untouched so the happy path is
+    // unaffected.
+    try {
+      const res = await placeOrder()
+      if (res?.error) {
+        setErrorMessage(res.error)
+        setSubmitting(false)
+        return
+      }
+      // Success: placeOrder() already redirected. Nothing else to do.
+    } catch (err) {
+      unstable_rethrow(err)
+      setErrorMessage("Something went wrong reaching our server. Please try again.")
       setSubmitting(false)
-      return
     }
-    // Success: placeOrder() already redirected. Nothing else to do.
   }
 
   const handlePayment = () => {

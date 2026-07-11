@@ -174,6 +174,10 @@ const StripePaymentButton = ({
             onPaymentCompleted()
           }
 
+          // Release the spinner on a declined/failed card — otherwise the
+          // "Place order" button hangs in its loading state (F14 twin: same
+          // stuck-spinner class, the confirmCardPayment branch).
+          setSubmitting(false)
           setErrorMessage(error.message || null)
           return
         }
@@ -185,7 +189,22 @@ const StripePaymentButton = ({
           return onPaymentCompleted()
         }
 
+        // Unexpected intent status (still processing / requires_action, etc.):
+        // release the spinner instead of hanging with no feedback.
+        setSubmitting(false)
+        setErrorMessage("Payment could not be confirmed. Please try again.")
         return
+      })
+      .catch((err) => {
+        // A Stripe SDK / network failure rejects the confirm promise. Re-throw
+        // framework navigation signals first (never swallow NEXT_REDIRECT),
+        // then release the spinner + surface a generic message.
+        unstable_rethrow(err)
+        setSubmitting(false)
+        setErrorMessage(
+          err?.message ||
+            "Something went wrong confirming your payment. Please try again."
+        )
       })
   }
 

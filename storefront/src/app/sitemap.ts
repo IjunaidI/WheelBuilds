@@ -1,6 +1,8 @@
 import { MetadataRoute } from "next"
 import { getBaseURL } from "@lib/util/env"
 import { meili, PRODUCTS_INDEX } from "@lib/meilisearch"
+import { getCategoriesList } from "@lib/data/categories"
+import { getCollectionsList } from "@lib/data/collections"
 
 /**
  * WB-082: sitemap for the ~2,700-product catalog. Product handles come from
@@ -61,5 +63,35 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     console.error("[sitemap] Meilisearch unavailable — emitting static URLs only:", e)
   }
 
-  return [...statics, ...products]
+  const taxonomy: MetadataRoute.Sitemap = []
+  try {
+    const { product_categories } = await getCategoriesList(0, 200)
+    for (const c of product_categories ?? []) {
+      if (c.handle) {
+        taxonomy.push({
+          url: at(`/categories/${c.handle}`),
+          changeFrequency: "weekly",
+          priority: 0.5,
+        })
+      }
+    }
+  } catch (e) {
+    console.error("[sitemap] categories unavailable — skipping:", e)
+  }
+  try {
+    const { collections } = await getCollectionsList(0, 200)
+    for (const col of collections ?? []) {
+      if (col.handle) {
+        taxonomy.push({
+          url: at(`/collections/${col.handle}`),
+          changeFrequency: "weekly",
+          priority: 0.5,
+        })
+      }
+    }
+  } catch (e) {
+    console.error("[sitemap] collections unavailable — skipping:", e)
+  }
+
+  return [...statics, ...taxonomy, ...products]
 }

@@ -1,3 +1,5 @@
+import { extractMedusaMessage } from "./error-message"
+
 export default function medusaError(error: any): never {
   if (error.response) {
     // The request was made and the server responded with a status code
@@ -17,14 +19,10 @@ export default function medusaError(error: any): never {
       // ignore — logging only
     }
 
-    // Extracting the error message from the response data. response.data may
-    // be a string, an object with a .message, or something else entirely —
-    // never assume it has .charAt (that throws a masking TypeError).
-    const raw = error.response.data?.message ?? error.response.data
-    const message =
-      typeof raw === "string" ? raw : raw?.message ?? JSON.stringify(raw)
+    // Extract the user-facing message via the shared helper (WB-079 F15).
+    const message = extractMedusaMessage(error) ?? "An error occurred."
 
-    throw new Error(message.charAt(0).toUpperCase() + message.slice(1) + ".")
+    throw new Error(message)
   } else if (error.request) {
     // The request was made but no response was received
     throw new Error("No response received: " + error.request)

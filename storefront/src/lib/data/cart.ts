@@ -2,6 +2,7 @@
 
 import { sdk } from "@lib/config"
 import medusaError from "@lib/util/medusa-error"
+import { extractMedusaMessage } from "@lib/util/error-message"
 import { HttpTypes } from "@medusajs/types"
 import { omit } from "lodash"
 import { revalidateTag } from "next/cache"
@@ -218,17 +219,9 @@ export async function enrichLineItems(
 // mask the real reason. Server Actions must RETURN error strings, not throw
 // user-facing copy.
 function errText(error: any): string {
-  if (error?.response) {
-    const raw = error.response.data?.message ?? error.response.data
-    const message =
-      typeof raw === "string" ? raw : raw?.message ?? JSON.stringify(raw)
-    if (typeof message === "string" && message.length > 0) {
-      return message.charAt(0).toUpperCase() + message.slice(1) + "."
-    }
-  }
-  if (error?.request) {
-    return "No response received. Please try again."
-  }
+  const fromResponse = extractMedusaMessage(error)
+  if (fromResponse) return fromResponse
+  if (error?.request) return "No response received. Please try again."
   return error?.message || "An unexpected error occurred. Please try again."
 }
 

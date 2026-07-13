@@ -33,5 +33,5 @@ export default async function reindexSearchProducts({ container }: ExecArgs) {
     if (offset >= count) break
   }
 
-  logger.info(`[reindex-search-products] done — ${emitted} products re-indexed`)
+  logger.info(`[reindex-search-products] done — emitted product.updated for ${emitted} products (indexing runs async in the worker)`)
 }

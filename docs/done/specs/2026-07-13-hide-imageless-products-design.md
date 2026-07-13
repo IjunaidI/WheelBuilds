@@ -95,6 +95,12 @@ safety pass, not a bulk migration.
   `hasImage(p.thumbnail)` (drop in the `curated` build); the Meili fallback is already gated by §3.2.
 - **Related tires** (`getRelatedTireProducts`): no change — it reads through `getTireDiscoveryProducts`
   (Meili), already gated.
+- **Legacy listing pages** (`/collections/[handle]`, `/categories/[handle]`): the shared
+  `modules/store/templates/paginated-products.tsx` fetches via the Store API (`getProductsListWithSort`)
+  and renders cards with no image check. Added `products = products.filter((p) => hasImage(p.thumbnail))`
+  after the fetch. These surfaces are not linked from the primary journey (nav/home/PDP), but the
+  requirement is "hidden **anywhere**", so they are gated too. (Added in the whole-branch-review fix
+  wave — the reviewer flagged them as the one ungated Store-API listing path.)
 
 ### 3.5 Deliberately unchanged
 - The card-level `<Wheel>` fallback stays in both cards. Post-change it can only trigger for a *broken

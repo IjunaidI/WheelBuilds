@@ -74,7 +74,11 @@ export function extractTireModel(
     )
 
   const model = kept.join(" ").trim()
-  const confident = model.length > 0 && /[A-Za-z]/.test(model)
+  // A model is only trustworthy when the row actually parsed as a tire (a real
+  // size token was found). Junk text with letters but no parseable size → not
+  // confident → per-SKU group fallback, so garbage never becomes a grouped
+  // product title (WB-089 L8).
+  const confident = model.length > 0 && /[A-Za-z]/.test(model) && sizeToken != null
   return { model: confident ? model : null, confident }
 }
 

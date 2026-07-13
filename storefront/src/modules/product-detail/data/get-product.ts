@@ -15,6 +15,7 @@ import { HttpTypes } from "@medusajs/types"
 import { getProductByHandle, getProductsList } from "@lib/data/products"
 import { getRegion } from "@lib/data/regions"
 import { getFitmentByProduct, getFitmentByTireProduct } from "@lib/data/fitment"
+import { hasImage } from "@lib/util/has-image"
 import { canonicalBoltPatterns } from "@lib/fitment/canonical-bolt-pattern"
 import { DiscoveryProduct } from "@modules/discovery/data/types"
 import { AnyProductDetail, ProductDetail } from "./types"
@@ -101,6 +102,9 @@ export async function getProductDetail(
   if (!region) notFound()
   const product = await getProductByHandle(handle, region.id)
   if (!product) notFound()
+  // No image → not shown anywhere, including a direct PDP link. Covers wheel
+  // AND tire PDP (this precedes the tire branch below). (WB-084)
+  if (!hasImage(product.thumbnail)) notFound()
 
   if ((product.metadata as any)?.product_type === "tire") {
     const tire = mapTireDetail(product)
@@ -205,7 +209,7 @@ export async function getRelatedProducts(
   })
 
   return response.products
-    .filter((p) => p.handle !== product.handle)
+    .filter((p) => p.handle !== product.handle && hasImage(p.thumbnail))
     .slice(0, 6)
     .map(toRelatedProduct)
 }

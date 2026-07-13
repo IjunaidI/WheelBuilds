@@ -7,12 +7,26 @@ interface StageResult {
   rowCount: number
   stagedCount: number
   skippedNoImageCount: number
+  skippedInvalidPriceCount: number
 }
 
 interface Logger {
   info(message: string, ...args: any[]): void
   warn(message: string, ...args: any[]): void
   error(message: string, ...args: any[]): void
+}
+
+/**
+ * Why a normalized row is dropped at staging, or null if it should be staged.
+ * Image gate is WB-084; the non-positive/missing MSRP gate is WB-089 L3 (a $0
+ * price becomes a $0 Medusa price + a "From $0.00" card addable at $0).
+ */
+export function stageSkipReason(
+  normalized: { imageUrl?: string | null; msrpUsd: number }
+): "no-image" | "invalid-price" | null {
+  if (!normalized.imageUrl) return "no-image"
+  if (!(normalized.msrpUsd > 0)) return "invalid-price"
+  return null
 }
 
 /**
@@ -35,6 +49,7 @@ export async function stageFeed(
   let rowCount = 0
   let stagedCount = 0
   let skippedNoImageCount = 0
+  let skippedInvalidPriceCount = 0
   let truncated = false
 
   let feedStagingBatch: any[] = []
@@ -71,9 +86,13 @@ export async function stageFeed(
       continue
     }
 
-    // Skip rows with no image URL
-    if (!normalized.imageUrl) {
+    const skip = stageSkipReason(normalized)
+    if (skip === "no-image") {
       skippedNoImageCount++
+      continue
+    }
+    if (skip === "invalid-price") {
+      skippedInvalidPriceCount++
       continue
     }
 
@@ -123,12 +142,14 @@ export async function stageFeed(
     id: runId,
     row_count: rowCount,
     skipped_no_image_count: skippedNoImageCount,
+    skipped_invalid_price_count: skippedInvalidPriceCount,
   })
 
   logger.info(
-    `Staging complete: ${rowCount} rows parsed, ${stagedCount} staged, ${skippedNoImageCount} skipped (no image)` +
+    `Staging complete: ${rowCount} rows parsed, ${stagedCount} staged, ` +
+      `${skippedNoImageCount} skipped (no image), ${skippedInvalidPriceCount} skipped (invalid price)` +
       (truncated ? ` [TRUNCATED to maxRows=${maxRows} — dev mode]` : '')
   )
 
-  return { rowCount, stagedCount, skippedNoImageCount }
+  return { rowCount, stagedCount, skippedNoImageCount, skippedInvalidPriceCount }
 }

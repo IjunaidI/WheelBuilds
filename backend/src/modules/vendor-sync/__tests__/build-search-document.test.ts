@@ -236,4 +236,63 @@ describe("buildSearchDocument — discontinued variants (WB-089 L4)", () => {
     } as any)
     expect(doc).toBeNull()
   })
+
+  it("excludes discontinued TIRE variants from price + facets", () => {
+    const tire = {
+      id: "prod_t3",
+      handle: "falken-wildpeak-at4w-2",
+      title: "Falken WDPEAK AT4W",
+      thumbnail: "https://cdn.example.com/t3.jpg",
+      metadata: { product_type: "tire", brand: "Falken" },
+      variants: [
+        {
+          sku: "live",
+          prices: [{ amount: 200, currency_code: "usd" }],
+          metadata: {
+            canonical_size: "305/45R22",
+            rim_diameter_in: 22,
+            tire_width_mm: 305,
+            aspect_ratio: 45,
+            load_index: 118,
+            speed_rating: "S",
+          },
+        },
+        {
+          sku: "dead",
+          prices: [{ amount: 50, currency_code: "usd" }],
+          metadata: {
+            canonical_size: "285/40R22",
+            rim_diameter_in: 22,
+            tire_width_mm: 285,
+            aspect_ratio: 40,
+            load_index: 110,
+            speed_rating: "T",
+            discontinued: true,
+          },
+        },
+      ],
+    }
+    const doc: any = buildSearchDocument(tire as any)
+    expect(doc.tire_sizes).toEqual(["305/45R22"]) // NOT the dead "285/40R22"
+    expect(doc.price_min).toBe(20000) // 200.00 → cents; NOT the dead 50.00 → 5000
+    expect(doc.price_max).toBe(20000)
+  })
+
+  it("returns null when every TIRE variant is discontinued", () => {
+    const tire = {
+      id: "prod_t4",
+      handle: "falken-wildpeak-at4w-3",
+      title: "Falken WDPEAK AT4W",
+      thumbnail: "https://cdn.example.com/t4.jpg",
+      metadata: { product_type: "tire", brand: "Falken" },
+      variants: [
+        {
+          sku: "dead",
+          prices: [{ amount: 50, currency_code: "usd" }],
+          metadata: { canonical_size: "285/40R22", rim_diameter_in: 22, discontinued: true },
+        },
+      ],
+    }
+    expect(buildSearchDocument(tire as any)).toBeNull()
+  })
 })

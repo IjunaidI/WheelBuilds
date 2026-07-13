@@ -16,7 +16,7 @@ import { finalizeApply } from "./pipeline/finalize-apply"
 import { shouldShortCircuitFeed, terminalStatusForFeed } from "./pipeline/retry-policy"
 import { uploadArchive } from "./utils/archive"
 import { shouldUploadArchive } from "./utils/archive-policy"
-import { selectStockPartNumbers, stockOnlyPartsToApply } from "./pipeline/stock-select"
+import { stockOnlyPartsToApply } from "./pipeline/stock-select"
 import { applyStockLevels } from "./pipeline/apply-stock"
 import { ensureDefaultSalesChannel } from "./pipeline/bootstrap"
 import {

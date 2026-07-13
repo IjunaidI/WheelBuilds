@@ -1,5 +1,6 @@
 import { canonicalBoltPatterns } from "./bolt-pattern-canonical"
 import { normalizeFinish } from "./normalize-finish"
+import { hasImage } from "./has-image"
 
 /** Minimal shape we read off a Medusa product in the Meilisearch transformer. */
 type IndexableVariant = {
@@ -32,6 +33,10 @@ const uniqStr = (xs: string[]): string[] => Array.from(new Set(xs))
  * falsy result to a minimal { id, product_type } stub in medusa-config.js).
  */
 export function buildSearchDocument(product: IndexableProduct) {
+  // No image → not shown anywhere. Returning null routes through the
+  // medusa-config stub fallback (forced to product_type:'non-wheel'), so it
+  // matches no wheel/tire discovery filter. (WB-084)
+  if (!hasImage(product.thumbnail)) return null
   const meta = product.metadata ?? {}
   if (meta.product_type === "wheel") return buildWheelDocument(product, meta)
   if (meta.product_type === "tire") return buildTireDocument(product, meta)

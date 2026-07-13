@@ -1,6 +1,7 @@
 import { canonicalBoltPatterns } from "./bolt-pattern-canonical"
 import { normalizeFinish } from "./normalize-finish"
 import { hasImage } from "./has-image"
+import { isRealBoltPattern } from "./placeholder-bolt-pattern"
 
 /** Minimal shape we read off a Medusa product in the Meilisearch transformer. */
 type IndexableVariant = {
@@ -51,7 +52,10 @@ function buildWheelDocument(
   product: IndexableProduct,
   meta: Record<string, unknown>
 ) {
-  const variants = product.variants ?? []
+  const variants = (product.variants ?? []).filter(
+    (v) => (v.metadata ?? {}).discontinued !== true
+  )
+  if (variants.length === 0) return null
 
   const diameters: number[] = []
   const widths: number[] = []
@@ -75,7 +79,7 @@ function buildWheelDocument(
     const cb = num(vm.center_bore_mm)
     if (cb !== null) centerBores.push(cb)
     const bp = typeof vm.bolt_pattern_raw === "string" ? vm.bolt_pattern_raw : ""
-    if (bp) {
+    if (bp && isRealBoltPattern(bp)) {
       boltRaw.push(bp)
       boltCanonical.push(...canonicalBoltPatterns(bp))
     }
@@ -133,7 +137,11 @@ function buildTireDocument(
   product: IndexableProduct,
   meta: Record<string, unknown>
 ) {
-  const variants = product.variants ?? []
+  const variants = (product.variants ?? []).filter(
+    (v) => (v.metadata ?? {}).discontinued !== true
+  )
+  if (variants.length === 0) return null
+
   const sizes: string[] = []
   const rimDiameters: number[] = []
   const sectionWidths: number[] = []

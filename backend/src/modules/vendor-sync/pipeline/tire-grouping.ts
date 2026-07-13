@@ -1,6 +1,7 @@
 import { TireNormalizedRecord } from "../adapters/types"
 import { slugify } from "./wheel-grouping"
 import { canonicalTireSize, tireSizeLabel } from "./tire-facets"
+import { expandTireModelName } from "../adapters/wheelpros-tires/model-alias"
 
 /** Tires have one meaningful variant axis: size. */
 export const TIRE_OPTION_TITLES = {
@@ -53,10 +54,10 @@ export function buildTireVariantOptions(
   return { [TIRE_OPTION_TITLES.SIZE]: tireSizeLabel(record) }
 }
 
-/** Grouped title = brand + model; per-SKU fallback uses the raw description. */
+/** Grouped title = brand + expanded model name; per-SKU fallback uses the raw description. */
 export function buildTireGroupTitle(record: TireNormalizedRecord): string {
   if (!record.model) return record.title
-  return `${record.brand} ${record.model}`
+  return `${record.brand} ${expandTireModelName(record.model)}`
 }
 
 /** Grouped handle = brand-model; per-SKU fallback = brand-partNumber. */

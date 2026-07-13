@@ -31,6 +31,14 @@ export function extractTireModel(
     work = work.split(sizeToken).join(" ")
   }
 
+  // 1b. Also strip any size-SHAPED token whose literal form differs from the
+  //     canonicalized sizeToken -- e.g. a dash-metric size "ST225/75-15" whose
+  //     sizeToken was canonicalized to "225/75R15" (WB-089 L8). Without this,
+  //     the glued-prefix leftover survives the alpha filter (step 6) and
+  //     pollutes the model, fragmenting grouping. Matches metric (...Z?[RBD]RR)
+  //     and dash-metric (...-RR) with an optional glued P/LT/ST prefix.
+  work = work.replace(/\b(?:P|LT|ST)?\d{2,3}\/\d{2,3}(?:Z?[RBD]|-)\d{2}\b/g, " ")
+
   // 2. Remove a parenthesised service description, e.g. "(96Y)".
   work = work.replace(/\([^)]*\)/g, " ")
 
@@ -66,7 +74,11 @@ export function extractTireModel(
     )
 
   const model = kept.join(" ").trim()
-  const confident = model.length > 0 && /[A-Za-z]/.test(model)
+  // A model is only trustworthy when the row actually parsed as a tire (a real
+  // size token was found). Junk text with letters but no parseable size → not
+  // confident → per-SKU group fallback, so garbage never becomes a grouped
+  // product title (WB-089 L8).
+  const confident = model.length > 0 && /[A-Za-z]/.test(model) && sizeToken != null
   return { model: confident ? model : null, confident }
 }
 

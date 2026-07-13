@@ -16,7 +16,7 @@ import { finalizeApply } from "./pipeline/finalize-apply"
 import { shouldShortCircuitFeed, terminalStatusForFeed } from "./pipeline/retry-policy"
 import { uploadArchive } from "./utils/archive"
 import { shouldUploadArchive } from "./utils/archive-policy"
-import { selectStockPartNumbers } from "./pipeline/stock-select"
+import { stockOnlyPartsToApply } from "./pipeline/stock-select"
 import { applyStockLevels } from "./pipeline/apply-stock"
 import { ensureDefaultSalesChannel } from "./pipeline/bootstrap"
 import {
@@ -549,12 +549,15 @@ class VendorSyncService extends MedusaService({
       })
       await stageFeed(adapter, descriptor, this, runId, this.logger_, this.options_.devMaxRows)
 
-      // Which staged parts have a current row?
-      const stockRows = await (this as any).listVendorStockStagings({ run_id: runId }, { take: null })
-      const stagedParts = stockRows.map((r: any) => r.part_number)
+      // Which staged parts have a current row? Source from vendor_feed_staging
+      // (ALL parts staged this run), not vendor_stock_staging (only qoh>0 rows) —
+      // else a part that sold out at every warehouse is never selected and its
+      // Medusa levels stay phantom-stocked (WB-089 L5).
+      const stagedRows = await (this as any).listVendorFeedStagings({ run_id: runId }, { select: ["part_number"], take: null })
+      const stagedParts = stagedRows.map((r: any) => r.part_number)
       const currentRows = await (this as any).listVendorProductCurrents({ vendor_code: vendorCode }, { select: ["part_number"], take: null })
       const currentParts = new Set<string>(currentRows.map((r: any) => r.part_number))
-      const parts = selectStockPartNumbers(stagedParts, currentParts)
+      const parts = stockOnlyPartsToApply(stagedParts, currentParts)
 
       await (this as any).updateVendorFeedRuns({ id: runId, status: "applying" })
       const salesChannelId = await ensureDefaultSalesChannel(container)

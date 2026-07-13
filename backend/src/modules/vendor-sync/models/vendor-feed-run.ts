@@ -9,6 +9,7 @@ const VendorFeedRun = model.define("vendor_feed_run", {
   run_date_vendor: model.dateTime().nullable(),
   row_count: model.number().default(0),
   skipped_no_image_count: model.number().default(0),
+  skipped_invalid_price_count: model.number().default(0),
   hash_match_count: model.number().default(0),
   new_count: model.number().default(0),
   changed_count: model.number().default(0),

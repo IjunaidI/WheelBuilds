@@ -43,7 +43,9 @@ describe("tire grouping", () => {
   })
 
   it("titles a grouped product as brand + model", () => {
-    expect(buildTireGroupTitle(tire())).toBe("Falken WDPEAK AT4W")
+    // Default fixture model ("WDPEAK AT4W") is the seeded alias key (WB-089 L8) —
+    // buildTireGroupTitle expands it for display; see the dedicated alias describe below.
+    expect(buildTireGroupTitle(tire())).toBe("Falken Wildpeak A/T4W")
   })
 
   it("titles a per-SKU fallback product with the raw description", () => {
@@ -63,5 +65,16 @@ describe("tire grouping", () => {
     ])
     expect(survivors.map((r) => r.partNumber)).toEqual(["IN"])
     expect(dropped.map((r) => r.partNumber)).toEqual(["OUT"])
+  })
+})
+
+describe("buildTireGroupTitle / handle — alias is display-only (WB-089 L8)", () => {
+  it("expands a known model abbreviation in the title", () => {
+    const rec = { brand: "Falken", model: "WDPEAK AT4W", title: "raw" } as any
+    expect(buildTireGroupTitle(rec)).toBe("Falken Wildpeak A/T4W")
+  })
+  it("does NOT expand the handle (identity/URL stays stable)", () => {
+    const rec = { brand: "Falken", model: "WDPEAK AT4W", partNumber: "P1" } as any
+    expect(buildTireGroupHandle(rec)).toBe("falken-wdpeak-at4w")
   })
 })

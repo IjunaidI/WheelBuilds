@@ -61,6 +61,7 @@ import {
 } from "./tire-grouping"
 import VendorSyncService from "../service"
 import { indexVariantsBySku, partitionRecordsBySku } from "./adopt"
+import { suffixedHandle, isHandleConflictError } from "./handle-collision"
 
 interface Logger {
   info(message: string, ...args: any[]): void
@@ -346,6 +347,36 @@ async function applyNewGroup(
   return applyNewTireGroup(ctx, group, records)
 }
 
+/**
+ * Create a product, retrying ONCE under a deterministic handle suffix if the
+ * base handle collides with an existing product (distinct group_keys can
+ * slugify to the same handle — WB-089 L10). buildInput must return the full
+ * product input for a given handle; everything else stays identical.
+ */
+async function createProductWithUniqueHandle(
+  ctx: ApplyContext,
+  groupKey: string,
+  baseHandle: string,
+  buildInput: (handle: string) => any
+): Promise<any> {
+  try {
+    const { result } = await createProductsWorkflow(ctx.container).run({
+      input: { products: [buildInput(baseHandle)] },
+    })
+    return result[0]
+  } catch (err: any) {
+    if (!isHandleConflictError(err)) throw err
+    const retryHandle = suffixedHandle(baseHandle, groupKey)
+    ctx.logger.warn(
+      `[vendor-sync] [${ctx.runId}] handle "${baseHandle}" collided for group ${groupKey}; retrying as "${retryHandle}"`
+    )
+    const { result } = await createProductsWorkflow(ctx.container).run({
+      input: { products: [buildInput(retryHandle)] },
+    })
+    return result[0]
+  }
+}
+
 async function applyNewWheelGroup(
   ctx: ApplyContext,
   group: NewGroup,
@@ -389,30 +420,27 @@ async function applyNewWheelGroup(
     new Set(survivors.map((r) => r.imageUrl).filter((u): u is string => !!u))
   )
 
-  const { result } = await createProductsWorkflow(ctx.container).run({
-    input: {
-      products: [
-        {
-          title: buildGroupTitle(rep),
-          handle: buildGroupHandle(rep),
-          status: ProductStatus.PUBLISHED,
-          thumbnail: rep.imageUrl ?? undefined,
-          images: imageUrls.map((url) => ({ url })),
-          weight: productWeight,
-          collection_id: brandCollectionId,
-          category_ids: [categoryId],
-          sales_channels: [{ id: ctx.salesChannelId }],
-          shipping_profile_id: ctx.shippingProfileId,
-          external_id: group.group_key,
-          metadata: buildProductMetadata(rep),
-          options: productOptions,
-          variants,
-        },
-      ],
-    },
-  })
-
-  const createdProduct = result[0]
+  const createdProduct = await createProductWithUniqueHandle(
+    ctx,
+    group.group_key,
+    buildGroupHandle(rep),
+    (handle) => ({
+      title: buildGroupTitle(rep),
+      handle,
+      status: ProductStatus.PUBLISHED,
+      thumbnail: rep.imageUrl ?? undefined,
+      images: imageUrls.map((url) => ({ url })),
+      weight: productWeight,
+      collection_id: brandCollectionId,
+      category_ids: [categoryId],
+      sales_channels: [{ id: ctx.salesChannelId }],
+      shipping_profile_id: ctx.shippingProfileId,
+      external_id: group.group_key,
+      metadata: buildProductMetadata(rep),
+      options: productOptions,
+      variants,
+    })
+  )
   await persistGroupAfterCreate(ctx, group, survivors, createdProduct)
   return { variantCount: survivors.length }
 }
@@ -461,31 +489,28 @@ async function applyNewTireGroup(
     prices: [{ amount: r.msrpUsd, currency_code: "usd" }],
   }))
 
-  const { result } = await createProductsWorkflow(ctx.container).run({
-    input: {
-      products: [
-        {
-          title: buildTireGroupTitle(rep),
-          handle: buildTireGroupHandle(rep),
-          status: ProductStatus.PUBLISHED,
-          thumbnail: rep.imageUrl ?? undefined,
-          images: imageUrls.map((url) => ({ url })),
-          collection_id: brandCollectionId,
-          category_ids: [categoryId],
-          sales_channels: [{ id: ctx.salesChannelId }],
-          shipping_profile_id: ctx.shippingProfileId,
-          external_id: group.group_key.startsWith("sku:")
-            ? rep.partNumber
-            : group.group_key,
-          metadata: buildProductMetadata(rep),
-          options: productOptions,
-          variants,
-        },
-      ],
-    },
-  })
-
-  const createdProduct = result[0]
+  const createdProduct = await createProductWithUniqueHandle(
+    ctx,
+    group.group_key,
+    buildTireGroupHandle(rep),
+    (handle) => ({
+      title: buildTireGroupTitle(rep),
+      handle,
+      status: ProductStatus.PUBLISHED,
+      thumbnail: rep.imageUrl ?? undefined,
+      images: imageUrls.map((url) => ({ url })),
+      collection_id: brandCollectionId,
+      category_ids: [categoryId],
+      sales_channels: [{ id: ctx.salesChannelId }],
+      shipping_profile_id: ctx.shippingProfileId,
+      external_id: group.group_key.startsWith("sku:")
+        ? rep.partNumber
+        : group.group_key,
+      metadata: buildProductMetadata(rep),
+      options: productOptions,
+      variants,
+    })
+  )
   await persistGroupAfterCreate(ctx, group, survivors, createdProduct)
   return { variantCount: survivors.length }
 }

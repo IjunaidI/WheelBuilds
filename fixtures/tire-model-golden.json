@@ -9,7 +9,9 @@
   { "brand": "Falken", "description": "255/35ZR19 FK453 (96Y) XL BLK 2553519", "sizeToken": "255/35ZR19", "model": "FK453", "confident": true },
   { "brand": "BKT", "description": "12.4-24 8PR BKT TR171 TT 451224", "sizeToken": "12.4-24", "model": "TR171", "confident": true },
   { "brand": "BKT", "description": "11.2-26 8PR BKT TR171 TT 451126", "sizeToken": "11.2-26", "model": "TR171", "confident": true },
-  { "brand": "OHTSU", "description": "ST5000 285/45-22 114H", "sizeToken": null, "model": "ST5000", "confident": true },
+  { "brand": "OHTSU", "description": "ST5000 285/45-22 114H", "sizeToken": "285/45R22", "model": "ST5000", "confident": true },
   { "brand": "Falken", "description": "305/45R22", "sizeToken": "305/45R22", "model": null, "confident": false },
-  { "brand": "Nowhere", "description": "UNKNOWN TIRE FORMAT", "sizeToken": null, "model": "UNKNOWN TIRE FORMAT", "confident": true }
+  { "brand": "Nowhere", "description": "UNKNOWN TIRE FORMAT", "sizeToken": null, "model": null, "confident": false },
+  { "brand": "Towmax", "description": "ST225/75-15 117L TOWMAX STR", "sizeToken": "225/75R15", "model": "STR", "confident": true },
+  { "brand": "Towmax", "description": "ST205/75-15 107L TOWMAX STR", "sizeToken": "205/75R15", "model": "STR", "confident": true }
 ]

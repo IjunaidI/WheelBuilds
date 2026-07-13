@@ -43,6 +43,8 @@
 - **G8 · Admin & ops tooling** `[S]` — admin UI + ops slice ✅ **DONE 2026-06-28** (WB-006 vendor-sync admin console, WB-044 rename `teraflex` fixtures, WB-052 scale-safe dev-wipe). Remaining: WB-031 (seed shipping options + reply-to — general commerce, not wheel; deferred). → WB-031
 - **G9 · Audit remediation — honest state & silent-failure elimination** `[L–XL · multi-session]` — remediate the 2026-07-06 full done-specs audit: **76 unique findings (9 CONFIRMED high, all vendor-sync lifecycle; 47 pending verification)**. Theme + raw logs: [future/plans/2026-07-06-audit-remediation-theme.md](plans/2026-07-06-audit-remediation-theme.md) (+ 4 finding-log docs). Convert per-cluster (sync-lifecycle-integrity, fitment-truth, checkout-money-honesty, garage-session-integrity, discovery-honest-signals, docs-truth-sweep) into specs/plans before implementing. **Cluster 1 `sync-lifecycle-integrity` (WB-070) ✅ DONE 2026-07-06** (the 9 confirmed + folded #11/#16). **Cluster 2 `checkout-money-honesty` (WB-071) ✅ DONE 2026-07-06** (9 findings F-A…F-I). **Cluster 3 `fitment-truth` (WB-072) ✅ DONE 2026-07-07** (17 findings B1–B8/S1–S9, re-verified vs current main first via 2 parallel verifiers; 16-commit branch + review fix, opus whole-branch review). **Cluster 4 `garage-session-integrity` (WB-073) ✅ DONE 2026-07-07** (10 findings G1–G10, re-verified first; 19-commit branch, per-task review + fix loops + opus whole-branch review MERGE-READY). **Cluster 5 `discovery-honest-signals` (WB-074) ✅ DONE 2026-07-08** (8 findings D1–D8, re-verified first; storefront-only, per-task review + fix loops + opus whole-branch review MERGE-READY; D3 disjunctive deferred via sanctioned fallback). **Cluster 6 `docs-truth-sweep` (WB-075) ✅ DONE 2026-07-08** (5 DOC findings + doc-drift, re-verified first; ran LAST to re-baseline the tsc/test counts — deleted dead code (tsc 14→12), atomic newsletter subscribe, module-status truthiness, corrected STATUS/README/CLAUDE; opus whole-branch review MERGE-READY). **✅ EPIC COMPLETE — all 6 clusters shipped + merged (WB-070…WB-075); WB-069 umbrella DONE.** → WB-069…WB-075
 - **G10 · Launch readiness — fitment truth v2 + P0 completeness** `[L · multi-session]` — remediate the 2026-07-10 audit ([future/plans/2026-07-10-launch-readiness-audit.md](plans/2026-07-10-launch-readiness-audit.md)): the user-confirmed fitment FALSE NEGATIVES (three-tier verdict + multi-trim/stock-inclusive windows, WB-077), transactional email + password reset (WB-078), the B1–B11 bug batch (WB-079), Stripe capture + US tax + live cutover (WB-080), ops hardening (WB-081), SEO/observability (WB-082), docs sweep #2 (WB-083, runs last). Consolidated design: [done/specs/2026-07-10-launch-readiness-fixes-design.md](../done/specs/2026-07-10-launch-readiness-fixes-design.md). Build order: WB-077 → 078 → 079 → 080 → 081 → 082 → 083. **WB-077 ✅ DONE + merged 2026-07-10** (merge `39c273a`; SDD + opus whole-branch review). **WB-078 ✅ DONE + merged 2026-07-10** (merge `7ec274e`; SDD + opus whole-branch review). **WB-079 ✅ DONE + merged 2026-07-10** (merge `8094f10`; SDD per-bug + opus whole-branch review; backend tsc→0). Decisions D1 (include+badge) & D4 (reset-email button) resolved as defaults; D2/D3 (Stripe capture / US tax) belong to WB-080. **WB-080 ✅ DONE 2026-07-11** (merge `de8c0e8`; `capture: true` [D2], US tax script + seed [D3], [go-live runbook](../reference/go-live-runbook.md) — live-cutover/tax-rates/prod-scripts are OPS steps in the runbook). **WB-081 ✅ DONE 2026-07-11** (merge `f645a66`; vendor-sync watchdog alerts + fail-open middleware + 5 policy pages + template drift). **WB-082 ✅ DONE 2026-07-11** (merge `03c0480` + review fix `09fd966`; robots/sitemap/error boundaries/env-gated analytics; Sentry deferred pending a vendor account). **WB-083 ✅ DONE 2026-07-11** (docs sweep; this file + STATUS re-baselined). Whole-stack adversarial review (28-agent workflow) confirmed + fixed 3 findings pre-merge. **✅ EPIC COMPLETE — G10 fully executed; what separates the store from LIVE is the ops runbook, not code.**
+- **G11 · Storefront trust & correctness — 2026-07-13 UX audit fixes** `[XL · multi-session]` — remediate the [2026-07-13 full-site UX & product-logic audit](plans/2026-07-13-ux-completeness-audit.md) (7 parallel surface auditors, ~60 unique findings; consolidated design: [specs/2026-07-13-ux-completeness-fixes-design.md](specs/2026-07-13-ux-completeness-fixes-design.md)). The launch-gating cluster: dead nav/footer chrome + fabricated drawer content (WB-085), legacy listing retirement (WB-086), search that finds products (WB-087), discovery filter truth (WB-088), catalog lifecycle integrity — index eviction/phantom stock/$0 (WB-089), PDP purchase honesty (WB-090), fitment honesty completion (WB-091), cart/checkout correctness (WB-092), account truth (WB-093), email reliability (WB-094), SEO de-boilerplate (WB-095), a11y & polish (WB-096). Build order: 089 → 085 → 087 → 088 → 090 → 091 → **104 (trim honesty, same session as 091)** → 092 → 093 → 094 → 086 → 095 → 096. Each task re-verifies its findings against current `main` first (WB-104's T1 already root-caused live). → WB-085…WB-096, WB-104
+- **G12 · Conversion & completeness features — 2026-07-13 UX audit** `[L]` — the missing-but-expected layer from the same audit: guest order lookup (WB-097), PDP merchandising — set framing/SKU/stock-ETA (WB-098), brand & style landing pages (WB-099), discovery availability signals (WB-100, depends WB-089), journey connectors (WB-101), staggered fitment (WB-102, XL — design first), post-purchase self-service (WB-103). → WB-097…WB-103
 
 ---
 
@@ -942,3 +944,196 @@
 - fix: define `hasImage(thumbnail)` = non-empty trimmed string (backend + storefront twins); the Meili transformer returns `null` for image-less products (so they leave the wheel/tire index) and the coalesce stub is forced to a constant `non-wheel` `product_type` so an image-less WHEEL can't slip back in; storefront guards on the Store-API surfaces the index doesn't feed — PDP 404 (wheel+tire), related + featured filters, and the legacy `PaginatedProducts` collections/categories path; a one-time `reindex-search-products.ts` `medusa exec` script re-emits `product.updated` to purge already-indexed image-less docs. Non-destructive (no catalog deletes).
 - verify: an image-less product is absent from `/store` + home + related + `/collections/*` + `/categories/*`, and its PDP 404s; `buildSearchDocument` returns `null` for a thumbnail-less wheel AND tire (unit); backend test:sync 330/6-skip, storefront vitest 352 (57 files).
 - refs: spec [docs/done/specs/2026-07-13-hide-imageless-products-design.md](../done/specs/2026-07-13-hide-imageless-products-design.md) ; plan [docs/done/plans/2026-07-13-hide-imageless-products.md](../done/plans/2026-07-13-hide-imageless-products.md)
+
+---
+
+## G11 · Storefront trust & correctness (2026-07-13 UX audit)
+
+> All finding ids (N/D/P/C/A/X/L) reference the
+> [2026-07-13 UX completeness audit](plans/2026-07-13-ux-completeness-audit.md);
+> per-task designs in the [consolidated fixes spec](specs/2026-07-13-ux-completeness-fixes-design.md).
+> Static audit — each task re-verifies its findings against current `main` first (G9/G10 discipline).
+
+### WB-085 · Site chrome integrity — dead nav/footer links, fabricated drawer content   [HIGH]
+- status: todo
+- area: storefront/layout + storefront/search + storefront/home
+- evidence: storefront/src/modules/layout/templates/nav/index.tsx:12-20 (Brands→/collections 404, Style→/categories 404, 3× href="#") ; footer/index.tsx:6-46 (9 dead links, fixture brand names) ; search-drawer/trending.tsx:10-38 (fabricated products)
+- problem: 5 of 7 nav items and 9 footer links are dead or placeholders on every page; the drawer's Trending panel shows fabricated products with fake prices that dead-end in zero-result searches; not-found pages are chrome-less boilerplate. Findings N1-N3, N6, N8-N11, X9.
+- fix: shared NAV_ITEMS module repointed to real routes (Support→/contact, Brands/Style→/store presets interim), delete placeholder items, live footer links from styleTiles()/brand facet, Trending fed by real newest products, mobile-menu vehicle row, catalog-wall slice offset, WB not-found pages, /results+/search redirects.
+- verify: every nav/footer/drawer href resolves 200; grep shows no `href="#"` in layout modules and no fabricated product names in search components.
+- refs: [spec §WB-085](specs/2026-07-13-ux-completeness-fixes-design.md)
+
+### WB-086 · Retire (redirect) the legacy /categories + /collections listing path   [HIGH]
+- status: todo
+- area: storefront/routes + storefront/store-modules + sitemap
+- evidence: storefront/src/lib/data/products.ts:107-151 (fetch capped at 100, sliced against real count) ; modules/store/templates/paginated-products.tsx:61-71 ; app/sitemap.ts:66-95 (advertises them) ; categories page:58-64 ("| Medusa Store" title + canonical resolving to a 404)
+- problem: /categories/wheels advertises ~144 pages but pages 9+ render an empty grid; sort only orders the first 100; N+1 fetch per card; boilerplate titles/branding; the sitemap sends crawlers there. Finding D1.
+- fix: 301 categories/wheels→/store, categories/tires→/tires, collections/[handle]→/store?brands=<brand> (route-level lookup); drop taxonomy from sitemap; quarantine/delete the dead PaginatedProducts path (respecting retained imports per storefront/CLAUDE.md).
+- verify: legacy URLs 301 to discovery equivalents; sitemap has no /categories//collections URLs; build + vitest green after module removal.
+- refs: [spec §WB-086](specs/2026-07-13-ux-completeness-fixes-design.md)
+
+### WB-087 · Search that finds products — model names, synonyms, size tokens, visible query   [HIGH]
+- status: todo
+- area: backend/vendor-sync-search + backend/medusa-config + storefront/discovery
+- evidence: backend/src/modules/vendor-sync/pipeline/wheel-grouping.ts:165-170 (title = Brand + DisplayStyleNo) ; build-metadata.ts:24-30 (Style name → metadata only) ; medusa-config.js:265 (searchableAttributes title/brand/skus, no synonyms) ; storefront discovery header/active-chips (q invisible/unclearable)
+- problem: "nomad" (the wheel's actual model name) returns 0 results; "rims" returns 0; size-first queries return 0; and after searching, the page shows no query indicator and no way to clear it. Findings D2, D3, L2, L7.
+- fix: index + searchable `style` and a `search_text` field (sizes + canonical patterns), append the real style name to product titles (handles unchanged), synonyms block; storefront renders "RESULTS FOR" + a removable q chip + q in isAnyFilterActive (both discovery twins).
+- verify: post re-sync, "nomad"/"rims"/"20x9 <brand>" return hits; searching renders the query with a clear affordance.
+- refs: [spec §WB-087](specs/2026-07-13-ux-completeness-fixes-design.md)
+
+### WB-088 · Discovery filter & listing truth   [MEDIUM]
+- status: todo
+- area: storefront/discovery + storefront/tire-discovery + backend/medusa-config (2 settings)
+- evidence: get-products.ts:44,65-66 (facet on RAW bolt strings — 5X114.3 vs 5X4.49 split) ; :115-126 (card diameters[0] + price_min 0) ; :382-385 (outage → "no wheels match these filters") ; get-tire-products.ts:154-181 (200-cap without isCapped) ; filter-sections.tsx:220-244 (per-keystroke navigation) ; medusa-config.js:264-284 (no maxValuesPerFacet → facet lists truncate at 100)
+- problem: the bolt-pattern filter silently drops products spelled in the other unit; cards contradict active filters; outages read as empty catalogs; tire fit-mode lies about totals; facet lists invisibly truncate. Findings D4-D13.
+- fix: canonical bolt-pattern facet with dual-unit labels; card size-range/count + $0 guard; discriminated outage state; tire isCapped parity; debounced validated price inputs; maxValuesPerFacet 500 + size type-ahead; numeric facet sort; page clamp; backslash escape; scroll/fit=0/totalHits polish.
+- verify: one physical pattern = one checkbox; Diameter=22 filter shows 22" on cards; forced Meili outage renders the unavailable state, not "no matches".
+- refs: [spec §WB-088](specs/2026-07-13-ux-completeness-fixes-design.md)
+
+### WB-089 · Catalog lifecycle & data integrity — index eviction, phantom stock, $0 prices   [HIGH]
+- status: todo
+- area: backend/vendor-sync + backend/medusa-config
+- evidence: medusa-config.js:258-263 (plugin `fields` lacks `status` → drafted products re-indexed forever, verified vs plugin 1.3.5 source) ; pipeline/stage.ts:92-104 + service.ts:553-557 (stock staging qoh>0-only feeds the stock-only part selection → all-warehouse sellouts keep phantom stock ≤12h) ; parse-helpers.ts:86-92 + schema.ts:39 ($0 MSRP ungated) ; build-search-document.ts:66-95 (discontinued variants still contribute price/facets) ; tire-parse-helpers.ts:77-156 (dash-metric sizes unparsed → part-number size labels)
+- problem: discontinued products stay in search (cards → dead PDPs, sitemap emits dead URLs); sold-out-everywhere SKUs stay buyable up to 12h; $0 rows render "From $0.00" and win price-asc; dead variants back card prices; BLANK/CALL placeholders reach the UI; slug collisions silently drop groups. Findings L1, L3-L5, L8-L10.
+- fix: add 'status' to plugin fields + daily meilisearch.sync reconcile; stock-only stagedParts from vendor_feed_staging; staging gate msrpUsd<=0; skip discontinued variants in both doc builders; placeholder-pattern filter at the transformer (+ "call" in the storefront twin) — closes the WB-074 follow-up; tire dash-size pattern + brand-model alias map + stricter model confidence; handle-collision suffix retry.
+- verify: test:sync RED-against-old cases per item; post-deploy: a drafted product leaves Meili within the reconcile window; forced all-zero part shows 0 stock after the next stock tick.
+- refs: [spec §WB-089](specs/2026-07-13-ux-completeness-fixes-design.md)
+
+### WB-090 · PDP purchase honesty — stock, price, and selection truth   [HIGH]
+- status: todo
+- area: storefront/pdp (wheel + tire)
+- evidence: group-sizes.ts:88 + hero/index.tsx:140-147 (availability-blind default offset → Status "In stock" beside an "Out of stock" button) ; purchase-panel:62-66 + pdp-config:15-21 (qty default 4, stepper cap 99, inventory-blind → doomed adds read "try again") ; hero/index.tsx:209-212 (sibling-price fallback; $0 purchasable) ; regions.ts:45-47 (backend outage → every PDP 404s) ; apply.ts:392-413 (no description → empty <p> + empty meta)
+- problem: the size grid, Status stat, price and buy button can all disagree on one screen; quantity limits are invisible until a cryptic failure; several guard/display gaps (tire variant-less, 0×0, +-12MM offsets, one shipping weight for all sizes). Findings P1, P2, P7-P12, P15-P19, L6.
+- fix: best-availability default offset + selected-variant Status; inventory-threaded qty cap + "Only N left" + insufficient-stock error branch; no cross-variant price fallback + "Price unavailable" gate; tire B8 guard; focusable OOS cells + all-OOS banner; finish-switch size continuity; +variants.weight per-size ("shipping weight"); sign-aware offsets; chip dedupe; region fetch-fail → error boundary not 404; description guard + templated meta fallback.
+- verify: mixed-availability product: Status/price/button agree on every selection; adding 4 of a 2-left variant explains itself; vitest per rule.
+- refs: [spec §WB-090](specs/2026-07-13-ux-completeness-fixes-design.md)
+
+### WB-091 · Fitment honesty completion — verdict consistency + grounded claims   [HIGH]
+- status: todo
+- area: storefront/fitment (pdp wheel+tire, search drawer) + backend/wheel-size (read shape)
+- evidence: tire/fitment.tsx:42-46,100-110 (no-OEM-data renders "runs a different factory size") ; purchase-panel:48-59 (wheel chip "DOESN'T FIT" where the band says unknown) ; fitment/index.tsx:122-136 + fits-vehicle.ts:57-62 (band subtext from variants[0]-bore product verdict) ; fitment/index.tsx:124 + tire/fitment:155-163 + advanced-fitment-panel:97-103 (fabricated process claims + href="#" links) ; lib/garage/vehicle-data.ts:10-40 (stale slug-incompatible YMM fallback) ; ymm-pane.tsx:202-271 (failed resolve leaves a window-less vehicle with no retry path)
+- problem: missing data renders as negative verdicts (kills sales); chip/band contradict on the same page; fitment surfaces promise processes that don't exist; the resolve-failure path strands vehicles fitment-less forever. Findings P3-P6, P13, P14, N4, N5, N7.
+- fix: tire unknown tier + neutral chip; wheel chip unknown parity; band subtext from fitView + most-permissive bore for product-level verdicts; tire YOUR-VEHICLE year/trim match; reverse-fitment non-exhaustive disclosure + CTA; ground/delete each fabricated claim; regenerate vehicle-data.ts from a wheel-size slug snapshot (years→2027); "Re-check fit" affordance for window-less vehicles; honest unavailable-toast copy.
+- verify: vehicle with no OEM tire data shows the unknown band, not a mismatch claim; chip/band agreement matrix (4 tiers × wheel/tire) unit-tested.
+- refs: [spec §WB-091](specs/2026-07-13-ux-completeness-fixes-design.md)
+
+### WB-092 · Cart & checkout correctness — stored prices, stock preflight, resilient failures   [HIGH]
+- status: todo
+- area: storefront/cart + storefront/checkout + storefront/order
+- evidence: line-item-price:14-23 (live-variant pricing → drift vs stored totals; discontinued item renders "$NaN" + /products/undefined) ; payment-button:136-197 (charge precedes placeOrder, no stock preflight; capture:true) ; cart.ts:21-27 + checkout-form:32-34 (outage → "Nothing in your cart" / vanished form) ; orders.ts:8-17 (order-confirmed rethrow → 500s a just-charged customer) ; (checkout)/layout.tsx:36-54 (fictional 555 phone; unlinked TERMS/PRIVACY; APPLE/GPAY badges) ; order-completed-template:30-97 (hardcoded "FREE 2-3 DAY UPS", view-time ETA, SMS claim)
+- problem: the money path can display amounts that were never charged, charge cards for stock that's gone, and dissolve into lies under failure; the payment moment carries fake trust signals. Findings C1-C14.
+- fix: line rows render item.unit_price/item.total (never NaN); server-side stock preflight before the client may confirm payment + cart OOS badges; retrieveCart/CheckoutForm/retrieveOrder honest failure modes; B2 error-shape for the 4 still-throwing cart actions; real /contact link + linked policies + badge cleanup; order.shipping_methods-derived confirmation + created_at-anchored ETA; fit-card `every` + policy-aligned refund copy; receipt decimal fix + guards; step clamp; sliding cart cookie; finish options + per-finish thumbnails on lines.
+- verify: test-Stripe run: OOS between add and pay blocks BEFORE charge naming the item; discontinued carted product renders stored title/price; forced backend failure at cart/checkout shows retry states, not empties.
+- refs: [spec §WB-092](specs/2026-07-13-ux-completeness-fixes-design.md)
+
+### WB-093 · Account & order-history truth   [HIGH]
+- status: todo
+- area: storefront/account + storefront/order (shared components) + backend/config (jwtExpiresIn)
+- evidence: profile-billing-address:37-40 (wired to wrong action — can never save) ; profile-email:19-34 (fake-success no-op) ; order-details:39-57 (status labels render EMPTY strings; no tracking anywhere; fulfillments never fetched) ; account/layout.tsx:11-17 (no parallel-route default.tsx → refresh+logout = 404) ; orders.ts:19-27 (history capped at 10) ; register:65-72 (no password rules) ; customer.ts:145-151 (un-awaited removeAuthToken — the banned auth class) ; cookies.ts:18 vs medusa-config.js:98-99 (7d cookie vs ~1d JWT)
+- problem: the account section fake-succeeds on edits it never persists, hides order status/tracking entirely, 404s on refresh edge-cases, and silently logs users out on day 2. Findings A2-A6, A8-A15.
+- fix: real updateCustomerBillingAddress action; email field read-only + support copy; fulfillment fields + status/tracking rendering + honest orders copy; @login/@dashboard default.tsx; orders pagination; minLength=8 + server check; await removeAuthToken + drop dead tag; jwtExpiresIn aligned to the cookie; dead links → /contact //privacy //terms; phone editor tel/optional; typo + order-card-math sweep.
+- verify: billing address saves and shows on the overview; order detail shows real statuses + tracking; refresh /account/profile then logout → login form not 404; 11th order reachable.
+- refs: [spec §WB-093](specs/2026-07-13-ux-completeness-fixes-design.md)
+
+### WB-094 · Transactional email reliability & coverage   [HIGH]
+- status: todo
+- area: backend/email-notifications
+- evidence: services/resend.ts:97-102 (Resend SDK returns {data,error} and never throws — provider logs "Successfully sent" on rejection; catch parses a SendGrid-shaped error) ; templates/order-placed.tsx:50,74-103 (raw "1479.96 usd", flex-div layout, no branding, NO link back to the order — a guest's only route back) ; templates/index.tsx:9-15 (no order-canceled or welcome template)
+- problem: every transactional email can silently fail while recorded as delivered; the two highest-value emails are unbranded, money-unformatted, and don't link the order. Findings A1, A7.
+- fix: throw on Resend {error}; branded base header/footer + table layout + Intl.NumberFormat money + "View your order" STOREFRONT_URL button (order-placed + shipping); order.canceled subscriber+template; reset email states the real 15-min expiry; optional welcome template behind a decision flag.
+- verify: jest: provider throws on error result; template snapshots show branding/formatted money/order link; live roundtrip once RESEND_* set (runbook §1).
+- refs: [spec §WB-094](specs/2026-07-13-ux-completeness-fixes-design.md)
+
+### WB-095 · SEO & shareability — de-boilerplate, canonicals, structured data   [MEDIUM]
+- status: todo
+- area: storefront/app (metadata, sitemap, middleware) + assets
+- evidence: src/app/opengraph-image.jpg + twitter-image.jpg (site-wide "Next.js Starter Template / MEDUSA STORE" share card, visually verified) ; grep alternates|canonical → only the broken categories one ; middleware:151-163 (/de/store etc. indexable duplicates) ; lib/util/env.ts:1-3 (localhost metadataBase fallback) ; check-env-variables.js:3-10 (validates 1 of 5 load-bearing vars)
+- problem: every social share advertises the boilerplate; no canonicals while duplicate region prefixes render; a mis-set env ships a silently empty catalog + localhost URLs in prod metadata. Findings X1-X3 + JSON-LD/title-template gaps.
+- fix: WB share images + favicon + PDP og:image; root title template; us-canonical on every indexable page + 301 non-default region prefixes while single-region; Product + BreadcrumbList JSON-LD on PDP; sitemap lastModified; require the 4 missing NEXT_PUBLIC_* in check-env + loud localhost guard in sitemap/robots.
+- verify: share-card validators show WB art; Rich Results test passes a PDP; curl /de/store → 301 /us/store; build fails when the required envs are absent.
+- refs: [spec §WB-095](specs/2026-07-13-ux-completeness-fixes-design.md)
+
+### WB-096 · Accessibility & interaction chrome   [MEDIUM]
+- status: todo
+- area: storefront (design tokens, common components, middleware) — runs last in G11
+- evidence: wheel-builds.css:318,371 (outline:none, zero :focus rules in the file) ; field/index.tsx:59-67 + ymm-pane:290-362 (YMM selects have no accessible name) ; delete-button:31-38 (unnamed icon-only remove) ; label/index.tsx (11px #FF6A00 ≈2.9:1) ; middleware:67,153-192 (self-redirect loop, notFound() in middleware, /US/ 404) ; filter-sections:54 (dup DOM ids) ; analytics/index.tsx (zero funnel events)
+- problem: the flagship fitment flow is keyboard/screen-reader hostile; the two most-used text tones fail WCAG AA; middleware has three edge-case traps; the merchant has no funnel visibility. Findings X4-X6, X8, X10, X11 (+X7 noted).
+- fix: :focus-visible rules + Field htmlFor wiring + aria-labels + aria-pressed; contrast token change (DESIGN.md decision: sub-18px accent → ~#D14A00, --ink-soft → ~#6E6E73); middleware same-URL fall-through + lowercase compare + no notFound(); instance-prefixed filter ids; Plausible add_to_cart/begin_checkout/purchase events; orphan cleanup (search-client.ts, side-menu, instantsearch deps); loading.tsx for / and (checkout); _next/image matcher note beside images.unoptimized.
+- verify: axe clean on home/store/PDP/cart for labels/ids; keyboard-only purchase walk fully focus-visible; /US/store lands on /us/store.
+- refs: [spec §WB-096](specs/2026-07-13-ux-completeness-fixes-design.md)
+
+### WB-104 · Trim honesty — reverse-fitment identity + trim-narrowing integrity   [HIGH]
+- status: todo
+- area: backend/wheel-size + storefront/fitment
+- evidence: backend/src/modules/wheel-size/reverse-fitment.ts:47-62 (`extractVehicleIdentity` reads `raw.data[0]` — arbitrary trim — while WB-077's normalize.ts:54-65 unions windows/patterns across ALL trims; git-confirmed: identity is WB-009 `4d0992f`, union is WB-077 `0ae83be`) ; storefront/src/modules/product-detail/components/fitment/index.tsx:200-214 (YOUR-VEHICLE trim-label-vs-arbitrary-trim + make slug-vs-name compare) ; backend/src/modules/wheel-size/service.ts:227-233 (trim-empty → silent broad fallback) ; backend/src/modules/wheel-size/client.ts:55-57 (modifications catalog unscoped by region)
+- problem: user-reported "trim fitment is wrong" — root-caused. The PDP "N CONFIRMED MODELS" lists (wheel + tire, shared helper) label union-of-all-trims cache rows with whichever trim the API returned FIRST, publicly attributing fitment to a trim it wasn't computed for ("Any trim" is the drawer default, so most rows are union rows). Knock-ons: the YOUR-VEHICLE highlight misfires (arbitrary trim + slug-vs-name make compare — multi-word makes never highlight); a non-usdm trim pick is silently discarded (global-catalog dropdown + broad fallback); the `/modifications/` slug assumption is untested.
+- fix: multi-trim rows return `trim: undefined` from `extractVehicleIdentity` (only trim-narrowed rows may name a trim); slug-normalized make/model + label-or-slug trim matching for the highlight; region param on the modifications catalog + a `trimNarrowed` flag and warn-log on the broad fallback; gated live test pinning the modifications `slug` contract; ops check that prod runs WB-077 (+ truncate) — cache keys carry `|v2`.
+- verify: multi-trim raw → identity without trim (unit golden); a trim-picked vehicle highlights its own confirmed-list row (live); "Land Rover" highlights despite the `land-rover` slug (unit); gated live: a dropdown slug narrows by_model non-empty.
+- refs: [audit §T](plans/2026-07-13-ux-completeness-audit.md) ; [spec §WB-104](specs/2026-07-13-ux-completeness-fixes-design.md) ; pairs with WB-091
+
+---
+
+## G12 · Conversion & completeness features (2026-07-13 UX audit)
+
+### WB-097 · Guest order access — "find my order" page   [MEDIUM]
+- status: todo
+- area: storefront/order
+- evidence: order/confirmed/[id] is a guest's only order artifact; the order email carries no link (→ WB-094); no lookup surface exists
+- problem: a guest who loses the confirmation tab has NO route back to their order — not even in principle.
+- fix: public /order/lookup (email + order display-id → confirmation view; no enumeration), linked from footer + /contact; pairs with WB-094's email deep link.
+- verify: guest re-reaches an order with email + order number; wrong pairs leak nothing.
+- refs: [spec §WB-097](specs/2026-07-13-ux-completeness-fixes-design.md)
+
+### WB-098 · PDP merchandising completeness — set framing, SKU, stock/ETA at CTA   [MEDIUM]
+- status: todo
+- area: storefront/pdp
+- evidence: price row says only "PER WHEEL" while default qty is 4; SKUs never render; lead time lives in hover tooltips only (invisible on touch); InvOrderType (SO/special-order) captured in variant metadata but never surfaced
+- problem: the PDP omits the standard wheel-commerce decision info: set price, part number, when-will-it-ship, special-order warnings.
+- fix: "$X × 4 = $Y per set" line; copyable SKU row; stock + lead time at the CTA incl. an SO "special order — extended lead time" signal; tire load/speed legend; derived backspacing spec row.
+- verify: touch device shows stock/ETA without hover; an SO variant is visibly flagged.
+- refs: [spec §WB-098](specs/2026-07-13-ux-completeness-fixes-design.md)
+
+### WB-099 · Brand & style landing pages   [MEDIUM]
+- status: todo
+- area: storefront (new routes on the discovery engine)
+- evidence: three surfaces already point at a brand index (nav, footer "All Brands", ShopByBrand "View all"); style presets exist in style-map.ts; the legacy /collections path is being retired (WB-086)
+- problem: brands are the site's top navigation concept with no real landing surface; WB-085's repoint is an interim.
+- fix: /brands index (live facet + counts) + /brands/[slug] (hero + scoped discovery grid); optional /styles/[slug]; nav repoint; sitemap entries.
+- verify: nav Brands → an indexable page listing every live brand; brand page grid matches /store?brands=.
+- refs: [spec §WB-099](specs/2026-07-13-ux-completeness-fixes-design.md) ; depends: WB-086 (path retirement), supersedes WB-085's interim repoint
+
+### WB-100 · Availability signals in discovery — in_stock index + badge + facet   [MEDIUM]
+- status: todo
+- area: backend/vendor-sync-search + storefront/discovery
+- evidence: neither Meili doc type carries any stock field — a sold-out product is indistinguishable on the grid until its PDP
+- problem: shoppers invest clicks in products they can't buy.
+- fix: in_stock boolean on both doc types; stock-pass hook re-indexes parts whose flag flipped (or lean on the WB-089 daily reconcile); card OUT-OF-STOCK badge + "In stock only" facet toggle.
+- verify: a zero-stock product is visibly marked and excludable on /store and /tires.
+- refs: [spec §WB-100](specs/2026-07-13-ux-completeness-fixes-design.md) ; depends: WB-089
+
+### WB-101 · Journey connectors — wheels↔tires cross-sell, recently viewed, typeahead   [LOW]
+- status: todo
+- area: storefront/discovery + storefront/search + storefront/home
+- evidence: no affordance connects /store and /tires even in fit mode (vehicle known on both); no recently-viewed surface; the search drawer is submit-only
+- problem: multi-product journeys (wheels AND tires for one vehicle) require manual re-navigation; comparison shopping across 1,700 groups has no memory.
+- fix: fit-mode cross-link band ("Need tires for these wheels?" → /tires?fit= and inverse); localStorage recently-viewed rail (home + PDP); drawer typeahead (server action → Meili, debounced).
+- verify: vehicle-active shopper hops wheels↔tires in one click with fit preserved.
+- refs: [spec §WB-101](specs/2026-07-13-ux-completeness-fixes-design.md)
+
+### WB-102 · Staggered fitment support (front/rear axles)   [LOW]
+- status: todo
+- area: backend/wheel-size + storefront/fitment + pdp + cart — XL, needs its own design pass
+- evidence: wheel-size by_model raw carries per-axle front/rear data; VehicleFitment flattens it; no axle concept in verdicts, PDP, or cart
+- problem: staggered-OEM vehicles (common on performance cars) match wheels/tires on either axle unlabeled; no 2+2 purchase flow.
+- fix: per-axle windows/OEM sizes; staggered PDP picker; cart pairing; per-axle verdicts. Spec before build.
+- verify: a staggered vehicle sees axle-labeled fitment and can buy a 2+2 set.
+- refs: [spec §WB-102](specs/2026-07-13-ux-completeness-fixes-design.md)
+
+### WB-103 · Post-purchase self-service — reorder, return request, marketing opt-in   [LOW]
+- status: todo
+- area: storefront/account + storefront/order + backend (return request wiring)
+- evidence: orders page copy already promises returns/exchanges (fixed to honest copy by WB-093); Medusa 2.13.6 ships return machinery unexposed; the newsletter module is never offered at registration
+- problem: after the WB-093 copy fix, there is still no actual self-service: no reorder, no return request, no marketing opt-in at the highest-intent moment.
+- fix: reorder button (order items → addToCart, dead variants skipped with a note); minimal return-request form → admin; registration marketing-consent checkbox → newsletter module; account-deletion contact path.
+- verify: a delivered order can be reordered and a return requested end-to-end in test.
+- refs: [spec §WB-103](specs/2026-07-13-ux-completeness-fixes-design.md)

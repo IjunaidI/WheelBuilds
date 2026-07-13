@@ -54,6 +54,7 @@ import {
   WHEEL_SIZE_WARM_BATCH,
 } from 'lib/constants';
 import { buildSearchDocument } from 'modules/vendor-sync/search/build-search-document';
+import { MEILI_PRODUCT_FIELDS } from 'modules/vendor-sync/search/meili-index-settings';
 import { resolveDevMaxRows } from 'lib/dev-max-rows';
 import { buildModuleStatusReport, formatModuleStatusReport } from 'lib/module-status';
 
@@ -254,13 +255,9 @@ const medusaConfig = {
           products: {
             type: 'products',
             enabled: true,
-            // Widened so the transformer receives variants + metadata + prices.
-            fields: [
-              'id', 'title', 'description', 'handle', 'thumbnail', 'created_at',
-              'metadata',
-              'variants.sku', 'variants.metadata',
-              'variants.prices.amount', 'variants.prices.currency_code',
-            ],
+            // Widened so the transformer receives variants + metadata + prices;
+            // 'status' lets the plugin evict drafted products (WB-089 L1).
+            fields: MEILI_PRODUCT_FIELDS,
             indexSettings: {
               searchableAttributes: ['title', 'brand', 'skus'],
               displayedAttributes: [

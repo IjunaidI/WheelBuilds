@@ -102,6 +102,34 @@ export function parseTireSize(description: string): TireSizeResult {
     }
   }
 
+  // --- Pattern 1b: Dash-metric radial (size written with a dash instead of R) ---
+  // Matches: 285/45-22, 285/45-22 114H  (WWW/AA-RR). The slash distinguishes it
+  // from bias sizes (12.4-24, no slash). Canonicalized to radial "R".
+  const dashMetricMatch = desc.match(
+    /(?:^|[\s])(P|LT|ST)?(\d{2,3})\/(\d{2,3})-(\d{2})\b/
+  )
+  if (dashMetricMatch) {
+    const tirePrefix = dashMetricMatch[1] || null
+    const tireWidthMm = parseInt(dashMetricMatch[2], 10)
+    const aspectRatio = parseInt(dashMetricMatch[3], 10)
+    const rimDiameterIn = parseInt(dashMetricMatch[4], 10)
+
+    const afterSize = desc.slice(desc.indexOf(dashMetricMatch[0]) + dashMetricMatch[0].length)
+    const { loadIndex, speedRating, plyRating } = parseLoadSpeedPly(afterSize)
+
+    return {
+      tireWidthMm,
+      aspectRatio,
+      constructionType: "R",
+      rimDiameterIn,
+      loadIndex,
+      speedRating,
+      plyRating,
+      tirePrefix,
+      sizeToken: `${tireWidthMm}/${aspectRatio}R${rimDiameterIn}`,
+    }
+  }
+
   // --- Pattern 2: LT/inch format ---
   // Matches: LT37X12.50R18, P265X70R17, 33X12.50R15
   const ltMatch = desc.match(

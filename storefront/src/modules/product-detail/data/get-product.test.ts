@@ -6,9 +6,26 @@
 // to "black" for post-WB-059 catalogs — every related card showed black), and
 // must drop a WB-048 "BLANK" placeholder bolt pattern instead of printing it
 // on the card ("18\" · BLANK").
-import { describe, it, expect } from "vitest"
+import { describe, it, expect, vi } from "vitest"
 import { HttpTypes } from "@medusajs/types"
-import { toRelatedProduct } from "./get-product"
+import { toRelatedProduct, getProductDetail } from "./get-product"
+
+vi.mock("next/navigation", () => ({
+  notFound: vi.fn(() => {
+    throw new Error("NEXT_NOT_FOUND")
+  }),
+}))
+vi.mock("@lib/data/regions", () => ({ getRegion: vi.fn(async () => ({ id: "reg_1" })) }))
+vi.mock("@lib/data/products", () => ({
+  getProductByHandle: vi.fn(),
+  getProductsList: vi.fn(),
+}))
+vi.mock("@lib/data/fitment", () => ({
+  getFitmentByProduct: vi.fn(async () => []),
+  getFitmentByTireProduct: vi.fn(async () => []),
+}))
+
+import { getProductByHandle } from "@lib/data/products"
 
 function variant(overrides: Record<string, unknown> = {}, priceMajor = 100) {
   return {
@@ -63,5 +80,23 @@ describe("toRelatedProduct — D7 no BLANK bolt pattern", () => {
     const out = toRelatedProduct(p)
     expect(out.boltPattern).toBe("5x114.3")
     expect(out.boltPatternsCanonical.length).toBeGreaterThan(0)
+  })
+})
+
+describe("getProductDetail — WB-084 image gate", () => {
+  it("404s (notFound) a product with no thumbnail", async () => {
+    ;(getProductByHandle as any).mockResolvedValueOnce({
+      id: "p1", handle: "p1", title: "No Image Wheel",
+      thumbnail: null, metadata: { brand: "B" }, variants: [],
+    })
+    await expect(getProductDetail("p1", "us")).rejects.toThrow("NEXT_NOT_FOUND")
+  })
+
+  it("does NOT 404 a product that has a thumbnail", async () => {
+    ;(getProductByHandle as any).mockResolvedValueOnce({
+      id: "p2", handle: "p2", title: "Real Wheel",
+      thumbnail: "https://cdn.example.com/x.jpg", metadata: { brand: "B" }, variants: [],
+    })
+    await expect(getProductDetail("p2", "us")).resolves.toMatchObject({ id: "p2" })
   })
 })

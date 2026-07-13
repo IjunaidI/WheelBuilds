@@ -289,10 +289,15 @@ const medusaConfig = {
             // a tire doc, or null for anything that is neither; map that null case
             // to a minimal doc carrying product_type so downstream product_type
             // filters (storefront wheel discovery, tire discovery) still exclude it.
+            // Anything buildSearchDocument skips (non-wheel/tire OR image-less —
+            // WB-084) becomes a minimal stub whose product_type matches NO
+            // discovery filter, so it is excluded from wheel + tire discovery.
+            // Forced constant (not metadata.product_type) so an image-less WHEEL
+            // can't slip back in as a product_type:"wheel" stub.
             transformer: (product) =>
               buildSearchDocument(product) ?? {
                 id: product.id,
-                product_type: product?.metadata?.product_type || 'non-wheel',
+                product_type: 'non-wheel',
               },
           }
         }

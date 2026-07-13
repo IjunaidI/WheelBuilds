@@ -121,6 +121,7 @@ describe("buildSearchDocument", () => {
       id: "prod_t2",
       handle: "generic-tire",
       title: "Generic Tire",
+      thumbnail: "https://cdn.example.com/t2.jpg",
       metadata: { product_type: "tire", brand: "Generic" },
       variants: [
         {
@@ -151,6 +152,7 @@ describe("buildSearchDocument", () => {
       id: "p2",
       handle: "h2",
       title: "t2",
+      thumbnail: "https://cdn.example.com/sparse.jpg",
       metadata: { product_type: "wheel", brand: "B" },
       variants: [{ sku: "s", prices: [], metadata: {} }],
     }
@@ -169,7 +171,7 @@ describe("buildSearchDocument", () => {
 
   it("emits the normalized union of variant finishes", () => {
     const doc = buildSearchDocument({
-      id: "p", handle: "h", title: "t", metadata: { product_type: "wheel", brand: "Petrol" },
+      id: "p", handle: "h", title: "t", thumbnail: "https://cdn.example.com/p.jpg", metadata: { product_type: "wheel", brand: "Petrol" },
       variants: [
         { metadata: { finish: "Matte Black", bolt_pattern_raw: "5x114.3", wheel_diameter_in: 20, wheel_width_in: 9, offset_mm: 35 } },
         { metadata: { finish: "Gloss Silver", bolt_pattern_raw: "5x114.3", wheel_diameter_in: 20, wheel_width_in: 9, offset_mm: 35 } },
@@ -178,5 +180,24 @@ describe("buildSearchDocument", () => {
     expect(doc).not.toBeNull()
     expect([...(doc!.finishes as string[])].sort()).toEqual(["black", "silver"])
     expect((doc as any).finish).toBeUndefined()
+  })
+
+  it("returns null (hidden) for an image-less WHEEL", () => {
+    expect(buildSearchDocument({ ...product, thumbnail: null } as any)).toBeNull()
+    expect(buildSearchDocument({ ...product, thumbnail: "" } as any)).toBeNull()
+    expect(buildSearchDocument({ ...product, thumbnail: "   " } as any)).toBeNull()
+  })
+
+  it("returns null (hidden) for an image-less TIRE", () => {
+    const tire = {
+      id: "t", handle: "t", title: "t",
+      metadata: { product_type: "tire", brand: "Falken" },
+      variants: [{ sku: "s", prices: [], metadata: { canonical_size: "305/45R22" } }],
+    }
+    expect(buildSearchDocument({ ...tire, thumbnail: null } as any)).toBeNull()
+  })
+
+  it("still indexes a wheel that HAS a thumbnail", () => {
+    expect(buildSearchDocument(product as any)).not.toBeNull()
   })
 })

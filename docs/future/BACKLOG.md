@@ -933,3 +933,12 @@
 - fix: move tire specs/plans to done/, fix refs, strike stale claims, annotate WB-069 + WB-072, correct storefront/CLAUDE.md; run /doc-review as the gate. Runs LAST (re-baselines counts the other clusters move).
 - verify: /doc-review clean; no `in-progress/` refs to shipped work
 - refs: spec [docs/done/specs/2026-07-10-launch-readiness-fixes-design.md](../done/specs/2026-07-10-launch-readiness-fixes-design.md) §7
+
+### WB-084 · Hide products with no image everywhere   [MEDIUM]
+- status: done (2026-07-13, branch `feat/wb-084-hide-imageless-products`, unmerged; SDD 4 tasks + fix wave, per-task review + opus whole-branch review = merge-ready. Ops to activate: backend deploy → run `reindex-search-products.ts` on prod → storefront rebuild)
+- area: backend/vendor-sync-search + backend/medusa-config + storefront (pdp, home, discovery-adjacent listings)
+- evidence: backend/src/modules/vendor-sync/search/build-search-document.ts (image gate) ; backend/medusa-config.js (forced `product_type:'non-wheel'` stub) ; storefront/src/modules/product-detail/data/get-product.ts (PDP `notFound()`)
+- problem: a product with no `thumbnail` still appeared on every storefront surface, rendered with a `<Wheel>` line-drawing placeholder instead of being hidden.
+- fix: define `hasImage(thumbnail)` = non-empty trimmed string (backend + storefront twins); the Meili transformer returns `null` for image-less products (so they leave the wheel/tire index) and the coalesce stub is forced to a constant `non-wheel` `product_type` so an image-less WHEEL can't slip back in; storefront guards on the Store-API surfaces the index doesn't feed — PDP 404 (wheel+tire), related + featured filters, and the legacy `PaginatedProducts` collections/categories path; a one-time `reindex-search-products.ts` `medusa exec` script re-emits `product.updated` to purge already-indexed image-less docs. Non-destructive (no catalog deletes).
+- verify: an image-less product is absent from `/store` + home + related + `/collections/*` + `/categories/*`, and its PDP 404s; `buildSearchDocument` returns `null` for a thumbnail-less wheel AND tire (unit); backend test:sync 330/6-skip, storefront vitest 352 (57 files).
+- refs: spec [docs/done/specs/2026-07-13-hide-imageless-products-design.md](../done/specs/2026-07-13-hide-imageless-products-design.md) ; plan [docs/done/plans/2026-07-13-hide-imageless-products.md](../done/plans/2026-07-13-hide-imageless-products.md)

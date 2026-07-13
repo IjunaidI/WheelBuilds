@@ -1,5 +1,6 @@
 import { getProductsListWithSort } from "@lib/data/products"
 import { getRegion } from "@lib/data/regions"
+import { hasImage } from "@lib/util/has-image"
 import ProductPreview from "@modules/products/components/product-preview"
 import { Pagination } from "@modules/store/components/pagination"
 import { SortOptions } from "@modules/store/components/refinement-list/sort-products"
@@ -63,6 +64,9 @@ export default async function PaginatedProducts({
     sortBy,
     countryCode,
   })
+
+  // WB-084: never show an image-less product on these listing surfaces either.
+  products = products.filter((p) => hasImage(p.thumbnail))
 
   const totalPages = Math.ceil(count / PRODUCT_LIMIT)
 

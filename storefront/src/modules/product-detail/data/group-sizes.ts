@@ -11,7 +11,7 @@ const numOrNull = (v: unknown): number | null =>
   typeof v === "number" && Number.isFinite(v) ? v : null
 
 /** Vendor placeholders that must never become a selectable bolt-pattern gate. */
-const PLACEHOLDER_BOLT_PATTERNS = new Set(["", "blank", "n/a"])
+const PLACEHOLDER_BOLT_PATTERNS = new Set(["", "blank", "n/a", "call"])
 
 /**
  * True when a vendor `bolt_pattern_raw` is a real, selectable pattern (not a

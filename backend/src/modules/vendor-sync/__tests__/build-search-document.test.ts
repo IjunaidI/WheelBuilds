@@ -200,4 +200,16 @@ describe("buildSearchDocument", () => {
   it("still indexes a wheel that HAS a thumbnail", () => {
     expect(buildSearchDocument(product as any)).not.toBeNull()
   })
+
+  it("does not index placeholder bolt patterns (BLANK/CALL/N/A) — WB-089 L9", () => {
+    const doc: any = buildSearchDocument({
+      ...product,
+      variants: [
+        { sku: "a", prices: [{ amount: 100, currency_code: "usd" }], metadata: { wheel_diameter_in: 20, bolt_pattern_raw: "BLANK" } },
+        { sku: "b", prices: [{ amount: 100, currency_code: "usd" }], metadata: { wheel_diameter_in: 20, bolt_pattern_raw: "CALL" } },
+        { sku: "c", prices: [{ amount: 100, currency_code: "usd" }], metadata: { wheel_diameter_in: 20, bolt_pattern_raw: "5X5.0" } },
+      ],
+    } as any)
+    expect(doc.bolt_patterns).toEqual(["5X5.0"])
+  })
 })

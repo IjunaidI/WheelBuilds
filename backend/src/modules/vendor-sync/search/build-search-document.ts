@@ -1,6 +1,7 @@
 import { canonicalBoltPatterns } from "./bolt-pattern-canonical"
 import { normalizeFinish } from "./normalize-finish"
 import { hasImage } from "./has-image"
+import { isRealBoltPattern } from "./placeholder-bolt-pattern"
 
 /** Minimal shape we read off a Medusa product in the Meilisearch transformer. */
 type IndexableVariant = {
@@ -75,7 +76,7 @@ function buildWheelDocument(
     const cb = num(vm.center_bore_mm)
     if (cb !== null) centerBores.push(cb)
     const bp = typeof vm.bolt_pattern_raw === "string" ? vm.bolt_pattern_raw : ""
-    if (bp) {
+    if (bp && isRealBoltPattern(bp)) {
       boltRaw.push(bp)
       boltCanonical.push(...canonicalBoltPatterns(bp))
     }

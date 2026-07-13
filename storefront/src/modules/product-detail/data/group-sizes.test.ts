@@ -211,7 +211,7 @@ describe("loadsForBore (cascade off bore) — WB-051", () => {
 
 describe("isRealBoltPattern", () => {
   it("rejects placeholders (empty, whitespace, BLANK, N/A — any case)", () => {
-    for (const raw of ["", "   ", "BLANK", "blank", "Blank", "N/A", "n/a", null, undefined]) {
+    for (const raw of ["", "   ", "BLANK", "blank", "Blank", "N/A", "n/a", "CALL", "call", null, undefined]) {
       expect(isRealBoltPattern(raw)).toBe(false)
     }
   })

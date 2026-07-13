@@ -10,8 +10,12 @@ export const num = (v: unknown): number =>
 const numOrNull = (v: unknown): number | null =>
   typeof v === "number" && Number.isFinite(v) ? v : null
 
-/** Vendor placeholders that must never become a selectable bolt-pattern gate. */
-const PLACEHOLDER_BOLT_PATTERNS = new Set(["", "blank", "n/a", "call"])
+/**
+ * Vendor placeholders that must never become a selectable bolt-pattern gate.
+ * Must stay byte-identical with the backend twin in
+ * backend/src/modules/vendor-sync/search/placeholder-bolt-pattern.ts.
+ */
+const PLACEHOLDER_BOLT_PATTERNS = new Set(["", "blank", "n/a", "na", "call"])
 
 /**
  * True when a vendor `bolt_pattern_raw` is a real, selectable pattern (not a

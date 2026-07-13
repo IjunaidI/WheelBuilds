@@ -52,7 +52,10 @@ function buildWheelDocument(
   product: IndexableProduct,
   meta: Record<string, unknown>
 ) {
-  const variants = product.variants ?? []
+  const variants = (product.variants ?? []).filter(
+    (v) => (v.metadata ?? {}).discontinued !== true
+  )
+  if (variants.length === 0) return null
 
   const diameters: number[] = []
   const widths: number[] = []
@@ -134,7 +137,11 @@ function buildTireDocument(
   product: IndexableProduct,
   meta: Record<string, unknown>
 ) {
-  const variants = product.variants ?? []
+  const variants = (product.variants ?? []).filter(
+    (v) => (v.metadata ?? {}).discontinued !== true
+  )
+  if (variants.length === 0) return null
+
   const sizes: string[] = []
   const rimDiameters: number[] = []
   const sectionWidths: number[] = []

@@ -213,3 +213,27 @@ describe("buildSearchDocument", () => {
     expect(doc.bolt_patterns).toEqual(["5X5.0"])
   })
 })
+
+describe("buildSearchDocument — discontinued variants (WB-089 L4)", () => {
+  it("excludes discontinued variants from price + facets", () => {
+    const doc: any = buildSearchDocument({
+      ...product,
+      variants: [
+        { sku: "live", prices: [{ amount: 200, currency_code: "usd" }], metadata: { wheel_diameter_in: 20, bolt_pattern_raw: "5X5.0" } },
+        { sku: "dead", prices: [{ amount: 50, currency_code: "usd" }], metadata: { wheel_diameter_in: 18, bolt_pattern_raw: "5X5.0", discontinued: true } },
+      ],
+    } as any)
+    expect(doc.price_min).toBe(20000) // 200.00 → cents; NOT the dead 50.00 → 5000
+    expect(doc.diameters).toEqual([20])
+  })
+
+  it("returns null when every variant is discontinued", () => {
+    const doc = buildSearchDocument({
+      ...product,
+      variants: [
+        { sku: "dead", prices: [{ amount: 50, currency_code: "usd" }], metadata: { discontinued: true } },
+      ],
+    } as any)
+    expect(doc).toBeNull()
+  })
+})

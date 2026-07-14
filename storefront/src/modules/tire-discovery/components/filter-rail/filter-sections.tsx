@@ -1,5 +1,6 @@
 "use client"
 
+import { useCallback, useEffect, useState } from "react"
 import { usePathname, useRouter, useSearchParams } from "next/navigation"
 import { useGarage } from "@lib/garage/use-garage"
 import { openSearch } from "@lib/stores/search-store"
@@ -19,6 +20,7 @@ import TextInput from "@modules/common/components/text-input"
 
 import { useTireQuery } from "../../use-tire-query"
 import { TireFacetCounts, TireType } from "../../data/types"
+import { commitPriceRange } from "@modules/discovery/data/price-range"
 
 const TIRE_TYPE_LABELS: Record<TireType, string> = {
   passenger: "Passenger",
@@ -108,7 +110,6 @@ const FilterSections = ({ facets, hideClearAll }: FilterSectionsProps) => {
   const {
     filters,
     toggleArrayFilter,
-    setScalarFilter,
     clearAll,
     isAnyFilterActive,
   } = useTireQuery()
@@ -116,6 +117,66 @@ const FilterSections = ({ facets, hideClearAll }: FilterSectionsProps) => {
   const vehicleLabel = active
     ? `${active.year} ${active.make} ${active.model}`
     : "Pick a vehicle for fitment"
+
+  // WB-088 D8: local (uncommitted) text for the price Min/Max inputs. Kept
+  // separate from `filters.priceMinCents`/`priceMaxCents` so keystrokes don't
+  // push a URL change — only commit (blur/Enter) does. Re-synced from the
+  // URL-derived filters whenever they change externally (Clear all, back/
+  // forward nav, or the commit below landing). Mirrors the wheel twin in
+  // discovery/components/filter-rail/filter-sections.tsx.
+  const [minInput, setMinInput] = useState(
+    filters.priceMinCents != null
+      ? String(Math.round(filters.priceMinCents / 100))
+      : ""
+  )
+  const [maxInput, setMaxInput] = useState(
+    filters.priceMaxCents != null
+      ? String(Math.round(filters.priceMaxCents / 100))
+      : ""
+  )
+
+  useEffect(() => {
+    setMinInput(
+      filters.priceMinCents != null
+        ? String(Math.round(filters.priceMinCents / 100))
+        : ""
+    )
+  }, [filters.priceMinCents])
+
+  useEffect(() => {
+    setMaxInput(
+      filters.priceMaxCents != null
+        ? String(Math.round(filters.priceMaxCents / 100))
+        : ""
+    )
+  }, [filters.priceMaxCents])
+
+  // Commit-on-blur/Enter (not per-keystroke `push`): parses + clamps/swaps
+  // via `commitPriceRange`, reflects the coherent pair back into the local
+  // inputs, then writes both params together with `router.replace` — a
+  // transient scalar edit, not a `push` — so typing a price range doesn't
+  // spam browser history.
+  const commitPrice = useCallback(() => {
+    const { min, max } = commitPriceRange(minInput, maxInput)
+    setMinInput(min != null ? String(min) : "")
+    setMaxInput(max != null ? String(max) : "")
+
+    const next = new URLSearchParams(Array.from(sp.entries()))
+    if (min != null) next.set("priceMin", String(Math.round(min * 100)))
+    else next.delete("priceMin")
+    if (max != null) next.set("priceMax", String(Math.round(max * 100)))
+    else next.delete("priceMax")
+    next.delete("page")
+    const qs = next.toString()
+    router.replace(`${pathname}${qs ? `?${qs}` : ""}`, { scroll: false })
+  }, [minInput, maxInput, sp, pathname, router])
+
+  const onPriceKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Enter") {
+      e.preventDefault()
+      commitPrice()
+    }
+  }
 
   return (
     <>
@@ -254,17 +315,10 @@ const FilterSections = ({ facets, hideClearAll }: FilterSectionsProps) => {
                   type="number"
                   inputMode="numeric"
                   placeholder="$0"
-                  value={
-                    filters.priceMinCents != null
-                      ? Math.round(filters.priceMinCents / 100)
-                      : ""
-                  }
-                  onChange={(e) =>
-                    setScalarFilter(
-                      "priceMinCents",
-                      e.target.value ? Number(e.target.value) * 100 : undefined
-                    )
-                  }
+                  value={minInput}
+                  onChange={(e) => setMinInput(e.target.value)}
+                  onBlur={commitPrice}
+                  onKeyDown={onPriceKeyDown}
                 />
               </Field>
               <Field label="Max">
@@ -272,17 +326,10 @@ const FilterSections = ({ facets, hideClearAll }: FilterSectionsProps) => {
                   type="number"
                   inputMode="numeric"
                   placeholder="$300"
-                  value={
-                    filters.priceMaxCents != null
-                      ? Math.round(filters.priceMaxCents / 100)
-                      : ""
-                  }
-                  onChange={(e) =>
-                    setScalarFilter(
-                      "priceMaxCents",
-                      e.target.value ? Number(e.target.value) * 100 : undefined
-                    )
-                  }
+                  value={maxInput}
+                  onChange={(e) => setMaxInput(e.target.value)}
+                  onBlur={commitPrice}
+                  onKeyDown={onPriceKeyDown}
                 />
               </Field>
             </div>

@@ -133,6 +133,13 @@ export const useDiscoveryQuery = () => {
     [push]
   )
 
+  // WB-088 D13: pagination changes the product list but not scroll position
+  // — without this, clicking "Next" while scrolled deep into a long grid
+  // left the shopper staring at the OLD scroll offset over NEW products
+  // (or the pagination control itself, well below the fold of the new
+  // page). Scroll to the top of the viewport so the new page's results are
+  // visible immediately, same as the filter/sort changes above (which reset
+  // `page` and, via a fresh page load, already start scrolled up).
   const setPage = useCallback(
     (page: number) => {
       push(
@@ -142,6 +149,9 @@ export const useDiscoveryQuery = () => {
         },
         { keepPage: true }
       )
+      if (typeof window !== "undefined") {
+        window.scrollTo({ top: 0, behavior: "smooth" })
+      }
     },
     [push]
   )

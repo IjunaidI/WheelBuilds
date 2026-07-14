@@ -137,6 +137,10 @@ export const useTireQuery = () => {
     [push]
   )
 
+  // WB-088 D13 (mirrors the wheel use-discovery-query.ts): scroll to the top
+  // of the viewport on page change so the new page's results are visible
+  // immediately instead of leaving the shopper at the old scroll offset
+  // (often deep in the grid or at the pagination control itself).
   const setPage = useCallback(
     (page: number) => {
       push(
@@ -146,6 +150,9 @@ export const useTireQuery = () => {
         },
         { keepPage: true }
       )
+      if (typeof window !== "undefined") {
+        window.scrollTo({ top: 0, behavior: "smooth" })
+      }
     },
     [push]
   )

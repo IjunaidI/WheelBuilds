@@ -202,14 +202,17 @@ export async function fetchTireDiscoveryProducts(query: TireDiscoveryQuery): Pro
     }
   }
 
-  const offset = (query.page - 1) * pageSize
-
+  // WB-088 D13 (mirrors the wheel get-products.ts): `hitsPerPage`/`page`
+  // (finite pagination) instead of `limit`/`offset` so Meilisearch returns
+  // the EXHAUSTIVE `totalHits`/`totalPages` instead of the approximate
+  // `estimatedTotalHits` — the header "N results" count and the pagination
+  // control's page count both read off this total.
   const { results } = await meili.multiSearch({
     queries: [
       {
         indexUid: PRODUCTS_INDEX, q: query.q ?? "",
         filter: buildTireFilters(query.filters).join(" AND "),
-        sort: sortExpr(query.sort), limit: pageSize, offset,
+        sort: sortExpr(query.sort), hitsPerPage: pageSize, page: query.page,
       },
       ...TIRE_FACET_FIELDS.map((field) => ({
         indexUid: PRODUCTS_INDEX, q: query.q ?? "",
@@ -231,7 +234,9 @@ export async function fetchTireDiscoveryProducts(query: TireDiscoveryQuery): Pro
   }
   return {
     products: hitsRes.hits.map(hitToTireProduct),
-    totalCount: hitsRes.estimatedTotalHits ?? hitsRes.hits.length,
+    // WB-088 D13: prefer the exhaustive `totalHits` (present because the
+    // query above uses `hitsPerPage`/`page`) over `estimatedTotalHits`.
+    totalCount: hitsRes.totalHits ?? hitsRes.estimatedTotalHits ?? hitsRes.hits.length,
     pageSize, facets,
     // Non-fit mode has no candidate cap — totalCount is Meili's real total,
     // so it is never "capped" in the D2/D7 sense. (WB-088 D7)

@@ -107,7 +107,7 @@ const TireMobileFilterTrigger = ({
           </div>
 
           <div className="flex-1 overflow-y-auto p-5">
-            <FilterSections facets={facets} hideClearAll />
+            <FilterSections facets={facets} hideClearAll instanceId="drawer" />
           </div>
 
           <div className="flex gap-2 p-4 border-t border-[var(--hairline)] bg-white">

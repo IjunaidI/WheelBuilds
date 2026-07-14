@@ -21,6 +21,7 @@ import TextInput from "@modules/common/components/text-input"
 import { useTireQuery } from "../../use-tire-query"
 import { TireFacetCounts, TireType } from "../../data/types"
 import { commitPriceRange } from "@modules/discovery/data/price-range"
+import { sortFacetEntries } from "@modules/discovery/data/facet-sort"
 import { filterFacetKeys } from "./filter-facet-keys"
 
 const TIRE_TYPE_LABELS: Record<TireType, string> = {
@@ -38,9 +39,11 @@ const inchLabelMap = (facetMap: Record<string, number>): Record<string, string> 
   Object.fromEntries(Object.keys(facetMap).map((k) => [k, `${k}"`]))
 
 /**
- * Reusable checkbox-list section. Sorts by count desc, then alpha. Copied
- * verbatim from modules/discovery/components/filter-rail/filter-sections.tsx
- * — this primitive is field-agnostic and needs no tire-specific changes.
+ * Reusable checkbox-list section. Sorts by count desc, then alpha — unless
+ * `numeric` (rim diameter, load index), which sorts ascending by
+ * `Number(key)` instead (WB-088 D10). Mirrors
+ * modules/discovery/components/filter-rail/filter-sections.tsx — this
+ * primitive is field-agnostic and needs no tire-specific changes.
  */
 const ChecklistSection = <T extends string | number>({
   facetMap,
@@ -48,23 +51,28 @@ const ChecklistSection = <T extends string | number>({
   onToggle,
   labelMap,
   formatKey,
+  numeric,
+  instanceId,
 }: {
   facetMap: Record<string, number>
   selected: T[]
   onToggle: (value: T) => void
   labelMap?: Record<string, string>
   formatKey: (raw: string) => T
+  numeric?: boolean
+  /** Distinguishes the desktop rail from the mobile drawer instance of this
+   *  section so checkbox ids don't collide when both are mounted at once
+   *  (WB-088 X10). */
+  instanceId: string
 }) => {
-  const entries = Object.entries(facetMap).sort(
-    (a, b) => b[1] - a[1] || a[0].localeCompare(b[0])
-  )
+  const entries = sortFacetEntries(facetMap, numeric)
 
   return (
     <ul className="flex flex-col gap-2 pt-1">
       {entries.map(([key, count]) => {
         const typed = formatKey(key)
         const checked = selected.some((s) => String(s) === key)
-        const id = `filter-${key}`
+        const id = `filter-${instanceId}-${key}`
         return (
           <li key={key} className="flex items-center gap-2.5">
             <Checkbox
@@ -94,6 +102,13 @@ type FilterSectionsProps = {
   facets: TireFacetCounts
   /** Hides the clear-all button (used inside the mobile drawer which has its own footer). */
   hideClearAll?: boolean
+  /**
+   * Distinguishes the desktop rail ("rail") from the mobile drawer ("drawer")
+   * instance of this component so the checkbox ids they generate don't
+   * collide when both are mounted at once (WB-088 X10). Mirrors the wheel
+   * FilterSections prop of the same name.
+   */
+  instanceId?: string
 }
 
 /**
@@ -103,7 +118,11 @@ type FilterSectionsProps = {
  * vehicle's OEM tire sizes are applied as `?fit=` by TireFitmentSync; "Show all
  * tires" opts out with fit=0).
  */
-const FilterSections = ({ facets, hideClearAll }: FilterSectionsProps) => {
+const FilterSections = ({
+  facets,
+  hideClearAll,
+  instanceId = "rail",
+}: FilterSectionsProps) => {
   const { active } = useGarage()
   const router = useRouter()
   const pathname = usePathname()
@@ -241,6 +260,7 @@ const FilterSections = ({ facets, hideClearAll }: FilterSectionsProps) => {
               selected={filters.brands}
               onToggle={(v) => toggleArrayFilter("brands", v)}
               formatKey={(k) => k}
+              instanceId={instanceId}
             />
           </AccordionContent>
         </AccordionItem>
@@ -256,6 +276,8 @@ const FilterSections = ({ facets, hideClearAll }: FilterSectionsProps) => {
               onToggle={(v) => toggleArrayFilter("rimDiameters", v)}
               labelMap={inchLabelMap(facets.rimDiameters)}
               formatKey={(k) => Number(k)}
+              numeric
+              instanceId={instanceId}
             />
           </AccordionContent>
         </AccordionItem>
@@ -283,6 +305,7 @@ const FilterSections = ({ facets, hideClearAll }: FilterSectionsProps) => {
                 selected={filters.sizes}
                 onToggle={(v) => toggleArrayFilter("sizes", v)}
                 formatKey={(k) => k}
+                instanceId={instanceId}
               />
             )}
           </AccordionContent>
@@ -299,6 +322,7 @@ const FilterSections = ({ facets, hideClearAll }: FilterSectionsProps) => {
               onToggle={(v) => toggleArrayFilter("tireTypes", v)}
               labelMap={TIRE_TYPE_LABELS}
               formatKey={(k) => k}
+              instanceId={instanceId}
             />
           </AccordionContent>
         </AccordionItem>
@@ -313,6 +337,7 @@ const FilterSections = ({ facets, hideClearAll }: FilterSectionsProps) => {
               selected={filters.speedRatings}
               onToggle={(v) => toggleArrayFilter("speedRatings", v)}
               formatKey={(k) => k}
+              instanceId={instanceId}
             />
           </AccordionContent>
         </AccordionItem>
@@ -327,6 +352,8 @@ const FilterSections = ({ facets, hideClearAll }: FilterSectionsProps) => {
               selected={filters.loadIndexes}
               onToggle={(v) => toggleArrayFilter("loadIndexes", v)}
               formatKey={(k) => Number(k)}
+              numeric
+              instanceId={instanceId}
             />
           </AccordionContent>
         </AccordionItem>

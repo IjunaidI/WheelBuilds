@@ -205,7 +205,6 @@ export async function fetchDiscoveryProducts(
   query: DiscoveryQuery
 ): Promise<DiscoveryResult> {
   const pageSize = DEFAULT_PAGE_SIZE
-  const offset = (query.page - 1) * pageSize
 
   // FIT MODE: bolt-pattern-filtered candidates from Meili, then the REAL
   // per-variant check (same as the PDP) so a multi-pattern wheel whose matching
@@ -326,8 +325,17 @@ export async function fetchDiscoveryProducts(
         q: query.q ?? "",
         filter: buildFilters(query.filters, query).join(" AND "),
         sort: sortExpr(query.sort),
-        limit: pageSize,
-        offset,
+        // WB-088 D13: `hitsPerPage`/`page` (finite pagination) instead of
+        // `limit`/`offset` — Meilisearch only computes the EXHAUSTIVE
+        // `totalHits`/`totalPages` for this pagination style; the
+        // offset/limit style returns a cheaper but approximate
+        // `estimatedTotalHits`, which fed the header "N results" count and
+        // the pagination control's page count with a number that could
+        // drift from what was actually filtered. `hits` for a given page are
+        // identical either way — this only changes which total the response
+        // carries.
+        hitsPerPage: pageSize,
+        page: query.page,
       },
       ...FACET_FIELDS.map((field) => ({
         indexUid: PRODUCTS_INDEX,
@@ -359,7 +367,11 @@ export async function fetchDiscoveryProducts(
 
   return {
     products: hitsRes.hits.map(hitToProduct),
-    totalCount: hitsRes.estimatedTotalHits ?? hitsRes.hits.length,
+    // WB-088 D13: prefer the exhaustive `totalHits` (present because the
+    // query above uses `hitsPerPage`/`page`) over `estimatedTotalHits`,
+    // which older mocks/fixtures may still supply and which real Meili
+    // would only return for the offset/limit pagination style.
+    totalCount: hitsRes.totalHits ?? hitsRes.estimatedTotalHits ?? hitsRes.hits.length,
     pageSize,
     facets,
     // Non-fit mode has no candidate cap — totalCount is Meili's real total,

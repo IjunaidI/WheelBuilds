@@ -8,6 +8,7 @@ import DiscoveryPagination from "../components/pagination"
 import DiscoveryEmpty from "../components/empty-state"
 import DiscoveryOutage from "../components/empty-state/outage"
 import { DEFAULT_PAGE_SIZE, DiscoveryResult } from "../data/types"
+import { totalPagesFor } from "../data/clamp-page"
 
 type DiscoveryTemplateProps = {
   result: DiscoveryResult
@@ -32,6 +33,13 @@ type DiscoveryTemplateProps = {
  * failed, not that 0 products genuinely matched — rendered as
  * `<DiscoveryOutage>` instead of the 0-match `<DiscoveryEmpty>` so an infra
  * blip doesn't read as "no wheels match these filters".
+ *
+ * `currentPage` is guaranteed <= `totalPages` by the time it reaches this
+ * template (WB-088 D11) — the `/store` route redirects an out-of-range
+ * `?page` to the last valid page (via `clampPage`, using this same
+ * `totalPagesFor`) before ever calling this component, so an out-of-range
+ * request never lands on the 0-match empty state for filters that actually
+ * have matches.
  */
 const DiscoveryTemplate = ({
   result,
@@ -43,10 +51,7 @@ const DiscoveryTemplate = ({
   // fetched/checked (bounded by FIT_CANDIDATE_CAP in fit mode — see
   // get-products.ts), so this pagination math never produces phantom pages
   // beyond what was actually loaded, capped or not. (WB-074 D2)
-  const totalPages = Math.max(
-    1,
-    Math.ceil(result.totalCount / (result.pageSize || DEFAULT_PAGE_SIZE))
-  )
+  const totalPages = totalPagesFor(result.totalCount, result.pageSize || DEFAULT_PAGE_SIZE)
 
   return (
     <section className="px-5 pt-6 pb-16 xsmall:px-8 small:px-20 small:pt-8 small:pb-20">

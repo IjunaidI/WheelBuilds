@@ -9,6 +9,7 @@ import TireEmpty from "../components/empty-state"
 import TireOutage from "../components/empty-state/outage"
 import FitmentContextSetter from "@modules/common/components/fitment-context-setter"
 import { DEFAULT_PAGE_SIZE, TireDiscoveryResult } from "../data/types"
+import { totalPagesFor } from "@modules/discovery/data/clamp-page"
 
 type TireDiscoveryTemplateProps = {
   result: TireDiscoveryResult
@@ -35,15 +36,17 @@ type TireDiscoveryTemplateProps = {
  * failed, not that 0 tires genuinely matched — rendered as `<TireOutage>`
  * instead of the 0-match `<TireEmpty>` so an infra blip doesn't read as "no
  * tires match these filters".
+ *
+ * `currentPage` is guaranteed <= `totalPages` by the time it reaches this
+ * template (WB-088 D11, mirrors the wheel template) — the `/tires` route
+ * redirects an out-of-range `?page` to the last valid page (via `clampPage`,
+ * using this same `totalPagesFor`) before ever calling this component.
  */
 const TireDiscoveryTemplate = ({
   result,
   currentPage,
 }: TireDiscoveryTemplateProps) => {
-  const totalPages = Math.max(
-    1,
-    Math.ceil(result.totalCount / (result.pageSize || DEFAULT_PAGE_SIZE))
-  )
+  const totalPages = totalPagesFor(result.totalCount, result.pageSize || DEFAULT_PAGE_SIZE)
 
   return (
     <section className="px-5 pt-6 pb-16 xsmall:px-8 small:px-20 small:pt-8 small:pb-20">

@@ -1,19 +1,56 @@
-import InteractiveLink from "@modules/common/components/interactive-link"
 import { Metadata } from "next"
+
+import Display from "@modules/common/components/display"
+import Label from "@modules/common/components/label"
+import LocalizedClientLink from "@modules/common/components/localized-client-link"
 
 export const metadata: Metadata = {
   title: "404",
-  description: "Something went wrong",
+  description: "This page doesn't exist",
 }
 
-export default async function NotFound() {
+/**
+ * WB-085: renders inside `(checkout)/layout.tsx`, which already applies
+ * `.frame` (WB-082 brought checkout into the design chrome) — no wrapper
+ * needed here. Primary CTA goes back to the cart (the natural recovery step
+ * mid-checkout); secondary link offers the full catalog.
+ */
+export default function NotFound() {
   return (
-    <div className="flex flex-col gap-4 items-center justify-center min-h-[calc(100vh-64px)]">
-      <h1 className="text-2xl-semi text-ui-fg-base">Page not found</h1>
-      <p className="text-small-regular text-ui-fg-base">
-        The page you tried to access does not exist.
+    <div className="flex flex-col items-center justify-center text-center px-5 py-24 small:py-32 min-h-[60vh]">
+      <Label bar style={{ marginBottom: 14 }}>
+        404
+      </Label>
+      <Display as="h1" size={44}>
+        This page doesn&apos;t exist
+      </Display>
+      <p
+        style={{
+          fontSize: 14,
+          lineHeight: 1.75,
+          color: "var(--graphite)",
+          margin: "18px 0 30px",
+          maxWidth: 420,
+        }}
+      >
+        Let&apos;s get you back to the build.
       </p>
-      <InteractiveLink href="/">Go to frontpage</InteractiveLink>
+      <div className="flex flex-wrap items-center justify-center gap-3">
+        <LocalizedClientLink href="/cart" className="btn btn-primary">
+          Back to cart
+        </LocalizedClientLink>
+        <LocalizedClientLink
+          href="/store"
+          style={{
+            fontSize: 13,
+            color: "var(--ink)",
+            textDecoration: "underline",
+            textUnderlineOffset: 3,
+          }}
+        >
+          Browse the catalog
+        </LocalizedClientLink>
+      </div>
     </div>
   )
 }

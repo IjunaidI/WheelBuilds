@@ -49,6 +49,15 @@ const nextConfig = {
   serverRuntimeConfig: {
     port: process.env.PORT || 3000
   },
+  async redirects() {
+    // Discovery moved to Meilisearch-backed /store; these routes are retired
+    // (WB-085 X9) but old links/bookmarks/search-engine results still point
+    // at them.
+    return [
+      { source: "/:cc/results/:query*", destination: "/:cc/store?q=:query", permanent: true },
+      { source: "/:cc/search", destination: "/:cc/store", permanent: true },
+    ]
+  },
   webpack: (config, { dev, nextRuntime }) => {
     // Next 15.5.x dev mode pushes an `EvalSourceMapDevToolPlugin` into every
     // bundle, including the Edge runtime bundle that runs middleware. Edge

@@ -9,6 +9,7 @@ import { Separator } from "@/components/ui/separator"
 import { useGarage } from "@lib/garage/use-garage"
 import { openSearch } from "@lib/stores/search-store"
 import { fitsVehicle } from "@lib/fitment/fits-vehicle"
+import { entryMatchesVehicle } from "@lib/fitment/vehicle-entry-match"
 import { FitTier } from "@lib/fitment/fit-tier"
 import { buildFitView, fitViewAllWithinWindow } from "../../data/fit-view"
 import { FitmentEntry, ProductDetail } from "../../data/types"
@@ -64,9 +65,19 @@ const Fitment = ({ product }: FitmentProps) => {
   return (
     <section className="border-t border-[var(--hairline)] py-16 small:py-20">
       <SectionHeader
-        eyebrow={`FITMENT · ${product.fitment.length} CONFIRMED MODELS`}
+        // WB-091 P14: an empty confirmed-models list previously still rendered
+        // "FITMENT · 0 CONFIRMED MODELS", which reads as "fits nothing" rather
+        // than "we haven't listed your vehicle yet". Only show the count once
+        // there's something to count.
+        eyebrow={product.fitment.length > 0 ? `FITMENT · ${product.fitment.length} CONFIRMED MODELS` : "FITMENT"}
         title="Will it fit your build?"
-        description="Each vehicle below matches this wheel's bolt pattern and hub bore, per wheel-size.com data. We also check the wheel's size against typical size windows for your vehicle."
+        description="Each vehicle below matches this wheel's bolt pattern and hub bore, per wheel-size.com data. We also check the wheel's size against typical size windows for your vehicle. This list is non-exhaustive — check your door-jamb placard or ask us to confirm."
+        action={
+          <Button onClick={openSearch} size="sm" variant="outline">
+            <Icon name="garage" size={14} strokeWidth={1.6} />
+            Check YOUR vehicle
+          </Button>
+        }
         marginBottom={32}
       />
 
@@ -187,37 +198,9 @@ const Fitment = ({ product }: FitmentProps) => {
           so the final row doubles as the section's bottom frame. */}
       <div className="grid grid-cols-1 small:grid-cols-2 gap-x-8 gap-y-0 border-t border-[var(--hairline)]">
         {product.fitment.map((f, i) => {
-          // Helper: check if entry.year matches active.year (handles year ranges like "2013–2017")
-          const yearMatches = () => {
-            if (!active) return false
-            // entry.year is a string (e.g., "2021" or "2013–2017")
-            // active.year is a number (e.g., 2021)
-            const parts = f.year.match(/^(\d+)\s*[–-]\s*(\d+)$/)
-            if (parts) {
-              // Year range: check if active.year falls within [start, end]
-              const start = parseInt(parts[1], 10)
-              const end = parseInt(parts[2], 10)
-              return active.year >= start && active.year <= end
-            }
-            // Single year: exact match
-            return String(active.year) === f.year
-          }
-
-          // Helper: check if trims match (case-insensitive, only if both present)
-          const trimMatches = () => {
-            if (!active) return false
-            // Only require trim match if BOTH have a trim value
-            if (!active.trim || !f.trim) return true
-            return active.trim.toLowerCase() === f.trim.toLowerCase()
-          }
-
-          const isActive =
-            tier === "fits" &&
-            active &&
-            f.make.toLowerCase() === active.make.toLowerCase() &&
-            f.model.toLowerCase() === active.model.toLowerCase() &&
-            yearMatches() &&
-            trimMatches()
+          // Range-aware year + best-effort trim matching, shared with the
+          // tire fitment list (see lib/fitment/vehicle-entry-match.ts).
+          const isActive = tier === "fits" && entryMatchesVehicle(f, active)
           return (
             <FitmentRow
               key={`${f.make}-${f.model}-${i}`}

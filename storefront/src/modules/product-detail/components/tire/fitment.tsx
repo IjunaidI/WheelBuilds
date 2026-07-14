@@ -9,6 +9,7 @@ import { useGarage } from "@lib/garage/use-garage"
 import { openSearch } from "@lib/stores/search-store"
 import { useSelectedTireFit } from "@lib/stores/selected-tire-fit"
 import { tireFitVerdict } from "@lib/fitment/tire-fits-vehicle"
+import { entryMatchesVehicle } from "@lib/fitment/vehicle-entry-match"
 import { TireFitmentEntry, TireProductDetail } from "../../data/types"
 
 type TireFitmentProps = {
@@ -157,11 +158,11 @@ const TireFitment = ({ product }: TireFitmentProps) => {
           // Highlight the active vehicle's row whenever it's in the confirmed
           // list — independent of the currently selected size, so switching to a
           // non-OEM size doesn't un-mark "YOUR VEHICLE" (the band above already
-          // carries the per-selection fit verdict).
-          const isActive =
-            active &&
-            f.make.toLowerCase() === active.make.toLowerCase() &&
-            f.model.toLowerCase() === active.model.toLowerCase()
+          // carries the per-selection fit verdict). Matches make + model
+          // (case-insensitive), range-aware year, and best-effort trim — same
+          // logic as the wheel fitment list (WB-091 P13: previously make+model
+          // only, so e.g. a 1998 Civic highlighted the 2021 Civic row).
+          const isActive = entryMatchesVehicle(f, active)
           return (
             <TireFitmentRow
               key={`${f.make}-${f.model}-${i}`}

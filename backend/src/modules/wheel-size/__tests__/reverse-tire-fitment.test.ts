@@ -3,30 +3,36 @@ import { buildReverseTireFitment } from "../reverse-tire-fitment"
 // raw with both a display identity AND is_stock front tires (what extractOemTires reads).
 // `tires` entries carry size + optional load index + speed rating so fixtures can
 // exercise the multi-axis gate (meet-or-exceed on load + speed rank).
+// `trim` accepts a single value (single-entry `data`) or an array (one `data`
+// entry per element, all sharing make/model/years/tires) to build multi-trim
+// "union" rows (WB-077) for the WB-104 T1 trim-honesty golden test below.
 const rawOf = (
   make: string | null,
   model: string | null,
-  trim: string | undefined,
+  trim: string | undefined | (string | undefined)[],
   start: number | null,
   end: number | null,
   tires: { size: string; loadIndex?: number | null; speedRating?: string | null }[]
-) => ({
-  data: [{
-    make: make ? { name: make } : undefined,
-    model: model ? { name: model } : undefined,
-    trim, start_year: start, end_year: end,
-    wheels: tires.map((t) => ({
-      is_stock: true,
-      front: { tire: t.size, load_index: t.loadIndex ?? null, speed_index: t.speedRating ?? null },
-      rear: { tire: t.size, load_index: t.loadIndex ?? null, speed_index: t.speedRating ?? null },
+) => {
+  const trims = Array.isArray(trim) ? trim : [trim]
+  return {
+    data: trims.map((t) => ({
+      make: make ? { name: make } : undefined,
+      model: model ? { name: model } : undefined,
+      trim: t, start_year: start, end_year: end,
+      wheels: tires.map((tire) => ({
+        is_stock: true,
+        front: { tire: tire.size, load_index: tire.loadIndex ?? null, speed_index: tire.speedRating ?? null },
+        rear: { tire: tire.size, load_index: tire.loadIndex ?? null, speed_index: tire.speedRating ?? null },
+      })),
     })),
-  }],
-})
+  }
+}
 
 const ok = (
   make: string,
   model: string,
-  trim: string | undefined,
+  trim: string | undefined | (string | undefined)[],
   start: number,
   end: number,
   tires: { size: string; loadIndex?: number | null; speedRating?: string | null }[]
@@ -105,5 +111,15 @@ describe("buildReverseTireFitment", () => {
     ]
     // A spec missing load/speed still matches because missing spec data passes too.
     expect(buildReverseTireFitment(rowsWithOemData, [spec("265/70R16")], 24)).toHaveLength(1)
+  })
+
+  // WB-104 T1: buildReverseTireFitment shares extractVehicleIdentity with
+  // buildReverseFitment, so a union row (WB-077 multi-trim cache entry) must
+  // not surface an arbitrary trim here either.
+  it("emits no trim (and trimNarrowed: false) for a union row with >1 distinct trims", () => {
+    const rows = [ok("Honda", "Accord", ["Sport", "Sport SE"], 2018, 2022, [{ size: "235/40R19" }])]
+    const out = buildReverseTireFitment(rows, [spec("235/40R19")], 24)
+    expect(out).toHaveLength(1)
+    expect(out[0]).toMatchObject({ make: "Honda", model: "Accord", trim: undefined, trimNarrowed: false })
   })
 })

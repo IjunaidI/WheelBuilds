@@ -41,24 +41,39 @@ export function sizeInWindow(sizes: ProductSize[], row: FitmentRow): boolean {
 
 /**
  * Pull a display-ready vehicle identity out of a cached wheel-size `by_model`
- * body (`raw.data[0]`): make.name, model.name, trim, and a year label from
- * start_year/end_year. Returns null when make or model is missing.
+ * body: make.name, model.name, trim, and a year label from start_year/end_year
+ * — all read off `raw.data[0]` except `trim`. Returns null when make or model
+ * is missing.
+ *
+ * WB-104 T1: WB-077 made a cached row's `raw.data` cover EVERY trim the
+ * vehicle query matched (a "union" row) when there's more than one, so
+ * `raw.data[0].trim` is an arbitrary pick that would otherwise be displayed
+ * as if it were the only trim this fitment applies to. Trim-honesty rule: a
+ * multi-entry row only keeps a trim label when every entry agrees on it
+ * (`trims.size === 1`); a genuine union of >1 distinct trims claims no trim
+ * at all. `trimNarrowed` (`raw.data.length === 1`) tells callers whether the
+ * row was ever narrowed to one specific trim, independent of whether that
+ * trim happened to be nameable.
  */
 export function extractVehicleIdentity(
   raw: any
-): { make: string; model: string; trim?: string; yearLabel: string } | null {
-  const d = raw?.data?.[0]
+): { make: string; model: string; trim?: string; yearLabel: string; trimNarrowed: boolean } | null {
+  const data: any[] = Array.isArray(raw?.data) ? raw.data : []
+  const d = data[0]
   const make = d?.make?.name
   const model = d?.model?.name
   if (typeof make !== "string" || !make || typeof model !== "string" || !model) return null
-  const trim = typeof d?.trim === "string" && d.trim ? d.trim : undefined
+  const trims = new Set(data.map((e) => e?.trim).filter(Boolean))
+  const trimNarrowed = data.length === 1
+  const trim: string | undefined =
+    trimNarrowed || trims.size === 1 ? (([...trims][0] as string | undefined) ?? d?.trim) : undefined
   const start = typeof d?.start_year === "number" ? d.start_year : null
   const end = typeof d?.end_year === "number" ? d.end_year : null
   const yearLabel =
     start != null && end != null
       ? start === end ? `${start}` : `${start}–${end}`
       : start != null ? `${start}` : ""
-  return { make, model, trim, yearLabel }
+  return { make, model, trim, yearLabel, trimNarrowed }
 }
 
 /**
@@ -116,7 +131,14 @@ export function buildReverseFitment(
     const key = `${id.make}|${id.model}|${id.trim ?? ""}|${id.yearLabel}`.toLowerCase()
     if (seen.has(key)) continue
     seen.add(key)
-    out.push({ year: id.yearLabel, make: id.make, model: id.model, trim: id.trim, boltPattern: pattern })
+    out.push({
+      year: id.yearLabel,
+      make: id.make,
+      model: id.model,
+      trim: id.trim,
+      trimNarrowed: id.trimNarrowed,
+      boltPattern: pattern,
+    })
   }
   out.sort(
     (a, b) =>

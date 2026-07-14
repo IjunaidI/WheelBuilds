@@ -37,6 +37,10 @@ export type ReverseFitmentVehicle = {
   make: string
   model: string
   trim?: string
+  /** True when the cached row's `raw.data` had exactly one entry — i.e. `trim`
+   * (when present) identifies a single specific trim rather than a value that
+   * happened to be shared across every trim in a multi-trim union row. */
+  trimNarrowed: boolean
   boltPattern: string
 }
 
@@ -45,6 +49,8 @@ export type ReverseTireFitmentVehicle = {
   make: string
   model: string
   trim?: string
+  /** See `ReverseFitmentVehicle.trimNarrowed`. */
+  trimNarrowed: boolean
   /** The matched canonical OEM tire size, e.g. "225/55R18". */
   size: string
 }

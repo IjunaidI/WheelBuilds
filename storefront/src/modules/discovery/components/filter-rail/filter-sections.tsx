@@ -54,6 +54,7 @@ const ChecklistSection = <T extends string | number>({
   formatKey,
   numeric,
   instanceId,
+  sectionId,
 }: {
   facetMap: Record<string, number>
   selected: T[]
@@ -65,6 +66,11 @@ const ChecklistSection = <T extends string | number>({
    *  section so checkbox ids don't collide when both are mounted at once
    *  (WB-088 X10). */
   instanceId: string
+  /** Facet dimension (e.g. "brand"/"diameter") — combined with `instanceId`
+   *  so two numeric sections in the SAME instance can't collide on a shared
+   *  bare integer key (WB-088 X10, e.g. tire `rimDiameters` vs
+   *  `loadIndexes` both minting id `filter-rail-15`). */
+  sectionId: string
 }) => {
   const entries = sortFacetEntries(facetMap, numeric)
 
@@ -73,7 +79,7 @@ const ChecklistSection = <T extends string | number>({
       {entries.map(([key, count]) => {
         const typed = formatKey(key)
         const checked = selected.some((s) => String(s) === key)
-        const id = `filter-${instanceId}-${key}`
+        const id = `filter-${instanceId}-${sectionId}-${key}`
         return (
           <li key={key} className="flex items-center gap-2.5">
             <Checkbox
@@ -129,6 +135,7 @@ const FilterSections = ({
   const {
     filters,
     toggleArrayFilter,
+    replaceScalars,
     clearAll,
     isAnyFilterActive,
   } = useDiscoveryQuery()
@@ -178,23 +185,22 @@ const FilterSections = ({
 
   // Commit-on-blur/Enter (not per-keystroke `push`): parses + clamps/swaps
   // via `commitPriceRange`, reflects the coherent pair back into the local
-  // inputs, then writes both params together with `router.replace` — a
+  // inputs, then writes both params together via `replaceScalars` — a
   // transient scalar edit, not a `push` — so typing a price range doesn't
-  // spam browser history.
+  // spam browser history. WB-088 fixwave: routed through the hook's
+  // `replaceScalars` (the bprogress router) instead of a local
+  // `next/navigation` `router.replace`, so the commit shows the top progress
+  // bar like every other filter interaction.
   const commitPrice = useCallback(() => {
     const { min, max } = commitPriceRange(minInput, maxInput)
     setMinInput(min != null ? String(min) : "")
     setMaxInput(max != null ? String(max) : "")
 
-    const next = new URLSearchParams(Array.from(sp.entries()))
-    if (min != null) next.set("priceMin", String(Math.round(min * 100)))
-    else next.delete("priceMin")
-    if (max != null) next.set("priceMax", String(Math.round(max * 100)))
-    else next.delete("priceMax")
-    next.delete("page")
-    const qs = next.toString()
-    router.replace(`${pathname}${qs ? `?${qs}` : ""}`, { scroll: false })
-  }, [minInput, maxInput, sp, pathname, router])
+    replaceScalars({
+      priceMinCents: min != null ? Math.round(min * 100) : undefined,
+      priceMaxCents: max != null ? Math.round(max * 100) : undefined,
+    })
+  }, [minInput, maxInput, replaceScalars])
 
   const onPriceKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === "Enter") {
@@ -254,6 +260,7 @@ const FilterSections = ({
               onToggle={(v) => toggleArrayFilter("brands", v)}
               formatKey={(k) => k}
               instanceId={instanceId}
+              sectionId="brand"
             />
           </AccordionContent>
         </AccordionItem>
@@ -271,6 +278,7 @@ const FilterSections = ({
               formatKey={(k) => Number(k)}
               numeric
               instanceId={instanceId}
+              sectionId="diameter"
             />
           </AccordionContent>
         </AccordionItem>
@@ -287,6 +295,7 @@ const FilterSections = ({
               labelMap={boltPatternLabels}
               formatKey={(k) => k}
               instanceId={instanceId}
+              sectionId="bolt-pattern"
             />
           </AccordionContent>
         </AccordionItem>
@@ -303,6 +312,7 @@ const FilterSections = ({
               labelMap={FINISH_LABELS}
               formatKey={(k) => k as any}
               instanceId={instanceId}
+              sectionId="finish"
             />
           </AccordionContent>
         </AccordionItem>

@@ -127,6 +127,31 @@ export const useTireQuery = () => {
     [push]
   )
 
+  // WB-088 fixwave (mirrors the wheel use-discovery-query.ts twin): commits
+  // one or more scalar filters (price min/max) in a single navigation via the
+  // SAME bprogress `router` this hook already uses, instead of a bare
+  // `next/navigation` router.replace — so price commits show the top
+  // progress bar like every other filter interaction. `router.replace` (not
+  // `push`) because a price commit is a transient scalar edit, not a new
+  // history entry.
+  const replaceScalars = useCallback(
+    (patch: Partial<Record<ScalarFilterKey, number | undefined>>) => {
+      const next = new URLSearchParams(searchParams.toString())
+      for (const key of Object.keys(patch) as ScalarFilterKey[]) {
+        const param = SCALAR_PARAM[key]
+        const value = patch[key]
+        next.delete(param)
+        if (value != null && Number.isFinite(value)) {
+          next.set(param, String(value))
+        }
+      }
+      next.delete("page")
+      const qs = next.toString()
+      router.replace(`${pathname}${qs ? `?${qs}` : ""}`, { scroll: false })
+    },
+    [router, pathname, searchParams]
+  )
+
   const setSort = useCallback(
     (sort: SortOption) => {
       push((sp) => {
@@ -183,6 +208,7 @@ export const useTireQuery = () => {
     toggleArrayFilter,
     removeArrayFilter,
     setScalarFilter,
+    replaceScalars,
     setSort,
     setPage,
     clearAll,

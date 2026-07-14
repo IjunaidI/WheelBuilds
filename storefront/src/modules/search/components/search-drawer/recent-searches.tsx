@@ -22,7 +22,21 @@ const RecentSearches = ({ onClose }: RecentSearchesProps) => {
 
   const go = (q: string) => {
     onClose()
-    router.push(`/${countryCode}/store?q=${encodeURIComponent(q)}`)
+
+    // WB-088 fixwave: mirror header.tsx's D13 fit=0 preservation — without
+    // this, re-running a recent search from inside "Show all wheels" (fit=0)
+    // mode silently re-enabled fitment filtering on the results page. Read
+    // directly off `window.location.search` (not `useSearchParams()`) for
+    // the same reason header.tsx does: this drawer is mounted globally in
+    // the root layout with no Suspense boundary around it, and
+    // `useSearchParams()` there would de-opt the whole app shell to dynamic
+    // rendering.
+    const params = new URLSearchParams({ q })
+    if (typeof window !== "undefined") {
+      const currentFit = new URLSearchParams(window.location.search).get("fit")
+      if (currentFit === "0") params.set("fit", "0")
+    }
+    router.push(`/${countryCode}/store?${params.toString()}`)
   }
 
   return (

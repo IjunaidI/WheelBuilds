@@ -123,6 +123,32 @@ export const useDiscoveryQuery = () => {
     [push]
   )
 
+  // WB-088 fixwave: commits one or more scalar filters (price min/max) in a
+  // single navigation via the SAME bprogress `router` this hook already uses
+  // — not a bare `next/navigation` router.replace — so the top progress bar
+  // fires for price commits just like every other filter interaction
+  // (checkboxes/sort/page all go through `push`/this router). Uses
+  // `router.replace` (not `push`) because a price commit is a transient
+  // scalar edit, not a new history entry — same reasoning `push` already
+  // documents for `setPage`'s `keepPage`, just via replace instead.
+  const replaceScalars = useCallback(
+    (patch: Partial<Record<ScalarFilterKey, number | undefined>>) => {
+      const next = new URLSearchParams(searchParams.toString())
+      for (const key of Object.keys(patch) as ScalarFilterKey[]) {
+        const param = SCALAR_PARAM[key]
+        const value = patch[key]
+        next.delete(param)
+        if (value != null && Number.isFinite(value)) {
+          next.set(param, String(value))
+        }
+      }
+      next.delete("page")
+      const qs = next.toString()
+      router.replace(`${pathname}${qs ? `?${qs}` : ""}`, { scroll: false })
+    },
+    [router, pathname, searchParams]
+  )
+
   const setSort = useCallback(
     (sort: SortOption) => {
       push((sp) => {
@@ -169,6 +195,7 @@ export const useDiscoveryQuery = () => {
     toggleArrayFilter,
     removeArrayFilter,
     setScalarFilter,
+    replaceScalars,
     setSort,
     setPage,
     clearAll,

@@ -119,6 +119,22 @@ function trim(finishOptions: FinishOption[], vehicle: FitVehicle): FinishOption[
     .filter((f) => f.sizeOptions.length > 0)
 }
 
+/**
+ * True when EVERY surviving size across every surviving finish in the view
+ * is a full match (tier "fits") — i.e. nothing here only cleared the coarse
+ * bolt+bore gate while sitting outside the vehicle's typical size window.
+ * WB-091 P5: the fitment band's "fits"-tier subtext used to branch on
+ * `fitsVehicle()`'s PRODUCT-LEVEL `withinWindow`, which reads a single
+ * arbitrary variant's bore (`product.specs.centerBoreMm`) — that can
+ * disagree with this per-variant-correct view for a multi-bore wheel (the
+ * badge already comes from `bestTier`, computed off this same view). Only
+ * meaningful when `view.bestTier === "fits"`; a "check"/"no" bestTier always
+ * fails this (some/all surviving sizes are "check", never "fits").
+ */
+export function fitViewAllWithinWindow(view: FitView): boolean {
+  return view.finishOptions.every((f) => f.sizeOptions.every((s) => s.tier === "fits"))
+}
+
 export function buildFitView(product: ProductDetail, vehicle: FitVehicle): FitView {
   const noFit: FitView = {
     bestTier: "no",

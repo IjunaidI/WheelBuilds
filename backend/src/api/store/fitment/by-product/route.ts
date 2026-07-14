@@ -18,8 +18,19 @@ export async function GET(req: MedusaRequest, res: MedusaResponse): Promise<void
   const { boltPatterns, boreMm, limit, diameters, widths, offsets } = req.query as Record<string, string>
   const patterns = (boltPatterns ?? "").split(",").map((s) => s.trim()).filter(Boolean)
   if (!svc || patterns.length === 0) { res.json({ vehicles: [] }); return }
-  const wheelBoreMm =
-    boreMm != null && boreMm !== "" && Number.isFinite(Number(boreMm)) ? Number(boreMm) : null
+  // WB-091 P5: `boreMm` is now a CSV of the product's per-size bores (one
+  // per buildable size) rather than a single value — a multi-bore wheel is
+  // no longer gated on whichever variant happened to be variants[0];
+  // matchedPattern passes if ANY bore in the set clears the vehicle's hub.
+  // A single bare number still parses fine (one-element array). Absent/
+  // unparseable tokens yield [], which matchedPattern treats as "unknown
+  // bore" (passes), matching the pre-P5 behavior.
+  const wheelBoreMm = (boreMm ?? "")
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean)
+    .map(Number)
+    .filter((n) => Number.isFinite(n))
   const lim = limit != null && limit !== "" && Number.isFinite(Number(limit)) ? Number(limit) : 24
 
   const dTokens = (diameters ?? "").split(",").map((s) => s.trim()).filter(Boolean)

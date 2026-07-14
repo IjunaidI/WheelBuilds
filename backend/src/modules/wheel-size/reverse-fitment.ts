@@ -62,21 +62,31 @@ export function extractVehicleIdentity(
 }
 
 /**
- * Hard-gate match: bolt-pattern intersection AND wheel bore clears the
- * vehicle hub (unknown values pass — never exclude on missing data). Mirrors
- * the storefront fits-vehicle.ts hard gates so the PDP list and the
- * active-vehicle band agree. Returns the matched canonical pattern, or null.
+ * Hard-gate match: bolt-pattern intersection AND (at least one of) the
+ * wheel's bore(s) clears the vehicle hub (unknown values pass — never
+ * exclude on missing data). Mirrors the storefront fits-vehicle.ts hard
+ * gates so the PDP list and the active-vehicle band agree. Returns the
+ * matched canonical pattern, or null.
+ *
+ * WB-091 P5: `wheelBoreMm` may be the product's full per-size bore SET (one
+ * entry per buildable size) instead of a single value — a multi-bore wheel's
+ * "confirmed models" list is no longer gated by whichever variant happened
+ * to be `variants[0]`; it matches this vehicle if ANY of the wheel's bores
+ * clears the hub. A bare number (or null) still works unchanged.
  */
 export function matchedPattern(
   row: FitmentRow,
   productPatterns: string[],
-  wheelBoreMm: number | null
+  wheelBoreMm: number | (number | null)[] | null
 ): string | null {
   const rowPats = Array.isArray(row.canonical_bolt_patterns) ? row.canonical_bolt_patterns : []
   const hit = productPatterns.find((p) => rowPats.includes(p))
   if (!hit) return null
   const hub = typeof row.hub_bore_mm_x100 === "number" ? row.hub_bore_mm_x100 / 100 : null
-  const boreOk = boreClears(wheelBoreMm, hub)
+  const bores = Array.isArray(wheelBoreMm) ? wheelBoreMm : [wheelBoreMm]
+  // No bores supplied at all → same as an unknown single bore: pass (never
+  // exclude on missing data).
+  const boreOk = bores.length === 0 ? boreClears(null, hub) : bores.some((b) => boreClears(b, hub))
   return boreOk ? hit : null
 }
 
@@ -89,7 +99,7 @@ export function matchedPattern(
 export function buildReverseFitment(
   rows: FitmentRow[],
   productPatterns: string[],
-  wheelBoreMm: number | null,
+  wheelBoreMm: number | (number | null)[] | null,
   limit: number,
   productSizes: ProductSize[] = []
 ): ReverseFitmentVehicle[] {

@@ -174,7 +174,7 @@ class WheelSizeService extends MedusaService({ WheelSizeCatalog, WheelSizeFitmen
    * the active-vehicle band). Pure cache read — no wheel-size API calls, so no
    * quota impact. `raw` supplies the display identity.
    */
-  async reverseFitment(p: { canonicalBoltPatterns: string[]; wheelBoreMm?: number | null; limit?: number; productSizes?: ProductSize[] }): Promise<ReverseFitmentVehicle[]> {
+  async reverseFitment(p: { canonicalBoltPatterns: string[]; wheelBoreMm?: number | (number | null)[] | null; limit?: number; productSizes?: ProductSize[] }): Promise<ReverseFitmentVehicle[]> {
     const rows = await this.listWheelSizeFitments({ status: "ok" })
     // model.json() columns are Record<string, unknown>; buildReverseFitment reads
     // canonical_bolt_patterns / *_window as the shapes we persisted.

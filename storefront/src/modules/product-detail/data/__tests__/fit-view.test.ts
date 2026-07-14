@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest"
-import { buildFitView } from "../fit-view"
+import { buildFitView, fitViewAllWithinWindow } from "../fit-view"
 import type { FinishOption, ProductDetail, SizeOption } from "../types"
 
 // Minimal SizeOption factory — only the fields buildFitView reads.
@@ -187,5 +187,41 @@ describe("buildFitView", () => {
     expect(fv.bestTier).toBe("fits")
     const offsetVariants = fv.finishOptions[0].sizeOptions[0].offsetVariants
     expect(offsetVariants?.map((o) => o.value)).toEqual([40, 20]) // 45 (no-tier) dropped; 20 (check-tier) now stays
+  })
+})
+
+// WB-091 P5: the fitment band's "fits"-tier subtext must derive from THIS
+// per-variant-correct signal, not fitsVehicle()'s product-level (single
+// arbitrary variants[0] bore) `withinWindow`.
+describe("fitViewAllWithinWindow", () => {
+  it("is true when every surviving size is fits-tier (a clean single-size match)", () => {
+    const product = productOf(["5x114.3"], [finish("Black", [size(18, 8, "5x114.3", 40)])])
+    const vehicle = { canonicalBoltPatterns: ["5x114.3"], hubBoreMm: 60.1,
+      diameterWindow: { min: 17, max: 19 }, widthWindow: { min: 6.5, max: 8.5 }, offsetWindow: { min: 35, max: 50 } }
+    const fv = buildFitView(product, vehicle)
+    expect(fv.bestTier).toBe("fits")
+    expect(fitViewAllWithinWindow(fv)).toBe(true)
+  })
+
+  it("is false when bestTier is 'fits' but a surviving size/finish is only check-tier (mixed) — the multi-bore-disagreement case", () => {
+    // Matte Black's 18x8 is a full match; its 22x10 (and Chrome's only size)
+    // survive as check-tier — same fixture as the buildFitView mixed-tier test.
+    const product = productOf(["5x114.3"], [
+      finish("Matte Black", [size(18, 8, "5x114.3", 40), size(22, 10, "5x114.3", 15)]),
+      finish("Chrome", [size(22, 10, "5x114.3", 15)]),
+    ])
+    const vehicle = { canonicalBoltPatterns: ["5x114.3"], hubBoreMm: 60.1,
+      diameterWindow: { min: 17, max: 19 }, widthWindow: { min: 6.5, max: 8.5 }, offsetWindow: { min: 35, max: 50 } }
+    const fv = buildFitView(product, vehicle)
+    expect(fv.bestTier).toBe("fits")
+    expect(fitViewAllWithinWindow(fv)).toBe(false)
+  })
+
+  it("is false when bestTier is 'check' (no size ever reached fits-tier)", () => {
+    const product = productOf(["5x114.3"], [finish("Black", [size(18, 8, "5x114.3", 40), size(22, 10, "5x114.3", 15)])])
+    const vehicle = { canonicalBoltPatterns: ["5x114.3"], hubBoreMm: 60.1, diameterWindow: { min: 24, max: 26 } }
+    const fv = buildFitView(product, vehicle)
+    expect(fv.bestTier).toBe("check")
+    expect(fitViewAllWithinWindow(fv)).toBe(false)
   })
 })

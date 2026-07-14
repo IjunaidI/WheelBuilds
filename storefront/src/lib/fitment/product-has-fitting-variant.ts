@@ -62,6 +62,28 @@ export function variantFitsVehicle(v: VariantFitInput, vehicle: FitVehicle): boo
   return variantFitTier(v, vehicle) === "fits"
 }
 
+/**
+ * Chip-facing tier: the same per-variant gate as `variantFitTier`, PLUS the
+ * "we don't know" gate the fitment band's `fitsVehicle` applies (S5/F5) —
+ * the vehicle has no bolt-pattern data on file, OR the product has no
+ * canonical bolt pattern at ALL (not just this variant's raw pattern
+ * failing to parse). WB-091 P4: without this, a missing-data vehicle/product
+ * fell through `variantFitTier`'s "no" — a genuine physical mismatch — so
+ * the purchase-panel chip said "DOESN'T FIT" for the exact case the band
+ * below it (correctly) calls "unknown". `variantFitTier` itself stays a pure
+ * 3-tier gate (see its own doc: "no unknown here — that's a display
+ * concern"); this wraps it so the chip and the band agree on all four states.
+ */
+export function chipFitTier(
+  v: VariantFitInput,
+  vehicle: FitVehicle,
+  productBoltPatternsCanonical: string[]
+): "fits" | "check" | "no" | "unknown" {
+  const vPats = vehicle.canonicalBoltPatterns ?? []
+  if (vPats.length === 0 || !productBoltPatternsCanonical?.length) return "unknown"
+  return variantFitTier(v, vehicle)
+}
+
 const TIER_RANK = { fits: 2, check: 1, no: 0 } as const
 
 /**

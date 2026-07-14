@@ -10,7 +10,7 @@ import { useGarage } from "@lib/garage/use-garage"
 import { openSearch } from "@lib/stores/search-store"
 import { fitsVehicle } from "@lib/fitment/fits-vehicle"
 import { FitTier } from "@lib/fitment/fit-tier"
-import { buildFitView } from "../../data/fit-view"
+import { buildFitView, fitViewAllWithinWindow } from "../../data/fit-view"
 import { FitmentEntry, ProductDetail } from "../../data/types"
 
 type FitmentProps = {
@@ -119,7 +119,13 @@ const Fitment = ({ product }: FitmentProps) => {
                   {active.trim ? ` ${active.trim}` : ""}
                 </div>
                 <div className="text-[12px] text-[var(--ink-soft)] mt-0.5">
-                  {verdict && !verdict.withinWindow
+                  {/* WB-091 P5: derived from buildFitView's per-variant tiers
+                      (the same data the "fits" badge above already came from),
+                      not fitsVehicle()'s product-level `withinWindow` — that
+                      reads a single arbitrary variant's bore
+                      (product.specs.centerBoreMm) and can disagree with the
+                      per-variant-correct view for a multi-bore wheel. */}
+                  {fitView && !fitViewAllWithinWindow(fitView)
                     ? "Bolt pattern and hub bore clear, but this size is outside the typical size window for your vehicle — confirm offset before ordering."
                     : "Add this wheel to cart — we'll verify final offset against your build at order review."}
                 </div>

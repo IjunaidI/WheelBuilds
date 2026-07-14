@@ -49,6 +49,27 @@ describe("matchedPattern", () => {
   })
 })
 
+// WB-091 P5: `wheelBoreMm` can be a SET of the product's per-size bores — a
+// multi-bore wheel should match if ANY bore clears the hub, instead of being
+// gated by whichever single bore (e.g. an arbitrary variants[0] pick) the
+// caller happened to supply.
+describe("matchedPattern with a bore SET", () => {
+  const row = { canonical_bolt_patterns: ["5x114.3"], hub_bore_mm_x100: 6710 } // hub 67.1
+
+  it("matches when at least one bore in the set clears the hub, even if others don't", () => {
+    expect(matchedPattern(row, ["5x114.3"], [60, 70])).toBe("5x114.3") // 60 fails, 70 clears
+  })
+  it("returns null when EVERY bore in the set fails to clear the hub", () => {
+    expect(matchedPattern(row, ["5x114.3"], [50, 60])).toBeNull()
+  })
+  it("treats an empty bore set as unknown data — passes the gate", () => {
+    expect(matchedPattern(row, ["5x114.3"], [])).toBe("5x114.3")
+  })
+  it("a null entry within the set is an unknown bore for that size — clears on its own", () => {
+    expect(matchedPattern(row, ["5x114.3"], [null, 50])).toBe("5x114.3") // null always clears
+  })
+})
+
 describe("buildReverseFitment", () => {
   const ok = (make: string, model: string, trim: string | undefined, start: number, end: number, pats: string[], hub: number | null) =>
     ({ status: "ok", canonical_bolt_patterns: pats, hub_bore_mm_x100: hub == null ? null : Math.round(hub * 100), raw: rawOf(make, model, trim, start, end) })

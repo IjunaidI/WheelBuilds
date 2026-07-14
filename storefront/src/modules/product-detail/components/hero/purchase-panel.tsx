@@ -10,7 +10,7 @@ import Icon from "@modules/common/components/icon"
 import { Button } from "@/components/ui/button"
 import { Separator } from "@/components/ui/separator"
 import { useGarage } from "@lib/garage/use-garage"
-import { variantFitTier } from "@lib/fitment/product-has-fitting-variant"
+import { chipFitTier } from "@lib/fitment/product-has-fitting-variant"
 import { openSearch } from "@lib/stores/search-store"
 import { addToCart } from "@lib/data/cart"
 import { insufficientStockMessage } from "@lib/util/error-message"
@@ -47,11 +47,13 @@ const PurchasePanel = ({
   // finish's bolt pattern) — NOT whether the product fits somewhere. So after
   // "Show all", changing to a non-fitting size/offset/colour honestly flips the
   // chip; picking a fitting one flips it back. Same per-variant gate discovery
-  // uses, so the PDP and the catalog agree. (WB-077: an empty-pattern vehicle
-  // makes variantFitTier return "no" here too — same as before this only had
-  // two states — kept out of scope per the task brief.)
+  // uses, so the PDP and the catalog agree. (WB-091 P4: `chipFitTier` adds an
+  // "unknown" state — vehicle has no bolt-pattern data on file, OR the product
+  // has none at all — the same gate the fitment band below uses, so the two
+  // no longer disagree when data is simply missing rather than a real
+  // mismatch.)
   const tier = active
-    ? variantFitTier(
+    ? chipFitTier(
         {
           boltPatternRaw: selectedSize.boltPattern,
           centerBoreMm: selectedVariant?.centerBoreMm,
@@ -59,7 +61,8 @@ const PurchasePanel = ({
           widthIn: selectedSize.width,
           offsetMm: selectedVariant?.value ?? selectedSize.offsetMm,
         },
-        active
+        active,
+        product.boltPatternsCanonical
       )
     : null
   const router = useRouter()
@@ -209,14 +212,17 @@ const PurchasePanel = ({
         </p>
       )}
 
-      {/* Fitment chip — uses variantFitTier on the CURRENTLY SELECTED variant
+      {/* Fitment chip — uses chipFitTier on the CURRENTLY SELECTED variant
           (per-variant bore + offset, paired), not fitsVehicle. The fitment
           band (fitment/index.tsx) derives its tier from buildFitView, which
           applies the same per-variant bore+offset gate — so the chip and the
           band agree on the bore/window axes even though they call different
-          functions. WB-077: three chip states now (fits / check / no) plus
-          the no-active-vehicle prompt — CHECK gets the same amber treatment
-          as the fitment band's check state. */}
+          functions. WB-077: three fit states (fits / check / no) plus the
+          no-active-vehicle prompt — CHECK gets the same amber treatment as
+          the fitment band's check state. WB-091 P4: a fourth, neutral
+          "unknown" state (no color accent, same as DOESN'T FIT's plain
+          outline) for missing fitment data, mirroring the band's unknown
+          copy instead of claiming a disproven mismatch. */}
       <div className="mt-5">
         {active ? (
           tier === "fits" ? (
@@ -230,6 +236,11 @@ const PurchasePanel = ({
               className="!border-[rgba(184,134,11,0.35)] !bg-[rgba(184,134,11,0.08)] !text-[#8A6508]"
             >
               CHECK FIT · verify clearance
+            </Chip>
+          ) : tier === "unknown" ? (
+            <Chip variant="outline">
+              FIT DATA UNKNOWN · {active.make.toUpperCase()}{" "}
+              {active.model.toUpperCase()}
             </Chip>
           ) : (
             <Chip variant="outline">

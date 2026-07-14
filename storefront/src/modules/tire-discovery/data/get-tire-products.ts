@@ -19,7 +19,7 @@ import type { MultiSearchResult } from "meilisearch"
 import { meili, PRODUCTS_INDEX } from "@lib/meilisearch"
 import { lit } from "@modules/discovery/data/escape"
 import {
-  DEFAULT_PAGE_SIZE, SortOption, TireDiscoveryFilters,
+  DEFAULT_PAGE_SIZE, FIT_CANDIDATE_CAP, SortOption, TireDiscoveryFilters,
   TireDiscoveryProduct, TireDiscoveryQuery, TireDiscoveryResult, TireFacetCounts, TireType,
 } from "./types"
 import { tireDiscoveryCacheKey } from "./cache-key"
@@ -59,7 +59,7 @@ function sortExpr(sort: SortOption): string[] {
   }
 }
 
-type TireHit = {
+export type TireHit = {
   id: string; handle: string; title: string; brand: string; thumbnail: string | null
   tire_sizes?: string[]; rim_diameters?: number[]; tire_type?: TireType
   /** "size|load|speed" per variant; load/speed segments are "" when absent. */
@@ -141,6 +141,7 @@ function outageResult(pageSize: number): TireDiscoveryResult {
     ok: false,
     products: [], totalCount: 0, pageSize,
     facets: { brands: {}, rimDiameters: {}, sizes: {}, tireTypes: {}, speedRatings: {}, loadIndexes: {} },
+    isCapped: false,
   }
 }
 
@@ -149,7 +150,7 @@ const facetQueryByDim: Record<string, keyof TireDiscoveryFilters> = {
   tire_type: "tireTypes", speed_ratings: "speedRatings", load_indexes: "loadIndexes",
 }
 
-async function fetchTireDiscoveryProducts(query: TireDiscoveryQuery): Promise<TireDiscoveryResult> {
+export async function fetchTireDiscoveryProducts(query: TireDiscoveryQuery): Promise<TireDiscoveryResult> {
   const pageSize = DEFAULT_PAGE_SIZE
 
   // FIT MODE (WB-068): coarse tire_sizes-matched candidates from Meili, then
@@ -159,7 +160,6 @@ async function fetchTireDiscoveryProducts(query: TireDiscoveryQuery): Promise<Ti
   // pagination + facet recompute over the fitting set only.
   const vehicleOemTires = query.vehicleOemTires
   if (vehicleOemTires?.length) {
-    const FIT_CANDIDATE_CAP = 200
     const sizes = Array.from(new Set(vehicleOemTires.map((o) => o.size)))
     const { results } = await meili.multiSearch({
       queries: [
@@ -173,7 +173,19 @@ async function fetchTireDiscoveryProducts(query: TireDiscoveryQuery): Promise<Ti
         },
       ],
     })
-    const hits = (results[0] as MultiSearchResult<TireHit>).hits
+    const candidateRes = results[0] as MultiSearchResult<TireHit>
+    const hits = candidateRes.hits
+    // Honest cap signal (WB-088 D7, mirrors the wheel WB-074 D2): Meili's
+    // real total for this candidate query, independent of the
+    // `limit: FIT_CANDIDATE_CAP` we actually fetched. When it exceeds the
+    // cap, some genuinely-fitting tires may sit past the window we scanned,
+    // so `totalCount` below (a count of the capped candidates AFTER the real
+    // per-variant fit check) must not be presented as a precise total —
+    // callers gate on `isCapped` first. Deliberately NOT used to inflate
+    // `totalCount`/pagination — that would trade an honest small count for
+    // phantom pages past what was fetched.
+    const estimatedTotalHits = candidateRes.estimatedTotalHits
+    const isCapped = (estimatedTotalHits ?? 0) > FIT_CANDIDATE_CAP
     const candidates = hits.map((hit) => ({ hit, product: hitToTireProduct(hit) }))
     const fitting = candidates.filter(({ product }) =>
       passesFitFilter(product.fitSpecs, vehicleOemTires)
@@ -185,6 +197,8 @@ async function fetchTireDiscoveryProducts(query: TireDiscoveryQuery): Promise<Ti
       totalCount: fitting.length,
       pageSize,
       facets: facetsFromTireHits(fitting.map((c) => c.hit)),
+      isCapped,
+      estimatedTotalHits,
     }
   }
 
@@ -219,6 +233,9 @@ async function fetchTireDiscoveryProducts(query: TireDiscoveryQuery): Promise<Ti
     products: hitsRes.hits.map(hitToTireProduct),
     totalCount: hitsRes.estimatedTotalHits ?? hitsRes.hits.length,
     pageSize, facets,
+    // Non-fit mode has no candidate cap — totalCount is Meili's real total,
+    // so it is never "capped" in the D2/D7 sense. (WB-088 D7)
+    isCapped: false,
   }
 }
 

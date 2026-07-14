@@ -137,9 +137,34 @@ export type TireDiscoveryResult = {
   totalCount: number
   pageSize: number
   facets: TireFacetCounts
+  /**
+   * True when fit mode's Meili `estimatedTotalHits` for the tire_sizes
+   * candidate query exceeded `FIT_CANDIDATE_CAP` — i.e. there may be more
+   * genuinely-fitting tires than what actually got scanned. When true,
+   * `totalCount` is a count of the (capped) candidates that passed
+   * `passesFitFilter`, NOT a precise total — callers must not present it as
+   * one. Always `false` outside fit mode, where `totalCount` comes straight
+   * from Meili's real total. Mirrors the wheel `DiscoveryResult.isCapped`
+   * (WB-074 D2 / WB-088 D7 parity port).
+   */
+  isCapped: boolean
+  /**
+   * Meili's `estimatedTotalHits` for the fit-mode candidate query. Only set
+   * in fit mode; `undefined` otherwise.
+   */
+  estimatedTotalHits?: number
 }
 
 export const DEFAULT_PAGE_SIZE = 12
+
+/**
+ * Fit mode's Meili candidate-fetch cap (see get-tire-products.ts's fit
+ * branch). Defined here — not only in the server-side data module — so
+ * client components (e.g. the tire header's "Top N candidates" copy) can
+ * reference the same number without importing the Meilisearch adapter.
+ * Mirrors the wheel `FIT_CANDIDATE_CAP` (discovery/data/types.ts).
+ */
+export const FIT_CANDIDATE_CAP = 200
 
 export function parseTireQueryFromSearchParams(
   sp: Record<string, string | string[] | undefined> | undefined

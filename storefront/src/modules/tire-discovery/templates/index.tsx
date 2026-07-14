@@ -49,11 +49,12 @@ const TireDiscoveryTemplate = ({
     <section className="px-5 pt-6 pb-16 xsmall:px-8 small:px-20 small:pt-8 small:pb-20">
       <FitmentContextSetter target="tires" />
       <TireFitmentSync />
-      <TireHeader totalCount={result.totalCount} />
+      <TireHeader totalCount={result.totalCount} isCapped={result.isCapped} />
       <TireActiveChips />
       <TireMobileFilterTrigger
         facets={result.facets}
         totalCount={result.totalCount}
+        isCapped={result.isCapped}
       />
       <div className="flex items-start gap-8">
         <TireFilterRail facets={result.facets} />

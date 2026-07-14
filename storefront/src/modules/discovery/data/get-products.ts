@@ -41,7 +41,7 @@ import { isRealBoltPattern } from "@modules/product-detail/data/group-sizes"
 // Re-export so any existing imports from this file keep working.
 export { parseQueryFromSearchParams } from "./types"
 
-const FACET_FIELDS = ["brand", "diameters", "bolt_patterns", "finishes"] as const
+const FACET_FIELDS = ["brand", "diameters", "bolt_patterns_canonical", "finishes"] as const
 
 const NEW_DAYS = 30
 const NEW_MS = NEW_DAYS * 24 * 60 * 60 * 1000
@@ -63,7 +63,7 @@ function buildFilters(
   if (skip !== "diameters" && f.diameters.length)
     clauses.push(`diameters IN [${f.diameters.map(lit).join(", ")}]`)
   if (skip !== "boltPatterns" && f.boltPatterns.length)
-    clauses.push(`bolt_patterns IN [${f.boltPatterns.map(lit).join(", ")}]`)
+    clauses.push(`bolt_patterns_canonical IN [${f.boltPatterns.map(lit).join(", ")}]`)
   if (skip !== "finishes" && f.finishes.length)
     clauses.push(`finishes IN [${f.finishes.map(lit).join(", ")}]`)
   if (f.priceMinCents != null) clauses.push(`price_min >= ${f.priceMinCents}`)
@@ -166,7 +166,12 @@ export function facetsFromHits(hits: Hit[]): FacetCounts {
   for (const h of hits) {
     if (h.brand) tally(brands, h.brand)
     for (const d of h.diameters ?? []) tally(diameters, String(d))
-    for (const bp of h.bolt_patterns ?? []) tally(boltPatterns, bp)
+    // Canonical (WB-088 D4) — matches FACET_FIELDS/buildFilters below, so
+    // fit mode's rebuilt facets carry the same key space (bolt_patterns_
+    // canonical) as the non-fit disjunctive facet query, keeping the
+    // checkbox `selected` match + labelMap lookups in filter-sections.tsx
+    // correct regardless of which mode produced the counts.
+    for (const bp of h.bolt_patterns_canonical ?? []) tally(boltPatterns, bp)
     for (const f of h.finishes ?? []) tally(finishes, f)
   }
   return { brands, diameters, boltPatterns, finishes }
@@ -301,7 +306,7 @@ export async function fetchDiscoveryProducts(
   const facetQueryByDim: Record<string, keyof DiscoveryFilters> = {
     brand: "brands",
     diameters: "diameters",
-    bolt_patterns: "boltPatterns",
+    bolt_patterns_canonical: "boltPatterns",
     finishes: "finishes",
   }
 
@@ -339,7 +344,7 @@ export async function fetchDiscoveryProducts(
   const facets: FacetCounts = {
     brands: facetByField["brand"],
     diameters: facetByField["diameters"],
-    boltPatterns: facetByField["bolt_patterns"],
+    boltPatterns: facetByField["bolt_patterns_canonical"],
     finishes: facetByField["finishes"],
   }
 

@@ -19,6 +19,7 @@ import { Separator } from "@/components/ui/separator"
 
 import { useDiscoveryQuery } from "../../data/use-discovery-query"
 import { FacetCounts } from "../../data/types"
+import { pcdInchLabel } from "../../data/pcd-inch-label"
 
 const FINISH_LABELS: Record<string, string> = {
   black: "Gloss black",
@@ -104,6 +105,13 @@ const FilterSections = ({ facets, hideClearAll }: FilterSectionsProps) => {
     ? `${active.year} ${active.make} ${active.model}`
     : "Pick a vehicle for fitment"
 
+  // WB-088 D4: facets.boltPatterns now carries canonical keys
+  // ("{count}x{pcd_mm}") — map each to its dual-unit ("5×114.3 (5×4.5″)")
+  // label so one physical pattern renders as one clear checkbox.
+  const boltPatternLabels = Object.fromEntries(
+    Object.keys(facets.boltPatterns).map((k) => [k, pcdInchLabel(k)])
+  )
+
   return (
     <>
       <div className="rounded-[var(--radius)] border border-[var(--hairline)] bg-white p-4 mb-4">
@@ -181,6 +189,7 @@ const FilterSections = ({ facets, hideClearAll }: FilterSectionsProps) => {
               facetMap={facets.boltPatterns}
               selected={filters.boltPatterns}
               onToggle={(v) => toggleArrayFilter("boltPatterns", v)}
+              labelMap={boltPatternLabels}
               formatKey={(k) => k}
             />
           </AccordionContent>

@@ -7,6 +7,7 @@ import Icon from "@modules/common/components/icon"
 import { useGarage } from "@lib/garage/use-garage"
 import { useDiscoveryQuery } from "../../data/use-discovery-query"
 import { formatCentsUsd } from "@lib/util/money"
+import { pcdInchLabel } from "../../data/pcd-inch-label"
 
 const FINISH_LABELS: Record<string, string> = {
   black: "Gloss black",
@@ -91,7 +92,7 @@ const ActiveChips = () => {
   for (const bp of filters.boltPatterns) {
     chips.push({
       key: `bolt-${bp}`,
-      label: bp,
+      label: pcdInchLabel(bp),
       onRemove: () => removeArrayFilter("boltPatterns", bp),
     })
   }

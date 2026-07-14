@@ -80,11 +80,14 @@ const VariantPicker = ({
         <div className="grid grid-cols-4 gap-1.5">
           {sizes.map((s) => {
             const disabled = s.availability === "out_of_stock"
-            // Same match as before (`!disabled`) unless every size is OOS, in
-            // which case the selected cell is still highlighted so the grid
-            // never shows "no selection" (WB-090 P16).
-            const active =
-              sizeKey(s) === sizeKey(selectedSize) && (!disabled || allOutOfStock)
+            // Gate purely on the sizeKey match (WB-090 P15/P16 edge) — a
+            // selected size that's OOS (e.g. still reachable after a finish
+            // switch that keeps the same size, which is out of stock in the
+            // new finish) must still render as the selected cell. The
+            // `disabled && !active` styling below already yields to
+            // `active`, so this alone is sufficient — no separate
+            // allOutOfStock case needed here.
+            const active = sizeKey(s) === sizeKey(selectedSize)
             return (
               <Tooltip key={sizeKey(s)}>
                 <TooltipTrigger asChild>

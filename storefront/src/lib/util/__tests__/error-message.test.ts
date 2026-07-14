@@ -29,14 +29,17 @@ describe("insufficientStockMessage", () => {
     ).toBe("Only 2 in stock — reduce quantity")
   })
   it("recognizes a plain already-extracted message string (post-WB-079 B2 return-not-throw shape)", () => {
-    expect(insufficientStockMessage("Not enough stock reserved", 1)).toBe(
-      "Only 1 in stock — reduce quantity"
-    )
+    expect(
+      insufficientStockMessage("This variant does not have the required inventory", 1)
+    ).toBe("Only 1 in stock — reduce quantity")
   })
-  it("matches on 'not enough' without the word 'stock'/'inventory'", () => {
-    expect(insufficientStockMessage("There is not enough available", 5)).toBe(
+  it("matches on 'in stock' without the words 'inventory'/'insufficient'", () => {
+    expect(insufficientStockMessage("Only 2 left in stock right now", 5)).toBe(
       "Only 5 in stock — reduce quantity"
     )
+  })
+  it("does not false-positive on 'not enough' alone (dropped keyword — WB-090 fixwave)", () => {
+    expect(insufficientStockMessage("There is not enough available", 5)).toBeNull()
   })
   it("is case-insensitive", () => {
     expect(insufficientStockMessage("INSUFFICIENT STOCK", 3)).toBe(

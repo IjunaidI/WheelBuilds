@@ -43,6 +43,13 @@ const TireSizePicker = ({
   selectedSize,
   onSizeChange,
 }: TireSizePickerProps) => {
+  // WB-090 P16: when EVERY size in the grid is sold out, an availability-
+  // gated `active` would never highlight any cell — the shopper's actual
+  // selection becomes visually invisible even though `selectedSize` still
+  // holds a real value. Surface it honestly with an explicit banner instead
+  // (mirrors the wheel VariantPicker).
+  const allOutOfStock =
+    sizes.length > 0 && sizes.every((s) => s.availability === "out_of_stock")
   return (
     <div className="flex flex-col gap-5">
       {/* Rim diameter row — hidden when there's nothing meaningful to choose. */}
@@ -83,8 +90,22 @@ const TireSizePicker = ({
             {sizes.length} {sizes.length === 1 ? "size" : "sizes"}
           </span>
         </div>
+        {allOutOfStock && (
+          <div
+            role="status"
+            className="mb-2 rounded-[var(--radius)] border border-[var(--hairline)] bg-[var(--soft)] px-3 py-2 text-[12px] font-semibold text-[var(--ink-soft)]"
+          >
+            Currently out of stock — every size shown is sold out.
+          </div>
+        )}
         <div className="grid grid-cols-2 gap-1.5">
           {sizes.map((s) => {
+            // Gate purely on the sizeLabel match (WB-090 P15/P16 edge) — a
+            // selected size that's OOS (e.g. still reachable after a rim
+            // switch that keeps the same size, which is out of stock at
+            // that rim) must still render as the selected cell. The
+            // `disabled && !active` styling below already yields to
+            // `active`, so this alone is sufficient.
             const active = selectedSize?.sizeLabel === s.sizeLabel
             const disabled = s.availability === "out_of_stock"
             return (
@@ -92,18 +113,25 @@ const TireSizePicker = ({
                 <TooltipTrigger asChild>
                   <button
                     type="button"
-                    disabled={disabled}
-                    onClick={() => onSizeChange(s.sizeLabel)}
+                    aria-disabled={disabled}
+                    onClick={() => {
+                      // Native `disabled` was removed so the button stays
+                      // focusable/tabbable and its Tooltip is keyboard- and
+                      // screen-reader-reachable (WB-090 P16); selection is
+                      // instead blocked here.
+                      if (disabled) return
+                      onSizeChange(s.sizeLabel)
+                    }}
                     aria-pressed={active}
                     className={cn(
                       "relative h-14 rounded-[var(--radius)] border text-[13px] font-semibold transition-colors flex items-center justify-center gap-1.5",
                       active &&
-                        !disabled &&
                         "border-[var(--orange)] bg-[var(--orange)] text-white",
                       !active &&
                         !disabled &&
                         "border-[var(--hairline)] bg-white text-[var(--ink)] hover:border-[var(--ink)]",
                       disabled &&
+                        !active &&
                         "border-[var(--hairline)] bg-[var(--soft)] text-[var(--ink-soft)] opacity-60 cursor-not-allowed line-through"
                     )}
                   >

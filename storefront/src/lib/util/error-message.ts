@@ -38,10 +38,14 @@ export function insufficientStockMessage(
   const message = typeof err === "string" ? err : extractMedusaMessage(err)
   if (!message) return null
   const lower = message.toLowerCase()
+  // "not enough" was dropped (WB-090 fixwave) — it false-positives on
+  // non-stock errors. These three cover Medusa v2's real insufficient-
+  // inventory strings ("does not have the required inventory",
+  // "Insufficient stock").
   const looksInsufficient =
     lower.includes("inventory") ||
-    lower.includes("stock") ||
-    lower.includes("not enough")
+    lower.includes("insufficient") ||
+    lower.includes("in stock")
   if (!looksInsufficient) return null
   return `Only ${available} in stock — reduce quantity`
 }

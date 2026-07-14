@@ -2,53 +2,25 @@
 
 import { useParams, useRouter } from "next/navigation"
 import Icon from "@modules/common/components/icon"
-import Wheel, { Finish } from "@modules/common/components/wheel"
+import Wheel from "@modules/common/components/wheel"
 import Display from "@modules/common/components/display"
 import Label from "@modules/common/components/label"
+import LocalizedClientLink from "@modules/common/components/localized-client-link"
 import { Button } from "@/components/ui/button"
-
-const TRENDING: {
-  name: string
-  brand: string
-  finish: Finish
-  price: string
-  query: string
-}[] = [
-  {
-    name: "BLACKLINE BL-7",
-    brand: "BLACKLINE FORGED",
-    finish: "black",
-    price: "1,249",
-    query: "blackline bl-7",
-  },
-  {
-    name: "VANGUARD V8 MESH",
-    brand: "VANGUARD",
-    finish: "bronze",
-    price: "1,049",
-    query: "vanguard v8",
-  },
-  {
-    name: "ATLAS AT-9 BEADLOCK",
-    brand: "ATLAS OFFROAD",
-    finish: "bronze",
-    price: "789",
-    query: "atlas at-9",
-  },
-]
+import { formatCentsUsd } from "@lib/util/money"
+import type { TrendingProduct } from "./trending-data"
 
 type TrendingProps = {
   onClose: () => void
+  /** Real newest-products, pre-mapped by toTrendingProducts (WB-085 N3). */
+  products: TrendingProduct[]
 }
 
-const Trending = ({ onClose }: TrendingProps) => {
+const Trending = ({ onClose, products }: TrendingProps) => {
   const router = useRouter()
   const { countryCode } = useParams() as { countryCode: string }
 
-  const go = (q: string) => {
-    onClose()
-    router.push(`/${countryCode}/store?q=${encodeURIComponent(q)}`)
-  }
+  if (products.length === 0) return null
 
   return (
     <div style={{ marginBottom: 28 }}>
@@ -74,11 +46,11 @@ const Trending = ({ onClose }: TrendingProps) => {
         </Button>
       </div>
       <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-        {TRENDING.map((t) => (
-          <button
-            key={t.name}
-            type="button"
-            onClick={() => go(t.query)}
+        {products.map((p) => (
+          <LocalizedClientLink
+            key={p.handle}
+            href={`/products/${p.handle}`}
+            onClick={onClose}
             style={{
               display: "flex",
               alignItems: "center",
@@ -87,27 +59,26 @@ const Trending = ({ onClose }: TrendingProps) => {
               border: "1px solid var(--hairline)",
               borderRadius: 4,
               background: "white",
-              cursor: "pointer",
               width: "100%",
               fontFamily: "inherit",
               textAlign: "left",
             }}
           >
-            <Wheel size={56} finish={t.finish} />
+            <Wheel size={56} finish={p.finish ?? "black"} />
             <div style={{ flex: 1, minWidth: 0 }}>
               <Label style={{ fontSize: 9, marginBottom: 2, display: "block" }}>
-                {t.brand}
+                {p.brand}
               </Label>
               <Display size={14} as="div">
-                {t.name}
+                {p.name}
               </Display>
             </div>
             <Display size={15} as="div">
               <span style={{ color: "var(--orange)" }}>$</span>
-              {t.price}
+              {formatCentsUsd(p.priceCents).slice(1)}
             </Display>
             <Icon name="arrow-right" size={14} color="#8A8A8E" />
-          </button>
+          </LocalizedClientLink>
         ))}
       </div>
     </div>

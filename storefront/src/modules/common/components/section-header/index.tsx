@@ -23,8 +23,8 @@ type SectionHeaderProps = {
  *
  *   <SectionHeader
  *     counter="08"
- *     title="New This Week"
- *     description="Fresh fitments from Blackline, Vanguard, Meridian and more."
+ *     title="New Arrivals"
+ *     description="Fresh fitments, first to land — first to ship."
  *     action={<MicroLink href="/collections">View all 08</MicroLink>}
  *   />
  *

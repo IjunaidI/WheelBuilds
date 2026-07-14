@@ -6,6 +6,11 @@ import MicroLink from "@modules/common/components/micro-link"
 import Chip from "@modules/common/components/chip"
 import { getHomeCatalog } from "@modules/home/data/get-home-catalog"
 import type { DiscoveryProduct } from "@modules/discovery/data/types"
+import { catalogWallTiles } from "./tiles"
+
+// Must match new-drops-row's `.slice(0, 6)` so the Catalog Wall never repeats
+// a product already shown in New Arrivals directly above it (WB-085 N6).
+const NEW_DROPS_COUNT = 6
 
 // Fixed visual rhythm (mixed 12-col spans on small+; .build-tile media-queries
 // the spans off on mobile to a plain 2-col grid). Decorative layout only —
@@ -57,7 +62,7 @@ const Tile = ({
 
 const CatalogWall = async () => {
   const { newestProducts } = await getHomeCatalog()
-  const tiles = newestProducts.slice(0, SPANS.length)
+  const tiles = catalogWallTiles(newestProducts, NEW_DROPS_COUNT, SPANS.length)
   if (tiles.length === 0) return null
 
   return (

@@ -12,6 +12,7 @@ import YmmPane from "./ymm-pane"
 import { useGarage } from "@lib/garage/use-garage"
 import { resolveFitmentForVehicle } from "@lib/data/fitment-resolve"
 import { getFitmentContext } from "@lib/stores/fitment-context"
+import { slugifyYmm } from "@lib/garage/vehicle-data"
 import { FitmentTarget } from "./destination-url"
 
 type FindByVehicleProps = {
@@ -32,13 +33,23 @@ const FindByVehicle = ({ onClose }: FindByVehicleProps) => {
   // pane is orphaned and not rendered anywhere, so a stuck vehicle used to
   // have no way back. Reuses the same resolveFitmentForVehicle + update()
   // call shape ymm-pane's submit() uses.
+  //
+  // A vehicle picked while the live wheel-size catalog was down (or never
+  // resolved for any other reason) stores the seed's DISPLAY name (e.g.
+  // "Silverado 1500") as make/model — ymm-pane's submit() only slugifies
+  // when it knows the field is seed-backed, but we don't have that context
+  // here for an already-stored vehicle. slugifyYmm is idempotent on real
+  // slugs ("f-150" -> "f-150"), so applying it unconditionally is safe for
+  // live-catalog vehicles and fixes the seed case — otherwise re-sending the
+  // stored display name would just resolve to nothing again, defeating the
+  // recovery this button exists for.
   const recheckFit = async () => {
     if (!active || rechecking) return
     setRechecking(true)
     try {
       const result = await resolveFitmentForVehicle(
-        active.make,
-        active.model,
+        slugifyYmm(active.make),
+        slugifyYmm(active.model),
         active.modificationSlug ?? "",
         String(active.year),
         "usdm"

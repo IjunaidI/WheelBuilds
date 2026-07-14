@@ -135,9 +135,19 @@ const Fitment = ({ product }: FitmentProps) => {
                       not fitsVehicle()'s product-level `withinWindow` — that
                       reads a single arbitrary variant's bore
                       (product.specs.centerBoreMm) and can disagree with the
-                      per-variant-correct view for a multi-bore wheel. */}
+                      per-variant-correct view for a multi-bore wheel.
+                      WB-091 review fix: bestTier "fits" means AT LEAST ONE
+                      size is confirmed — it does not mean every size is. The
+                      previous copy rendered the "check"-tier caution
+                      ("outside the typical size window — confirm offset")
+                      under a "Fits your {vehicle}" header whenever any other
+                      size on this product wasn't within window, which reads
+                      as self-contradictory. Both branches below stay
+                      positive; the per-selection chip on the purchase panel
+                      remains the honest authority for whichever size is
+                      actually picked. */}
                   {fitView && !fitViewAllWithinWindow(fitView)
-                    ? "Bolt pattern and hub bore clear, but this size is outside the typical size window for your vehicle — confirm offset before ordering."
+                    ? "A fitting size is confirmed for your vehicle — pick your size below; the chip on your selected size shows its exact verdict."
                     : "Bolt pattern, hub bore, and size are confirmed for your vehicle."}
                 </div>
               </>

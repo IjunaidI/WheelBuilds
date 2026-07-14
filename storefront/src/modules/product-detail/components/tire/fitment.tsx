@@ -55,7 +55,12 @@ const TireFitment = ({ product }: TireFitmentProps) => {
   return (
     <section className="border-t border-[var(--hairline)] py-16 small:py-20">
       <SectionHeader
-        eyebrow={`FITMENT · ${product.fitment.length} CONFIRMED MODELS`}
+        // Mirrors the wheel fitment eyebrow fix (WB-091 P14,
+        // components/fitment/index.tsx): an empty confirmed-models list
+        // previously still rendered "FITMENT · 0 CONFIRMED MODELS", which
+        // reads as "fits nothing" rather than "we haven't listed your
+        // vehicle yet". Only show the count once there's something to count.
+        eyebrow={product.fitment.length > 0 ? `FITMENT · ${product.fitment.length} CONFIRMED MODELS` : "FITMENT"}
         title="Does it fit your ride?"
         description="Every vehicle below runs this tire size from the factory. The list is non-exhaustive — check your door-jamb placard or ask us to confirm."
         marginBottom={32}

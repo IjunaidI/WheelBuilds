@@ -117,6 +117,18 @@ export type FacetCounts = {
 }
 
 export type DiscoveryResult = {
+  /**
+   * Outage discriminant (WB-088 D6). `undefined`/`true` = a real Meilisearch
+   * query ran and this is its honest result (possibly a genuine 0 matches).
+   * `false` = the query itself failed (see `getDiscoveryProducts`'s outer
+   * catch in get-products.ts) and every field below is a synthetic
+   * zero-value placeholder — NOT a real 0-match count. Optional so every
+   * pre-existing success-path consumer that destructures `{ products,
+   * facets }` (home data loaders, etc.) keeps compiling and behaving exactly
+   * as before; only the discovery template needs to branch on it to avoid
+   * telling a shopper "no wheels match these filters" during an infra outage.
+   */
+  ok?: boolean
   products: DiscoveryProduct[]
   totalCount: number
   pageSize: number

@@ -6,6 +6,7 @@ import MobileFilterTrigger from "../components/filter-rail/mobile-trigger"
 import DiscoveryGrid from "../components/grid"
 import DiscoveryPagination from "../components/pagination"
 import DiscoveryEmpty from "../components/empty-state"
+import DiscoveryOutage from "../components/empty-state/outage"
 import { DEFAULT_PAGE_SIZE, DiscoveryResult } from "../data/types"
 
 type DiscoveryTemplateProps = {
@@ -26,6 +27,11 @@ type DiscoveryTemplateProps = {
  * Layout:
  *   small+: header + chips + [ rail 260px | grid+pagination ]
  *   mobile: header + chips + filter button (opens bottom Vaul) + grid stacked
+ *
+ * `result.ok === false` (WB-088 D6) means the Meilisearch query itself
+ * failed, not that 0 products genuinely matched — rendered as
+ * `<DiscoveryOutage>` instead of the 0-match `<DiscoveryEmpty>` so an infra
+ * blip doesn't read as "no wheels match these filters".
  */
 const DiscoveryTemplate = ({
   result,
@@ -55,7 +61,9 @@ const DiscoveryTemplate = ({
       <div className="flex items-start gap-8">
         <FilterRail facets={result.facets} />
         <div className="flex-1 min-w-0">
-          {result.products.length === 0 ? (
+          {result.ok === false ? (
+            <DiscoveryOutage />
+          ) : result.products.length === 0 ? (
             <DiscoveryEmpty />
           ) : (
             <>

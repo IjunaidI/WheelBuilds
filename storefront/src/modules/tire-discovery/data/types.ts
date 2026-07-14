@@ -122,6 +122,17 @@ export type TireFacetCounts = {
 }
 
 export type TireDiscoveryResult = {
+  /**
+   * Outage discriminant (WB-088 D6) — mirrors the wheel `DiscoveryResult.ok`.
+   * `undefined`/`true` = a real Meilisearch query ran and this is its honest
+   * result (possibly a genuine 0 matches). `false` = the query itself failed
+   * (see `getTireDiscoveryProducts`'s outer catch) and every field below is a
+   * synthetic zero-value placeholder — NOT a real 0-match count. Optional so
+   * every pre-existing success-path consumer (home data loaders that
+   * destructure `{ products, facets }`) keeps compiling and behaving exactly
+   * as before.
+   */
+  ok?: boolean
   products: TireDiscoveryProduct[]
   totalCount: number
   pageSize: number

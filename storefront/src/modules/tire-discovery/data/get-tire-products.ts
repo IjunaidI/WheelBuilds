@@ -130,8 +130,15 @@ function facetsFromTireHits(hits: TireHit[]): TireFacetCounts {
   return { brands, rimDiameters, sizes, tireTypes, speedRatings, loadIndexes }
 }
 
-function emptyResult(pageSize: number): TireDiscoveryResult {
+/**
+ * Synthetic zero-value result for a real Meilisearch OUTAGE (WB-088 D6) —
+ * mirrors the wheel adapter's `outageResult`. `ok: false` so the tire
+ * template can tell this apart from a genuine 0-match filter combination.
+ * The only caller is `getTireDiscoveryProducts`'s outer catch, below.
+ */
+function outageResult(pageSize: number): TireDiscoveryResult {
   return {
+    ok: false,
     products: [], totalCount: 0, pageSize,
     facets: { brands: {}, rimDiameters: {}, sizes: {}, tireTypes: {}, speedRatings: {}, loadIndexes: {} },
   }
@@ -215,6 +222,15 @@ async function fetchTireDiscoveryProducts(query: TireDiscoveryQuery): Promise<Ti
   }
 }
 
+/**
+ * Cached tire-discovery read (mirrors the wheel `getDiscoveryProducts`). On a
+ * Meili failure the inner `fetchTireDiscoveryProducts` throws — never
+ * returns `{ ok: false, ... }` itself — so `unstable_cache` does not cache
+ * the outage; only this outer catch degrades to `outageResult` (`ok: false`,
+ * WB-088 D6) so the tire template can render an honest "catalog temporarily
+ * unavailable" block instead of the 0-match empty state, and the outage
+ * self-heals on the next request once Meili recovers.
+ */
 export async function getTireDiscoveryProducts(query: TireDiscoveryQuery): Promise<TireDiscoveryResult> {
   try {
     const cached = unstable_cache(
@@ -225,6 +241,6 @@ export async function getTireDiscoveryProducts(query: TireDiscoveryQuery): Promi
     return await cached()
   } catch (e) {
     console.error("[tire-discovery] Meilisearch query failed:", e)
-    return emptyResult(DEFAULT_PAGE_SIZE)
+    return outageResult(DEFAULT_PAGE_SIZE)
   }
 }

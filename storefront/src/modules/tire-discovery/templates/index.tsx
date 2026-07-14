@@ -6,6 +6,7 @@ import TireMobileFilterTrigger from "../components/filter-rail/mobile-trigger"
 import TireGrid from "../components/grid"
 import TirePagination from "../components/pagination"
 import TireEmpty from "../components/empty-state"
+import TireOutage from "../components/empty-state/outage"
 import FitmentContextSetter from "@modules/common/components/fitment-context-setter"
 import { DEFAULT_PAGE_SIZE, TireDiscoveryResult } from "../data/types"
 
@@ -29,6 +30,11 @@ type TireDiscoveryTemplateProps = {
  * Layout:
  *   small+: header + chips + [ rail 260px | grid+pagination ]
  *   mobile: header + chips + filter button (opens bottom Vaul) + grid stacked
+ *
+ * `result.ok === false` (WB-088 D6) means the Meilisearch query itself
+ * failed, not that 0 tires genuinely matched — rendered as `<TireOutage>`
+ * instead of the 0-match `<TireEmpty>` so an infra blip doesn't read as "no
+ * tires match these filters".
  */
 const TireDiscoveryTemplate = ({
   result,
@@ -52,7 +58,9 @@ const TireDiscoveryTemplate = ({
       <div className="flex items-start gap-8">
         <TireFilterRail facets={result.facets} />
         <div className="flex-1 min-w-0">
-          {result.products.length === 0 ? (
+          {result.ok === false ? (
+            <TireOutage />
+          ) : result.products.length === 0 ? (
             <TireEmpty />
           ) : (
             <>

@@ -178,8 +178,16 @@ export function facetsFromHits(hits: Hit[]): FacetCounts {
   return { brands, diameters, boltPatterns, finishes }
 }
 
-function emptyResult(pageSize: number): DiscoveryResult {
+/**
+ * Synthetic zero-value result for a real Meilisearch OUTAGE (WB-088 D6) —
+ * `ok: false` so the template can tell this apart from a genuine 0-match
+ * filter combination and show "catalog temporarily unavailable" instead of
+ * blaming the shopper's filters. The only caller is `getDiscoveryProducts`'s
+ * outer catch, below.
+ */
+function outageResult(pageSize: number): DiscoveryResult {
   return {
+    ok: false,
     products: [],
     totalCount: 0,
     pageSize,
@@ -374,6 +382,14 @@ export async function fetchDiscoveryProducts(
  * candidate would pass the fit gate unverified, and returning normally would
  * let unstable_cache serve that over-claim for 60s. A future re-sync can
  * revalidateTag("discovery").
+ *
+ * WB-088 D6: the degraded result returned from the catch below sets
+ * `ok: false` (see `outageResult`) so the discovery template can render an
+ * honest "catalog temporarily unavailable" block instead of the 0-match
+ * empty state. This is intentionally set only in the outer catch — the
+ * inner `fetchDiscoveryProducts` must keep THROWING on failure (never
+ * return `{ ok: false, ... }` itself) so `unstable_cache` never caches the
+ * outage and it self-heals on the very next request.
  */
 export async function getDiscoveryProducts(
   query: DiscoveryQuery
@@ -387,6 +403,6 @@ export async function getDiscoveryProducts(
     return await cached()
   } catch (e) {
     console.error("[discovery] Meilisearch query failed:", e)
-    return emptyResult(DEFAULT_PAGE_SIZE)
+    return outageResult(DEFAULT_PAGE_SIZE)
   }
 }

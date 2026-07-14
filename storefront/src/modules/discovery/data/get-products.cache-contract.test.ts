@@ -141,6 +141,18 @@ describe("getDiscoveryProducts cache contract (WB-021 + WB-074 D4)", () => {
     expect(mockedMultiSearch).toHaveBeenCalledTimes(2)
   })
 
+  // WB-088 D6: a real outage must be tagged `ok: false` so the template can
+  // tell it apart from a genuine 0-match filter combination. The inner
+  // fetchDiscoveryProducts must keep THROWING (asserted above by "is NEVER
+  // cached") — only this outer degrade sets the discriminant.
+  it("Meili failure is tagged ok: false (outage), distinct from a genuine 0-match result", async () => {
+    mockedMultiSearch.mockRejectedValue(new Error("meili down"))
+
+    const result = await getDiscoveryProducts(nonFitQuery)
+
+    expect(result.ok).toBe(false)
+  })
+
   it("Meili success on the non-fit path IS cached across repeat calls", async () => {
     mockNonFitSearch([makeHit("p1")], 1)
 
@@ -150,6 +162,18 @@ describe("getDiscoveryProducts cache contract (WB-021 + WB-074 D4)", () => {
     expect(first.products.map((p) => p.id)).toEqual(["p1"])
     expect(second.products.map((p) => p.id)).toEqual(["p1"])
     expect(mockedMultiSearch).toHaveBeenCalledTimes(1)
+  })
+
+  // WB-088 D6: a genuine 0-match result (real query, real empty hits) must
+  // NOT carry ok: false — that discriminant is reserved for outages, or the
+  // template would wrongly show "catalog unavailable" for an honest 0.
+  it("a genuine 0-match result (Meili succeeds, 0 hits) is NOT tagged ok: false", async () => {
+    mockNonFitSearch([], 0)
+
+    const result = await getDiscoveryProducts(nonFitQuery)
+
+    expect(result.products).toEqual([])
+    expect(result.ok).not.toBe(false)
   })
 
   it("fit-mode Store-API failure does NOT return the coarse over-claiming list — degrades to empty, uncached (WB-074 D4)", async () => {

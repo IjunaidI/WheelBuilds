@@ -2,48 +2,71 @@ import LocalizedClientLink from "@modules/common/components/localized-client-lin
 import Icon from "@modules/common/components/icon"
 import Logo from "@modules/common/components/logo"
 import Label from "@modules/common/components/label"
+import { getHomeCatalog } from "@modules/home/data/get-home-catalog"
+import { styleTiles } from "@modules/home/components/shop-by-style/style-map"
+import { footerBrandLinks } from "./footer-links"
+import type { FacetCounts } from "@modules/discovery/data/types"
 
-const FOOTER_COLUMNS: { h: string; items: { label: string; href: string }[] }[] = [
-  {
-    h: "Shop",
-    items: [
-      { label: "All Wheels", href: "/store" },
-      { label: "New Drops", href: "/collections" },
-      { label: "Off-Road", href: "/categories" },
-      { label: "Luxury", href: "/categories" },
-      { label: "Street", href: "/categories" },
-      { label: "Truck & Dually", href: "/categories" },
-    ],
-  },
-  {
-    h: "Brands",
-    items: [
-      { label: "Forgiato Type", href: "/collections" },
-      { label: "Vossen Type", href: "/collections" },
-      { label: "Method Type", href: "/collections" },
-      { label: "Fuel Type", href: "/collections" },
-      { label: "All Brands", href: "/collections" },
-    ],
-  },
-  // WB-081: every footer link now points at a real route — the Help/Company
-  // columns were ten dead `#` anchors. Company links (About/Press/Careers…)
-  // are gone until those pages exist; Legal carries the policy pages.
-  {
-    h: "Help",
-    items: [
-      { label: "Contact", href: "/contact" },
-      { label: "Returns & Exchanges", href: "/returns" },
-      { label: "Shipping", href: "/shipping" },
-    ],
-  },
-  {
-    h: "Legal",
-    items: [
-      { label: "Terms of Service", href: "/terms" },
-      { label: "Privacy Policy", href: "/privacy" },
-    ],
-  },
-]
+type FooterColumn = { h: string; items: { label: string; href: string }[] }
+
+// Display labels for the footer's curated STYLE_DEFS subset — style-map's
+// labels are all-caps (rendered via CSS elsewhere); the footer's other
+// columns are title-case text, so map to that instead of deriving it.
+const FOOTER_STYLE_LABELS: Record<string, string> = {
+  "OFF-ROAD": "Off-Road",
+  LUXURY: "Luxury",
+  STREET: "Street",
+  "TRUCK & DUALLY": "Truck & Dually",
+}
+
+// WB-085 N1/N8: Shop + Brands columns are built from live Discovery facets
+// (via getHomeCatalog — shared react.cache hit, no extra Meili call) so every
+// link resolves to real results. Style tiles reuse the same curated mapping
+// as the homepage's Shop-by-Style section; brand links are the top-5 by
+// product count.
+function buildFooterColumns(facets: FacetCounts): FooterColumn[] {
+  const styles = styleTiles(facets)
+  const styleItems = Object.keys(FOOTER_STYLE_LABELS)
+    .map((label) => styles.find((t) => t.label === label))
+    .filter((t): t is NonNullable<typeof t> => Boolean(t))
+    .map((t) => ({ label: FOOTER_STYLE_LABELS[t.label], href: t.href }))
+
+  return [
+    {
+      h: "Shop",
+      items: [
+        { label: "All Wheels", href: "/store" },
+        { label: "All Tires", href: "/tires" },
+        ...styleItems,
+      ],
+    },
+    {
+      h: "Brands",
+      items: [
+        ...footerBrandLinks(facets.brands),
+        { label: "All Brands", href: "/store" },
+      ],
+    },
+    // WB-081: every footer link now points at a real route — the Help/Company
+    // columns were ten dead `#` anchors. Company links (About/Press/Careers…)
+    // are gone until those pages exist; Legal carries the policy pages.
+    {
+      h: "Help",
+      items: [
+        { label: "Contact", href: "/contact" },
+        { label: "Returns & Exchanges", href: "/returns" },
+        { label: "Shipping", href: "/shipping" },
+      ],
+    },
+    {
+      h: "Legal",
+      items: [
+        { label: "Terms of Service", href: "/terms" },
+        { label: "Privacy Policy", href: "/privacy" },
+      ],
+    },
+  ]
+}
 
 const SOCIALS: { name: "instagram" | "youtube" | "tiktok" | "facebook"; label: string }[] = [
   { name: "instagram", label: "Instagram" },
@@ -53,6 +76,10 @@ const SOCIALS: { name: "instagram" | "youtube" | "tiktok" | "facebook"; label: s
 ]
 
 export default async function Footer() {
+  const { facets } = await getHomeCatalog()
+  const brandCount = Object.keys(facets.brands).length
+  const footerColumns = buildFooterColumns(facets)
+
   return (
     <footer
       className="px-5 pt-12 pb-8 xsmall:px-8 small:px-20 small:pt-16 bg-white"
@@ -72,11 +99,11 @@ export default async function Footer() {
             <Logo size={20} />
           </LocalizedClientLink>
           <div className="text-[13px] text-[var(--graphite)] mt-4 max-w-[260px] leading-[1.6]">
-            Authorized dealer for 40+ premium aftermarket wheel brands. Built
-            in Long Beach.
+            Authorized dealer for {brandCount}+ premium aftermarket wheel
+            brands. Built in Long Beach.
           </div>
         </div>
-        {FOOTER_COLUMNS.map((col) => (
+        {footerColumns.map((col) => (
           <div key={col.h}>
             <Label tone="muted" style={{ marginBottom: 14, display: "block" }}>
               {col.h}

@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react"
 import { OffsetVariant, ProductDetail, SizeOption } from "../../data/types"
 import { sizesForBoltPattern, pickDefaultSize, boresFor, loadsForBore, resolveLeafVariant, boltPatternsForFinish } from "../../data/group-sizes"
+import { headlinePriceCents } from "../../data/price-truth"
 import Gallery from "./gallery"
 import VariantPicker from "./variant-picker"
 import PurchasePanel from "./purchase-panel"
@@ -207,12 +208,15 @@ const Hero = ({ product }: HeroProps) => {
     resolveLeafVariant(selectedSize, selectedOffsetMm, selectedBore) ??
     resolveLeafVariant(selectedSize, selectedOffsetMm)
 
-  // Price the *selected* offset, not the size's cheapest — multi-offset sizes
-  // can carry different MSRPs. Falls back to the size "from" price, then product.
-  const unitPriceCents =
-    currentOffset?.priceCents ??
-    selectedSize.priceCentsOverride ??
-    product.priceCents
+  // Price the *selected* offset's OWN price ONLY (WB-090 P12) — multi-offset
+  // sizes can carry different MSRPs, and this used to fall back to the size
+  // "from" price (a sibling offset's min) or the product-level price when the
+  // selected leaf had no price of its own, silently showing a DIFFERENT price
+  // than what this exact variant actually charges. `null` means Medusa has no
+  // live price for this variant right now; the purchase panel renders "Price
+  // unavailable" and disables purchase instead of a misleading $0.00 behind a
+  // live buy button.
+  const unitPriceCents = headlinePriceCents(currentOffset?.priceCents)
 
   return (
     <section className="grid grid-cols-1 small:grid-cols-2 gap-10 small:gap-16 items-start">

@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react"
 import { TireProductDetail, TireSizeOption } from "../../../data/types"
 import { sizesForRim, pickDefaultTireSize } from "../../../data/tire/tire-size-options"
+import { headlinePriceCents } from "../../../data/price-truth"
 import { useGarage } from "@lib/garage/use-garage"
 import { tireFitsVehicle } from "@lib/fitment/tire-fits-vehicle"
 import { setSelectedTireFit } from "@lib/stores/selected-tire-fit"
@@ -145,7 +146,13 @@ const TireHero = ({ product }: TireHeroProps) => {
     setSelectedSizeLabel(label)
   }
 
-  const unitPriceCents = selectedSize?.priceCents ?? product.priceCents
+  // The selected size's OWN price ONLY (WB-090 P12) — dropping the
+  // `?? product.priceCents` fallback, which was the product-wide min-price
+  // across all sizes (see map-tire-detail.ts) and could silently show a
+  // DIFFERENT price than this exact size actually charges. `null` means no
+  // live price for this size right now; the purchase panel renders "Price
+  // unavailable" and disables purchase instead of a misleading $0.00.
+  const unitPriceCents = headlinePriceCents(selectedSize?.priceCents)
   const vehicleLabel = active
     ? `${active.year} ${active.make} ${active.model}${active.trim ? ` ${active.trim}` : ""}`
     : ""

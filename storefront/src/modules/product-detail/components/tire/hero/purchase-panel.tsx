@@ -18,12 +18,17 @@ import { formatCentsUsd } from "@lib/util/money"
 import { TireProductDetail, TireSizeOption } from "../../../data/types"
 import { DEFAULT_TIRE_QTY, LOW_STOCK_THRESHOLD, TRUST_STRIP } from "../../../data/pdp-config"
 import { clampQty, stepperCap } from "../../../data/qty-bounds"
+import { canPurchasePrice } from "../../../data/price-truth"
 
 type TirePurchasePanelProps = {
   product: TireProductDetail
   selectedSize: TireSizeOption | undefined
-  /** Computed unit price for the current size, in cents. */
-  unitPriceCents: number
+  /**
+   * The selected size's own headline price in cents (WB-090 P12), or `null`
+   * when Medusa has no live price for this exact size right now. Never a
+   * product-level fallback — see `data/price-truth.ts`.
+   */
+  unitPriceCents: number | null
 }
 
 const formatUsd = (cents: number) => formatCentsUsd(cents)
@@ -79,7 +84,16 @@ const TirePurchasePanel = ({
   const stepQty = (delta: number) =>
     setQuantity((q) => clampQty(q + delta, cap))
 
-  const canPurchase = !!selectedSize && selectedSize.availability !== "out_of_stock"
+  // Purchasable only when a size resolved, is in stock, AND carries a real
+  // (>0) price (WB-090 P12) — a genuinely price-less size must never render
+  // an enabled buy button behind a misleading "$0.00".
+  const canPurchase = canPurchasePrice(
+    !!selectedSize && selectedSize.availability !== "out_of_stock",
+    unitPriceCents
+  )
+  // Pre-multiplied line total; null propagates "Price unavailable" into both
+  // buy buttons instead of a fabricated $0.00 line.
+  const lineTotalCents = unitPriceCents !== null ? unitPriceCents * quantity : null
 
   const handleAddToCart = async () => {
     if (!selectedSize) return
@@ -154,13 +168,23 @@ const TirePurchasePanel = ({
         {product.name}
       </Display>
 
-      {/* Price row */}
+      {/* Price row — unitPriceCents null (WB-090 P12: no live price on the
+          selected size, no product-level fallback) renders honest "Price
+          unavailable" copy instead of a fabricated $0.00. */}
       <div className="flex items-baseline gap-3 mt-5">
-        <Display size={40} as="div">
-          <span style={{ color: "var(--orange)" }}>$</span>
-          {formatCentsUsd(unitPriceCents).slice(1)}
-        </Display>
-        <Label tone="muted">PER TIRE</Label>
+        {unitPriceCents === null ? (
+          <Display size={40} as="div" tone="graphite">
+            Price unavailable
+          </Display>
+        ) : (
+          <>
+            <Display size={40} as="div">
+              <span style={{ color: "var(--orange)" }}>$</span>
+              {formatCentsUsd(unitPriceCents).slice(1)}
+            </Display>
+            <Label tone="muted">PER TIRE</Label>
+          </>
+        )}
       </div>
 
       {product.description && (
@@ -235,9 +259,11 @@ const TirePurchasePanel = ({
           className="flex-1"
           style={{ height: 56, fontSize: 14 }}
         >
-          {!canPurchase
-            ? "Out of stock"
-            : `Add to cart · ${formatUsd(unitPriceCents * quantity)}`}
+          {canPurchase && lineTotalCents !== null
+            ? `Add to cart · ${formatUsd(lineTotalCents)}`
+            : unitPriceCents === null
+              ? "Price unavailable"
+              : "Out of stock"}
           {canPurchase && <Icon name="arrow-right" size={16} color="white" />}
         </Button>
 
@@ -275,7 +301,7 @@ const TirePurchasePanel = ({
         className="mt-3 w-full bg-[var(--ink)] text-white hover:bg-[var(--ink)]/90"
         style={{ height: 56, fontSize: 14 }}
       >
-        Buy now · {formatUsd(unitPriceCents * quantity)}
+        {lineTotalCents !== null ? `Buy now · ${formatUsd(lineTotalCents)}` : "Price unavailable"}
         <Icon name="arrow-right" size={16} color="white" />
       </Button>
 

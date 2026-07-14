@@ -28,9 +28,17 @@ type Props = {
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { handle, countryCode } = await params
   const product = await getProductDetail(handle, countryCode)
+  // WB-090 P10: an empty vendor description used to ship an empty <meta
+  // name="description">. Wheel-only templated fallback (tires aren't in
+  // scope for this fix); a wheel with a real description is unaffected.
+  const description =
+    product.description ||
+    (product.kind === "wheel"
+      ? `${product.brand} ${product.name} wheels — sizes, finishes, live fitment check.`
+      : product.description)
   return {
     title: `${product.brand} ${product.name} | Wheel Builds`,
-    description: product.description,
+    description,
   }
 }
 

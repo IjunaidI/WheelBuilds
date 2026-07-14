@@ -18,15 +18,18 @@ import { formatCentsUsd } from "@lib/util/money"
 import { OffsetVariant, ProductDetail, SizeOption } from "../../data/types"
 import { DEFAULT_WHEEL_QTY, LOW_STOCK_THRESHOLD, TRUST_STRIP } from "../../data/pdp-config"
 import { clampQty, stepperCap } from "../../data/qty-bounds"
+import { canPurchasePrice } from "../../data/price-truth"
 
 type PurchasePanelProps = {
   product: ProductDetail
   selectedSize: SizeOption
   /**
-   * Computed unit price for the current (size) variant in cents. Falls back
-   * to `product.priceCents` when no override on the size.
+   * The SELECTED variant's own headline price in cents (WB-090 P12), or
+   * `null` when Medusa has no live price for this exact size × offset right
+   * now. Never a sibling `priceCentsOverride`/`product.priceCents` fallback —
+   * see `data/price-truth.ts`.
    */
-  unitPriceCents: number
+  unitPriceCents: number | null
   /** The exact Medusa variant resolved from size × offset; null if unresolved. */
   selectedVariant: OffsetVariant | null
 }
@@ -81,8 +84,16 @@ const PurchasePanel = ({
   const stepQty = (delta: number) =>
     setQuantity((q) => clampQty(q + delta, cap))
 
-  const canPurchase =
-    !!selectedVariant && selectedVariant.availability !== "out_of_stock"
+  // Purchasable only when the variant resolved, is in stock, AND carries a
+  // real (>0) price (WB-090 P12) — a genuinely price-less variant must never
+  // render an enabled buy button behind a misleading "$0.00".
+  const canPurchase = canPurchasePrice(
+    !!selectedVariant && selectedVariant.availability !== "out_of_stock",
+    unitPriceCents
+  )
+  // Pre-multiplied line total; null propagates "Price unavailable" into both
+  // buy buttons instead of a fabricated $0.00 line.
+  const lineTotalCents = unitPriceCents !== null ? unitPriceCents * quantity : null
 
   const handleAddToCart = async () => {
     if (!selectedVariant) return
@@ -157,32 +168,46 @@ const PurchasePanel = ({
         {product.name}
       </Display>
 
-      {/* Price row */}
+      {/* Price row — unitPriceCents null (WB-090 P12: no live price on the
+          selected variant, no sibling fallback) renders honest "Price
+          unavailable" copy instead of a fabricated $0.00. */}
       <div className="flex items-baseline gap-3 mt-5">
-        {product.originalPriceCents &&
-          product.originalPriceCents > unitPriceCents && (
-            <span className="text-[18px] font-[var(--mono)] text-[var(--ink-soft)] line-through">
-              {formatUsd(product.originalPriceCents)}
-            </span>
-          )}
-        <Display size={40} as="div">
-          <span style={{ color: "var(--orange)" }}>$</span>
-          {formatCentsUsd(unitPriceCents).slice(1)}
-        </Display>
-        <Label tone="muted">PER WHEEL</Label>
+        {unitPriceCents === null ? (
+          <Display size={40} as="div" tone="graphite">
+            Price unavailable
+          </Display>
+        ) : (
+          <>
+            {product.originalPriceCents &&
+              product.originalPriceCents > unitPriceCents && (
+                <span className="text-[18px] font-[var(--mono)] text-[var(--ink-soft)] line-through">
+                  {formatUsd(product.originalPriceCents)}
+                </span>
+              )}
+            <Display size={40} as="div">
+              <span style={{ color: "var(--orange)" }}>$</span>
+              {formatCentsUsd(unitPriceCents).slice(1)}
+            </Display>
+            <Label tone="muted">PER WHEEL</Label>
+          </>
+        )}
       </div>
 
-      <p
-        style={{
-          fontSize: 15,
-          color: "var(--graphite)",
-          margin: "20px 0 0",
-          maxWidth: 520,
-          lineHeight: 1.55,
-        }}
-      >
-        {product.description}
-      </p>
+      {/* WB-090 P10: guard the empty description (mirrors the tire panel's
+          `{product.description && …}`) instead of rendering a blank <p>. */}
+      {product.description && (
+        <p
+          style={{
+            fontSize: 15,
+            color: "var(--graphite)",
+            margin: "20px 0 0",
+            maxWidth: 520,
+            lineHeight: 1.55,
+          }}
+        >
+          {product.description}
+        </p>
+      )}
 
       {/* Fitment chip — uses variantFitTier on the CURRENTLY SELECTED variant
           (per-variant bore + offset, paired), not fitsVehicle. The fitment
@@ -256,9 +281,11 @@ const PurchasePanel = ({
           className="flex-1"
           style={{ height: 56, fontSize: 14 }}
         >
-          {!canPurchase
-            ? "Out of stock"
-            : `Add to cart · ${formatUsd(unitPriceCents * quantity)}`}
+          {canPurchase && lineTotalCents !== null
+            ? `Add to cart · ${formatUsd(lineTotalCents)}`
+            : unitPriceCents === null
+              ? "Price unavailable"
+              : "Out of stock"}
           {canPurchase && (
             <Icon name="arrow-right" size={16} color="white" />
           )}
@@ -304,7 +331,7 @@ const PurchasePanel = ({
         className="mt-3 w-full bg-[var(--ink)] text-white hover:bg-[var(--ink)]/90"
         style={{ height: 56, fontSize: 14 }}
       >
-        Buy now · {formatUsd(unitPriceCents * quantity)}
+        {lineTotalCents !== null ? `Buy now · ${formatUsd(lineTotalCents)}` : "Price unavailable"}
         <Icon name="arrow-right" size={16} color="white" />
       </Button>
 

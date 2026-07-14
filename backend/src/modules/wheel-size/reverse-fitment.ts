@@ -49,11 +49,16 @@ export function sizeInWindow(sizes: ProductSize[], row: FitmentRow): boolean {
  * vehicle query matched (a "union" row) when there's more than one, so
  * `raw.data[0].trim` is an arbitrary pick that would otherwise be displayed
  * as if it were the only trim this fitment applies to. Trim-honesty rule: a
- * multi-entry row only keeps a trim label when every entry agrees on it
- * (`trims.size === 1`); a genuine union of >1 distinct trims claims no trim
- * at all. `trimNarrowed` (`raw.data.length === 1`) tells callers whether the
- * row was ever narrowed to one specific trim, independent of whether that
- * trim happened to be nameable.
+ * multi-entry row only keeps a trim label when EVERY entry agrees on it — a
+ * missing/empty trim on any entry counts as its OWN distinct value, so a
+ * mixed known/unknown-trim union (e.g. one entry "Sport", another with no
+ * trim) is NOT collapsed down to the one named trim; it claims no trim at
+ * all, same as a genuine union of >1 distinct named trims. (A naive
+ * `.filter(Boolean)` before deduping would silently drop the empty entries
+ * and let a mixed union masquerade as narrowed — that's the bug this fixes.)
+ * `trimNarrowed` (`raw.data.length === 1`) tells callers whether the row was
+ * ever narrowed to one specific trim, independent of whether that trim
+ * happened to be nameable.
  */
 export function extractVehicleIdentity(
   raw: any
@@ -63,10 +68,12 @@ export function extractVehicleIdentity(
   const make = d?.make?.name
   const model = d?.model?.name
   if (typeof make !== "string" || !make || typeof model !== "string" || !model) return null
-  const trims = new Set(data.map((e) => e?.trim).filter(Boolean))
+  // Missing/empty trims are distinct values here (NOT filtered out) so a
+  // mixed known/unknown-trim row is caught by distinct.size > 1 below.
+  const trimVals = data.map((e) => (e?.trim ?? "").trim())
+  const distinct = new Set(trimVals)
   const trimNarrowed = data.length === 1
-  const trim: string | undefined =
-    trimNarrowed || trims.size === 1 ? (([...trims][0] as string | undefined) ?? d?.trim) : undefined
+  const trim: string | undefined = distinct.size === 1 && trimVals[0] ? trimVals[0] : undefined
   const start = typeof d?.start_year === "number" ? d.start_year : null
   const end = typeof d?.end_year === "number" ? d.end_year : null
   const yearLabel =

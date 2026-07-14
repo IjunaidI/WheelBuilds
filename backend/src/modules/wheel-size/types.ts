@@ -21,8 +21,14 @@ export type VehicleFitment = {
      * `resolveByModel` discarded it and retried broad (all trims) because the
      * trim-narrowed query returned no data (WB-104 T3) — the storefront's trim
      * dropdown is the GLOBAL modifications catalog, so a non-US trim slug against
-     * a `usdm` fitment query is a common, previously-silent cause. Undefined when
-     * no trim was supplied at all.
+     * a `usdm` fitment query is a common cause. That fallback is logged (visible
+     * in ops logs via `resolveByModel`'s `logger.warn`) and surfaced here on the
+     * live-resolve response. Undefined when no trim was supplied at all, OR
+     * when this value is being read back off a warm cache-hit (`toFitment`)
+     * rather than a live resolve/refresh — WB-104 T3: this flag is
+     * first-fetch/refresh-only, it is not persisted on the cache row, so a
+     * later cache-hit read cannot reconstruct it. The `logger.warn` above is
+     * the authoritative signal that a silent trim-fallback occurred.
      */
     trimNarrowed?: boolean
   }

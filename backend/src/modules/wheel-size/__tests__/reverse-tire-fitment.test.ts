@@ -122,4 +122,14 @@ describe("buildReverseTireFitment", () => {
     expect(out).toHaveLength(1)
     expect(out[0]).toMatchObject({ make: "Honda", model: "Accord", trim: undefined, trimNarrowed: false })
   })
+
+  // WB-104 T1: a MIXED known/unknown-trim union — one entry has trim "Sport",
+  // the other has no trim at all — must claim NO trim, not silently collapse
+  // to the single named value (the exact dishonesty this fix removes).
+  it("emits no trim for a MIXED known/unknown-trim union (entry A 'Sport', entry B no trim)", () => {
+    const rows = [ok("Honda", "Accord", ["Sport", undefined], 2018, 2022, [{ size: "235/40R19" }])]
+    const out = buildReverseTireFitment(rows, [spec("235/40R19")], 24)
+    expect(out).toHaveLength(1)
+    expect(out[0]).toMatchObject({ make: "Honda", model: "Accord", trim: undefined, trimNarrowed: false })
+  })
 })

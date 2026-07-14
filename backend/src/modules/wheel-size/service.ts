@@ -83,7 +83,21 @@ class WheelSizeService extends MedusaService({ WheelSizeCatalog, WheelSizeFitmen
     return this.refreshFitment({ ...p, region })
   }
 
-  /** Map a cache row to the VehicleFitment read contract. */
+  /**
+   * Map a cache row to the VehicleFitment read contract.
+   *
+   * WB-104 T3: `source.trimNarrowed` is deliberately omitted here (left
+   * `undefined`) — it is populated ONLY on a live resolve/refresh (a cold
+   * cache miss, or the SWR background refresh in `getFitment`), never on this
+   * warm cache-HIT read path, because `WheelSizeFitment` has no
+   * `trim_narrowed` column to reconstruct it from. That's a deliberate
+   * scope cut, not an oversight — the field has no consumer yet, so a
+   * migration to persist it is a tracked follow-up rather than done here.
+   * The AUTHORITATIVE operator signal for a silent trim-fallback is the
+   * `logger.warn` in `resolveByModel`, which fires exactly when the fallback
+   * happens (on the live path that discovers it) regardless of whether any
+   * caller ever reads `trimNarrowed` back off a later cached response.
+   */
   private toFitment(c: any, region: string, modificationSlug?: string): VehicleFitment {
     return {
       status: c.status as VehicleFitment["status"],
@@ -94,11 +108,20 @@ class WheelSizeService extends MedusaService({ WheelSizeCatalog, WheelSizeFitmen
       offsetWindow: (c.offset_window as unknown as Window) ?? null,
       oemTireSizes: extractOemTireSizes(c.raw),
       oemTires: extractOemTires(c.raw),
+      // trimNarrowed intentionally absent — see the method comment above.
       source: { modificationSlug: modificationSlug ?? "", region: c.region ?? region },
     }
   }
 
-  /** Fetch live + upsert the cache row by cache_key. Returns the fresh fitment. */
+  /**
+   * Fetch live + upsert the cache row by cache_key. Returns the fresh fitment.
+   *
+   * WB-104 T3: `trimNarrowed` below is a first-fetch/refresh-only signal — it
+   * rides on THIS call's return value only and is never written to the cache
+   * row (no `trim_narrowed` column on `WheelSizeFitment`), so a subsequent
+   * warm cache-hit through `toFitment` cannot reconstruct it. See the
+   * `toFitment` comment for the honest read-side contract.
+   */
   async refreshFitment(p: { make: string; model: string; modificationSlug?: string; year?: string; region: string }): Promise<VehicleFitment> {
     const cache_key = buildFitmentCacheKey(p)
     const { body, regionUsed, trimNarrowed } = await this.resolveByModel(p)
@@ -225,10 +248,16 @@ class WheelSizeService extends MedusaService({ WheelSizeCatalog, WheelSizeFitmen
     // stays on US data. emptyBody then carries the broader make+model+year
     // meta.regions, a better fallback hint than the trim-narrowed one.
     //
-    // WB-104 T3: this retry used to be silent — no log, and the broader (all-trims)
-    // result gets cached under the trim-narrowed cache_key with no signal that the
-    // trim was discarded. `trimDiscarded` makes that visible on the returned
-    // fitment's `source.trimNarrowed` for every return path below.
+    // WB-104 T3: this retry used to be silent — no log at all, and the broader
+    // (all-trims) result gets cached under the trim-narrowed cache_key with no
+    // signal that the trim was discarded. The fallback is no longer silent in
+    // the sense that matters operationally: it is now ALWAYS logged here
+    // (`logger.warn`, visible in ops logs) the moment it happens, and
+    // `trimDiscarded` additionally surfaces on THIS live-resolve response's
+    // `source.trimNarrowed` for every return path below. That surfaced value
+    // is first-fetch/refresh-only, though — it is not persisted, so a later
+    // warm cache-hit read (`toFitment`) can't reconstruct it; the logger.warn
+    // above remains the authoritative record of the fallback having occurred.
     let emptyBody = primary.body
     let trimDiscarded = false
     if (p.modificationSlug) {

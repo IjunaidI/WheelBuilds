@@ -58,6 +58,15 @@ describe("extractVehicleIdentity", () => {
         make: "Honda", model: "Accord", trim: "Sport", yearLabel: "2018–2022", trimNarrowed: false,
       })
     })
+    it("claims no trim for a MIXED known/unknown-trim union row (one entry named, one missing)", () => {
+      // Entry A has trim "Sport", entry B has no trim at all — a naive
+      // .filter(Boolean)-then-dedupe would collapse this to size-1 {"Sport"}
+      // and wrongly claim trim: "Sport". The honest rule treats the missing
+      // trim as its own distinct value, so this must claim NO trim.
+      expect(extractVehicleIdentity(rawOf("Honda", "Accord", ["Sport", undefined], 2018, 2022))).toEqual({
+        make: "Honda", model: "Accord", trim: undefined, yearLabel: "2018–2022", trimNarrowed: false,
+      })
+    })
   })
 })
 

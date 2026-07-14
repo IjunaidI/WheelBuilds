@@ -54,7 +54,28 @@ export function availabilityOf(
   return "in_stock"
 }
 
-const rank = { in_stock: 2, low_stock: 1, out_of_stock: 0 } as const
+export const rank = { in_stock: 2, low_stock: 1, out_of_stock: 0 } as const
+
+/**
+ * The best-availability offset among a size's sibling ETs — ties resolve to
+ * the first-listed (vendor feed order), matching `resolveLeafVariant`'s
+ * tie-break. Used as a size's organic `defaultOffsetMm` (WB-090 P1) so a
+ * first-seen-but-out-of-stock ET can never become the default while a
+ * sibling ET is actually purchasable — without this, the Status stat (a
+ * size-level rollup) and the buy button (variant-level) could disagree on
+ * the same screen.
+ */
+export function bestAvailabilityOffset(
+  offsetVariants: OffsetVariant[]
+): number | undefined {
+  if (offsetVariants.length === 0) return undefined
+  let best = offsetVariants[0]
+  for (let i = 1; i < offsetVariants.length; i++) {
+    const o = offsetVariants[i]
+    if (rank[o.availability] > rank[best.availability]) best = o
+  }
+  return best.value
+}
 
 /**
  * Group variants into the Diameter × Width × BoltPattern size matrix. The
@@ -95,6 +116,10 @@ export function groupVariantsIntoSizes(
       existing.offsetVariants = [...(existing.offsetVariants ?? []), offset]
       // Best availability across sibling offsets within this pattern.
       if (rank[avail] > rank[existing.availability]) existing.availability = avail
+      // Best-availability default offset among sibling offsets (WB-090 P1) —
+      // recomputed off the running list so the organic default never sticks
+      // to a first-seen-but-out-of-stock ET while a sibling is purchasable.
+      existing.defaultOffsetMm = bestAvailabilityOffset(existing.offsetVariants)
       // Min non-zero price across sibling offsets for the size "from" price.
       if (priceCents > 0) {
         existing.priceCentsOverride =

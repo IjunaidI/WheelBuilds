@@ -46,7 +46,7 @@ export type SizeOption = {
   offsetVariants?: OffsetVariant[]
   /** Raw bolt pattern (e.g. "5x114.3") this size is scoped to. Each SizeOption belongs to exactly one pattern; the picker filters sizes by the selected pattern. */
   boltPattern: string
-  /** The wheel's default ET for this size (its first-listed offset variant) — NOT a per-vehicle OEM lookup. Selecting anything else flips to a CustomFit override. */
+  /** The wheel's default ET for this size — its best-availability offset variant (ties resolve first-listed), NOT a per-vehicle OEM lookup. Selecting anything else flips to a CustomFit override. */
   defaultOffsetMm?: number
   /** Per-wheel weight in pounds. */
   weightLb: number

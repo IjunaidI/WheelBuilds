@@ -7,7 +7,7 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip"
-import { SizeOption } from "../../data/types"
+import { OffsetVariant, SizeOption } from "../../data/types"
 import { SHIP_LEAD_TIME } from "../../data/pdp-config"
 
 type VariantPickerProps = {
@@ -18,6 +18,15 @@ type VariantPickerProps = {
   boltPatterns: string[]
   selectedBoltPattern: string
   onBoltPatternChange: (b: string) => void
+
+  /**
+   * The actually-selected leaf variant (size × offset × bore × load). The
+   * Status stat reads ITS availability, not the size-level rollup
+   * (`selectedSize.availability`), so it can never disagree with the buy
+   * button on the same screen (WB-090 P1). Falls back to the size rollup
+   * when absent (e.g. a variant-less size).
+   */
+  selectedVariant?: OffsetVariant | null
 }
 
 const AVAILABILITY_LABEL: Record<SizeOption["availability"], string> = {
@@ -40,7 +49,9 @@ const VariantPicker = ({
   boltPatterns,
   selectedBoltPattern,
   onBoltPatternChange,
+  selectedVariant,
 }: VariantPickerProps) => {
+  const statusAvailability = selectedVariant?.availability ?? selectedSize.availability
   return (
     <div className="flex flex-col gap-5">
       {/* Size matrix */}
@@ -141,13 +152,13 @@ const VariantPicker = ({
         <Stat
           label="Status"
           value={
-            selectedSize.availability === "in_stock"
+            statusAvailability === "in_stock"
               ? "In stock"
-              : selectedSize.availability === "low_stock"
+              : statusAvailability === "low_stock"
                 ? "Low stock"
                 : "Out of stock"
           }
-          accent={selectedSize.availability !== "out_of_stock"}
+          accent={statusAvailability !== "out_of_stock"}
         />
       </div>
     </div>

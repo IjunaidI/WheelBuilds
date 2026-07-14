@@ -4,6 +4,7 @@ import { useState } from "react"
 import Icon from "@modules/common/components/icon"
 import Label from "@modules/common/components/label"
 import { OffsetVariant } from "../../data/types"
+import { rank } from "../../data/group-sizes"
 import OffsetDiagram from "./offset-diagram"
 
 type AdvancedFitmentPanelProps = {
@@ -13,19 +14,34 @@ type AdvancedFitmentPanelProps = {
   offsetVariants: OffsetVariant[]
   /** The currently selected ET. */
   selectedOffsetMm: number
-  /** The wheel's default ET (gets the orange badge in the chip row). */
+  /** The wheel's TRUE default ET (WB-090 P1's best-availability pick) — gets
+   * the orange badge in the chip row. Always the organic default, even in
+   * fit mode (separate from whatever ET fit-mode auto-picked as the initial
+   * selection). */
   defaultOffsetMm?: number
-  /**
-   * The currently active center bore, when the hero tracks one (bore
-   * branches at the offset level — see `boresFor`/`resolveLeafVariant` in
-   * `data/group-sizes.ts`). Disambiguates chip selection when a size holds
-   * two variants at the SAME ET that differ only in bore. `undefined` means
-   * the caller doesn't track bore — selection then falls back to matching on
-   * offset alone.
-   */
-  selectedCenterBoreMm?: number | null
   /** Called when the user picks a different ET. */
   onSelectOffset: (mm: number) => void
+}
+
+/**
+ * One chip per distinct ET (WB-090 P17). A size can hold multiple variants at
+ * the SAME offset that differ only in center bore or load rating (those axes
+ * branch off the offset — see `boresFor`/`loadsForBore` in
+ * `data/group-sizes.ts`); rendering one chip per VARIANT duplicated "+35 MM"
+ * buttons (and could collide on React key). Collapsing to one representative
+ * per ET — best-availability, first-seen tie-break — keeps the row honest;
+ * bore/load sub-selection happens via the SpecSelector rows in the hero, not
+ * here.
+ */
+function dedupeOffsetsByEt(variants: OffsetVariant[]): OffsetVariant[] {
+  const byValue = new Map<number, OffsetVariant>()
+  for (const o of variants) {
+    const existing = byValue.get(o.value)
+    if (!existing || rank[o.availability] > rank[existing.availability]) {
+      byValue.set(o.value, o)
+    }
+  }
+  return Array.from(byValue.values())
 }
 
 /**
@@ -39,7 +55,6 @@ const AdvancedFitmentPanel = ({
   offsetVariants,
   selectedOffsetMm,
   defaultOffsetMm,
-  selectedCenterBoreMm,
   onSelectOffset,
 }: AdvancedFitmentPanelProps) => {
   const [open, setOpen] = useState(false)
@@ -49,6 +64,7 @@ const AdvancedFitmentPanel = ({
   const current =
     offsetVariants.find((o) => o.value === selectedOffsetMm) ?? offsetVariants[0]
   const isDefault = selectedOffsetMm === defaultOffsetMm
+  const chips = dedupeOffsetsByEt(offsetVariants)
 
   return (
     <div
@@ -102,21 +118,13 @@ const AdvancedFitmentPanel = ({
             </a>
           </div>
           <div className="flex gap-1.5 mb-3.5">
-            {offsetVariants.map((o) => {
-              // A size can hold two variants at the SAME ET that only differ
-              // in center bore (bore branches off the offset — see
-              // `boresFor` in data/group-sizes.ts). Matching on offset alone
-              // would style BOTH of those chips as selected; disambiguate with
-              // the active bore when the caller tracks one.
-              const sel =
-                o.value === selectedOffsetMm &&
-                (selectedCenterBoreMm === undefined ||
-                  o.centerBoreMm === selectedCenterBoreMm)
+            {chips.map((o) => {
+              const sel = o.value === selectedOffsetMm
               const isDefaultOffset = o.value === defaultOffsetMm
               return (
                 <button
                   type="button"
-                  key={`${o.value}|${o.centerBoreMm ?? "x"}`}
+                  key={o.variantId}
                   onClick={() => onSelectOffset(o.value)}
                   className="flex-1 relative rounded-[4px] px-2 py-2.5 font-[var(--display)] font-black text-[16px]"
                   style={{

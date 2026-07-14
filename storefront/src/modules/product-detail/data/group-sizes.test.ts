@@ -10,7 +10,9 @@ import {
   isRealBoltPattern,
   availabilityOf,
   boltPatternsForFinish,
+  bestAvailabilityOffset,
 } from "./group-sizes"
+import type { OffsetVariant } from "./types"
 
 // Minimal variant factory mirroring the Medusa Store API shape the loader reads.
 function variant(
@@ -244,5 +246,74 @@ describe("availabilityOf — configurable low-stock threshold", () => {
   it("honors an explicit threshold", () => {
     expect(availabilityOf(2, 2)).toBe("low_stock")
     expect(availabilityOf(3, 2)).toBe("in_stock")
+  })
+})
+
+describe("bestAvailabilityOffset", () => {
+  const ov = (
+    value: number,
+    availability: OffsetVariant["availability"],
+    variantId = `v-${value}`
+  ): OffsetVariant => ({
+    value,
+    backspaceIn: "",
+    variantId,
+    availability,
+    centerBoreMm: null,
+    loadRatingLb: null,
+  })
+
+  it("picks the in-stock offset over a first-listed out-of-stock sibling", () => {
+    const offsets = [ov(35, "out_of_stock"), ov(20, "in_stock")]
+    expect(bestAvailabilityOffset(offsets)).toBe(20)
+  })
+
+  it("ties resolve to the first-listed offset", () => {
+    expect(bestAvailabilityOffset([ov(35, "in_stock"), ov(20, "in_stock")])).toBe(35)
+  })
+
+  it("prefers low_stock over out_of_stock when nothing is fully in stock", () => {
+    expect(bestAvailabilityOffset([ov(35, "out_of_stock"), ov(20, "low_stock")])).toBe(20)
+  })
+
+  it("returns undefined for an empty list (total — never crashes)", () => {
+    expect(bestAvailabilityOffset([])).toBeUndefined()
+  })
+})
+
+describe("groupVariantsIntoSizes — defaultOffsetMm best-availability (WB-090 P1)", () => {
+  it("resolves defaultOffsetMm to the in-stock sibling offset when the first-listed offset is OOS", () => {
+    // v_a (ET35) is first-seen but OOS; v_b (ET20) is a sibling offset in stock.
+    // Regression: the old static `defaultOffsetMm: offsetMm` (first-seen) would
+    // pin the default to ET35 here, so the Status stat (size rollup, already
+    // "in_stock") and the buy button (OOS ET35 variant) would disagree.
+    const sizes = groupVariantsIntoSizes(
+      [
+        variant("v_a", 20, 9, 35, "5x114.3", 0, 300),
+        variant("v_b", 20, 9, 20, "5x114.3", 10, 320),
+      ],
+      28
+    )
+    expect(sizes[0].defaultOffsetMm).toBe(20)
+    expect(sizes[0].availability).toBe("in_stock")
+  })
+
+  it("keeps the first-listed offset as default when it already has the best availability", () => {
+    const sizes = groupVariantsIntoSizes(
+      [
+        variant("v_a", 20, 9, 35, "5x114.3", 10, 300),
+        variant("v_b", 20, 9, 20, "5x114.3", 0, 320),
+      ],
+      28
+    )
+    expect(sizes[0].defaultOffsetMm).toBe(35)
+  })
+
+  it("a single-offset size defaults to its only offset", () => {
+    const sizes = groupVariantsIntoSizes(
+      [variant("v_only", 20, 9, 12, "5x114.3", 0, 300)],
+      28
+    )
+    expect(sizes[0].defaultOffsetMm).toBe(12)
   })
 })

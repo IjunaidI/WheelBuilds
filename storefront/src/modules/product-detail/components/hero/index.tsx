@@ -137,8 +137,11 @@ const Hero = ({ product }: HeroProps) => {
   // the FitBanner's amber "verify clearance" copy owns the honesty. Outside fit
   // mode (useFilter false) this is unchanged.
   const fittingDefaultOffsetMm = useFilter ? selectedSize?.offsetVariants?.[0]?.value : undefined
-  const defaultOffsetMm =
-    fittingDefaultOffsetMm ?? selectedSize?.defaultOffsetMm ?? selectedSize?.offsetMm ?? 0
+  // The wheel's own organic default (WB-090 P1's best-availability pick) —
+  // independent of fit mode. Feeds the AdvancedFitmentPanel's "DEFAULT" badge
+  // so it always marks the TRUE default, never the fit-mode auto-pick (P17).
+  const wheelDefaultOffsetMm = selectedSize?.defaultOffsetMm ?? selectedSize?.offsetMm ?? 0
+  const defaultOffsetMm = fittingDefaultOffsetMm ?? wheelDefaultOffsetMm
   const [selectedOffsetMm, setSelectedOffsetMm] = useState<number>(defaultOffsetMm)
 
   // When the size changes, snap the offset back to the new size's default pick.
@@ -250,6 +253,7 @@ const Hero = ({ product }: HeroProps) => {
           boltPatterns={boltPatternOptions}
           selectedBoltPattern={selectedBoltPattern}
           onBoltPatternChange={setSelectedBoltPattern}
+          selectedVariant={currentOffset}
         />
         {availableBores.length > 1 && (
           <SpecSelector
@@ -281,8 +285,7 @@ const Hero = ({ product }: HeroProps) => {
             sizeLabel={`${selectedSize.diameter}×${selectedSize.width}`}
             offsetVariants={offsetVariants}
             selectedOffsetMm={selectedOffsetMm}
-            defaultOffsetMm={defaultOffsetMm}
-            selectedCenterBoreMm={selectedBore}
+            defaultOffsetMm={wheelDefaultOffsetMm}
             onSelectOffset={setSelectedOffsetMm}
           />
         )}

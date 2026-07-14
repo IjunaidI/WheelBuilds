@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest"
-import { extractMedusaMessage } from "../error-message"
+import { extractMedusaMessage, insufficientStockMessage } from "../error-message"
 
 const respErr = (data: unknown) => ({ response: { data } })
 
@@ -19,5 +19,38 @@ describe("extractMedusaMessage", () => {
   })
   it("returns null on empty response data", () => {
     expect(extractMedusaMessage(respErr(""))).toBeNull()
+  })
+})
+
+describe("insufficientStockMessage", () => {
+  it("recognizes a Medusa insufficient-inventory error (axios-shaped) and reports the exact available count", () => {
+    expect(
+      insufficientStockMessage(respErr({ message: "Insufficient inventory for variant" }), 2)
+    ).toBe("Only 2 in stock — reduce quantity")
+  })
+  it("recognizes a plain already-extracted message string (post-WB-079 B2 return-not-throw shape)", () => {
+    expect(
+      insufficientStockMessage("This variant does not have the required inventory", 1)
+    ).toBe("Only 1 in stock — reduce quantity")
+  })
+  it("matches on 'in stock' without the words 'inventory'/'insufficient'", () => {
+    expect(insufficientStockMessage("Only 2 left in stock right now", 5)).toBe(
+      "Only 5 in stock — reduce quantity"
+    )
+  })
+  it("does not false-positive on 'not enough' alone (dropped keyword — WB-090 fixwave)", () => {
+    expect(insufficientStockMessage("There is not enough available", 5)).toBeNull()
+  })
+  it("is case-insensitive", () => {
+    expect(insufficientStockMessage("INSUFFICIENT STOCK", 3)).toBe(
+      "Only 3 in stock — reduce quantity"
+    )
+  })
+  it("returns null for an unrelated error so the caller can fall back to generic copy", () => {
+    expect(insufficientStockMessage("Region not found", 3)).toBeNull()
+  })
+  it("returns null when there is no message at all", () => {
+    expect(insufficientStockMessage({ request: {} }, 3)).toBeNull()
+    expect(insufficientStockMessage(undefined, 3)).toBeNull()
   })
 })

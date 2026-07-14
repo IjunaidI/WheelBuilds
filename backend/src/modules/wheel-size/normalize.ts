@@ -20,7 +20,7 @@ function windowFrom(values: (number | null)[]): Window {
 
 export function normalizeByModel(
   raw: RawByModel | null | undefined,
-  source: { modificationSlug: string; region: string }
+  source: { modificationSlug: string; region: string; trimNarrowed?: boolean }
 ): VehicleFitment {
   const entries = raw?.data ?? []
   if (!entries.length) {

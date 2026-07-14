@@ -16,6 +16,8 @@ export type TireSizeOption = {
   variantId: string
   priceCents: number
   availability: TireAvailability
+  /** Real on-hand quantity for this size's variant (WB-090 P2/P18) — drives the purchase panel's qty stepper cap/default and the "Only N left" copy. */
+  quantity: number
 }
 
 const optNum = (v: unknown): number | null =>
@@ -40,6 +42,7 @@ export function buildTireSizeOptions(variants: any[]): TireSizeOption[] {
       variantId: String(v.id ?? ""),
       priceCents: Math.round(num((v.calculated_price as any)?.calculated_amount) * 100),
       availability: availabilityOf(num(v.inventory_quantity), LOW_STOCK_THRESHOLD),
+      quantity: num(v.inventory_quantity),
     }
   })
   return opts.sort(

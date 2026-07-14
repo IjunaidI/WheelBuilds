@@ -1,3 +1,5 @@
+import { formatOffset } from "../../data/group-sizes"
+
 /**
  * Top-down cross-section diagram of a wheel barrel + mounting pad. The orange
  * tick shows where the mounting pad sits relative to the centerline (`CL`) for
@@ -15,7 +17,7 @@ const OffsetDiagram = ({ value }: { value: number }) => {
       width="100%"
       height={60}
       role="img"
-      aria-label={`Cross-section showing mounting pad at +${value}mm offset`}
+      aria-label={`Cross-section showing mounting pad at ${formatOffset(value)}mm offset`}
     >
       <line
         x1="100"
@@ -64,8 +66,7 @@ const OffsetDiagram = ({ value }: { value: number }) => {
         fontWeight="600"
         fill="#FF6A00"
       >
-        {value >= 0 ? "+" : ""}
-        {value}MM
+        {formatOffset(value)}MM
       </text>
     </svg>
   )

@@ -225,6 +225,83 @@ describe("WheelSizeService.resolveByModel quota exhaustion mid-lookup (WB-072 B4
   })
 })
 
+describe("WheelSizeService.getFitment trim-narrowed visibility (WB-104 T3)", () => {
+  it("logs a warn naming the discarded slug and sets source.trimNarrowed=false when the broad retry finds data", async () => {
+    const warnings: string[] = []
+    const { svc, calls } = makeRegionService({})
+    svc.logger_ = { warn: (m: string) => warnings.push(m), error() {} }
+    svc.client_.byModel = async (p: any) => {
+      calls.push(p)
+      if (p.region === "usdm" && p.modification) return emptyWithRegions({})
+      if (p.region === "usdm") return record(5, 112)
+      return record(4, 100) // would be wrong for a US car — must not be reached
+    }
+    const f = await svc.getFitment({ make: "audi", model: "a3", year: "2022", modificationSlug: "eu-trim", region: "usdm" })
+    expect(f.canonicalBoltPatterns).toContain("5x112")
+    expect(f.source.region).toBe("usdm")
+    expect(f.source.trimNarrowed).toBe(false)
+    expect(warnings).toHaveLength(1)
+    expect(warnings[0]).toMatch(/eu-trim/)
+    expect(warnings[0]).toMatch(/retrying broad/i)
+  })
+
+  it("sets source.trimNarrowed=true (and logs nothing) when the trim-narrowed primary query succeeds directly", async () => {
+    const warnings: string[] = []
+    const { svc } = makeRegionService({ usdm: record(5, 114.3) })
+    svc.logger_ = { warn: (m: string) => warnings.push(m), error() {} }
+    const f = await svc.getFitment({ make: "honda", model: "civic", year: "2022", modificationSlug: "us-trim", region: "usdm" })
+    expect(f.source.trimNarrowed).toBe(true)
+    expect(warnings).toHaveLength(0)
+  })
+
+  it("leaves source.trimNarrowed undefined when no modificationSlug was supplied at all", async () => {
+    const { svc } = makeRegionService({ usdm: record(5, 114.3) })
+    const f = await svc.getFitment({ make: "honda", model: "civic", year: "2022", region: "usdm" })
+    expect(f.source.trimNarrowed).toBeUndefined()
+  })
+})
+
+describe("WheelSizeService.listModifications (WB-104 T3: region-scoped catalog)", () => {
+  function makeModsService(fetcherResults: any[]) {
+    let i = 0
+    const store: any = { rows: new Map<string, any>() }
+    const calls: any[] = []
+    const svc = new (WheelSizeService as any)({ logger: { warn() {}, error() {} } }, { apiKey: "k", baseUrl: "b", defaultRegion: "usdm" })
+    svc.listWheelSizeCatalogs = async ({ kind, key }: any) => { const v = store.rows.get(`${kind}|${key}`); return v ? [v] : [] }
+    svc.createWheelSizeCatalogs = async (row: any) => { store.rows.set(`${row.kind}|${row.key}`, row); return row }
+    svc.client_ = {
+      modifications: async (make: string, model: string, year: string, region: string) => {
+        calls.push({ make, model, year, region })
+        return fetcherResults[i++]
+      },
+    }
+    svc.incrementAndCheckQuota = async () => true
+    return { svc, store, calls }
+  }
+
+  it("keys the cache by make|model|year|region and forwards region=usdm by default", async () => {
+    const { svc, store, calls } = makeModsService([{ status: 200, body: [{ slug: "m1" }] }])
+    const out = await svc.listModifications("honda", "accord", "2021")
+    expect(out).toEqual([{ slug: "m1" }])
+    expect(store.rows.has("modifications|honda|accord|2021|usdm")).toBe(true)
+    expect(calls[0]).toEqual({ make: "honda", model: "accord", year: "2021", region: "usdm" })
+  })
+
+  it("scopes distinct regions to distinct cache rows instead of colliding on the old 3-part key", async () => {
+    const { svc, store, calls } = makeModsService([
+      { status: 200, body: [{ slug: "us-1" }] },
+      { status: 200, body: [{ slug: "eu-1" }] },
+    ])
+    const usdm = await svc.listModifications("audi", "a3", "2022", "usdm")
+    const eudm = await svc.listModifications("audi", "a3", "2022", "eudm")
+    expect(usdm).toEqual([{ slug: "us-1" }])
+    expect(eudm).toEqual([{ slug: "eu-1" }])
+    expect(store.rows.has("modifications|audi|a3|2022|usdm")).toBe(true)
+    expect(store.rows.has("modifications|audi|a3|2022|eudm")).toBe(true)
+    expect(calls.map((c) => c.region)).toEqual(["usdm", "eudm"])
+  })
+})
+
 describe("WheelSizeService.reverseFitment", () => {
   function makeReverseService(rows: any[]) {
     const svc = new (WheelSizeService as any)({ logger: { warn() {}, error() {} } }, { apiKey: "k", baseUrl: "b", defaultRegion: "usdm" })

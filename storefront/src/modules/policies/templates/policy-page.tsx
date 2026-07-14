@@ -3,6 +3,10 @@ import Label from "@modules/common/components/label"
 import Display from "@modules/common/components/display"
 
 export type PolicySection = {
+  /** Optional anchor id (e.g. "fitment") so other pages can deep-link to this
+   * section — see PurchasePanel's "Fitment guarantee" trust-strip cell
+   * (WB-091 P6), which links to `/returns#fitment`. */
+  id?: string
   heading?: string
   paragraphs?: string[]
   bullets?: string[]
@@ -46,7 +50,11 @@ const PolicyPage = ({ content }: { content: PolicyContent }) => {
         {content.intro && <p style={body}>{content.intro}</p>}
 
         {content.sections.map((s, i) => (
-          <section key={i} style={{ marginTop: s.heading ? 30 : 0 }}>
+          <section
+            key={i}
+            id={s.id}
+            style={{ marginTop: s.heading ? 30 : 0, scrollMarginTop: 24 }}
+          >
             {s.heading && (
               <div style={{ marginBottom: 10 }}>
                 <Display as="h2" size={20}>

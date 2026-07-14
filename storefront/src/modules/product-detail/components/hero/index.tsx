@@ -2,7 +2,8 @@
 
 import { useEffect, useMemo, useState } from "react"
 import { OffsetVariant, ProductDetail, SizeOption } from "../../data/types"
-import { sizesForBoltPattern, pickDefaultSize, boresFor, loadsForBore, resolveLeafVariant, boltPatternsForFinish } from "../../data/group-sizes"
+import { sizesForBoltPattern, pickDefaultSize, boresFor, loadsForBore, resolveLeafVariant, boltPatternsForFinish, findBySizeKey } from "../../data/group-sizes"
+import { headlinePriceCents } from "../../data/price-truth"
 import Gallery from "./gallery"
 import VariantPicker from "./variant-picker"
 import PurchasePanel from "./purchase-panel"
@@ -116,15 +117,21 @@ const Hero = ({ product }: HeroProps) => {
   )
   const [selectedSize, setSelectedSize] = useState<SizeOption | null>(defaultSize)
 
-  // When the bolt pattern changes, the previously-selected size belongs to the
-  // old pattern and is no longer in visibleSizes — re-snap to a valid size.
-  // visibleSizes is filtered from product.sizeOptions, so element references are
-  // preserved and includes() is a reliable membership check.
+  // Re-snap when the visible size set changes — either the bolt pattern
+  // changed (the old size belongs to a pattern no longer shown) or the
+  // finish changed. Matching MUST be key-based (`findBySizeKey`, D×W×
+  // BoltPattern), not object-identity (WB-090 P15): `finishSizeOptions` is
+  // built by a fresh `groupVariantsIntoSizes` call per finish (see
+  // finish-options.ts), so a size that is genuinely still offered under the
+  // new finish is never `===` its old-finish counterpart — a reference check
+  // (`.includes()`) always missed and reset the shopper's pick to the
+  // default on EVERY finish switch. `findBySizeKey` re-points `selectedSize`
+  // at the new finish's own object (so price/stock/offsets read fresh) when
+  // the same size still exists, and only falls back to the default when it
+  // genuinely doesn't.
   useEffect(() => {
-    if (!selectedSize || !visibleSizes.includes(selectedSize)) {
-      setSelectedSize(pickDefaultSize(visibleSizes))
-    }
-    // selectedSize intentionally omitted: re-snap only when the pattern changes.
+    setSelectedSize(findBySizeKey(visibleSizes, selectedSize) ?? pickDefaultSize(visibleSizes))
+    // selectedSize intentionally omitted: re-snap only when the visible set changes.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [visibleSizes])
 
@@ -137,8 +144,11 @@ const Hero = ({ product }: HeroProps) => {
   // the FitBanner's amber "verify clearance" copy owns the honesty. Outside fit
   // mode (useFilter false) this is unchanged.
   const fittingDefaultOffsetMm = useFilter ? selectedSize?.offsetVariants?.[0]?.value : undefined
-  const defaultOffsetMm =
-    fittingDefaultOffsetMm ?? selectedSize?.defaultOffsetMm ?? selectedSize?.offsetMm ?? 0
+  // The wheel's own organic default (WB-090 P1's best-availability pick) —
+  // independent of fit mode. Feeds the AdvancedFitmentPanel's "DEFAULT" badge
+  // so it always marks the TRUE default, never the fit-mode auto-pick (P17).
+  const wheelDefaultOffsetMm = selectedSize?.defaultOffsetMm ?? selectedSize?.offsetMm ?? 0
+  const defaultOffsetMm = fittingDefaultOffsetMm ?? wheelDefaultOffsetMm
   const [selectedOffsetMm, setSelectedOffsetMm] = useState<number>(defaultOffsetMm)
 
   // When the size changes, snap the offset back to the new size's default pick.
@@ -204,12 +214,15 @@ const Hero = ({ product }: HeroProps) => {
     resolveLeafVariant(selectedSize, selectedOffsetMm, selectedBore) ??
     resolveLeafVariant(selectedSize, selectedOffsetMm)
 
-  // Price the *selected* offset, not the size's cheapest — multi-offset sizes
-  // can carry different MSRPs. Falls back to the size "from" price, then product.
-  const unitPriceCents =
-    currentOffset?.priceCents ??
-    selectedSize.priceCentsOverride ??
-    product.priceCents
+  // Price the *selected* offset's OWN price ONLY (WB-090 P12) — multi-offset
+  // sizes can carry different MSRPs, and this used to fall back to the size
+  // "from" price (a sibling offset's min) or the product-level price when the
+  // selected leaf had no price of its own, silently showing a DIFFERENT price
+  // than what this exact variant actually charges. `null` means Medusa has no
+  // live price for this variant right now; the purchase panel renders "Price
+  // unavailable" and disables purchase instead of a misleading $0.00 behind a
+  // live buy button.
+  const unitPriceCents = headlinePriceCents(currentOffset?.priceCents)
 
   return (
     <section className="grid grid-cols-1 small:grid-cols-2 gap-10 small:gap-16 items-start">
@@ -250,6 +263,7 @@ const Hero = ({ product }: HeroProps) => {
           boltPatterns={boltPatternOptions}
           selectedBoltPattern={selectedBoltPattern}
           onBoltPatternChange={setSelectedBoltPattern}
+          selectedVariant={currentOffset}
         />
         {availableBores.length > 1 && (
           <SpecSelector
@@ -281,8 +295,7 @@ const Hero = ({ product }: HeroProps) => {
             sizeLabel={`${selectedSize.diameter}×${selectedSize.width}`}
             offsetVariants={offsetVariants}
             selectedOffsetMm={selectedOffsetMm}
-            defaultOffsetMm={defaultOffsetMm}
-            selectedCenterBoreMm={selectedBore}
+            defaultOffsetMm={wheelDefaultOffsetMm}
             onSelectOffset={setSelectedOffsetMm}
           />
         )}

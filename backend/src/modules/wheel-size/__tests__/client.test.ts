@@ -48,6 +48,30 @@ describe("WheelSizeClient", () => {
     expect(r.body).toBeNull()
   })
 
+  // WB-104 T3: the modifications catalog (storefront trim dropdown) is otherwise
+  // GLOBAL — no region — while fitment queries are region-scoped (usdm), so a
+  // non-US trim can be offered for a US vehicle and silently fail to resolve.
+  it("sends region=usdm by default on the modifications query", async () => {
+    let captured = ""
+    const fakeFetch = async (url: string) => { captured = url; return { status: 200, text: async () => "[]" } as any }
+    const c = new WheelSizeClient({ apiKey: "k", baseUrl: "https://api.wheel-size.com/v2", fetchImpl: fakeFetch })
+    await c.modifications("honda", "accord", "2021")
+    const qs = new URL(captured).searchParams
+    expect(qs.get("region")).toBe("usdm")
+    expect(qs.get("make")).toBe("honda")
+    expect(qs.get("model")).toBe("accord")
+    expect(qs.get("year")).toBe("2021")
+  })
+
+  it("forwards an explicit region on the modifications query", async () => {
+    let captured = ""
+    const fakeFetch = async (url: string) => { captured = url; return { status: 200, text: async () => "[]" } as any }
+    const c = new WheelSizeClient({ apiKey: "k", baseUrl: "https://api.wheel-size.com/v2", fetchImpl: fakeFetch })
+    await c.modifications("audi", "a3", "2022", "eudm")
+    const qs = new URL(captured).searchParams
+    expect(qs.get("region")).toBe("eudm")
+  })
+
   it("returns 408 and swallows the orphaned fetch's abort rejection when the timeout wins", async () => {
     // A fetch that hangs until its signal aborts, then REJECTS (like Node's real fetch).
     const abortRejectingFetch = (_url: string, init?: { signal?: AbortSignal }) =>

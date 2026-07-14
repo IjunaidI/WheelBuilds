@@ -10,7 +10,13 @@ import {
   isRealBoltPattern,
   availabilityOf,
   boltPatternsForFinish,
+  bestAvailabilityOffset,
+  sizeKey,
+  findBySizeKey,
+  formatOffset,
+  gramsToLb,
 } from "./group-sizes"
+import type { OffsetVariant } from "./types"
 
 // Minimal variant factory mirroring the Medusa Store API shape the loader reads.
 function variant(
@@ -34,6 +40,16 @@ function variant(
     calculated_price: { calculated_amount: priceMajor },
   } as any
 }
+
+describe("groupVariantsIntoSizes — quantity threading (WB-090 P2/P18)", () => {
+  it("keeps the raw inventory_quantity on each offset variant instead of discarding it after deriving availability", () => {
+    const sizes = groupVariantsIntoSizes(
+      [variant("v_a", 20, 9, 18, "5x114.3", 3, 300)],
+      28
+    )
+    expect(sizes[0].offsetVariants?.[0].quantity).toBe(3)
+  })
+})
 
 describe("groupVariantsIntoSizes — bolt-pattern scoping", () => {
   it("keeps the same Diameter×Width in two patterns as TWO size options", () => {
@@ -244,5 +260,193 @@ describe("availabilityOf — configurable low-stock threshold", () => {
   it("honors an explicit threshold", () => {
     expect(availabilityOf(2, 2)).toBe("low_stock")
     expect(availabilityOf(3, 2)).toBe("in_stock")
+  })
+})
+
+describe("bestAvailabilityOffset", () => {
+  const ov = (
+    value: number,
+    availability: OffsetVariant["availability"],
+    variantId = `v-${value}`
+  ): OffsetVariant => ({
+    value,
+    backspaceIn: "",
+    variantId,
+    availability,
+    centerBoreMm: null,
+    loadRatingLb: null,
+    quantity: 10,
+  })
+
+  it("picks the in-stock offset over a first-listed out-of-stock sibling", () => {
+    const offsets = [ov(35, "out_of_stock"), ov(20, "in_stock")]
+    expect(bestAvailabilityOffset(offsets)).toBe(20)
+  })
+
+  it("ties resolve to the first-listed offset", () => {
+    expect(bestAvailabilityOffset([ov(35, "in_stock"), ov(20, "in_stock")])).toBe(35)
+  })
+
+  it("prefers low_stock over out_of_stock when nothing is fully in stock", () => {
+    expect(bestAvailabilityOffset([ov(35, "out_of_stock"), ov(20, "low_stock")])).toBe(20)
+  })
+
+  it("returns undefined for an empty list (total — never crashes)", () => {
+    expect(bestAvailabilityOffset([])).toBeUndefined()
+  })
+})
+
+describe("groupVariantsIntoSizes — drops placeholder 0×0 sizes (WB-090 P19)", () => {
+  it("drops a variant whose diameter is 0 (non-vendor / malformed metadata)", () => {
+    const sizes = groupVariantsIntoSizes(
+      [variant("v_zero_d", 0, 9, 18, "5x114.3", 10, 300)],
+      28
+    )
+    expect(sizes).toHaveLength(0)
+  })
+
+  it("drops a variant whose width is 0", () => {
+    const sizes = groupVariantsIntoSizes(
+      [variant("v_zero_w", 20, 0, 18, "5x114.3", 10, 300)],
+      28
+    )
+    expect(sizes).toHaveLength(0)
+  })
+
+  it("drops a fully-blank 0×0 row while keeping a real sibling size", () => {
+    const sizes = groupVariantsIntoSizes(
+      [
+        variant("v_real", 20, 9, 18, "5x114.3", 10, 300),
+        variant("v_blank", 0, 0, 0, "", 10, 0),
+      ],
+      28
+    )
+    expect(sizes).toHaveLength(1)
+    expect(sizes[0].diameter).toBe(20)
+    expect(sizes[0].width).toBe(9)
+  })
+})
+
+describe("sizeKey", () => {
+  it("encodes Diameter×Width|BoltPattern, not offset", () => {
+    expect(sizeKey({ diameter: 20, width: 9, boltPattern: "5x114.3" })).toBe(
+      "20x9|5x114.3"
+    )
+  })
+})
+
+describe("findBySizeKey — finish-switch continuity (WB-090 P15)", () => {
+  it("finds the equivalent size (same D×W|pattern) in a different finish's list, even though the objects are never the same reference", () => {
+    // Two independent groupVariantsIntoSizes calls — mirrors buildFinishOptions
+    // building one matrix PER finish — so these SizeOption objects are never
+    // object-identical even though they share the same D×W|pattern identity.
+    const finishA = groupVariantsIntoSizes(
+      [variant("v_a", 20, 9, 18, "5x114.3", 10, 300)],
+      28
+    )
+    const finishB = groupVariantsIntoSizes(
+      [variant("v_b", 20, 9, 35, "5x114.3", 5, 320)],
+      28
+    )
+    expect(finishA[0]).not.toBe(finishB[0])
+    const matched = findBySizeKey(finishB, finishA[0])
+    expect(matched).toBe(finishB[0])
+  })
+
+  it("returns undefined when no equivalent size exists under the new finish (falls back to default)", () => {
+    const finishA = groupVariantsIntoSizes(
+      [variant("v_a", 20, 9, 18, "5x114.3", 10, 300)],
+      28
+    )
+    const finishB = groupVariantsIntoSizes(
+      [variant("v_b", 22, 10, 35, "6x139.7", 10, 320)],
+      28
+    )
+    expect(findBySizeKey(finishB, finishA[0])).toBeUndefined()
+  })
+
+  it("returns undefined when current is null", () => {
+    const finishB = groupVariantsIntoSizes(
+      [variant("v_b", 20, 9, 18, "5x114.3", 10, 300)],
+      28
+    )
+    expect(findBySizeKey(finishB, null)).toBeUndefined()
+  })
+})
+
+describe("groupVariantsIntoSizes — defaultOffsetMm best-availability (WB-090 P1)", () => {
+  it("resolves defaultOffsetMm to the in-stock sibling offset when the first-listed offset is OOS", () => {
+    // v_a (ET35) is first-seen but OOS; v_b (ET20) is a sibling offset in stock.
+    // Regression: the old static `defaultOffsetMm: offsetMm` (first-seen) would
+    // pin the default to ET35 here, so the Status stat (size rollup, already
+    // "in_stock") and the buy button (OOS ET35 variant) would disagree.
+    const sizes = groupVariantsIntoSizes(
+      [
+        variant("v_a", 20, 9, 35, "5x114.3", 0, 300),
+        variant("v_b", 20, 9, 20, "5x114.3", 10, 320),
+      ],
+      28
+    )
+    expect(sizes[0].defaultOffsetMm).toBe(20)
+    expect(sizes[0].availability).toBe("in_stock")
+  })
+
+  it("keeps the first-listed offset as default when it already has the best availability", () => {
+    const sizes = groupVariantsIntoSizes(
+      [
+        variant("v_a", 20, 9, 35, "5x114.3", 10, 300),
+        variant("v_b", 20, 9, 20, "5x114.3", 0, 320),
+      ],
+      28
+    )
+    expect(sizes[0].defaultOffsetMm).toBe(35)
+  })
+
+  it("a single-offset size defaults to its only offset", () => {
+    const sizes = groupVariantsIntoSizes(
+      [variant("v_only", 20, 9, 12, "5x114.3", 0, 300)],
+      28
+    )
+    expect(sizes[0].defaultOffsetMm).toBe(12)
+  })
+})
+
+describe("formatOffset — sign-aware ET display (WB-090 P7)", () => {
+  it("prepends + for zero and positive values", () => {
+    expect(formatOffset(35)).toBe("+35")
+    expect(formatOffset(0)).toBe("+0")
+  })
+
+  it("does not double the sign for a negative value (regression: '+-12mm')", () => {
+    expect(formatOffset(-12)).toBe("-12")
+  })
+})
+
+describe("gramsToLb", () => {
+  it("converts grams to pounds, rounded to 1 decimal", () => {
+    expect(gramsToLb(14515)).toBe(32)
+  })
+
+  it("returns 0 for 0 grams", () => {
+    expect(gramsToLb(0)).toBe(0)
+  })
+})
+
+describe("groupVariantsIntoSizes — per-variant shipping weight (WB-090 P8/L6)", () => {
+  it("threads each variant's own weight (grams→lb) into its SizeOption instead of applying one product-level weight to every size", () => {
+    const heavy = { ...variant("v_heavy", 20, 9, 18, "5x114.3", 10, 300), weight: 14515 } // ≈32 lb
+    const light = { ...variant("v_light", 22, 10, 20, "5x114.3", 10, 320), weight: 9072 } // ≈20 lb
+    const sizes = groupVariantsIntoSizes([heavy, light], 28)
+    const s20 = sizes.find((s) => s.diameter === 20)!
+    const s22 = sizes.find((s) => s.diameter === 22)!
+    expect(s20.weightLb).toBe(32)
+    expect(s22.weightLb).toBe(20)
+    expect(s20.weightLb).not.toBe(s22.weightLb)
+  })
+
+  it("falls back to the product-level weight when a variant carries no weight of its own", () => {
+    const noWeight = variant("v_a", 20, 9, 18, "5x114.3", 10, 300) // no `weight` key
+    const sizes = groupVariantsIntoSizes([noWeight], 28)
+    expect(sizes[0].weightLb).toBe(28)
   })
 })

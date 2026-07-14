@@ -60,7 +60,14 @@ export function buildReverseTireFitment(
     const key = `${id.make}|${id.model}|${id.trim ?? ""}|${id.yearLabel}`.toLowerCase()
     if (seen.has(key)) continue
     seen.add(key)
-    out.push({ year: id.yearLabel, make: id.make, model: id.model, trim: id.trim, size: matchedSize })
+    out.push({
+      year: id.yearLabel,
+      make: id.make,
+      model: id.model,
+      trim: id.trim,
+      trimNarrowed: id.trimNarrowed,
+      size: matchedSize,
+    })
   }
   out.sort(
     (a, b) =>

@@ -68,6 +68,7 @@ export const RETURNS_POLICY: PolicyContent = {
       ],
     },
     {
+      id: "fitment",
       heading: "Fitment-related returns",
       paragraphs: [
         "Our fitment checker matches bolt pattern, hub bore, and size ranges against wheel-size.com data — but final fitment depends on your exact vehicle and modifications. Items marked as aggressive fitment are sold with the expectation that you have verified clearance. When in doubt, contact us BEFORE ordering and we'll check your setup.",

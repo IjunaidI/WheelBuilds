@@ -10,6 +10,12 @@ const BLANK_FINISH = "—"
  * Partition a product's variants by their RAW finish (matching the backend's
  * Finish variant axis), and build a per-finish size matrix + image. Blank
  * finishes collapse under the "—" sentinel. Sorted by raw label. (WB-059)
+ *
+ * NOTE (WB-090 P15): each finish gets its OWN `groupVariantsIntoSizes` call
+ * below, so two finishes' SizeOption objects are never object-identical even
+ * when they represent the same Diameter×Width×BoltPattern combo. The hero's
+ * finish-switch re-snap effect (`components/hero/index.tsx`) accounts for
+ * this via `findBySizeKey` (group-sizes.ts) rather than reference equality.
  */
 export function buildFinishOptions(
   variants: HttpTypes.StoreProductVariant[],

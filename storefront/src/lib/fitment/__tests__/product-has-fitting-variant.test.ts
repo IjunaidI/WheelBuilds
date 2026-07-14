@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest"
-import { variantFitsVehicle, productHasFittingVariant, variantFitTier } from "../product-has-fitting-variant"
+import { variantFitsVehicle, productHasFittingVariant, variantFitTier, chipFitTier } from "../product-has-fitting-variant"
 
 const v = (bolt: string, dia: number, width: number, offset: number, bore = 72) => ({
   metadata: {
@@ -57,6 +57,33 @@ describe("variantFitTier", () => {
       { boltPatternRaw: "6x139.7", centerBoreMm: 78.1, diameterIn: 22, widthIn: 9, offsetMm: 28 },
       { canonicalBoltPatterns: ["6x139.7"], hubBoreMm: 78.1, diameterWindow: { min: 17, max: 20 }, widthWindow: { min: 8, max: 9 }, offsetWindow: { min: 0, max: 31 } }
     )).toBe("check")
+  })
+})
+
+// WB-091 P4: the purchase-panel chip must agree with the fitment band on all
+// FOUR states, not just fits/check/no — a missing-data vehicle/product reads
+// "unknown", never a disproven "no" (DOESN'T FIT).
+describe("chipFitTier", () => {
+  const variant = { boltPatternRaw: "5x130", diameterIn: 20, widthIn: 9, offsetMm: 55, centerBoreMm: 71.6 }
+
+  it("fits/check/no pass straight through to variantFitTier when both sides have pattern data", () => {
+    expect(chipFitTier(variant, porsche, ["5x130"])).toBe("fits")
+    expect(chipFitTier({ ...variant, diameterIn: 22 }, porsche, ["5x130"])).toBe("check")
+    expect(chipFitTier({ ...variant, boltPatternRaw: "5x114.3" }, porsche, ["5x130"])).toBe("no")
+  })
+
+  it("returns 'unknown' when the vehicle has no bolt-pattern data on file", () => {
+    expect(chipFitTier(variant, { ...porsche, canonicalBoltPatterns: [] }, ["5x130"])).toBe("unknown")
+    expect(chipFitTier(variant, { hubBoreMm: 71.5 }, ["5x130"])).toBe("unknown") // canonicalBoltPatterns entirely absent
+  })
+
+  it("returns 'unknown' when the product has no canonical bolt pattern at all", () => {
+    expect(chipFitTier(variant, porsche, [])).toBe("unknown")
+  })
+
+  it("does NOT return 'unknown' merely because the SELECTED variant's own raw pattern fails to parse — that's a real 'no'", () => {
+    // Product has other canonical patterns on file; only this one variant's raw value is junk.
+    expect(chipFitTier({ ...variant, boltPatternRaw: "" }, porsche, ["5x130"])).toBe("no")
   })
 })
 

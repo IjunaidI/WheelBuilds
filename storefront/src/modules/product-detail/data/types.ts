@@ -32,6 +32,8 @@ export type OffsetVariant = {
   centerBoreMm: number | null
   /** Load rating (lb) for this exact variant; null when the vendor omits it. */
   loadRatingLb: number | null
+  /** Real on-hand quantity for this exact variant (WB-090 P2/P18) — drives the purchase panel's qty stepper cap/default and the "Only N left" copy, instead of the panel being inventory-blind. */
+  quantity: number
 }
 
 /** A specific Diameter × Width combination available for this product. */
@@ -46,7 +48,7 @@ export type SizeOption = {
   offsetVariants?: OffsetVariant[]
   /** Raw bolt pattern (e.g. "5x114.3") this size is scoped to. Each SizeOption belongs to exactly one pattern; the picker filters sizes by the selected pattern. */
   boltPattern: string
-  /** The wheel's default ET for this size (its first-listed offset variant) — NOT a per-vehicle OEM lookup. Selecting anything else flips to a CustomFit override. */
+  /** The wheel's default ET for this size — its best-availability offset variant (ties resolve first-listed), NOT a per-vehicle OEM lookup. Selecting anything else flips to a CustomFit override. */
   defaultOffsetMm?: number
   /** Per-wheel weight in pounds. */
   weightLb: number
@@ -76,6 +78,12 @@ export type FitmentEntry = {
   make: string
   model: string
   trim?: string
+  /** True when the backend narrowed this row to exactly one specific trim
+   *  (as opposed to a multi-trim union that happened to share a trim value)
+   *  — see backend/src/modules/wheel-size/reverse-fitment.ts
+   *  `extractVehicleIdentity` (WB-104 T1). Drives trim-aware YOUR-VEHICLE
+   *  matching (WB-104 T2, lib/fitment/vehicle-entry-match.ts). */
+  trimNarrowed?: boolean
   /** OEM bolt pattern for this vehicle — informational on the fitment row. */
   boltPattern?: string
   /** Notes (lug pattern conflict, requires hub adapter, etc.). */
@@ -88,6 +96,8 @@ export type TireFitmentEntry = {
   make: string
   model: string
   trim?: string
+  /** See `FitmentEntry.trimNarrowed` (WB-104 T1/T2). */
+  trimNarrowed?: boolean
   size: string
 }
 

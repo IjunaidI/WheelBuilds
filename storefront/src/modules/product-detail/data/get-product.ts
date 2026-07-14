@@ -131,9 +131,20 @@ export async function getProductDetail(
       offset,
     }))
   )
+  // WB-091 P5: pass the full SET of per-size bores (deduped, across every
+  // variant) instead of `detail.specs.centerBoreMm` — that's a single
+  // arbitrary `variants[0]` pick, which can wrongly gate a multi-bore
+  // product's "confirmed models" list on whichever variant happened to load
+  // first. The backend matches a cached vehicle if ANY bore in the set
+  // clears that vehicle's hub.
+  const productBores = Array.from(
+    new Set(
+      detail.sizeOptions.flatMap((s) => (s.offsetVariants ?? []).map((o) => o.centerBoreMm))
+    )
+  ).filter((b): b is number => b != null && b > 0)
   const fitment = await getFitmentByProduct(
     detail.boltPatternsCanonical,
-    detail.specs.centerBoreMm || undefined,
+    productBores,
     productSizes
   )
   return { ...detail, fitment }

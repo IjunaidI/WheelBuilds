@@ -15,3 +15,37 @@ export function extractMedusaMessage(error: any): string | null {
   if (typeof message !== "string" || message.length === 0) return null
   return message.charAt(0).toUpperCase() + message.slice(1) + "."
 }
+
+/**
+ * Detects a Medusa insufficient-inventory error and turns it into an exact,
+ * actionable message instead of the generic transient-failure copy (WB-090
+ * P2/P18) — a permanent condition ("not enough stock") reading like a
+ * transient one ("try again in a moment") is itself the bug this fixes.
+ *
+ * Accepts either a raw axios/Medusa-shaped error (unwrapped via
+ * `extractMedusaMessage`) or an already-extracted message string — the shape
+ * `addToCart` returns, since Next.js redacts thrown Server Action error
+ * messages in production (WB-079 B2), so the real message has to cross the
+ * client/server boundary as plain string data, not as a thrown Error.
+ *
+ * Returns null when the message doesn't look inventory-related (or there is
+ * no message at all), so the caller falls back to its own generic copy.
+ */
+export function insufficientStockMessage(
+  err: unknown,
+  available: number
+): string | null {
+  const message = typeof err === "string" ? err : extractMedusaMessage(err)
+  if (!message) return null
+  const lower = message.toLowerCase()
+  // "not enough" was dropped (WB-090 fixwave) — it false-positives on
+  // non-stock errors. These three cover Medusa v2's real insufficient-
+  // inventory strings ("does not have the required inventory",
+  // "Insufficient stock").
+  const looksInsufficient =
+    lower.includes("inventory") ||
+    lower.includes("insufficient") ||
+    lower.includes("in stock")
+  if (!looksInsufficient) return null
+  return `Only ${available} in stock — reduce quantity`
+}

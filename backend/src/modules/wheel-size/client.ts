@@ -52,7 +52,12 @@ export class WheelSizeClient {
   makes(): Promise<ClientResult> { return this.get("/makes/", {}) }
   models(make: string): Promise<ClientResult> { return this.get("/models/", { make }) }
   years(make: string, model: string): Promise<ClientResult> { return this.get("/years/", { make, model }) }
-  modifications(make: string, model: string, year: string): Promise<ClientResult> {
-    return this.get("/modifications/", { make, model, year })
+  // Region-scoped (WB-104 T3, additive default): the storefront's trim dropdown
+  // previously read the GLOBAL modifications catalog (no region sent), so it could
+  // list trims that don't exist in the `usdm` fitment catalog `resolveByModel`
+  // actually queries against. Defaulting to "usdm" here keeps every existing caller
+  // working unchanged while letting callers scope to another market on request.
+  modifications(make: string, model: string, year: string, region: string = "usdm"): Promise<ClientResult> {
+    return this.get("/modifications/", { make, model, year, region })
   }
 }

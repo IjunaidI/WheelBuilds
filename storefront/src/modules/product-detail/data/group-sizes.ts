@@ -11,6 +11,29 @@ const numOrNull = (v: unknown): number | null =>
   typeof v === "number" && Number.isFinite(v) ? v : null
 
 /**
+ * Grams → pounds, rounded to 1 decimal. Medusa stores `weight` in grams;
+ * shared by every weight rollup (the product-level fallback computed in
+ * get-product.ts / map-tire-detail.ts, and the per-variant threading in
+ * `groupVariantsIntoSizes` below) so the importer's grams round-trip never
+ * surfaces an ugly value like 31.9997 lb.
+ */
+export function gramsToLb(grams: number): number {
+  return Math.round((grams / 453.592) * 10) / 10
+}
+
+/**
+ * Sign-aware ET (offset) formatter (WB-090 P7). A negative `mm` already
+ * carries its own "-" when stringified, so hand-rolled `+${mm}` templates
+ * double the sign into "+-12mm" — only a non-negative value needs the "+"
+ * prepended. Mirrors variant-picker.tsx's already-correct inline
+ * `{v >= 0 ? "+" : ""}{v}` pattern; every other offset-rendering site should
+ * call this instead of re-deriving the same conditional.
+ */
+export function formatOffset(mm: number): string {
+  return `${mm >= 0 ? "+" : ""}${mm}`
+}
+
+/**
  * Vendor placeholders that must never become a selectable bolt-pattern gate.
  * Must stay byte-identical with the backend twin in
  * backend/src/modules/vendor-sync/search/placeholder-bolt-pattern.ts.
@@ -54,14 +77,61 @@ export function availabilityOf(
   return "in_stock"
 }
 
-const rank = { in_stock: 2, low_stock: 1, out_of_stock: 0 } as const
+export const rank = { in_stock: 2, low_stock: 1, out_of_stock: 0 } as const
+
+/**
+ * The best-availability offset among a size's sibling ETs — ties resolve to
+ * the first-listed (vendor feed order), matching `resolveLeafVariant`'s
+ * tie-break. Used as a size's organic `defaultOffsetMm` (WB-090 P1) so a
+ * first-seen-but-out-of-stock ET can never become the default while a
+ * sibling ET is actually purchasable — without this, the Status stat (a
+ * size-level rollup) and the buy button (variant-level) could disagree on
+ * the same screen.
+ */
+export function bestAvailabilityOffset(
+  offsetVariants: OffsetVariant[]
+): number | undefined {
+  if (offsetVariants.length === 0) return undefined
+  let best = offsetVariants[0]
+  for (let i = 1; i < offsetVariants.length; i++) {
+    const o = offsetVariants[i]
+    if (rank[o.availability] > rank[best.availability]) best = o
+  }
+  return best.value
+}
+
+/**
+ * A size's stable identity: Diameter × Width × BoltPattern — deliberately NOT
+ * offset, since several sibling ETs collapse into one SizeOption's
+ * `offsetVariants`. This is `groupVariantsIntoSizes`'s own Map key, exported
+ * so callers can recognize "the same size" across independent grouping runs
+ * (e.g. one per finish, WB-090 P15) — `buildFinishOptions` calls
+ * `groupVariantsIntoSizes` fresh per finish, so two finishes' SizeOption
+ * objects for the identical Diameter×Width×BoltPattern combo are never
+ * object-identical, and a reference-equality check (`Array.includes`) can
+ * never detect that continuity. This key can.
+ */
+export function sizeKey(s: {
+  diameter: number
+  width: number
+  boltPattern: string
+}): string {
+  return `${s.diameter}x${s.width}|${s.boltPattern}`
+}
 
 /**
  * Group variants into the Diameter × Width × BoltPattern size matrix. The
  * group key includes `bolt_pattern_raw`, so each SizeOption is scoped to ONE
  * bolt pattern and its offsets / price / availability never mix across
- * patterns. `productWeightLb` is the single product-level weight (vendor data
- * has no per-size weight) applied to every size.
+ * patterns. Each SizeOption's `weightLb` is threaded from ITS OWN variant's
+ * `weight` (grams → lb, WB-090 P8/L6) — `productWeightLb` is only the
+ * fallback used when a variant carries no weight of its own, so a size no
+ * longer inherits an unrelated sibling size's shipping weight.
+ *
+ * Rows with no real Diameter AND Width (both <= 0 — a non-vendor / malformed
+ * product whose variant metadata never carried wheel_diameter_in /
+ * wheel_width_in) are dropped entirely rather than collapsing into a fake
+ * "0×0" SizeOption cell (WB-090 P19).
  */
 export function groupVariantsIntoSizes(
   variants: HttpTypes.StoreProductVariant[],
@@ -72,15 +142,22 @@ export function groupVariantsIntoSizes(
     const m = (v.metadata ?? {}) as Record<string, unknown>
     const diameter = num(m.wheel_diameter_in)
     const width = num(m.wheel_width_in)
+    if (diameter <= 0 || width <= 0) continue
     const offsetMm = num(m.offset_mm)
     const rawBp = String(m.bolt_pattern_raw ?? "")
     const boltPattern = isRealBoltPattern(rawBp) ? rawBp : ""
-    const key = `${diameter}x${width}|${boltPattern}`
+    const key = sizeKey({ diameter, width, boltPattern })
     const qty = num((v as any).inventory_quantity)
     const priceCents = Math.round(
       num((v.calculated_price as any)?.calculated_amount) * 100
     )
     const avail = availabilityOf(qty)
+    // Per-variant shipping weight (WB-090 P8/L6) — falls back to the
+    // product-level rollup when this specific variant has no weight of its
+    // own, so a size is never left with a fake 0 lb.
+    const variantWeightGrams = num((v as any).weight)
+    const variantWeightLb =
+      variantWeightGrams > 0 ? gramsToLb(variantWeightGrams) : productWeightLb
     const offset: OffsetVariant = {
       value: offsetMm,
       backspaceIn: "",
@@ -89,12 +166,17 @@ export function groupVariantsIntoSizes(
       availability: avail,
       centerBoreMm: numOrNull(m.center_bore_mm),
       loadRatingLb: numOrNull(m.load_rating_lb),
+      quantity: qty,
     }
     const existing = byKey.get(key)
     if (existing) {
       existing.offsetVariants = [...(existing.offsetVariants ?? []), offset]
       // Best availability across sibling offsets within this pattern.
       if (rank[avail] > rank[existing.availability]) existing.availability = avail
+      // Best-availability default offset among sibling offsets (WB-090 P1) —
+      // recomputed off the running list so the organic default never sticks
+      // to a first-seen-but-out-of-stock ET while a sibling is purchasable.
+      existing.defaultOffsetMm = bestAvailabilityOffset(existing.offsetVariants)
       // Min non-zero price across sibling offsets for the size "from" price.
       if (priceCents > 0) {
         existing.priceCentsOverride =
@@ -110,7 +192,7 @@ export function groupVariantsIntoSizes(
         defaultOffsetMm: offsetMm,
         boltPattern,
         offsetVariants: [offset],
-        weightLb: productWeightLb,
+        weightLb: variantWeightLb,
         availability: avail,
         priceCentsOverride: priceCents > 0 ? priceCents : undefined,
       })
@@ -137,6 +219,25 @@ export function sizesForBoltPattern(
 /** Default size pick: first in-stock, else the first, else null (total — never crashes on an empty list). */
 export function pickDefaultSize(sizes: SizeOption[]): SizeOption | null {
   return sizes.find((s) => s.availability !== "out_of_stock") ?? sizes[0] ?? null
+}
+
+/**
+ * Find `current`'s equivalent (same `sizeKey` — Diameter×Width×BoltPattern)
+ * within a different `sizes` list, or `undefined` when no equivalent exists.
+ * Powers the PDP hero's finish-switch continuity (WB-090 P15): each finish's
+ * SizeOption[] is built by a fresh `groupVariantsIntoSizes` call, so the
+ * "same" size under a different finish is never the same object — this looks
+ * up by identity key instead of by reference, and returns the NEW list's own
+ * object (never `current` itself) so the caller's downstream price/stock/
+ * offsets read from the finish that's actually selected.
+ */
+export function findBySizeKey(
+  sizes: SizeOption[],
+  current: SizeOption | null
+): SizeOption | undefined {
+  if (!current) return undefined
+  const key = sizeKey(current)
+  return sizes.find((s) => sizeKey(s) === key)
 }
 
 /**

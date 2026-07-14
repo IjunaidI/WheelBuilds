@@ -19,7 +19,7 @@ describe("buildTireSizeOptions", () => {
     expect(o).toMatchObject({
       sizeLabel: "305/45R22 118S", canonicalSize: "305/45R22", rimDiameterIn: 22,
       sectionWidthMm: 305, aspectRatio: 45, loadIndex: 118, speedRating: "S",
-      variantId: "var_1", priceCents: 46200, availability: "in_stock",
+      variantId: "var_1", priceCents: 46200, availability: "in_stock", quantity: 8,
     })
   })
   it("marks out_of_stock at qty 0 and low_stock at/under the threshold", () => {

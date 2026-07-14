@@ -18,17 +18,26 @@ export const getModifications = (make: string, model: string, year: string) =>
  * empty array) falls back to the pre-S2 bolt+bore-only match. Server-side;
  * best-effort cache via Next revalidate. Returns [] on any error — the section
  * degrades to 0 models.
+ *
+ * `boreMm` accepts the product's full per-size bore SET (one entry per
+ * buildable size) in addition to a single value (WB-091 P5) — a multi-bore
+ * wheel matches a cached vehicle if ANY of its bores clears that vehicle's
+ * hub, instead of being gated by whichever variant happened to be
+ * `variants[0]`.
  */
 export async function getFitmentByProduct(
   boltPatternsCanonical: string[],
-  boreMm?: number,
+  boreMm?: number | (number | null | undefined)[],
   sizes?: { diameter: number; width: number; offset: number }[]
 ): Promise<FitmentEntry[]> {
   if (!boltPatternsCanonical?.length) return []
   try {
     const params = new URLSearchParams({ boltPatterns: boltPatternsCanonical.join(",") })
-    if (typeof boreMm === "number" && Number.isFinite(boreMm) && boreMm > 0) {
-      params.set("boreMm", String(boreMm))
+    const boreValues = (Array.isArray(boreMm) ? boreMm : boreMm != null ? [boreMm] : []).filter(
+      (b): b is number => typeof b === "number" && Number.isFinite(b) && b > 0
+    )
+    if (boreValues.length) {
+      params.set("boreMm", boreValues.join(","))
     }
     const validSizes = (sizes ?? []).filter(
       (s) => Number.isFinite(s.diameter) && Number.isFinite(s.width) && Number.isFinite(s.offset)

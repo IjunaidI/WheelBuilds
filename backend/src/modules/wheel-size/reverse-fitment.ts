@@ -41,42 +41,74 @@ export function sizeInWindow(sizes: ProductSize[], row: FitmentRow): boolean {
 
 /**
  * Pull a display-ready vehicle identity out of a cached wheel-size `by_model`
- * body (`raw.data[0]`): make.name, model.name, trim, and a year label from
- * start_year/end_year. Returns null when make or model is missing.
+ * body: make.name, model.name, trim, and a year label from start_year/end_year
+ * — all read off `raw.data[0]` except `trim`. Returns null when make or model
+ * is missing.
+ *
+ * WB-104 T1: WB-077 made a cached row's `raw.data` cover EVERY trim the
+ * vehicle query matched (a "union" row) when there's more than one, so
+ * `raw.data[0].trim` is an arbitrary pick that would otherwise be displayed
+ * as if it were the only trim this fitment applies to. Trim-honesty rule: a
+ * multi-entry row only keeps a trim label when EVERY entry agrees on it — a
+ * missing/empty trim on any entry counts as its OWN distinct value, so a
+ * mixed known/unknown-trim union (e.g. one entry "Sport", another with no
+ * trim) is NOT collapsed down to the one named trim; it claims no trim at
+ * all, same as a genuine union of >1 distinct named trims. (A naive
+ * `.filter(Boolean)` before deduping would silently drop the empty entries
+ * and let a mixed union masquerade as narrowed — that's the bug this fixes.)
+ * `trimNarrowed` (`raw.data.length === 1`) tells callers whether the row was
+ * ever narrowed to one specific trim, independent of whether that trim
+ * happened to be nameable.
  */
 export function extractVehicleIdentity(
   raw: any
-): { make: string; model: string; trim?: string; yearLabel: string } | null {
-  const d = raw?.data?.[0]
+): { make: string; model: string; trim?: string; yearLabel: string; trimNarrowed: boolean } | null {
+  const data: any[] = Array.isArray(raw?.data) ? raw.data : []
+  const d = data[0]
   const make = d?.make?.name
   const model = d?.model?.name
   if (typeof make !== "string" || !make || typeof model !== "string" || !model) return null
-  const trim = typeof d?.trim === "string" && d.trim ? d.trim : undefined
+  // Missing/empty trims are distinct values here (NOT filtered out) so a
+  // mixed known/unknown-trim row is caught by distinct.size > 1 below.
+  const trimVals = data.map((e) => (e?.trim ?? "").trim())
+  const distinct = new Set(trimVals)
+  const trimNarrowed = data.length === 1
+  const trim: string | undefined = distinct.size === 1 && trimVals[0] ? trimVals[0] : undefined
   const start = typeof d?.start_year === "number" ? d.start_year : null
   const end = typeof d?.end_year === "number" ? d.end_year : null
   const yearLabel =
     start != null && end != null
       ? start === end ? `${start}` : `${start}–${end}`
       : start != null ? `${start}` : ""
-  return { make, model, trim, yearLabel }
+  return { make, model, trim, yearLabel, trimNarrowed }
 }
 
 /**
- * Hard-gate match: bolt-pattern intersection AND wheel bore clears the
- * vehicle hub (unknown values pass — never exclude on missing data). Mirrors
- * the storefront fits-vehicle.ts hard gates so the PDP list and the
- * active-vehicle band agree. Returns the matched canonical pattern, or null.
+ * Hard-gate match: bolt-pattern intersection AND (at least one of) the
+ * wheel's bore(s) clears the vehicle hub (unknown values pass — never
+ * exclude on missing data). Mirrors the storefront fits-vehicle.ts hard
+ * gates so the PDP list and the active-vehicle band agree. Returns the
+ * matched canonical pattern, or null.
+ *
+ * WB-091 P5: `wheelBoreMm` may be the product's full per-size bore SET (one
+ * entry per buildable size) instead of a single value — a multi-bore wheel's
+ * "confirmed models" list is no longer gated by whichever variant happened
+ * to be `variants[0]`; it matches this vehicle if ANY of the wheel's bores
+ * clears the hub. A bare number (or null) still works unchanged.
  */
 export function matchedPattern(
   row: FitmentRow,
   productPatterns: string[],
-  wheelBoreMm: number | null
+  wheelBoreMm: number | (number | null)[] | null
 ): string | null {
   const rowPats = Array.isArray(row.canonical_bolt_patterns) ? row.canonical_bolt_patterns : []
   const hit = productPatterns.find((p) => rowPats.includes(p))
   if (!hit) return null
   const hub = typeof row.hub_bore_mm_x100 === "number" ? row.hub_bore_mm_x100 / 100 : null
-  const boreOk = boreClears(wheelBoreMm, hub)
+  const bores = Array.isArray(wheelBoreMm) ? wheelBoreMm : [wheelBoreMm]
+  // No bores supplied at all → same as an unknown single bore: pass (never
+  // exclude on missing data).
+  const boreOk = bores.length === 0 ? boreClears(null, hub) : bores.some((b) => boreClears(b, hub))
   return boreOk ? hit : null
 }
 
@@ -89,7 +121,7 @@ export function matchedPattern(
 export function buildReverseFitment(
   rows: FitmentRow[],
   productPatterns: string[],
-  wheelBoreMm: number | null,
+  wheelBoreMm: number | (number | null)[] | null,
   limit: number,
   productSizes: ProductSize[] = []
 ): ReverseFitmentVehicle[] {
@@ -106,7 +138,14 @@ export function buildReverseFitment(
     const key = `${id.make}|${id.model}|${id.trim ?? ""}|${id.yearLabel}`.toLowerCase()
     if (seen.has(key)) continue
     seen.add(key)
-    out.push({ year: id.yearLabel, make: id.make, model: id.model, trim: id.trim, boltPattern: pattern })
+    out.push({
+      year: id.yearLabel,
+      make: id.make,
+      model: id.model,
+      trim: id.trim,
+      trimNarrowed: id.trimNarrowed,
+      boltPattern: pattern,
+    })
   }
   out.sort(
     (a, b) =>

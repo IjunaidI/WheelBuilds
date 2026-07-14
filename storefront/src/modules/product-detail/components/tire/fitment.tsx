@@ -3,11 +3,13 @@
 import SectionHeader from "@modules/common/components/section-header"
 import Chip from "@modules/common/components/chip"
 import Icon from "@modules/common/components/icon"
+import LocalizedClientLink from "@modules/common/components/localized-client-link"
 import { Button } from "@/components/ui/button"
 import { useGarage } from "@lib/garage/use-garage"
 import { openSearch } from "@lib/stores/search-store"
 import { useSelectedTireFit } from "@lib/stores/selected-tire-fit"
-import { tireFitsVehicle } from "@lib/fitment/tire-fits-vehicle"
+import { tireFitVerdict } from "@lib/fitment/tire-fits-vehicle"
+import { entryMatchesVehicle } from "@lib/fitment/vehicle-entry-match"
 import { TireFitmentEntry, TireProductDetail } from "../../data/types"
 
 type TireFitmentProps = {
@@ -39,28 +41,41 @@ const TireFitment = ({ product }: TireFitmentProps) => {
     loadIndex: o.loadIndex ?? null,
     speedRating: o.speedRating ?? null,
   }))
-  const activeFits = !active?.oemTires?.length
-    ? null
-    : selectedSpec
-      ? tireFitsVehicle([selectedSpec], active.oemTires)
-      : tireFitsVehicle(productSpecs, active.oemTires)
+  // Three-state verdict (WB-091 P3): "unknown" when the vehicle simply has no
+  // OEM tire data on file is NOT the same as "no" (a disproven mismatch) — a
+  // null/false collapse here previously rendered "runs a different factory
+  // tire size" for vehicles we've never checked at all.
+  const verdict = active
+    ? selectedSpec
+      ? tireFitVerdict([selectedSpec], active.oemTires ?? [])
+      : tireFitVerdict(productSpecs, active.oemTires ?? [])
+    : null
+  const activeFits = verdict === "fits"
 
   return (
     <section className="border-t border-[var(--hairline)] py-16 small:py-20">
       <SectionHeader
-        eyebrow={`FITMENT · ${product.fitment.length} CONFIRMED MODELS`}
+        // Mirrors the wheel fitment eyebrow fix (WB-091 P14,
+        // components/fitment/index.tsx): an empty confirmed-models list
+        // previously still rendered "FITMENT · 0 CONFIRMED MODELS", which
+        // reads as "fits nothing" rather than "we haven't listed your
+        // vehicle yet". Only show the count once there's something to count.
+        eyebrow={product.fitment.length > 0 ? `FITMENT · ${product.fitment.length} CONFIRMED MODELS` : "FITMENT"}
         title="Does it fit your ride?"
         description="Every vehicle below runs this tire size from the factory. The list is non-exhaustive — check your door-jamb placard or ask us to confirm."
         marginBottom={32}
       />
 
-      {/* Active vehicle status band */}
+      {/* Active vehicle status band — three states when a vehicle is active
+          (fits / no / unknown), plus the no-active-vehicle prompt. "unknown"
+          shares the neutral hairline/white treatment with "no active vehicle"
+          since neither is a disproven mismatch. */}
       <div
         className="rounded-[var(--radius)] border p-5 mb-8 flex items-center gap-4"
         style={{
           borderColor: activeFits
             ? "var(--orange)"
-            : active && !activeFits
+            : verdict === "no"
               ? "var(--ink-soft)"
               : "var(--hairline)",
           background: activeFits ? "rgba(255,106,0,0.04)" : "white",
@@ -86,7 +101,7 @@ const TireFitment = ({ product }: TireFitmentProps) => {
         </div>
         <div className="flex-1 min-w-0">
           {active ? (
-            activeFits ? (
+            verdict === "fits" ? (
               <>
                 <div className="text-[14px] font-semibold text-[var(--ink)]">
                   Fits your{" "}
@@ -95,6 +110,18 @@ const TireFitment = ({ product }: TireFitmentProps) => {
                 </div>
                 <div className="text-[12px] text-[var(--ink-soft)] mt-0.5">
                   This tire size is a factory fit for your vehicle.
+                </div>
+              </>
+            ) : verdict === "unknown" ? (
+              <>
+                <div className="text-[14px] font-semibold text-[var(--ink)]">
+                  We don&apos;t have factory tire data for your{" "}
+                  {active.year} {active.make} {active.model}
+                  {active.trim ? ` ${active.trim}` : ""} yet.
+                </div>
+                <div className="text-[12px] text-[var(--ink-soft)] mt-0.5">
+                  This isn&apos;t a mismatch — check your door placard for the
+                  factory tire size before ordering.
                 </div>
               </>
             ) : (
@@ -136,11 +163,11 @@ const TireFitment = ({ product }: TireFitmentProps) => {
           // Highlight the active vehicle's row whenever it's in the confirmed
           // list — independent of the currently selected size, so switching to a
           // non-OEM size doesn't un-mark "YOUR VEHICLE" (the band above already
-          // carries the per-selection fit verdict).
-          const isActive =
-            active &&
-            f.make.toLowerCase() === active.make.toLowerCase() &&
-            f.model.toLowerCase() === active.model.toLowerCase()
+          // carries the per-selection fit verdict). Matches make + model
+          // (case-insensitive), range-aware year, and best-effort trim — same
+          // logic as the wheel fitment list (WB-091 P13: previously make+model
+          // only, so e.g. a 1998 Civic highlighted the 2021 Civic row).
+          const isActive = entryMatchesVehicle(f, active)
           return (
             <TireFitmentRow
               key={`${f.make}-${f.model}-${i}`}
@@ -153,12 +180,12 @@ const TireFitment = ({ product }: TireFitmentProps) => {
 
       <p className="mt-6 text-[12px] text-[var(--ink-soft)] font-[var(--mono)] leading-relaxed">
         Don&apos;t see your vehicle?{" "}
-        <a
-          href="#"
+        <LocalizedClientLink
+          href="/contact"
           className="text-[var(--orange)] font-semibold no-underline hover:underline"
         >
           Submit your vehicle for a fitment check
-        </a>{" "}
+        </LocalizedClientLink>{" "}
         — we usually confirm within 24 hours.
       </p>
     </section>

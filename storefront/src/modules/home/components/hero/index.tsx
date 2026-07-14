@@ -18,12 +18,20 @@ const Hero = ({ brandCount }: { brandCount?: number }) => {
   // GARAGE" off the saved-vehicles list — the cache now holds one vehicle.
   const vehicleCtaLabel = active ? "CHANGE VEHICLE" : "SELECT VEHICLE"
 
-  const primaryCtaText = active
-    ? `Find My Fit · See wheels for your ${active.make}`
-    : "Find My Fit · Start with your vehicle"
+  // A vehicle can be active-but-window-less: saved+activated by the YMM pane
+  // while its fitment lookup failed or is still resolving (N5/N7). Don't
+  // promise "See wheels for your {make}" in that state — the href would just
+  // degrade to the bare, unfiltered /store and look filtered when it isn't.
+  const hasFit = Boolean(active?.canonicalBoltPatterns?.length)
 
-  // The active-vehicle CTA is a wheels CTA ("See wheels for your …"), so carry the
-  // vehicle's bolt-pattern fit into /store instead of dropping on the bare catalog.
+  const primaryCtaText = !active
+    ? "Find My Fit · Start with your vehicle"
+    : hasFit
+    ? `Find My Fit · See wheels for your ${active.make}`
+    : `Recheck fit for your ${active.make}`
+
+  // Only meaningful (and only used) once hasFit is true — a real bolt-pattern
+  // fit to carry into /store instead of dropping on the bare catalog.
   const activeFitHref = active?.canonicalBoltPatterns?.length
     ? `/store?fit=${active.canonicalBoltPatterns.join(",")}`
     : "/store"
@@ -105,7 +113,7 @@ const Hero = ({ brandCount }: { brandCount?: number }) => {
 
         {/* CTA row */}
         <div className="flex gap-3 small:gap-3.5 items-stretch small:items-center flex-wrap">
-          {active ? (
+          {active && hasFit ? (
             <Button asChild size="lg" className="w-full small:w-auto">
               <LocalizedClientLink href={activeFitHref}>
                 {primaryCtaText}

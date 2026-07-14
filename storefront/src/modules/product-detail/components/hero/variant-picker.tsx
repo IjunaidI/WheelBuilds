@@ -7,7 +7,7 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip"
-import { SizeOption } from "../../data/types"
+import { OffsetVariant, SizeOption } from "../../data/types"
 import { SHIP_LEAD_TIME } from "../../data/pdp-config"
 
 type VariantPickerProps = {
@@ -18,11 +18,22 @@ type VariantPickerProps = {
   boltPatterns: string[]
   selectedBoltPattern: string
   onBoltPatternChange: (b: string) => void
+
+  /**
+   * The actually-selected leaf variant (size × offset × bore × load). The
+   * Status stat reads ITS availability, not the size-level rollup
+   * (`selectedSize.availability`), so it can never disagree with the buy
+   * button on the same screen (WB-090 P1). Falls back to the size rollup
+   * when absent (e.g. a variant-less size).
+   */
+  selectedVariant?: OffsetVariant | null
 }
 
+// "last few sets" was wrong — a size at/under the low-stock threshold (default
+// 4 units) is at most 1 set, not several (WB-090 P2/P18).
 const AVAILABILITY_LABEL: Record<SizeOption["availability"], string> = {
   in_stock: `In stock — ${SHIP_LEAD_TIME}`,
-  low_stock: "Low stock — last few sets",
+  low_stock: "Low stock — only a few left",
   out_of_stock: "Out of stock",
 }
 
@@ -40,7 +51,14 @@ const VariantPicker = ({
   boltPatterns,
   selectedBoltPattern,
   onBoltPatternChange,
+  selectedVariant,
 }: VariantPickerProps) => {
+  const statusAvailability = selectedVariant?.availability ?? selectedSize.availability
+  // WB-090 P16: when EVERY size in the grid is sold out, `active` (below)
+  // would otherwise never highlight any cell — the shopper's actual selection
+  // becomes visually invisible even though `selectedSize` still holds a real
+  // value. Surface it honestly with an explicit banner instead.
+  const allOutOfStock = sizes.length > 0 && sizes.every((s) => s.availability === "out_of_stock")
   return (
     <div className="flex flex-col gap-5">
       {/* Size matrix */}
@@ -51,19 +69,39 @@ const VariantPicker = ({
             {sizes.length} configs
           </span>
         </div>
+        {allOutOfStock && (
+          <div
+            role="status"
+            className="mb-2 rounded-[var(--radius)] border border-[var(--hairline)] bg-[var(--soft)] px-3 py-2 text-[12px] font-semibold text-[var(--ink-soft)]"
+          >
+            Currently out of stock — every size shown is sold out.
+          </div>
+        )}
         <div className="grid grid-cols-4 gap-1.5">
           {sizes.map((s) => {
-            const active =
-              sizeKey(s) === sizeKey(selectedSize) &&
-              s.availability !== "out_of_stock"
             const disabled = s.availability === "out_of_stock"
+            // Gate purely on the sizeKey match (WB-090 P15/P16 edge) — a
+            // selected size that's OOS (e.g. still reachable after a finish
+            // switch that keeps the same size, which is out of stock in the
+            // new finish) must still render as the selected cell. The
+            // `disabled && !active` styling below already yields to
+            // `active`, so this alone is sufficient — no separate
+            // allOutOfStock case needed here.
+            const active = sizeKey(s) === sizeKey(selectedSize)
             return (
               <Tooltip key={sizeKey(s)}>
                 <TooltipTrigger asChild>
                   <button
                     type="button"
-                    disabled={disabled}
-                    onClick={() => onSizeChange(s)}
+                    aria-disabled={disabled}
+                    onClick={() => {
+                      // Native `disabled` was removed so the button stays
+                      // focusable/tabbable and its Tooltip is keyboard- and
+                      // screen-reader-reachable (WB-090 P16); selection is
+                      // instead blocked here.
+                      if (disabled) return
+                      onSizeChange(s)
+                    }}
                     className={cn(
                       "relative h-14 rounded-[var(--radius)] border text-[13px] font-semibold transition-colors",
                       active &&
@@ -72,6 +110,7 @@ const VariantPicker = ({
                         !disabled &&
                         "border-[var(--hairline)] bg-white text-[var(--ink)] hover:border-[var(--ink)]",
                       disabled &&
+                        !active &&
                         "border-[var(--hairline)] bg-[var(--soft)] text-[var(--ink-soft)] opacity-60 cursor-not-allowed line-through"
                     )}
                   >
@@ -136,18 +175,18 @@ const VariantPicker = ({
       {/* Weight + stock readout. Offset moved to the AutoFitmentCard below. */}
       <div className="grid grid-cols-2 gap-3 pt-4 border-t border-[var(--hairline)]">
         {selectedSize.weightLb > 0 && (
-          <Stat label="Weight" value={`${selectedSize.weightLb} lb`} />
+          <Stat label="Shipping weight" value={`${selectedSize.weightLb} lb`} />
         )}
         <Stat
           label="Status"
           value={
-            selectedSize.availability === "in_stock"
+            statusAvailability === "in_stock"
               ? "In stock"
-              : selectedSize.availability === "low_stock"
+              : statusAvailability === "low_stock"
                 ? "Low stock"
                 : "Out of stock"
           }
-          accent={selectedSize.availability !== "out_of_stock"}
+          accent={statusAvailability !== "out_of_stock"}
         />
       </div>
     </div>

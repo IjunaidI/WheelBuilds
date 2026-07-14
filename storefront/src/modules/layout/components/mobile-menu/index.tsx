@@ -7,6 +7,8 @@ import Icon from "@modules/common/components/icon"
 import Logo from "@modules/common/components/logo"
 import Label from "@modules/common/components/label"
 import { isNavLinkActive } from "@modules/layout/templates/nav/nav-active"
+import { NAV_ITEMS } from "@modules/layout/components/nav-items"
+import GaragePill from "@modules/layout/components/garage-pill"
 import { Button } from "@/components/ui/button"
 import {
   Drawer,
@@ -15,19 +17,8 @@ import {
   DrawerTitle,
 } from "@/components/ui/drawer"
 
-const NAV_ITEMS: { label: string; href: string }[] = [
-  { label: "Wheels", href: "/store" },
-  { label: "Tires", href: "/tires" },
-  { label: "Brands", href: "/collections" },
-  { label: "Style", href: "/categories" },
-  { label: "Build Gallery", href: "#" },
-  { label: "Deals", href: "#" },
-  { label: "Support", href: "#" },
-]
-
 const ACCOUNT_ITEMS: { label: string; href: string; icon: "user" | "heart" | "bag" }[] = [
   { label: "Account", href: "/account", icon: "user" },
-  { label: "Saved", href: "/account", icon: "heart" },
   { label: "Cart", href: "/cart", icon: "bag" },
 ]
 
@@ -97,6 +88,10 @@ const MobileMenu = () => {
           </div>
 
           <nav className="flex-1 overflow-y-auto p-5">
+            <div className="mb-6" onClick={() => setOpen(false)}>
+              <GaragePill />
+            </div>
+
             <Label tone="muted" style={{ display: "block", marginBottom: 12 }}>
               SHOP
             </Label>

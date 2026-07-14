@@ -4,7 +4,7 @@ import { useState } from "react"
 import Icon from "@modules/common/components/icon"
 import Label from "@modules/common/components/label"
 import { OffsetVariant } from "../../data/types"
-import { rank } from "../../data/group-sizes"
+import { rank, formatOffset } from "../../data/group-sizes"
 import OffsetDiagram from "./offset-diagram"
 
 type AdvancedFitmentPanelProps = {
@@ -134,7 +134,7 @@ const AdvancedFitmentPanel = ({
                     borderColor: sel ? "var(--ink)" : "var(--hairline)",
                   }}
                 >
-                  +{o.value}
+                  {formatOffset(o.value)}
                   <span className="text-[10px] opacity-60 ml-0.5">MM</span>
                   {isDefaultOffset && (
                     <span
@@ -158,7 +158,7 @@ const AdvancedFitmentPanel = ({
                 Cross-section · top-down
               </span>
               <span className="font-[var(--mono)] text-[10px] text-[var(--ink-soft)] tracking-[0.04em]">
-                {sizeLabel} · ET +{selectedOffsetMm}
+                {sizeLabel} · ET {formatOffset(selectedOffsetMm)}
               </span>
             </div>
             <OffsetDiagram value={selectedOffsetMm} />
@@ -169,7 +169,7 @@ const AdvancedFitmentPanel = ({
             style={{ background: "var(--hairline)", border: "1px solid var(--hairline)" }}
           >
             {[
-              { l: "Offset (ET)", v: `+${current.value}mm` },
+              { l: "Offset (ET)", v: `${formatOffset(current.value)}mm` },
               { l: "Backspace", v: current.backspaceIn },
               { l: "Lip depth", v: current.lipDepthIn ?? "—" },
               { l: "Hub-to-lock", v: current.hubToLockIn ?? "—" },

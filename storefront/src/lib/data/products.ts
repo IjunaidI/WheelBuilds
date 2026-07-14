@@ -44,7 +44,12 @@ export const getProductByHandle = cache(async function (
         // omits product metadata unless it's named — without it EVERY tire renders
         // through the wheel template (blank image + zeroed specs), and the wheel
         // PDP's own brand/construction/warranty (also read from metadata) come back empty.
-        fields: "*variants.calculated_price,+variants.inventory_quantity,+collection_id,+weight,+metadata",
+        // +variants.weight (WB-090 P8/L6) is also load-bearing: without it every
+        // variant's own shipping weight comes back undefined and
+        // groupVariantsIntoSizes falls back to the single product-level +weight
+        // for every size, so all sizes show the same weight.
+        fields:
+          "*variants.calculated_price,+variants.inventory_quantity,+collection_id,+weight,+variants.weight,+metadata",
       },
       { next: { tags: ["products"] } }
     )

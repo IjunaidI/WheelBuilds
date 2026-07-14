@@ -13,6 +13,8 @@ import {
   bestAvailabilityOffset,
   sizeKey,
   findBySizeKey,
+  formatOffset,
+  gramsToLb,
 } from "./group-sizes"
 import type { OffsetVariant } from "./types"
 
@@ -406,5 +408,45 @@ describe("groupVariantsIntoSizes — defaultOffsetMm best-availability (WB-090 P
       28
     )
     expect(sizes[0].defaultOffsetMm).toBe(12)
+  })
+})
+
+describe("formatOffset — sign-aware ET display (WB-090 P7)", () => {
+  it("prepends + for zero and positive values", () => {
+    expect(formatOffset(35)).toBe("+35")
+    expect(formatOffset(0)).toBe("+0")
+  })
+
+  it("does not double the sign for a negative value (regression: '+-12mm')", () => {
+    expect(formatOffset(-12)).toBe("-12")
+  })
+})
+
+describe("gramsToLb", () => {
+  it("converts grams to pounds, rounded to 1 decimal", () => {
+    expect(gramsToLb(14515)).toBe(32)
+  })
+
+  it("returns 0 for 0 grams", () => {
+    expect(gramsToLb(0)).toBe(0)
+  })
+})
+
+describe("groupVariantsIntoSizes — per-variant shipping weight (WB-090 P8/L6)", () => {
+  it("threads each variant's own weight (grams→lb) into its SizeOption instead of applying one product-level weight to every size", () => {
+    const heavy = { ...variant("v_heavy", 20, 9, 18, "5x114.3", 10, 300), weight: 14515 } // ≈32 lb
+    const light = { ...variant("v_light", 22, 10, 20, "5x114.3", 10, 320), weight: 9072 } // ≈20 lb
+    const sizes = groupVariantsIntoSizes([heavy, light], 28)
+    const s20 = sizes.find((s) => s.diameter === 20)!
+    const s22 = sizes.find((s) => s.diameter === 22)!
+    expect(s20.weightLb).toBe(32)
+    expect(s22.weightLb).toBe(20)
+    expect(s20.weightLb).not.toBe(s22.weightLb)
+  })
+
+  it("falls back to the product-level weight when a variant carries no weight of its own", () => {
+    const noWeight = variant("v_a", 20, 9, 18, "5x114.3", 10, 300) // no `weight` key
+    const sizes = groupVariantsIntoSizes([noWeight], 28)
+    expect(sizes[0].weightLb).toBe(28)
   })
 })

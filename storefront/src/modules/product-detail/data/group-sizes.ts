@@ -11,6 +11,29 @@ const numOrNull = (v: unknown): number | null =>
   typeof v === "number" && Number.isFinite(v) ? v : null
 
 /**
+ * Grams → pounds, rounded to 1 decimal. Medusa stores `weight` in grams;
+ * shared by every weight rollup (the product-level fallback computed in
+ * get-product.ts / map-tire-detail.ts, and the per-variant threading in
+ * `groupVariantsIntoSizes` below) so the importer's grams round-trip never
+ * surfaces an ugly value like 31.9997 lb.
+ */
+export function gramsToLb(grams: number): number {
+  return Math.round((grams / 453.592) * 10) / 10
+}
+
+/**
+ * Sign-aware ET (offset) formatter (WB-090 P7). A negative `mm` already
+ * carries its own "-" when stringified, so hand-rolled `+${mm}` templates
+ * double the sign into "+-12mm" — only a non-negative value needs the "+"
+ * prepended. Mirrors variant-picker.tsx's already-correct inline
+ * `{v >= 0 ? "+" : ""}{v}` pattern; every other offset-rendering site should
+ * call this instead of re-deriving the same conditional.
+ */
+export function formatOffset(mm: number): string {
+  return `${mm >= 0 ? "+" : ""}${mm}`
+}
+
+/**
  * Vendor placeholders that must never become a selectable bolt-pattern gate.
  * Must stay byte-identical with the backend twin in
  * backend/src/modules/vendor-sync/search/placeholder-bolt-pattern.ts.
@@ -100,8 +123,10 @@ export function sizeKey(s: {
  * Group variants into the Diameter × Width × BoltPattern size matrix. The
  * group key includes `bolt_pattern_raw`, so each SizeOption is scoped to ONE
  * bolt pattern and its offsets / price / availability never mix across
- * patterns. `productWeightLb` is the single product-level weight (vendor data
- * has no per-size weight) applied to every size.
+ * patterns. Each SizeOption's `weightLb` is threaded from ITS OWN variant's
+ * `weight` (grams → lb, WB-090 P8/L6) — `productWeightLb` is only the
+ * fallback used when a variant carries no weight of its own, so a size no
+ * longer inherits an unrelated sibling size's shipping weight.
  *
  * Rows with no real Diameter AND Width (both <= 0 — a non-vendor / malformed
  * product whose variant metadata never carried wheel_diameter_in /
@@ -127,6 +152,12 @@ export function groupVariantsIntoSizes(
       num((v.calculated_price as any)?.calculated_amount) * 100
     )
     const avail = availabilityOf(qty)
+    // Per-variant shipping weight (WB-090 P8/L6) — falls back to the
+    // product-level rollup when this specific variant has no weight of its
+    // own, so a size is never left with a fake 0 lb.
+    const variantWeightGrams = num((v as any).weight)
+    const variantWeightLb =
+      variantWeightGrams > 0 ? gramsToLb(variantWeightGrams) : productWeightLb
     const offset: OffsetVariant = {
       value: offsetMm,
       backspaceIn: "",
@@ -161,7 +192,7 @@ export function groupVariantsIntoSizes(
         defaultOffsetMm: offsetMm,
         boltPattern,
         offsetVariants: [offset],
-        weightLb: productWeightLb,
+        weightLb: variantWeightLb,
         availability: avail,
         priceCentsOverride: priceCents > 0 ? priceCents : undefined,
       })

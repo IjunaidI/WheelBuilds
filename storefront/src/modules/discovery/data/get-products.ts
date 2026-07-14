@@ -122,6 +122,7 @@ export function hitToProduct(h: Hit): DiscoveryProduct {
     thumbnail: h.thumbnail ?? null,
     finishes: (h.finishes as Finish[]) ?? [],
     diameter: h.diameters?.[0] ?? 0,
+    diameters: h.diameters ?? [],
     width: h.widths?.[0] ?? 0,
     boltPattern: isRealBoltPattern(rawBoltPattern) ? (rawBoltPattern as string) : "",
     boltPatternsCanonical: h.bolt_patterns_canonical ?? [],

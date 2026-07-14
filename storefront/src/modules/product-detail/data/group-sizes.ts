@@ -27,6 +27,24 @@ export function isRealBoltPattern(raw: unknown): boolean {
   return !PLACEHOLDER_BOLT_PATTERNS.has(String(raw ?? "").trim().toLowerCase())
 }
 
+/**
+ * Distinct wheel diameters across a product's variants, ascending (WB-088
+ * D5). Feeds `DiscoveryProduct.diameters` for the featured/related card
+ * mappers (get-featured.ts's `toFeatured`, get-product.ts's
+ * `toRelatedProduct`), which — unlike `hitToProduct`'s Meili `diameters`
+ * field — only have per-variant metadata to derive it from. Mirrors
+ * `finishesUnion`'s shape (finish-options.ts).
+ */
+export function diametersUnion(variants: { metadata?: unknown }[]): number[] {
+  const set = new Set<number>()
+  for (const v of variants) {
+    const m = (v.metadata ?? {}) as Record<string, unknown>
+    const d = num(m.wheel_diameter_in)
+    if (d > 0) set.add(d)
+  }
+  return Array.from(set).sort((a, b) => a - b)
+}
+
 export function availabilityOf(
   qty: number,
   threshold: number = LOW_STOCK_THRESHOLD

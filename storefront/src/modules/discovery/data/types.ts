@@ -30,6 +30,11 @@ export type DiscoveryProduct = {
   /** Normalized finish buckets this product is offered in (multi-valued). */
   finishes: Finish[]
   diameter: number
+  /** All diameters this product is offered in, ascending (WB-088 D5). Feeds
+   *  `diameterLabel` so multi-size products show an honest range/"N sizes"
+   *  instead of the understating `diameter[0]`. Empty when no diameter data
+   *  is available (e.g. some featured/related card mappers). */
+  diameters: number[]
   width: number
   boltPattern: string
   /** Canonical bolt patterns ("{count}x{pcd_mm}") used to badge fit vs the active vehicle. */

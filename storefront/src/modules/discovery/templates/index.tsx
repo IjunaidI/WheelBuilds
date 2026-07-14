@@ -12,6 +12,8 @@ type DiscoveryTemplateProps = {
   result: DiscoveryResult
   currentPage: number
   fit?: boolean
+  /** Active diameter filter (WB-088 D5), threaded to the grid's cards. */
+  activeDiameters?: number[]
 }
 
 /**
@@ -29,6 +31,7 @@ const DiscoveryTemplate = ({
   result,
   currentPage,
   fit = false,
+  activeDiameters,
 }: DiscoveryTemplateProps) => {
   // result.totalCount already reflects only the candidates that were
   // fetched/checked (bounded by FIT_CANDIDATE_CAP in fit mode — see
@@ -56,7 +59,7 @@ const DiscoveryTemplate = ({
             <DiscoveryEmpty />
           ) : (
             <>
-              <DiscoveryGrid products={result.products} fit={fit} />
+              <DiscoveryGrid products={result.products} fit={fit} activeDiameters={activeDiameters} />
               <DiscoveryPagination
                 currentPage={currentPage}
                 totalPages={totalPages}

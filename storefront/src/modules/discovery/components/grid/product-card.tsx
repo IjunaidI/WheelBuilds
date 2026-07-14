@@ -6,6 +6,7 @@ import Display from "@modules/common/components/display"
 import Chip from "@modules/common/components/chip"
 import FitBadge from "./fit-badge"
 import { DiscoveryProduct } from "../../data/types"
+import { diameterLabel } from "../../data/diameter-label"
 import { formatCentsUsd } from "@lib/util/money"
 
 const FINISH_SWATCH: Record<string, string> = {
@@ -20,6 +21,15 @@ type DiscoveryProductCardProps = {
   product: DiscoveryProduct
   /** When true (discovery fit mode), link to the PDP with ?fit=1 so the PDP filters variants to the active vehicle. */
   fit?: boolean
+  /**
+   * Diameters currently selected in the filter rail (WB-088 D5). When set,
+   * `diameterLabel` narrows the chip to the matching diameter(s) instead of
+   * the product's full range. Only threaded from the Discovery grid page
+   * today (`store/page.tsx` → `DiscoveryTemplate` → `DiscoveryGrid`) — other
+   * callers (home rails, PDP "Similar wheels") have no active filter
+   * context, so they fall back to showing the full range.
+   */
+  activeDiameters?: number[]
 }
 
 /**
@@ -29,80 +39,101 @@ type DiscoveryProductCardProps = {
  * by the Discovery grid, the PDP "Similar wheels" row, and the home NEW THIS
  * WEEK rail.
  */
-const DiscoveryProductCard = ({ product, fit = false }: DiscoveryProductCardProps) => (
-  <LocalizedClientLink
-    href={`/products/${product.handle}${fit ? "?fit=1" : ""}`}
-    className="product-card group block"
-    aria-label={`${product.brand} ${product.name}`}
-  >
-    <div className="relative aspect-square bg-[var(--soft)] flex items-center justify-center overflow-hidden">
-      {product.thumbnail ? (
-        <Image
-          src={product.thumbnail}
-          alt={`${product.brand} ${product.name}`}
-          fill
-          sizes="(min-width: 1024px) 25vw, 50vw"
-          className="object-contain p-4"
+const DiscoveryProductCard = ({
+  product,
+  fit = false,
+  activeDiameters,
+}: DiscoveryProductCardProps) => {
+  const dLabel = diameterLabel(product.diameters, activeDiameters)
+  const hasPrice = product.priceCents > 0
+
+  return (
+    <LocalizedClientLink
+      href={`/products/${product.handle}${fit ? "?fit=1" : ""}`}
+      className="product-card group block"
+      aria-label={`${product.brand} ${product.name}`}
+    >
+      <div className="relative aspect-square bg-[var(--soft)] flex items-center justify-center overflow-hidden">
+        {product.thumbnail ? (
+          <Image
+            src={product.thumbnail}
+            alt={`${product.brand} ${product.name}`}
+            fill
+            sizes="(min-width: 1024px) 25vw, 50vw"
+            className="object-contain p-4"
+          />
+        ) : (
+          <Wheel size={180} finish={product.finishes[0] ?? "black"} />
+        )}
+        {product.isNew && (
+          <div className="absolute top-2.5 left-2.5">
+            <Chip variant="accent" size="sm">
+              NEW
+            </Chip>
+          </div>
+        )}
+        <FitBadge
+          patterns={product.boltPatternsCanonical}
+          fit={fit}
+          tier={product.fitTier}
         />
-      ) : (
-        <Wheel size={180} finish={product.finishes[0] ?? "black"} />
-      )}
-      {product.isNew && (
-        <div className="absolute top-2.5 left-2.5">
-          <Chip variant="accent" size="sm">
-            NEW
-          </Chip>
-        </div>
-      )}
-      <FitBadge patterns={product.boltPatternsCanonical} fit={fit} tier={product.fitTier} />
-    </div>
+      </div>
 
-    <div className="p-3 flex flex-col gap-1">
-      <Label tone="muted" style={{ fontSize: 9, display: "block" }}>
-        {product.brand}
-      </Label>
-      <Display size={16} as="div" style={{ marginTop: 2 }}>
-        {product.name}
-      </Display>
+      <div className="p-3 flex flex-col gap-1">
+        <Label tone="muted" style={{ fontSize: 9, display: "block" }}>
+          {product.brand}
+        </Label>
+        <Display size={16} as="div" style={{ marginTop: 2 }}>
+          {product.name}
+        </Display>
 
-      <div className="flex items-center gap-1.5 mt-2">
-        {/* Omit dots entirely for a genuinely finish-less product — do not
+        <div className="flex items-center gap-1.5 mt-2">
+          {/* Omit dots entirely for a genuinely finish-less product — do not
             re-assert the "defaults to black" claim D6 removed at the mapper
             (WB-074 D6/D7 review). */}
-        {product.finishes.slice(0, 3).map((f, i) => (
-          <span
-            key={`${f}-${i}`}
-            aria-hidden
-            className="inline-block h-2.5 w-2.5 rounded-full border border-[var(--hairline)]"
-            style={{ background: FINISH_SWATCH[f] ?? FINISH_SWATCH.black }}
-          />
-        ))}
-        <Label
-          tone="muted"
-          style={{ fontSize: 10, marginLeft: 4, letterSpacing: "0.06em" }}
-        >
-          {product.diameter}"{product.boltPattern ? ` · ${product.boltPattern}` : ""}
-        </Label>
-      </div>
+          {product.finishes.slice(0, 3).map((f, i) => (
+            <span
+              key={`${f}-${i}`}
+              aria-hidden
+              className="inline-block h-2.5 w-2.5 rounded-full border border-[var(--hairline)]"
+              style={{ background: FINISH_SWATCH[f] ?? FINISH_SWATCH.black }}
+            />
+          ))}
+          <Label
+            tone="muted"
+            style={{ fontSize: 10, marginLeft: 4, letterSpacing: "0.06em" }}
+          >
+            {[dLabel, product.boltPattern || null].filter(Boolean).join(" · ")}
+          </Label>
+        </div>
 
-      <div className="border-t border-[var(--hairline)] mt-3 pt-3 flex items-baseline justify-between">
-        <span className="text-[10px] font-[var(--mono)] uppercase tracking-[0.08em] text-[var(--ink-soft)]">
-          From
-        </span>
-        <span className="flex items-baseline gap-2">
-          {product.originalPriceCents && (
-            <span className="text-[12px] text-[var(--ink-soft)] line-through">
-              {formatPrice(product.originalPriceCents)}
+        <div className="border-t border-[var(--hairline)] mt-3 pt-3 flex items-baseline justify-between">
+          {hasPrice ? (
+            <>
+              <span className="text-[10px] font-[var(--mono)] uppercase tracking-[0.08em] text-[var(--ink-soft)]">
+                From
+              </span>
+              <span className="flex items-baseline gap-2">
+                {product.originalPriceCents && (
+                  <span className="text-[12px] text-[var(--ink-soft)] line-through">
+                    {formatPrice(product.originalPriceCents)}
+                  </span>
+                )}
+                <span className="font-[var(--display)] text-[18px] font-black text-[var(--ink)]">
+                  <span style={{ color: "var(--orange)" }}>$</span>
+                  {formatCentsUsd(product.priceCents).slice(1)}
+                </span>
+              </span>
+            </>
+          ) : (
+            <span className="text-[10px] font-[var(--mono)] uppercase tracking-[0.08em] text-[var(--ink-soft)]">
+              Price on request
             </span>
           )}
-          <span className="font-[var(--display)] text-[18px] font-black text-[var(--ink)]">
-            <span style={{ color: "var(--orange)" }}>$</span>
-            {formatCentsUsd(product.priceCents).slice(1)}
-          </span>
-        </span>
+        </div>
       </div>
-    </div>
-  </LocalizedClientLink>
-)
+    </LocalizedClientLink>
+  )
+}
 
 export default DiscoveryProductCard

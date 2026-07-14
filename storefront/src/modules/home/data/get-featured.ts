@@ -5,7 +5,7 @@ import { getRegion } from "@lib/data/regions"
 import { hasImage } from "@lib/util/has-image"
 import { getDiscoveryProducts } from "@modules/discovery/data/get-products"
 import { EMPTY_FILTERS, type DiscoveryProduct } from "@modules/discovery/data/types"
-import { num, isRealBoltPattern } from "@modules/product-detail/data/group-sizes"
+import { num, isRealBoltPattern, diametersUnion } from "@modules/product-detail/data/group-sizes"
 import { finishesUnion } from "@modules/product-detail/data/finish-options"
 import { canonicalBoltPatterns } from "@lib/fitment/canonical-bolt-pattern"
 import { selectFeatured } from "./select-featured"
@@ -48,6 +48,7 @@ export function toFeatured(p: HttpTypes.StoreProduct): DiscoveryProduct {
     thumbnail: p.thumbnail ?? null,
     finishes: finishesUnion(variants),
     diameter: num(rep.wheel_diameter_in),
+    diameters: diametersUnion(variants),
     width: num(rep.wheel_width_in),
     boltPattern,
     boltPatternsCanonical: boltPattern

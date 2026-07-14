@@ -31,5 +31,12 @@ export default async function StorePage({ searchParams }: StorePageProps) {
 
   const inFitMode = !!query.vehicleConstraint?.length
 
-  return <DiscoveryTemplate result={result} currentPage={query.page} fit={inFitMode} />
+  return (
+    <DiscoveryTemplate
+      result={result}
+      currentPage={query.page}
+      fit={inFitMode}
+      activeDiameters={query.filters.diameters}
+    />
+  )
 }

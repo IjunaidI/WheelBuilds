@@ -54,7 +54,7 @@ const nextConfig = {
     // (WB-085 X9) but old links/bookmarks/search-engine results still point
     // at them.
     return [
-      { source: "/:cc/results/:query*", destination: "/:cc/store?q=:query", permanent: true },
+      { source: "/:cc/results/:query", destination: "/:cc/store?q=:query", permanent: true },
       { source: "/:cc/search", destination: "/:cc/store", permanent: true },
     ]
   },

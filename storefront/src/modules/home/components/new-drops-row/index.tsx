@@ -2,10 +2,11 @@ import SectionHeader from "@modules/common/components/section-header"
 import MicroLink from "@modules/common/components/micro-link"
 import DiscoveryProductCard from "@modules/discovery/components/grid/product-card"
 import { getHomeCatalog } from "@modules/home/data/get-home-catalog"
+import { NEW_ARRIVALS_COUNT } from "@modules/home/data/home-config"
 
 const NewDropsRow = async () => {
   const { newestProducts } = await getHomeCatalog()
-  const drops = newestProducts.slice(0, 6)
+  const drops = newestProducts.slice(0, NEW_ARRIVALS_COUNT)
   if (drops.length === 0) return null
 
   return (

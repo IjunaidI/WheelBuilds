@@ -101,8 +101,8 @@ class WheelSizeService extends MedusaService({ WheelSizeCatalog, WheelSizeFitmen
   /** Fetch live + upsert the cache row by cache_key. Returns the fresh fitment. */
   async refreshFitment(p: { make: string; model: string; modificationSlug?: string; year?: string; region: string }): Promise<VehicleFitment> {
     const cache_key = buildFitmentCacheKey(p)
-    const { body, regionUsed } = await this.resolveByModel(p)
-    const fitment = normalizeByModel(body, { modificationSlug: p.modificationSlug ?? "", region: regionUsed })
+    const { body, regionUsed, trimNarrowed } = await this.resolveByModel(p)
+    const fitment = normalizeByModel(body, { modificationSlug: p.modificationSlug ?? "", region: regionUsed, trimNarrowed })
     const row = {
       cache_key, region: regionUsed, raw: body,
       canonical_bolt_patterns: fitment.canonicalBoltPatterns as unknown as Record<string, unknown>,
@@ -212,11 +212,11 @@ class WheelSizeService extends MedusaService({ WheelSizeCatalog, WheelSizeFitmen
   // Classification (spec §10): any non-2xx on the requested region => outage (folded
   // into the storefront's "fitment unavailable" 503). A non-2xx on a *fallback*
   // probe is non-fatal — we skip that region and keep trying.
-  private async resolveByModel(p: { make: string; model: string; modificationSlug?: string; year?: string; region: string }): Promise<{ body: any; regionUsed: string }> {
+  private async resolveByModel(p: { make: string; model: string; modificationSlug?: string; year?: string; region: string }): Promise<{ body: any; regionUsed: string; trimNarrowed?: boolean }> {
     if (!(await this.incrementAndCheckQuota())) throw new QuotaOutageError()
     const primary = await this.client_.byModel({ make: p.make, model: p.model, modification: p.modificationSlug, year: p.year, region: p.region })
     if (primary.status >= 300) throw new QuotaOutageError()
-    if (this.hasData(primary.body)) return { body: primary.body, regionUsed: p.region }
+    if (this.hasData(primary.body)) return { body: primary.body, regionUsed: p.region, trimNarrowed: p.modificationSlug ? true : undefined }
 
     // Empty in the requested region. If a trim slug was sent, the trim — not the
     // region — may be why: the storefront's trim dropdown is the GLOBAL wheel-size
@@ -224,11 +224,21 @@ class WheelSizeService extends MedusaService({ WheelSizeCatalog, WheelSizeFitmen
     // Retry the SAME region without the trim before crossing markets, so a US car
     // stays on US data. emptyBody then carries the broader make+model+year
     // meta.regions, a better fallback hint than the trim-narrowed one.
+    //
+    // WB-104 T3: this retry used to be silent — no log, and the broader (all-trims)
+    // result gets cached under the trim-narrowed cache_key with no signal that the
+    // trim was discarded. `trimDiscarded` makes that visible on the returned
+    // fitment's `source.trimNarrowed` for every return path below.
     let emptyBody = primary.body
+    let trimDiscarded = false
     if (p.modificationSlug) {
+      trimDiscarded = true
+      this.logger_.warn(
+        `[wheel-size] modification "${p.modificationSlug}" returned no data for ${p.make} ${p.model} in region ${p.region}; retrying broad (all trims)`
+      )
       if (!(await this.incrementAndCheckQuota())) throw new QuotaOutageError()
       const broad = await this.client_.byModel({ make: p.make, model: p.model, year: p.year, region: p.region })
-      if (broad.status < 300 && this.hasData(broad.body)) return { body: broad.body, regionUsed: p.region }
+      if (broad.status < 300 && this.hasData(broad.body)) return { body: broad.body, regionUsed: p.region, trimNarrowed: false }
       if (broad.status < 300) emptyBody = broad.body
     }
 
@@ -239,7 +249,7 @@ class WheelSizeService extends MedusaService({ WheelSizeCatalog, WheelSizeFitmen
         // this same loop already found usable data (firstWithData), surface that —
         // discarding it here would turn an already-found result into a needless
         // outage. Only throw when nothing has been found yet.
-        if (firstWithData) return firstWithData
+        if (firstWithData) return { ...firstWithData, trimNarrowed: trimDiscarded ? false : undefined }
         throw new QuotaOutageError()
       }
       let res: any
@@ -250,11 +260,13 @@ class WheelSizeService extends MedusaService({ WheelSizeCatalog, WheelSizeFitmen
       } catch { continue }
       if (res.status >= 300 || !this.hasData(res.body)) continue
       if (!firstWithData) firstWithData = { body: res.body, regionUsed: region }
-      if (this.hasBoltPattern(res.body)) return { body: res.body, regionUsed: region } // filterable — done
+      if (this.hasBoltPattern(res.body)) return { body: res.body, regionUsed: region, trimNarrowed: trimDiscarded ? false : undefined } // filterable — done
     }
     // Prefer any region that returned data (even without a bolt pattern); else the
     // empty primary body, which normalizes to not_found.
-    return firstWithData ?? { body: primary.body, regionUsed: p.region }
+    return firstWithData
+      ? { ...firstWithData, trimNarrowed: trimDiscarded ? false : undefined }
+      : { body: primary.body, regionUsed: p.region, trimNarrowed: trimDiscarded ? false : undefined }
   }
 
   private hasData(body: any): boolean {
@@ -302,8 +314,14 @@ class WheelSizeService extends MedusaService({ WheelSizeCatalog, WheelSizeFitmen
   listMakes() { return this.catalog("makes", "all", () => this.client_.makes()) }
   listModels(make: string) { return this.catalog("models", make, () => this.client_.models(make)) }
   listYears(make: string, model: string) { return this.catalog("years", `${make}|${model}`, () => this.client_.years(make, model)) }
-  listModifications(make: string, model: string, year: string) {
-    return this.catalog("modifications", `${make}|${model}|${year}`, () => this.client_.modifications(make, model, year))
+  // WB-104 T3: region-scoped (additive default "usdm"). The storefront's trim
+  // dropdown was reading the GLOBAL modifications catalog while fitment queries
+  // are region-scoped (usdm) — a non-US trim could be offered for a US vehicle and
+  // then silently fail to resolve. Cache key gains a 4th slot; old 3-part rows
+  // simply orphan and self-heal on next read (same non-breaking pattern as the
+  // fitment cache key's WB-077 "v2" bump).
+  listModifications(make: string, model: string, year: string, region: string = "usdm") {
+    return this.catalog("modifications", `${make}|${model}|${year}|${region}`, () => this.client_.modifications(make, model, year, region))
   }
 }
 export default WheelSizeService

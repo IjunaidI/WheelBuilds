@@ -12,7 +12,20 @@ export type VehicleFitment = {
   oemTireSizes: string[]
   /** Factory (is_stock) tires for the vehicle: canonical size + load index + speed rating. Superset of oemTireSizes. */
   oemTires: OemTire[]
-  source: { modificationSlug: string; region: string }
+  source: {
+    modificationSlug: string
+    region: string
+    /**
+     * True when a modificationSlug was supplied AND the trim-narrowed query
+     * returned data directly. False when a modificationSlug was supplied but
+     * `resolveByModel` discarded it and retried broad (all trims) because the
+     * trim-narrowed query returned no data (WB-104 T3) — the storefront's trim
+     * dropdown is the GLOBAL modifications catalog, so a non-US trim slug against
+     * a `usdm` fitment query is a common, previously-silent cause. Undefined when
+     * no trim was supplied at all.
+     */
+    trimNarrowed?: boolean
+  }
 }
 
 /** A single factory tire fitment: canonical size, load index, and speed rating (null when absent). */

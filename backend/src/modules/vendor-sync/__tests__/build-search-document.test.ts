@@ -212,6 +212,22 @@ describe("buildSearchDocument", () => {
     } as any)
     expect(doc.bolt_patterns).toEqual(["5X5.0"])
   })
+
+  it("indexes style + per-variant size tokens in search_text (no cross-join) — WB-087", () => {
+    const doc: any = buildSearchDocument({
+      ...product,
+      metadata: { product_type: "wheel", brand: "Petrol", style: "NOMAD" },
+      variants: [
+        { sku: "a", prices: [{ amount: 100, currency_code: "usd" }], metadata: { wheel_diameter_in: 20, wheel_width_in: 9, bolt_pattern_raw: "5X5.0" } },
+        { sku: "b", prices: [{ amount: 100, currency_code: "usd" }], metadata: { wheel_diameter_in: 18, wheel_width_in: 10, bolt_pattern_raw: "5X5.0" } },
+      ],
+    } as any)
+    expect(doc.style).toBe("NOMAD")
+    expect(doc.search_text).toContain("20x9")
+    expect(doc.search_text).toContain("18x10")
+    expect(doc.search_text).not.toContain("20x10") // no false cross-join token
+    expect(doc.search_text.toLowerCase()).toContain("nomad")
+  })
 })
 
 describe("buildSearchDocument — discontinued variants (WB-089 L4)", () => {

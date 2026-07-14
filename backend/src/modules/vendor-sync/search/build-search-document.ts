@@ -66,6 +66,7 @@ function buildWheelDocument(
   const usdPrices: number[] = []
   const skus: string[] = []
   const finishes: string[] = []
+  const sizeTokens: string[] = []
 
   for (const v of variants) {
     if (typeof v.sku === "string" && v.sku) skus.push(v.sku)
@@ -74,6 +75,7 @@ function buildWheelDocument(
     if (d !== null) diameters.push(d)
     const w = num(vm.wheel_width_in)
     if (w !== null) widths.push(w)
+    if (d !== null && w !== null) sizeTokens.push(`${d}x${w}`)
     const o = num(vm.offset_mm)
     if (o !== null) offsets.push(o)
     const cb = num(vm.center_bore_mm)
@@ -98,6 +100,8 @@ function buildWheelDocument(
     }
   }
 
+  const style = str(meta.style)
+
   return {
     id: product.id,
     handle: product.handle,
@@ -107,6 +111,7 @@ function buildWheelDocument(
     created_at: product.created_at ?? null,
     product_type: "wheel",
     brand: typeof meta.brand === "string" ? meta.brand : "",
+    style: style ?? "",
     finishes: uniqStr(finishes),
     skus: uniqStr(skus),
     diameters: uniqSorted(diameters),
@@ -115,6 +120,14 @@ function buildWheelDocument(
     center_bores: uniqSorted(centerBores),
     bolt_patterns: uniqStr(boltRaw),
     bolt_patterns_canonical: uniqStr(boltCanonical),
+    // Free-text search field (WB-087): per-variant size tokens ("20x9"),
+    // canonical bolt patterns, and the vendor style/model name — lets
+    // "nomad" or "20x9" match even though none of those are facets.
+    search_text: uniqStr([
+      ...sizeTokens,
+      ...boltCanonical,
+      ...(style ? [style] : []),
+    ]).join(" "),
     // Major units → integer cents: the storefront's DiscoveryProduct.priceCents
     // contract (the Discovery card divides by 100). PDP reads live Medusa
     // calculated_amount (major units) and ×100 itself, so the two surfaces agree.
@@ -193,6 +206,13 @@ function buildTireDocument(
     brand: typeof meta.brand === "string" ? meta.brand : "",
     skus: uniqStr(skus),
     tire_sizes: uniqStr(sizes),
+    // Free-text search field (WB-087): per-variant canonical sizes + the
+    // vendor model name (when present) — lets a size or model query match
+    // even though these aren't faceted attributes.
+    search_text: uniqStr([
+      ...sizes,
+      ...(str(meta.model) ? [str(meta.model)!] : []),
+    ]).join(" "),
     fit_specs: fitSpecs,
     rim_diameters: uniqSorted(rimDiameters),
     section_widths: uniqSorted(sectionWidths),

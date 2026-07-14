@@ -24,6 +24,7 @@ import {
   MODELS_BY_MAKE,
   TRIMS_BY_MODEL,
   YEARS,
+  slugifyYmm,
 } from "@lib/garage/vehicle-data"
 
 type YmmPaneProps = {
@@ -83,6 +84,14 @@ const YmmPane = ({ onClose }: YmmPaneProps) => {
   const [yearOptions, setYearOptions] = useState<Option[]>([])
   const [modificationOptions, setModificationOptions] = useState<Option[]>([])
 
+  // Which fields are currently backed by the static seed (vs the live
+  // wheel-size catalog) — the seed's option VALUE is a display name
+  // ("Silverado 1500"), not a slug, so a value sourced from it must be
+  // slugified before it's sent to resolveFitmentForVehicle (N4). A
+  // live-catalog value is already a real slug and must not be re-slugified.
+  const [makeIsSeed, setMakeIsSeed] = useState(false)
+  const [modelIsSeed, setModelIsSeed] = useState(false)
+
   const [loadingMakes, setLoadingMakes] = useState(false)
   const [loadingModels, setLoadingModels] = useState(false)
   const [loadingYears, setLoadingYears] = useState(false)
@@ -102,10 +111,19 @@ const YmmPane = ({ onClose }: YmmPaneProps) => {
       .then((r) => {
         if (cancelled) return
         const opts = toOptions(r?.makes)
-        setMakeOptions(opts.length ? opts : makeSeed)
+        if (opts.length) {
+          setMakeOptions(opts)
+          setMakeIsSeed(false)
+        } else {
+          setMakeOptions(makeSeed)
+          setMakeIsSeed(true)
+        }
       })
       .catch(() => {
-        if (!cancelled) setMakeOptions(makeSeed)
+        if (!cancelled) {
+          setMakeOptions(makeSeed)
+          setMakeIsSeed(true)
+        }
       })
       .finally(() => {
         if (!cancelled) setLoadingMakes(false)
@@ -127,10 +145,19 @@ const YmmPane = ({ onClose }: YmmPaneProps) => {
       .then((r) => {
         if (cancelled) return
         const opts = toOptions(r?.models)
-        setModelOptions(opts.length ? opts : modelSeed(make))
+        if (opts.length) {
+          setModelOptions(opts)
+          setModelIsSeed(false)
+        } else {
+          setModelOptions(modelSeed(make))
+          setModelIsSeed(true)
+        }
       })
       .catch(() => {
-        if (!cancelled) setModelOptions(modelSeed(make))
+        if (!cancelled) {
+          setModelOptions(modelSeed(make))
+          setModelIsSeed(true)
+        }
       })
       .finally(() => {
         if (!cancelled) setLoadingModels(false)
@@ -207,8 +234,14 @@ const YmmPane = ({ onClose }: YmmPaneProps) => {
         modificationSlug,
       })
       setActive(vehicle.id)
-      // fire the (human-initiated) fitment lookup, then write it back
-      const result = await resolveFitmentForVehicle(make, model, modificationSlug, year, "usdm")
+      // fire the (human-initiated) fitment lookup, then write it back.
+      // Slugify make/model ONLY when that field is currently backed by the
+      // static seed — its option value is a display name ("Silverado 1500"),
+      // and sending a display name to wheel-size silently resolves to
+      // nothing (N4). A live-catalog value is already a real slug.
+      const fitMake = makeIsSeed ? slugifyYmm(make) : make
+      const fitModel = modelIsSeed ? slugifyYmm(model) : model
+      const result = await resolveFitmentForVehicle(fitMake, fitModel, modificationSlug, year, "usdm")
 
       let boltPatterns: string[] = []
       let oemTireSizes: string[] = []
@@ -252,21 +285,20 @@ const YmmPane = ({ onClose }: YmmPaneProps) => {
           break
         }
         case "unavailable":
-          toast.error("Fitment temporarily unavailable", {
-            description: "Please contact support.",
-          })
-          break
         case "failed":
-          // A non-503 failure (network blip, unexpected 4xx/5xx) —
-          // resolveFitmentForVehicle already degrades a 503 to "unavailable" above;
-          // anything else lands here (WB-073 G8). The vehicle is already fully
-          // saved+active by `add`/`setActive` above — NOT rolled back, because it's
-          // in the exact same "saved, fitment unresolved" shape as any pre-fitment
-          // vehicle the garage pane already knows how to re-resolve on next select
-          // (see garage-pane's `needsResolve`), so selecting it again is the natural
-          // retry path. Keep the drawer open and tell the user rather than routing
-          // to an unfiltered catalog or closing on a silent failure.
-          toast.error("Couldn't check fitment right now — please try again.")
+          // Both a degraded 503/quota response ("unavailable") and a non-503
+          // failure (network blip, unexpected 4xx/5xx — "failed", WB-073 G8)
+          // land here. The vehicle is already fully saved+active by
+          // `add`/`setActive` above — NOT rolled back, because it's in the
+          // exact same "saved, fitment unresolved" shape any window-less
+          // vehicle can be in. `return` (not `break`) is load-bearing: it
+          // skips the onClose()+router.push below, so a 503 can no longer
+          // fall through to the UNFILTERED catalog looking like a filtered
+          // one (N5/N7). Keep the drawer open with an honest message — no
+          // "contact support" — and the "Re-check fit" button on the
+          // current-vehicle row (find-by-vehicle/index.tsx) is the real
+          // retry path now that garage-pane is orphaned.
+          toast.error("Fitment temporarily unavailable — please try again.")
           return
       }
       onClose()

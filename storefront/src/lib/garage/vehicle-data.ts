@@ -7,7 +7,23 @@
  * server-fetched dataset and the YMM pane swaps to async dropdowns.
  */
 
-export const YEARS: number[] = Array.from({ length: 11 }, (_, i) => 2025 - i)
+export const YEARS: number[] = Array.from({ length: 13 }, (_, i) => 2027 - i)
+
+/**
+ * Best-effort slug for a static seed value (e.g. "Silverado 1500" ->
+ * "silverado-1500"). The live wheel-size catalog endpoints return real slugs
+ * as option values, but this file's fallback seeds use the display name as
+ * both value and label — sending a display name straight to the wheel-size
+ * lookup silently resolves to nothing (N4). Callers should only slugify a
+ * value that actually came from this seed (a live-catalog value is already a
+ * real slug and must be passed through unchanged).
+ */
+export const slugifyYmm = (value: string): string =>
+  value
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
 
 export const MAKES: string[] = [
   "Ford",

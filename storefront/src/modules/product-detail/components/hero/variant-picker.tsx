@@ -54,6 +54,11 @@ const VariantPicker = ({
   selectedVariant,
 }: VariantPickerProps) => {
   const statusAvailability = selectedVariant?.availability ?? selectedSize.availability
+  // WB-090 P16: when EVERY size in the grid is sold out, `active` (below)
+  // would otherwise never highlight any cell — the shopper's actual selection
+  // becomes visually invisible even though `selectedSize` still holds a real
+  // value. Surface it honestly with an explicit banner instead.
+  const allOutOfStock = sizes.length > 0 && sizes.every((s) => s.availability === "out_of_stock")
   return (
     <div className="flex flex-col gap-5">
       {/* Size matrix */}
@@ -64,19 +69,36 @@ const VariantPicker = ({
             {sizes.length} configs
           </span>
         </div>
+        {allOutOfStock && (
+          <div
+            role="status"
+            className="mb-2 rounded-[var(--radius)] border border-[var(--hairline)] bg-[var(--soft)] px-3 py-2 text-[12px] font-semibold text-[var(--ink-soft)]"
+          >
+            Currently out of stock — every size shown is sold out.
+          </div>
+        )}
         <div className="grid grid-cols-4 gap-1.5">
           {sizes.map((s) => {
-            const active =
-              sizeKey(s) === sizeKey(selectedSize) &&
-              s.availability !== "out_of_stock"
             const disabled = s.availability === "out_of_stock"
+            // Same match as before (`!disabled`) unless every size is OOS, in
+            // which case the selected cell is still highlighted so the grid
+            // never shows "no selection" (WB-090 P16).
+            const active =
+              sizeKey(s) === sizeKey(selectedSize) && (!disabled || allOutOfStock)
             return (
               <Tooltip key={sizeKey(s)}>
                 <TooltipTrigger asChild>
                   <button
                     type="button"
-                    disabled={disabled}
-                    onClick={() => onSizeChange(s)}
+                    aria-disabled={disabled}
+                    onClick={() => {
+                      // Native `disabled` was removed so the button stays
+                      // focusable/tabbable and its Tooltip is keyboard- and
+                      // screen-reader-reachable (WB-090 P16); selection is
+                      // instead blocked here.
+                      if (disabled) return
+                      onSizeChange(s)
+                    }}
                     className={cn(
                       "relative h-14 rounded-[var(--radius)] border text-[13px] font-semibold transition-colors",
                       active &&
@@ -85,6 +107,7 @@ const VariantPicker = ({
                         !disabled &&
                         "border-[var(--hairline)] bg-white text-[var(--ink)] hover:border-[var(--ink)]",
                       disabled &&
+                        !active &&
                         "border-[var(--hairline)] bg-[var(--soft)] text-[var(--ink-soft)] opacity-60 cursor-not-allowed line-through"
                     )}
                   >

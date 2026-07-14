@@ -146,13 +146,31 @@ const TireHero = ({ product }: TireHeroProps) => {
     setSelectedSizeLabel(label)
   }
 
+  // Variant-less product — nothing to sell. Mirrors the wheel hero's guard
+  // (`components/hero/index.tsx`, WB-090 B8/P11): placed after every hook
+  // above so hook call order/count never varies across renders.
+  // `visibleSizeOptions` can only be empty when the product itself has zero
+  // size options — fit-filtering never empties it (`canFilter` requires
+  // `fittingSizeOptions` to be non-empty before `filtered` can be true).
+  // Without this guard the purchase panel and picker render with
+  // `selectedSize` undefined throughout — no price, a "MAY NOT FIT" chip,
+  // and an "Out of stock"-shaped buy button for a product that was never
+  // purchasable in the first place, instead of one honest message.
+  if (visibleSizeOptions.length === 0 || !selectedSize) {
+    return (
+      <div className="p-6 text-base-regular">
+        This product has no purchasable options right now.
+      </div>
+    )
+  }
+
   // The selected size's OWN price ONLY (WB-090 P12) — dropping the
   // `?? product.priceCents` fallback, which was the product-wide min-price
   // across all sizes (see map-tire-detail.ts) and could silently show a
   // DIFFERENT price than this exact size actually charges. `null` means no
   // live price for this size right now; the purchase panel renders "Price
   // unavailable" and disables purchase instead of a misleading $0.00.
-  const unitPriceCents = headlinePriceCents(selectedSize?.priceCents)
+  const unitPriceCents = headlinePriceCents(selectedSize.priceCents)
   const vehicleLabel = active
     ? `${active.year} ${active.make} ${active.model}${active.trim ? ` ${active.trim}` : ""}`
     : ""

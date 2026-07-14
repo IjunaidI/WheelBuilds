@@ -78,11 +78,35 @@ export function bestAvailabilityOffset(
 }
 
 /**
+ * A size's stable identity: Diameter × Width × BoltPattern — deliberately NOT
+ * offset, since several sibling ETs collapse into one SizeOption's
+ * `offsetVariants`. This is `groupVariantsIntoSizes`'s own Map key, exported
+ * so callers can recognize "the same size" across independent grouping runs
+ * (e.g. one per finish, WB-090 P15) — `buildFinishOptions` calls
+ * `groupVariantsIntoSizes` fresh per finish, so two finishes' SizeOption
+ * objects for the identical Diameter×Width×BoltPattern combo are never
+ * object-identical, and a reference-equality check (`Array.includes`) can
+ * never detect that continuity. This key can.
+ */
+export function sizeKey(s: {
+  diameter: number
+  width: number
+  boltPattern: string
+}): string {
+  return `${s.diameter}x${s.width}|${s.boltPattern}`
+}
+
+/**
  * Group variants into the Diameter × Width × BoltPattern size matrix. The
  * group key includes `bolt_pattern_raw`, so each SizeOption is scoped to ONE
  * bolt pattern and its offsets / price / availability never mix across
  * patterns. `productWeightLb` is the single product-level weight (vendor data
  * has no per-size weight) applied to every size.
+ *
+ * Rows with no real Diameter AND Width (both <= 0 — a non-vendor / malformed
+ * product whose variant metadata never carried wheel_diameter_in /
+ * wheel_width_in) are dropped entirely rather than collapsing into a fake
+ * "0×0" SizeOption cell (WB-090 P19).
  */
 export function groupVariantsIntoSizes(
   variants: HttpTypes.StoreProductVariant[],
@@ -93,10 +117,11 @@ export function groupVariantsIntoSizes(
     const m = (v.metadata ?? {}) as Record<string, unknown>
     const diameter = num(m.wheel_diameter_in)
     const width = num(m.wheel_width_in)
+    if (diameter <= 0 || width <= 0) continue
     const offsetMm = num(m.offset_mm)
     const rawBp = String(m.bolt_pattern_raw ?? "")
     const boltPattern = isRealBoltPattern(rawBp) ? rawBp : ""
-    const key = `${diameter}x${width}|${boltPattern}`
+    const key = sizeKey({ diameter, width, boltPattern })
     const qty = num((v as any).inventory_quantity)
     const priceCents = Math.round(
       num((v.calculated_price as any)?.calculated_amount) * 100
@@ -163,6 +188,25 @@ export function sizesForBoltPattern(
 /** Default size pick: first in-stock, else the first, else null (total — never crashes on an empty list). */
 export function pickDefaultSize(sizes: SizeOption[]): SizeOption | null {
   return sizes.find((s) => s.availability !== "out_of_stock") ?? sizes[0] ?? null
+}
+
+/**
+ * Find `current`'s equivalent (same `sizeKey` — Diameter×Width×BoltPattern)
+ * within a different `sizes` list, or `undefined` when no equivalent exists.
+ * Powers the PDP hero's finish-switch continuity (WB-090 P15): each finish's
+ * SizeOption[] is built by a fresh `groupVariantsIntoSizes` call, so the
+ * "same" size under a different finish is never the same object — this looks
+ * up by identity key instead of by reference, and returns the NEW list's own
+ * object (never `current` itself) so the caller's downstream price/stock/
+ * offsets read from the finish that's actually selected.
+ */
+export function findBySizeKey(
+  sizes: SizeOption[],
+  current: SizeOption | null
+): SizeOption | undefined {
+  if (!current) return undefined
+  const key = sizeKey(current)
+  return sizes.find((s) => sizeKey(s) === key)
 }
 
 /**

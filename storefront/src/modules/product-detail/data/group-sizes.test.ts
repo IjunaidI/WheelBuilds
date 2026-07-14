@@ -11,6 +11,8 @@ import {
   availabilityOf,
   boltPatternsForFinish,
   bestAvailabilityOffset,
+  sizeKey,
+  findBySizeKey,
 } from "./group-sizes"
 import type { OffsetVariant } from "./types"
 
@@ -289,6 +291,84 @@ describe("bestAvailabilityOffset", () => {
 
   it("returns undefined for an empty list (total — never crashes)", () => {
     expect(bestAvailabilityOffset([])).toBeUndefined()
+  })
+})
+
+describe("groupVariantsIntoSizes — drops placeholder 0×0 sizes (WB-090 P19)", () => {
+  it("drops a variant whose diameter is 0 (non-vendor / malformed metadata)", () => {
+    const sizes = groupVariantsIntoSizes(
+      [variant("v_zero_d", 0, 9, 18, "5x114.3", 10, 300)],
+      28
+    )
+    expect(sizes).toHaveLength(0)
+  })
+
+  it("drops a variant whose width is 0", () => {
+    const sizes = groupVariantsIntoSizes(
+      [variant("v_zero_w", 20, 0, 18, "5x114.3", 10, 300)],
+      28
+    )
+    expect(sizes).toHaveLength(0)
+  })
+
+  it("drops a fully-blank 0×0 row while keeping a real sibling size", () => {
+    const sizes = groupVariantsIntoSizes(
+      [
+        variant("v_real", 20, 9, 18, "5x114.3", 10, 300),
+        variant("v_blank", 0, 0, 0, "", 10, 0),
+      ],
+      28
+    )
+    expect(sizes).toHaveLength(1)
+    expect(sizes[0].diameter).toBe(20)
+    expect(sizes[0].width).toBe(9)
+  })
+})
+
+describe("sizeKey", () => {
+  it("encodes Diameter×Width|BoltPattern, not offset", () => {
+    expect(sizeKey({ diameter: 20, width: 9, boltPattern: "5x114.3" })).toBe(
+      "20x9|5x114.3"
+    )
+  })
+})
+
+describe("findBySizeKey — finish-switch continuity (WB-090 P15)", () => {
+  it("finds the equivalent size (same D×W|pattern) in a different finish's list, even though the objects are never the same reference", () => {
+    // Two independent groupVariantsIntoSizes calls — mirrors buildFinishOptions
+    // building one matrix PER finish — so these SizeOption objects are never
+    // object-identical even though they share the same D×W|pattern identity.
+    const finishA = groupVariantsIntoSizes(
+      [variant("v_a", 20, 9, 18, "5x114.3", 10, 300)],
+      28
+    )
+    const finishB = groupVariantsIntoSizes(
+      [variant("v_b", 20, 9, 35, "5x114.3", 5, 320)],
+      28
+    )
+    expect(finishA[0]).not.toBe(finishB[0])
+    const matched = findBySizeKey(finishB, finishA[0])
+    expect(matched).toBe(finishB[0])
+  })
+
+  it("returns undefined when no equivalent size exists under the new finish (falls back to default)", () => {
+    const finishA = groupVariantsIntoSizes(
+      [variant("v_a", 20, 9, 18, "5x114.3", 10, 300)],
+      28
+    )
+    const finishB = groupVariantsIntoSizes(
+      [variant("v_b", 22, 10, 35, "6x139.7", 10, 320)],
+      28
+    )
+    expect(findBySizeKey(finishB, finishA[0])).toBeUndefined()
+  })
+
+  it("returns undefined when current is null", () => {
+    const finishB = groupVariantsIntoSizes(
+      [variant("v_b", 20, 9, 18, "5x114.3", 10, 300)],
+      28
+    )
+    expect(findBySizeKey(finishB, null)).toBeUndefined()
   })
 })
 

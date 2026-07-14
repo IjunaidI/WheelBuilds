@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react"
 import { OffsetVariant, ProductDetail, SizeOption } from "../../data/types"
-import { sizesForBoltPattern, pickDefaultSize, boresFor, loadsForBore, resolveLeafVariant, boltPatternsForFinish } from "../../data/group-sizes"
+import { sizesForBoltPattern, pickDefaultSize, boresFor, loadsForBore, resolveLeafVariant, boltPatternsForFinish, findBySizeKey } from "../../data/group-sizes"
 import { headlinePriceCents } from "../../data/price-truth"
 import Gallery from "./gallery"
 import VariantPicker from "./variant-picker"
@@ -117,15 +117,21 @@ const Hero = ({ product }: HeroProps) => {
   )
   const [selectedSize, setSelectedSize] = useState<SizeOption | null>(defaultSize)
 
-  // When the bolt pattern changes, the previously-selected size belongs to the
-  // old pattern and is no longer in visibleSizes — re-snap to a valid size.
-  // visibleSizes is filtered from product.sizeOptions, so element references are
-  // preserved and includes() is a reliable membership check.
+  // Re-snap when the visible size set changes — either the bolt pattern
+  // changed (the old size belongs to a pattern no longer shown) or the
+  // finish changed. Matching MUST be key-based (`findBySizeKey`, D×W×
+  // BoltPattern), not object-identity (WB-090 P15): `finishSizeOptions` is
+  // built by a fresh `groupVariantsIntoSizes` call per finish (see
+  // finish-options.ts), so a size that is genuinely still offered under the
+  // new finish is never `===` its old-finish counterpart — a reference check
+  // (`.includes()`) always missed and reset the shopper's pick to the
+  // default on EVERY finish switch. `findBySizeKey` re-points `selectedSize`
+  // at the new finish's own object (so price/stock/offsets read fresh) when
+  // the same size still exists, and only falls back to the default when it
+  // genuinely doesn't.
   useEffect(() => {
-    if (!selectedSize || !visibleSizes.includes(selectedSize)) {
-      setSelectedSize(pickDefaultSize(visibleSizes))
-    }
-    // selectedSize intentionally omitted: re-snap only when the pattern changes.
+    setSelectedSize(findBySizeKey(visibleSizes, selectedSize) ?? pickDefaultSize(visibleSizes))
+    // selectedSize intentionally omitted: re-snap only when the visible set changes.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [visibleSizes])
 

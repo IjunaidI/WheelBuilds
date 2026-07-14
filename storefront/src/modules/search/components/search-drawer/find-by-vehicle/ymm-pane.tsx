@@ -11,6 +11,7 @@ import Select from "@modules/common/components/select"
 import { Button } from "@/components/ui/button"
 import { useGarage } from "@lib/garage/use-garage"
 import { fitmentDestinationUrl, FitmentTarget } from "./destination-url"
+import { toOptions, Option } from "./to-options"
 import { getFitmentContext } from "@lib/stores/fitment-context"
 import {
   getMakes,
@@ -29,34 +30,6 @@ import {
 
 type YmmPaneProps = {
   onClose: () => void
-}
-
-type Option = { value: string; label: string }
-
-// Defensive coercion of a wheel-size cataloging payload into {value,label} pairs.
-// The catalog endpoints proxy the wheel-size v2 body verbatim ({ data: [...] }),
-// but the exact element shape is pinned by the Task-1 validation gate; until then
-// we accept the documented `data[]` array (objects with slug/name, or bare strings)
-// plus a few common variants, and let the seed cover anything we can't read.
-const toOptions = (payload: any): Option[] => {
-  const arr: any[] = Array.isArray(payload)
-    ? payload
-    : Array.isArray(payload?.data)
-    ? payload.data
-    : []
-  return arr
-    .map((item): Option | null => {
-      if (item == null) return null
-      if (typeof item === "string" || typeof item === "number") {
-        const s = String(item)
-        return { value: s, label: s }
-      }
-      const value = item.slug ?? item.value ?? item.id ?? item.name
-      const label = item.name ?? item.title ?? item.trim ?? item.label ?? value
-      if (value == null) return null
-      return { value: String(value), label: String(label) }
-    })
-    .filter((o): o is Option => o !== null)
 }
 
 // Fallback seeds derived from the static vehicle-data.ts lists (used when a fetch fails).

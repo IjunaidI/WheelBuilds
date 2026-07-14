@@ -121,12 +121,16 @@ function buildWheelDocument(
     bolt_patterns: uniqStr(boltRaw),
     bolt_patterns_canonical: uniqStr(boltCanonical),
     // Free-text search field (WB-087): per-variant size tokens ("20x9"),
-    // canonical bolt patterns, and the vendor style/model name — lets
-    // "nomad" or "20x9" match even though none of those are facets.
+    // canonical bolt patterns, the vendor style/model name, and the literal
+    // category tokens "wheels"/"wheel" — the latter are the synonym TARGETS
+    // for rims→wheels (Meili synonyms only fire when the target token exists
+    // in a searchable field), and also let a bare "wheel" query match.
     search_text: uniqStr([
       ...sizeTokens,
       ...boltCanonical,
       ...(style ? [style] : []),
+      "wheels",
+      "wheel",
     ]).join(" "),
     // Major units → integer cents: the storefront's DiscoveryProduct.priceCents
     // contract (the Discovery card divides by 100). PDP reads live Medusa
@@ -207,12 +211,10 @@ function buildTireDocument(
     skus: uniqStr(skus),
     tire_sizes: uniqStr(sizes),
     // Free-text search field (WB-087): per-variant canonical sizes + the
-    // vendor model name (when present) — lets a size or model query match
-    // even though these aren't faceted attributes.
-    search_text: uniqStr([
-      ...sizes,
-      ...(str(meta.model) ? [str(meta.model)!] : []),
-    ]).join(" "),
+    // literal category tokens "tires"/"tire" — the synonym TARGETS for
+    // tyre/tyres→tire/tires (Meili synonyms only fire when the target token
+    // exists in a searchable field).
+    search_text: uniqStr([...sizes, "tires", "tire"]).join(" "),
     fit_specs: fitSpecs,
     rim_diameters: uniqSorted(rimDiameters),
     section_widths: uniqSorted(sectionWidths),

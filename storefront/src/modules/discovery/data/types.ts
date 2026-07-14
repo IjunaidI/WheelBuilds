@@ -207,7 +207,7 @@ export function parseQueryFromSearchParams(
     },
     sort,
     page: Math.max(1, num("page") ?? 1),
-    q: (Array.isArray(sp.q) ? sp.q[0] : sp.q) || undefined,
+    q: ((Array.isArray(sp.q) ? sp.q[0] : sp.q) ?? "").trim() || undefined,
     ...(vehicleConstraint?.length ? { vehicleConstraint } : {}),
     ...(vehicleFitment ? { vehicleFitment } : {}),
   }

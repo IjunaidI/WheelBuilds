@@ -114,6 +114,8 @@ describe("buildSearchDocument", () => {
       price_min: 40500,
       price_max: 46200,
     })
+    expect(doc!.search_text.split(" ")).toContain("tires")
+    expect(doc!.search_text.split(" ")).toContain("tire")
   })
 
   it("emits per-variant fit_specs for multi-axis fitment, dropping absent load/speed", () => {
@@ -227,6 +229,12 @@ describe("buildSearchDocument", () => {
     expect(doc.search_text).toContain("18x10")
     expect(doc.search_text).not.toContain("20x10") // no false cross-join token
     expect(doc.search_text.toLowerCase()).toContain("nomad")
+  })
+
+  it("seeds the literal category token 'wheels' into search_text so rims→wheels synonym resolves — WB-087", () => {
+    const doc: any = buildSearchDocument(product as any)
+    expect(doc.search_text.split(" ")).toContain("wheels")
+    expect(doc.search_text.split(" ")).toContain("wheel")
   })
 })
 

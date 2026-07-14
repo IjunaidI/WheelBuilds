@@ -123,6 +123,32 @@ export const useDiscoveryQuery = () => {
     [push]
   )
 
+  // WB-088 fixwave: commits one or more scalar filters (price min/max) in a
+  // single navigation via the SAME bprogress `router` this hook already uses
+  // — not a bare `next/navigation` router.replace — so the top progress bar
+  // fires for price commits just like every other filter interaction
+  // (checkboxes/sort/page all go through `push`/this router). Uses
+  // `router.replace` (not `push`) because a price commit is a transient
+  // scalar edit, not a new history entry — same reasoning `push` already
+  // documents for `setPage`'s `keepPage`, just via replace instead.
+  const replaceScalars = useCallback(
+    (patch: Partial<Record<ScalarFilterKey, number | undefined>>) => {
+      const next = new URLSearchParams(searchParams.toString())
+      for (const key of Object.keys(patch) as ScalarFilterKey[]) {
+        const param = SCALAR_PARAM[key]
+        const value = patch[key]
+        next.delete(param)
+        if (value != null && Number.isFinite(value)) {
+          next.set(param, String(value))
+        }
+      }
+      next.delete("page")
+      const qs = next.toString()
+      router.replace(`${pathname}${qs ? `?${qs}` : ""}`, { scroll: false })
+    },
+    [router, pathname, searchParams]
+  )
+
   const setSort = useCallback(
     (sort: SortOption) => {
       push((sp) => {
@@ -133,6 +159,13 @@ export const useDiscoveryQuery = () => {
     [push]
   )
 
+  // WB-088 D13: pagination changes the product list but not scroll position
+  // — without this, clicking "Next" while scrolled deep into a long grid
+  // left the shopper staring at the OLD scroll offset over NEW products
+  // (or the pagination control itself, well below the fold of the new
+  // page). Scroll to the top of the viewport so the new page's results are
+  // visible immediately, same as the filter/sort changes above (which reset
+  // `page` and, via a fresh page load, already start scrolled up).
   const setPage = useCallback(
     (page: number) => {
       push(
@@ -142,6 +175,9 @@ export const useDiscoveryQuery = () => {
         },
         { keepPage: true }
       )
+      if (typeof window !== "undefined") {
+        window.scrollTo({ top: 0, behavior: "smooth" })
+      }
     },
     [push]
   )
@@ -155,14 +191,16 @@ export const useDiscoveryQuery = () => {
     filters: query.filters,
     sort: query.sort,
     page: query.page,
+    q: query.q,
     toggleArrayFilter,
     removeArrayFilter,
     setScalarFilter,
+    replaceScalars,
     setSort,
     setPage,
     clearAll,
     // Helpers
-    isAnyFilterActive: hasAnyFilter(query.filters),
+    isAnyFilterActive: hasActiveQueryOrFilter(query.filters, query.q),
   }
 }
 
@@ -175,5 +213,18 @@ const hasAnyFilter = (f: DiscoveryFilters): boolean => {
   if (f.priceMaxCents != null) return true
   return false
 }
+
+/**
+ * A results page is "active" (filtered away from the bare catalog) when
+ * either a filter is set OR a free-text search term is present (WB-087 D3).
+ * Before this, `isAnyFilterActive` ignored `q` entirely, so a query-only
+ * visit (e.g. from the search drawer) rendered active-chips as empty and
+ * the header/empty-state as if the full, unfiltered catalog were showing —
+ * the active search was invisible and had no way to be cleared.
+ */
+export const hasActiveQueryOrFilter = (
+  f: DiscoveryFilters,
+  q: string | undefined
+): boolean => hasAnyFilter(f) || !!(q && q.trim())
 
 export { EMPTY_FILTERS }

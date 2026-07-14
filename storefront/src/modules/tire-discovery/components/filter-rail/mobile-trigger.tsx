@@ -14,10 +14,19 @@ import Icon from "@modules/common/components/icon"
 import { useTireQuery } from "../../use-tire-query"
 import { TireFacetCounts } from "../../data/types"
 import FilterSections from "./filter-sections"
+import { mobileTriggerLabel, mobileDrawerCta } from "./mobile-trigger-copy"
 
 type MobileFilterTriggerProps = {
   facets: TireFacetCounts
   totalCount: number
+  /**
+   * True when fit mode's candidate cap may have hidden additional matches
+   * (WB-088 D7, mirrors the wheel WB-074 D2 review) — mirrors
+   * `TireHeaderProps.isCapped`. This component renders on the same screen as
+   * the header on viewports under `small`, so it must show the same honest
+   * signal instead of the raw (possibly wrong) `totalCount`.
+   */
+  isCapped?: boolean
 }
 
 /**
@@ -29,6 +38,7 @@ type MobileFilterTriggerProps = {
 const TireMobileFilterTrigger = ({
   facets,
   totalCount,
+  isCapped = false,
 }: MobileFilterTriggerProps) => {
   const [open, setOpen] = useState(false)
   const { filters, isAnyFilterActive, clearAll } = useTireQuery()
@@ -61,7 +71,7 @@ const TireMobileFilterTrigger = ({
           )}
         </span>
         <span className="text-[11px] font-[var(--mono)] text-[var(--ink-soft)] uppercase tracking-[0.06em]">
-          {totalCount} {totalCount === 1 ? "result" : "results"}
+          {mobileTriggerLabel(totalCount, isCapped)}
         </span>
       </Button>
 
@@ -97,7 +107,7 @@ const TireMobileFilterTrigger = ({
           </div>
 
           <div className="flex-1 overflow-y-auto p-5">
-            <FilterSections facets={facets} hideClearAll />
+            <FilterSections facets={facets} hideClearAll instanceId="drawer" />
           </div>
 
           <div className="flex gap-2 p-4 border-t border-[var(--hairline)] bg-white">
@@ -114,7 +124,7 @@ const TireMobileFilterTrigger = ({
               </Button>
             )}
             <Button onClick={() => setOpen(false)} className="flex-[2]">
-              View {totalCount} {totalCount === 1 ? "result" : "results"}
+              {mobileDrawerCta(totalCount, isCapped)}
             </Button>
           </div>
         </DrawerContent>

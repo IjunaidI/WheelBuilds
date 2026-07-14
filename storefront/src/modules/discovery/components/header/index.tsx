@@ -36,7 +36,7 @@ type DiscoveryHeaderProps = {
 
 const DiscoveryHeader = ({ totalCount, isCapped = false }: DiscoveryHeaderProps) => {
   const { active } = useGarage()
-  const { sort, setSort } = useDiscoveryQuery()
+  const { sort, setSort, q } = useDiscoveryQuery()
   const sp = useSearchParams()
 
   // The list is genuinely fit-filtered only when a real fit param is applied —
@@ -62,7 +62,7 @@ const DiscoveryHeader = ({ totalCount, isCapped = false }: DiscoveryHeaderProps)
             )}
           </Label>
           <Display size={32} as="h1" className="small:!text-[48px]">
-            All wheels
+            {q ? `Results for "${q}"` : "All wheels"}
           </Display>
         </div>
         <div className="flex items-center gap-2 small:gap-3 flex-wrap">

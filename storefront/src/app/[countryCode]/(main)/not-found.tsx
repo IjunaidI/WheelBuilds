@@ -1,20 +1,47 @@
 import { Metadata } from "next"
 
-import InteractiveLink from "@modules/common/components/interactive-link"
+import Display from "@modules/common/components/display"
+import Label from "@modules/common/components/label"
+import LocalizedClientLink from "@modules/common/components/localized-client-link"
+import SearchCta from "@modules/search/components/search-cta"
 
 export const metadata: Metadata = {
   title: "404",
-  description: "Something went wrong",
+  description: "This page doesn't exist",
 }
 
+/**
+ * WB-085: renders inside `(main)/layout.tsx`, so it already gets Nav/Footer
+ * chrome + `.frame` tokens — no wrapper needed here. Offers both a direct
+ * catalog link and the search drawer (via `SearchCta`), since a dead link can
+ * land a visitor who was looking for something specific.
+ */
 export default function NotFound() {
   return (
-    <div className="flex flex-col gap-4 items-center justify-center min-h-[calc(100vh-64px)]">
-      <h1 className="text-2xl-semi text-ui-fg-base">Page not found</h1>
-      <p className="text-small-regular text-ui-fg-base">
-        The page you tried to access does not exist.
+    <div className="flex flex-col items-center justify-center text-center px-5 py-24 small:py-32 min-h-[60vh]">
+      <Label bar style={{ marginBottom: 14 }}>
+        404
+      </Label>
+      <Display as="h1" size={44}>
+        This page doesn&apos;t exist
+      </Display>
+      <p
+        style={{
+          fontSize: 14,
+          lineHeight: 1.75,
+          color: "var(--graphite)",
+          margin: "18px 0 30px",
+          maxWidth: 420,
+        }}
+      >
+        Let&apos;s get you back to the build.
       </p>
-      <InteractiveLink href="/">Go to frontpage</InteractiveLink>
+      <div className="flex flex-wrap items-center justify-center gap-3">
+        <LocalizedClientLink href="/store" className="btn btn-primary">
+          Browse the catalog
+        </LocalizedClientLink>
+        <SearchCta />
+      </div>
     </div>
   )
 }

@@ -41,7 +41,7 @@ import { isRealBoltPattern } from "@modules/product-detail/data/group-sizes"
 // Re-export so any existing imports from this file keep working.
 export { parseQueryFromSearchParams } from "./types"
 
-const FACET_FIELDS = ["brand", "diameters", "bolt_patterns", "finishes"] as const
+const FACET_FIELDS = ["brand", "diameters", "bolt_patterns_canonical", "finishes"] as const
 
 const NEW_DAYS = 30
 const NEW_MS = NEW_DAYS * 24 * 60 * 60 * 1000
@@ -63,7 +63,7 @@ function buildFilters(
   if (skip !== "diameters" && f.diameters.length)
     clauses.push(`diameters IN [${f.diameters.map(lit).join(", ")}]`)
   if (skip !== "boltPatterns" && f.boltPatterns.length)
-    clauses.push(`bolt_patterns IN [${f.boltPatterns.map(lit).join(", ")}]`)
+    clauses.push(`bolt_patterns_canonical IN [${f.boltPatterns.map(lit).join(", ")}]`)
   if (skip !== "finishes" && f.finishes.length)
     clauses.push(`finishes IN [${f.finishes.map(lit).join(", ")}]`)
   if (f.priceMinCents != null) clauses.push(`price_min >= ${f.priceMinCents}`)
@@ -122,6 +122,7 @@ export function hitToProduct(h: Hit): DiscoveryProduct {
     thumbnail: h.thumbnail ?? null,
     finishes: (h.finishes as Finish[]) ?? [],
     diameter: h.diameters?.[0] ?? 0,
+    diameters: h.diameters ?? [],
     width: h.widths?.[0] ?? 0,
     boltPattern: isRealBoltPattern(rawBoltPattern) ? (rawBoltPattern as string) : "",
     boltPatternsCanonical: h.bolt_patterns_canonical ?? [],
@@ -166,14 +167,27 @@ export function facetsFromHits(hits: Hit[]): FacetCounts {
   for (const h of hits) {
     if (h.brand) tally(brands, h.brand)
     for (const d of h.diameters ?? []) tally(diameters, String(d))
-    for (const bp of h.bolt_patterns ?? []) tally(boltPatterns, bp)
+    // Canonical (WB-088 D4) — matches FACET_FIELDS/buildFilters below, so
+    // fit mode's rebuilt facets carry the same key space (bolt_patterns_
+    // canonical) as the non-fit disjunctive facet query, keeping the
+    // checkbox `selected` match + labelMap lookups in filter-sections.tsx
+    // correct regardless of which mode produced the counts.
+    for (const bp of h.bolt_patterns_canonical ?? []) tally(boltPatterns, bp)
     for (const f of h.finishes ?? []) tally(finishes, f)
   }
   return { brands, diameters, boltPatterns, finishes }
 }
 
-function emptyResult(pageSize: number): DiscoveryResult {
+/**
+ * Synthetic zero-value result for a real Meilisearch OUTAGE (WB-088 D6) —
+ * `ok: false` so the template can tell this apart from a genuine 0-match
+ * filter combination and show "catalog temporarily unavailable" instead of
+ * blaming the shopper's filters. The only caller is `getDiscoveryProducts`'s
+ * outer catch, below.
+ */
+function outageResult(pageSize: number): DiscoveryResult {
   return {
+    ok: false,
     products: [],
     totalCount: 0,
     pageSize,
@@ -191,7 +205,6 @@ export async function fetchDiscoveryProducts(
   query: DiscoveryQuery
 ): Promise<DiscoveryResult> {
   const pageSize = DEFAULT_PAGE_SIZE
-  const offset = (query.page - 1) * pageSize
 
   // FIT MODE: bolt-pattern-filtered candidates from Meili, then the REAL
   // per-variant check (same as the PDP) so a multi-pattern wheel whose matching
@@ -301,7 +314,7 @@ export async function fetchDiscoveryProducts(
   const facetQueryByDim: Record<string, keyof DiscoveryFilters> = {
     brand: "brands",
     diameters: "diameters",
-    bolt_patterns: "boltPatterns",
+    bolt_patterns_canonical: "boltPatterns",
     finishes: "finishes",
   }
 
@@ -312,8 +325,17 @@ export async function fetchDiscoveryProducts(
         q: query.q ?? "",
         filter: buildFilters(query.filters, query).join(" AND "),
         sort: sortExpr(query.sort),
-        limit: pageSize,
-        offset,
+        // WB-088 D13: `hitsPerPage`/`page` (finite pagination) instead of
+        // `limit`/`offset` — Meilisearch only computes the EXHAUSTIVE
+        // `totalHits`/`totalPages` for this pagination style; the
+        // offset/limit style returns a cheaper but approximate
+        // `estimatedTotalHits`, which fed the header "N results" count and
+        // the pagination control's page count with a number that could
+        // drift from what was actually filtered. `hits` for a given page are
+        // identical either way — this only changes which total the response
+        // carries.
+        hitsPerPage: pageSize,
+        page: query.page,
       },
       ...FACET_FIELDS.map((field) => ({
         indexUid: PRODUCTS_INDEX,
@@ -339,13 +361,17 @@ export async function fetchDiscoveryProducts(
   const facets: FacetCounts = {
     brands: facetByField["brand"],
     diameters: facetByField["diameters"],
-    boltPatterns: facetByField["bolt_patterns"],
+    boltPatterns: facetByField["bolt_patterns_canonical"],
     finishes: facetByField["finishes"],
   }
 
   return {
     products: hitsRes.hits.map(hitToProduct),
-    totalCount: hitsRes.estimatedTotalHits ?? hitsRes.hits.length,
+    // WB-088 D13: prefer the exhaustive `totalHits` (present because the
+    // query above uses `hitsPerPage`/`page`) over `estimatedTotalHits`,
+    // which older mocks/fixtures may still supply and which real Meili
+    // would only return for the offset/limit pagination style.
+    totalCount: hitsRes.totalHits ?? hitsRes.estimatedTotalHits ?? hitsRes.hits.length,
     pageSize,
     facets,
     // Non-fit mode has no candidate cap — totalCount is Meili's real total,
@@ -368,6 +394,14 @@ export async function fetchDiscoveryProducts(
  * candidate would pass the fit gate unverified, and returning normally would
  * let unstable_cache serve that over-claim for 60s. A future re-sync can
  * revalidateTag("discovery").
+ *
+ * WB-088 D6: the degraded result returned from the catch below sets
+ * `ok: false` (see `outageResult`) so the discovery template can render an
+ * honest "catalog temporarily unavailable" block instead of the 0-match
+ * empty state. This is intentionally set only in the outer catch — the
+ * inner `fetchDiscoveryProducts` must keep THROWING on failure (never
+ * return `{ ok: false, ... }` itself) so `unstable_cache` never caches the
+ * outage and it self-heals on the very next request.
  */
 export async function getDiscoveryProducts(
   query: DiscoveryQuery
@@ -381,6 +415,6 @@ export async function getDiscoveryProducts(
     return await cached()
   } catch (e) {
     console.error("[discovery] Meilisearch query failed:", e)
-    return emptyResult(DEFAULT_PAGE_SIZE)
+    return outageResult(DEFAULT_PAGE_SIZE)
   }
 }

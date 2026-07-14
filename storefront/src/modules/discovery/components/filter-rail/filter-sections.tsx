@@ -1,5 +1,6 @@
 "use client"
 
+import { useCallback, useEffect, useState } from "react"
 import { usePathname, useRouter, useSearchParams } from "next/navigation"
 import { useGarage } from "@lib/garage/use-garage"
 import { openSearch } from "@lib/stores/search-store"
@@ -19,6 +20,9 @@ import { Separator } from "@/components/ui/separator"
 
 import { useDiscoveryQuery } from "../../data/use-discovery-query"
 import { FacetCounts } from "../../data/types"
+import { pcdInchLabel } from "../../data/pcd-inch-label"
+import { commitPriceRange } from "../../data/price-range"
+import { sortFacetEntries } from "../../data/facet-sort"
 
 const FINISH_LABELS: Record<string, string> = {
   black: "Gloss black",
@@ -27,7 +31,20 @@ const FINISH_LABELS: Record<string, string> = {
 }
 
 /**
- * Reusable checkbox-list section. Sorts by count desc, then alpha.
+ * Builds a labelMap that appends a trailing `"` to every diameter facet key
+ * for display (e.g. facet key "18" -> label `18"`) — WB-088 D10, ported from
+ * the tire rail's `inchLabelMap` (tire-discovery/components/filter-rail/
+ * filter-sections.tsx). Facet keys are data-driven so this can't be a static
+ * Record.
+ */
+const inchLabelMap = (facetMap: Record<string, number>): Record<string, string> =>
+  Object.fromEntries(Object.keys(facetMap).map((k) => [k, `${k}"`]))
+
+/**
+ * Reusable checkbox-list section. Sorts by count desc, then alpha — unless
+ * `numeric` (diameter, etc.), which sorts ascending by `Number(key)` instead
+ * (WB-088 D10; see `sortFacetEntries`'s docstring for why numeric facets
+ * can't use the count-first sort).
  */
 const ChecklistSection = <T extends string | number>({
   facetMap,
@@ -35,23 +52,34 @@ const ChecklistSection = <T extends string | number>({
   onToggle,
   labelMap,
   formatKey,
+  numeric,
+  instanceId,
+  sectionId,
 }: {
   facetMap: Record<string, number>
   selected: T[]
   onToggle: (value: T) => void
   labelMap?: Record<string, string>
   formatKey: (raw: string) => T
+  numeric?: boolean
+  /** Distinguishes the desktop rail from the mobile drawer instance of this
+   *  section so checkbox ids don't collide when both are mounted at once
+   *  (WB-088 X10). */
+  instanceId: string
+  /** Facet dimension (e.g. "brand"/"diameter") — combined with `instanceId`
+   *  so two numeric sections in the SAME instance can't collide on a shared
+   *  bare integer key (WB-088 X10, e.g. tire `rimDiameters` vs
+   *  `loadIndexes` both minting id `filter-rail-15`). */
+  sectionId: string
 }) => {
-  const entries = Object.entries(facetMap).sort(
-    (a, b) => b[1] - a[1] || a[0].localeCompare(b[0])
-  )
+  const entries = sortFacetEntries(facetMap, numeric)
 
   return (
     <ul className="flex flex-col gap-2 pt-1">
       {entries.map(([key, count]) => {
         const typed = formatKey(key)
         const checked = selected.some((s) => String(s) === key)
-        const id = `filter-${key}`
+        const id = `filter-${instanceId}-${sectionId}-${key}`
         return (
           <li key={key} className="flex items-center gap-2.5">
             <Checkbox
@@ -81,13 +109,25 @@ type FilterSectionsProps = {
   facets: FacetCounts
   /** Hides the clear-all button (used inside the mobile drawer which has its own footer). */
   hideClearAll?: boolean
+  /**
+   * Distinguishes the desktop rail ("rail") from the mobile drawer ("drawer")
+   * instance of this component so the checkbox ids they generate don't
+   * collide when both are mounted at once (WB-088 X10) — the desktop rail is
+   * `hidden small:block` (not unmounted) while the mobile drawer is open, so
+   * duplicate `id`/`htmlFor` pairs used to exist in the DOM simultaneously.
+   */
+  instanceId?: string
 }
 
 /**
  * Vehicle band + filter Accordion + optional Clear button. Reused by the
  * desktop FilterRail aside and the mobile filter drawer.
  */
-const FilterSections = ({ facets, hideClearAll }: FilterSectionsProps) => {
+const FilterSections = ({
+  facets,
+  hideClearAll,
+  instanceId = "rail",
+}: FilterSectionsProps) => {
   const { active } = useGarage()
   const router = useRouter()
   const pathname = usePathname()
@@ -95,7 +135,7 @@ const FilterSections = ({ facets, hideClearAll }: FilterSectionsProps) => {
   const {
     filters,
     toggleArrayFilter,
-    setScalarFilter,
+    replaceScalars,
     clearAll,
     isAnyFilterActive,
   } = useDiscoveryQuery()
@@ -103,6 +143,71 @@ const FilterSections = ({ facets, hideClearAll }: FilterSectionsProps) => {
   const vehicleLabel = active
     ? `${active.year} ${active.make} ${active.model}`
     : "Pick a vehicle for fitment"
+
+  // WB-088 D4: facets.boltPatterns now carries canonical keys
+  // ("{count}x{pcd_mm}") — map each to its dual-unit ("5×114.3 (5×4.5″)")
+  // label so one physical pattern renders as one clear checkbox.
+  const boltPatternLabels = Object.fromEntries(
+    Object.keys(facets.boltPatterns).map((k) => [k, pcdInchLabel(k)])
+  )
+
+  // WB-088 D8: local (uncommitted) text for the price Min/Max inputs. Kept
+  // separate from `filters.priceMinCents`/`priceMaxCents` so keystrokes don't
+  // push a URL change — only commit (blur/Enter) does. Re-synced from the
+  // URL-derived filters whenever they change externally (Clear all, back/
+  // forward nav, or the commit below landing).
+  const [minInput, setMinInput] = useState(
+    filters.priceMinCents != null
+      ? String(Math.round(filters.priceMinCents / 100))
+      : ""
+  )
+  const [maxInput, setMaxInput] = useState(
+    filters.priceMaxCents != null
+      ? String(Math.round(filters.priceMaxCents / 100))
+      : ""
+  )
+
+  useEffect(() => {
+    setMinInput(
+      filters.priceMinCents != null
+        ? String(Math.round(filters.priceMinCents / 100))
+        : ""
+    )
+  }, [filters.priceMinCents])
+
+  useEffect(() => {
+    setMaxInput(
+      filters.priceMaxCents != null
+        ? String(Math.round(filters.priceMaxCents / 100))
+        : ""
+    )
+  }, [filters.priceMaxCents])
+
+  // Commit-on-blur/Enter (not per-keystroke `push`): parses + clamps/swaps
+  // via `commitPriceRange`, reflects the coherent pair back into the local
+  // inputs, then writes both params together via `replaceScalars` — a
+  // transient scalar edit, not a `push` — so typing a price range doesn't
+  // spam browser history. WB-088 fixwave: routed through the hook's
+  // `replaceScalars` (the bprogress router) instead of a local
+  // `next/navigation` `router.replace`, so the commit shows the top progress
+  // bar like every other filter interaction.
+  const commitPrice = useCallback(() => {
+    const { min, max } = commitPriceRange(minInput, maxInput)
+    setMinInput(min != null ? String(min) : "")
+    setMaxInput(max != null ? String(max) : "")
+
+    replaceScalars({
+      priceMinCents: min != null ? Math.round(min * 100) : undefined,
+      priceMaxCents: max != null ? Math.round(max * 100) : undefined,
+    })
+  }, [minInput, maxInput, replaceScalars])
+
+  const onPriceKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Enter") {
+      e.preventDefault()
+      commitPrice()
+    }
+  }
 
   return (
     <>
@@ -154,6 +259,8 @@ const FilterSections = ({ facets, hideClearAll }: FilterSectionsProps) => {
               selected={filters.brands}
               onToggle={(v) => toggleArrayFilter("brands", v)}
               formatKey={(k) => k}
+              instanceId={instanceId}
+              sectionId="brand"
             />
           </AccordionContent>
         </AccordionItem>
@@ -167,7 +274,11 @@ const FilterSections = ({ facets, hideClearAll }: FilterSectionsProps) => {
               facetMap={facets.diameters}
               selected={filters.diameters}
               onToggle={(v) => toggleArrayFilter("diameters", v)}
+              labelMap={inchLabelMap(facets.diameters)}
               formatKey={(k) => Number(k)}
+              numeric
+              instanceId={instanceId}
+              sectionId="diameter"
             />
           </AccordionContent>
         </AccordionItem>
@@ -181,7 +292,10 @@ const FilterSections = ({ facets, hideClearAll }: FilterSectionsProps) => {
               facetMap={facets.boltPatterns}
               selected={filters.boltPatterns}
               onToggle={(v) => toggleArrayFilter("boltPatterns", v)}
+              labelMap={boltPatternLabels}
               formatKey={(k) => k}
+              instanceId={instanceId}
+              sectionId="bolt-pattern"
             />
           </AccordionContent>
         </AccordionItem>
@@ -197,6 +311,8 @@ const FilterSections = ({ facets, hideClearAll }: FilterSectionsProps) => {
               onToggle={(v) => toggleArrayFilter("finishes", v as any)}
               labelMap={FINISH_LABELS}
               formatKey={(k) => k as any}
+              instanceId={instanceId}
+              sectionId="finish"
             />
           </AccordionContent>
         </AccordionItem>
@@ -212,17 +328,10 @@ const FilterSections = ({ facets, hideClearAll }: FilterSectionsProps) => {
                   type="number"
                   inputMode="numeric"
                   placeholder="$0"
-                  value={
-                    filters.priceMinCents != null
-                      ? Math.round(filters.priceMinCents / 100)
-                      : ""
-                  }
-                  onChange={(e) =>
-                    setScalarFilter(
-                      "priceMinCents",
-                      e.target.value ? Number(e.target.value) * 100 : undefined
-                    )
-                  }
+                  value={minInput}
+                  onChange={(e) => setMinInput(e.target.value)}
+                  onBlur={commitPrice}
+                  onKeyDown={onPriceKeyDown}
                 />
               </Field>
               <Field label="Max">
@@ -230,17 +339,10 @@ const FilterSections = ({ facets, hideClearAll }: FilterSectionsProps) => {
                   type="number"
                   inputMode="numeric"
                   placeholder="$2,500"
-                  value={
-                    filters.priceMaxCents != null
-                      ? Math.round(filters.priceMaxCents / 100)
-                      : ""
-                  }
-                  onChange={(e) =>
-                    setScalarFilter(
-                      "priceMaxCents",
-                      e.target.value ? Number(e.target.value) * 100 : undefined
-                    )
-                  }
+                  value={maxInput}
+                  onChange={(e) => setMaxInput(e.target.value)}
+                  onBlur={commitPrice}
+                  onKeyDown={onPriceKeyDown}
                 />
               </Field>
             </div>

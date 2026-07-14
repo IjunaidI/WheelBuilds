@@ -16,7 +16,7 @@ import { useDiscoveryQuery } from "../../data/use-discovery-query"
  * would just get the active vehicle's fit re-applied by FitmentSync.
  */
 const DiscoveryEmpty = () => {
-  const { clearAll } = useDiscoveryQuery()
+  const { clearAll, q } = useDiscoveryQuery()
   const { active } = useGarage()
   const router = useRouter()
   const pathname = usePathname()
@@ -33,6 +33,15 @@ const DiscoveryEmpty = () => {
   const turnOffFit = () => {
     const n = new URLSearchParams(Array.from(sp.entries()))
     n.set("fit", "0")
+    n.delete("page")
+    router.replace(`${pathname}?${n.toString()}`)
+  }
+
+  // Clears only the free-text search term (WB-087 D3), leaving any other
+  // active filters intact.
+  const clearQuery = () => {
+    const n = new URLSearchParams(Array.from(sp.entries()))
+    n.delete("q")
     n.delete("page")
     router.replace(`${pathname}?${n.toString()}`)
   }
@@ -55,6 +64,26 @@ const DiscoveryEmpty = () => {
         </p>
         <Button onClick={turnOffFit} className="mt-2">
           See all wheels
+        </Button>
+      </div>
+    )
+  }
+
+  if (q) {
+    return (
+      <div className="flex flex-col items-center text-center py-24 gap-4 border border-dashed border-[var(--hairline)] rounded-[var(--radius)]">
+        <div style={{ opacity: 0.4 }}>
+          <Wheel size={140} finish="black" />
+        </div>
+        <Label tone="muted">NO MATCHES</Label>
+        <Display size={28} as="h2">
+          No results for &quot;{q}&quot;
+        </Display>
+        <p className="text-[14px] text-[var(--graphite)] max-w-[400px]">
+          Try a different search, or clear it to browse the full catalog.
+        </p>
+        <Button onClick={clearQuery} className="mt-2">
+          Clear search
         </Button>
       </div>
     )

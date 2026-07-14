@@ -6,8 +6,10 @@ import TireMobileFilterTrigger from "../components/filter-rail/mobile-trigger"
 import TireGrid from "../components/grid"
 import TirePagination from "../components/pagination"
 import TireEmpty from "../components/empty-state"
+import TireOutage from "../components/empty-state/outage"
 import FitmentContextSetter from "@modules/common/components/fitment-context-setter"
 import { DEFAULT_PAGE_SIZE, TireDiscoveryResult } from "../data/types"
+import { totalPagesFor } from "@modules/discovery/data/clamp-page"
 
 type TireDiscoveryTemplateProps = {
   result: TireDiscoveryResult
@@ -29,30 +31,40 @@ type TireDiscoveryTemplateProps = {
  * Layout:
  *   small+: header + chips + [ rail 260px | grid+pagination ]
  *   mobile: header + chips + filter button (opens bottom Vaul) + grid stacked
+ *
+ * `result.ok === false` (WB-088 D6) means the Meilisearch query itself
+ * failed, not that 0 tires genuinely matched — rendered as `<TireOutage>`
+ * instead of the 0-match `<TireEmpty>` so an infra blip doesn't read as "no
+ * tires match these filters".
+ *
+ * `currentPage` is guaranteed <= `totalPages` by the time it reaches this
+ * template (WB-088 D11, mirrors the wheel template) — the `/tires` route
+ * redirects an out-of-range `?page` to the last valid page (via `clampPage`,
+ * using this same `totalPagesFor`) before ever calling this component.
  */
 const TireDiscoveryTemplate = ({
   result,
   currentPage,
 }: TireDiscoveryTemplateProps) => {
-  const totalPages = Math.max(
-    1,
-    Math.ceil(result.totalCount / (result.pageSize || DEFAULT_PAGE_SIZE))
-  )
+  const totalPages = totalPagesFor(result.totalCount, result.pageSize || DEFAULT_PAGE_SIZE)
 
   return (
     <section className="px-5 pt-6 pb-16 xsmall:px-8 small:px-20 small:pt-8 small:pb-20">
       <FitmentContextSetter target="tires" />
       <TireFitmentSync />
-      <TireHeader totalCount={result.totalCount} />
+      <TireHeader totalCount={result.totalCount} isCapped={result.isCapped} />
       <TireActiveChips />
       <TireMobileFilterTrigger
         facets={result.facets}
         totalCount={result.totalCount}
+        isCapped={result.isCapped}
       />
       <div className="flex items-start gap-8">
         <TireFilterRail facets={result.facets} />
         <div className="flex-1 min-w-0">
-          {result.products.length === 0 ? (
+          {result.ok === false ? (
+            <TireOutage />
+          ) : result.products.length === 0 ? (
             <TireEmpty />
           ) : (
             <>

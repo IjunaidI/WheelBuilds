@@ -54,7 +54,11 @@ import {
   WHEEL_SIZE_WARM_BATCH,
 } from 'lib/constants';
 import { buildSearchDocument } from 'modules/vendor-sync/search/build-search-document';
-import { MEILI_PRODUCT_FIELDS } from 'modules/vendor-sync/search/meili-index-settings';
+import {
+  MEILI_PRODUCT_FIELDS,
+  MEILI_SEARCHABLE_ATTRIBUTES,
+  MEILI_SYNONYMS,
+} from 'modules/vendor-sync/search/meili-index-settings';
 import { resolveDevMaxRows } from 'lib/dev-max-rows';
 import { buildModuleStatusReport, formatModuleStatusReport } from 'lib/module-status';
 
@@ -259,7 +263,8 @@ const medusaConfig = {
             // 'status' lets the plugin evict drafted products (WB-089 L1).
             fields: MEILI_PRODUCT_FIELDS,
             indexSettings: {
-              searchableAttributes: ['title', 'brand', 'skus'],
+              searchableAttributes: MEILI_SEARCHABLE_ATTRIBUTES,
+              synonyms: MEILI_SYNONYMS,
               displayedAttributes: [
                 'id', 'handle', 'title', 'description', 'thumbnail', 'brand',
                 'finishes', 'skus',
@@ -278,6 +283,12 @@ const medusaConfig = {
               ],
               sortableAttributes: ['price_min', 'created_at', 'title'],
               pagination: { maxTotalHits: 10000 },
+              // WB-088 D9: Meili's default maxValuesPerFacet is 100, so any
+              // facet with more distinct values (brand, tire_sizes) silently
+              // truncates its counts/options past the 100th. Raised to 500 —
+              // an index-config change only (no content re-sync needed), it
+              // takes effect on the next backend boot.
+              faceting: { maxValuesPerFacet: 500 },
             },
             primaryKey: 'id',
             // The plugin falls back to its DEFAULT transformer when ours returns a

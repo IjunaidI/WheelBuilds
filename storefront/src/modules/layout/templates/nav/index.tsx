@@ -4,20 +4,11 @@ import LocalizedClientLink from "@modules/common/components/localized-client-lin
 import CartButton from "@modules/layout/components/cart-button"
 import GaragePill from "@modules/layout/components/garage-pill"
 import MobileMenu from "@modules/layout/components/mobile-menu"
+import { NAV_ITEMS } from "@modules/layout/components/nav-items"
 import Icon from "@modules/common/components/icon"
 import Logo from "@modules/common/components/logo"
 import SearchTrigger from "@modules/search/components/search-trigger"
 import NavLinks from "./nav-links"
-
-const NAV_ITEMS: { label: string; href: string }[] = [
-  { label: "Wheels", href: "/store" },
-  { label: "Tires", href: "/tires" },
-  { label: "Brands", href: "/collections" },
-  { label: "Style", href: "/categories" },
-  { label: "Build Gallery", href: "#" },
-  { label: "Deals", href: "#" },
-  { label: "Support", href: "#" },
-]
 
 export default async function Nav() {
   return (
@@ -46,7 +37,7 @@ export default async function Nav() {
           <SearchTrigger />
         </div>
 
-        {/* Right: account + cart. Hide user/heart on mobile (they're in the drawer). */}
+        {/* Right: account + cart. Hide user icon on mobile (it's in the drawer). */}
         <div className="flex items-center gap-4 small:gap-[18px] text-[var(--ink)]">
           <LocalizedClientLink
             href="/account"
@@ -55,14 +46,6 @@ export default async function Nav() {
             style={{ color: "inherit" }}
           >
             <Icon name="user" size={16} />
-          </LocalizedClientLink>
-          <LocalizedClientLink
-            href="/account"
-            aria-label="Saved"
-            className="hidden small:inline-flex"
-            style={{ color: "inherit" }}
-          >
-            <Icon name="heart" size={16} />
           </LocalizedClientLink>
           <Suspense
             fallback={

@@ -1,6 +1,6 @@
 "use client"
 
-import { useSearchParams } from "next/navigation"
+import { usePathname, useRouter, useSearchParams } from "next/navigation"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import Icon from "@modules/common/components/icon"
@@ -29,8 +29,11 @@ const TireActiveChips = () => {
     clearAll,
     clearFit,
     isAnyFilterActive,
+    q,
   } = useTireQuery()
   const { active } = useGarage()
+  const router = useRouter()
+  const pathname = usePathname()
   const sp = useSearchParams()
 
   // WB-079 B1: a fit param can be present with no active vehicle (garage
@@ -39,6 +42,15 @@ const TireActiveChips = () => {
   // is always removable rather than lingering invisibly.
   const hasFitParam = sp.get("fit") !== null && sp.get("fit") !== "0"
   const fitActive = hasFitParam
+
+  // Clears only the free-text search term (WB-087 D3), leaving any other
+  // active filters intact.
+  const removeQuery = () => {
+    const n = new URLSearchParams(Array.from(sp.entries()))
+    n.delete("q")
+    n.delete("page")
+    router.replace(`${pathname}?${n.toString()}`)
+  }
 
   if (!isAnyFilterActive && !fitActive) return null
 
@@ -49,6 +61,14 @@ const TireActiveChips = () => {
   }
 
   const chips: ChipRow[] = []
+
+  if (q) {
+    chips.push({
+      key: "q",
+      label: `"${q}"`,
+      onRemove: removeQuery,
+    })
+  }
 
   if (fitActive) {
     chips.push({

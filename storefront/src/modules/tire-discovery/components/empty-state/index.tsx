@@ -16,7 +16,7 @@ import { useTireQuery } from "../../use-tire-query"
  * by TireFitmentSync.
  */
 const TireEmpty = () => {
-  const { clearAll } = useTireQuery()
+  const { clearAll, q } = useTireQuery()
   const { active } = useGarage()
   const router = useRouter()
   const pathname = usePathname()
@@ -33,6 +33,15 @@ const TireEmpty = () => {
   const turnOffFit = () => {
     const n = new URLSearchParams(Array.from(sp.entries()))
     n.set("fit", "0")
+    n.delete("page")
+    router.replace(`${pathname}?${n.toString()}`)
+  }
+
+  // Clears only the free-text search term (WB-087 D3), leaving any other
+  // active filters intact.
+  const clearQuery = () => {
+    const n = new URLSearchParams(Array.from(sp.entries()))
+    n.delete("q")
     n.delete("page")
     router.replace(`${pathname}?${n.toString()}`)
   }
@@ -56,6 +65,28 @@ const TireEmpty = () => {
         </p>
         <Button onClick={turnOffFit} className="mt-2">
           See all tires
+        </Button>
+      </div>
+    )
+  }
+
+  if (q) {
+    return (
+      <div className="flex flex-col items-center text-center py-24 gap-4 border border-dashed border-[var(--hairline)] rounded-[var(--radius)]">
+        <div
+          aria-hidden
+          style={{ opacity: 0.4 }}
+          className="h-[140px] w-[140px] rounded-full border-[10px] border-[var(--hairline)] bg-[var(--ink)]/[0.04]"
+        />
+        <Label tone="muted">NO MATCHES</Label>
+        <Display size={28} as="h2">
+          No results for &quot;{q}&quot;
+        </Display>
+        <p className="text-[14px] text-[var(--graphite)] max-w-[400px]">
+          Try a different search, or clear it to browse the full catalog.
+        </p>
+        <Button onClick={clearQuery} className="mt-2">
+          Clear search
         </Button>
       </div>
     )

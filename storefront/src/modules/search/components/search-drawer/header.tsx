@@ -32,7 +32,23 @@ const Header = ({ onClose }: HeaderProps) => {
     if (!trimmed) return
     addRecentSearch(trimmed)
     onClose()
-    router.push(`/${countryCode}/store?q=${encodeURIComponent(trimmed)}`)
+
+    // WB-088 D13: if the shopper is currently in "Show all wheels" mode
+    // (fit=0 — the explicit garage-fitment opt-out, see
+    // discovery/components/filter-rail/filter-sections.tsx), carry that
+    // opt-out into the search results URL. Without this, searching from
+    // inside fit=0 silently re-enabled fitment filtering on the results
+    // page. Read directly off `window.location.search` (not
+    // `useSearchParams()`) so this stays a plain event-time read — this
+    // drawer is mounted globally in the root layout with no Suspense
+    // boundary around it, and `useSearchParams()` there would de-opt the
+    // whole app shell to dynamic rendering.
+    const params = new URLSearchParams({ q: trimmed })
+    if (typeof window !== "undefined") {
+      const currentFit = new URLSearchParams(window.location.search).get("fit")
+      if (currentFit === "0") params.set("fit", "0")
+    }
+    router.push(`/${countryCode}/store?${params.toString()}`)
   }
 
   return (

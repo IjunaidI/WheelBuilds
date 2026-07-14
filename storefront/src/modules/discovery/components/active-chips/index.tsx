@@ -7,6 +7,7 @@ import Icon from "@modules/common/components/icon"
 import { useGarage } from "@lib/garage/use-garage"
 import { useDiscoveryQuery } from "../../data/use-discovery-query"
 import { formatCentsUsd } from "@lib/util/money"
+import { pcdInchLabel } from "../../data/pcd-inch-label"
 
 const FINISH_LABELS: Record<string, string> = {
   black: "Gloss black",
@@ -23,6 +24,7 @@ const ActiveChips = () => {
     setScalarFilter,
     clearAll,
     isAnyFilterActive,
+    q,
   } = useDiscoveryQuery()
   const { active } = useGarage()
   const router = useRouter()
@@ -38,6 +40,15 @@ const ActiveChips = () => {
     router.replace(`${pathname}?${n.toString()}`)
   }
 
+  // Clears only the free-text search term (WB-087 D3), leaving any other
+  // active filters intact — mirrors `showAll`'s param-surgery pattern.
+  const removeQuery = () => {
+    const n = new URLSearchParams(Array.from(sp.entries()))
+    n.delete("q")
+    n.delete("page")
+    router.replace(`${pathname}?${n.toString()}`)
+  }
+
   if (!isAnyFilterActive && !fitActive) return null
 
   type ChipRow = {
@@ -47,6 +58,14 @@ const ActiveChips = () => {
   }
 
   const chips: ChipRow[] = []
+
+  if (q) {
+    chips.push({
+      key: "q",
+      label: `"${q}"`,
+      onRemove: removeQuery,
+    })
+  }
 
   if (fitActive && active) {
     chips.push({
@@ -73,7 +92,7 @@ const ActiveChips = () => {
   for (const bp of filters.boltPatterns) {
     chips.push({
       key: `bolt-${bp}`,
-      label: bp,
+      label: pcdInchLabel(bp),
       onRemove: () => removeArrayFilter("boltPatterns", bp),
     })
   }

@@ -54,11 +54,17 @@ const TireProductCard = ({ product }: TireProductCardProps) => {
         </Label>
 
         <div className="border-t border-[var(--hairline)] mt-3 pt-3 flex items-baseline justify-between">
-          <span className="text-[10px] font-[var(--mono)] uppercase tracking-[0.08em] text-[var(--ink-soft)]">From</span>
-          <span className="font-[var(--display)] text-[18px] font-black text-[var(--ink)]">
-            <span style={{ color: "var(--orange)" }}>$</span>
-            {formatCentsUsd(product.priceCents).slice(1)}
-          </span>
+          {product.priceCents > 0 ? (
+            <>
+              <span className="text-[10px] font-[var(--mono)] uppercase tracking-[0.08em] text-[var(--ink-soft)]">From</span>
+              <span className="font-[var(--display)] text-[18px] font-black text-[var(--ink)]">
+                <span style={{ color: "var(--orange)" }}>$</span>
+                {formatCentsUsd(product.priceCents).slice(1)}
+              </span>
+            </>
+          ) : (
+            <span className="text-[10px] font-[var(--mono)] uppercase tracking-[0.08em] text-[var(--ink-soft)]">Price on request</span>
+          )}
         </div>
       </div>
     </LocalizedClientLink>

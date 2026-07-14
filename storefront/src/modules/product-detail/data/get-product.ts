@@ -19,7 +19,7 @@ import { hasImage } from "@lib/util/has-image"
 import { canonicalBoltPatterns } from "@lib/fitment/canonical-bolt-pattern"
 import { DiscoveryProduct } from "@modules/discovery/data/types"
 import { AnyProductDetail, ProductDetail } from "./types"
-import { num, groupVariantsIntoSizes, isRealBoltPattern } from "./group-sizes"
+import { num, groupVariantsIntoSizes, isRealBoltPattern, diametersUnion } from "./group-sizes"
 import { buildFinishOptions, finishesUnion } from "./finish-options"
 import { mapTireDetail } from "./tire/map-tire-detail"
 import { getTireDiscoveryProducts } from "@modules/tire-discovery/data/get-tire-products"
@@ -66,6 +66,7 @@ function mapToDetail(product: HttpTypes.StoreProduct): ProductDetail {
     thumbnail: product.thumbnail ?? null,
     finishes: Array.from(new Set(finishOptionsList.map((f) => f.normalized))),
     diameter: num(rep.wheel_diameter_in),
+    diameters: diametersUnion(variants),
     width: num(rep.wheel_width_in),
     boltPattern: boltPatterns[0] ?? "",
     isNew: false,
@@ -181,6 +182,7 @@ export function toRelatedProduct(p: HttpTypes.StoreProduct): DiscoveryProduct {
     thumbnail: p.thumbnail ?? null,
     finishes: finishesUnion(variants),
     diameter: num(m.wheel_diameter_in),
+    diameters: diametersUnion(variants),
     width: num(m.wheel_width_in),
     boltPattern,
     boltPatternsCanonical: boltPattern

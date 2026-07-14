@@ -31,7 +31,11 @@ describe("facetsFromHits — D1 (tally every array element, not just [0])", () =
     const hit = makeHit({
       id: "p1",
       diameters: [18, 20],
+      // WB-088 D4: the bolt-pattern tally reads bolt_patterns_canonical, not
+      // the raw bolt_patterns field — set both so this fixture still proves
+      // "every array element", not just element [0].
       bolt_patterns: ["5x114.3", "5x120"],
+      bolt_patterns_canonical: ["5x114.3", "5x120"],
       finishes: ["black", "silver"],
     })
     const facets = facetsFromHits([hit])
@@ -42,7 +46,11 @@ describe("facetsFromHits — D1 (tally every array element, not just [0])", () =
   })
 
   it("regression: the OLD [0]-collapsed behavior would have dropped the second value — assert it does not", () => {
-    const hit = makeHit({ diameters: [18, 20], bolt_patterns: ["5x114.3", "5x120"] })
+    const hit = makeHit({
+      diameters: [18, 20],
+      bolt_patterns: ["5x114.3", "5x120"],
+      bolt_patterns_canonical: ["5x114.3", "5x120"],
+    })
     const facets = facetsFromHits([hit])
 
     // The bug this fixes: hitToProduct(h).diameter / .boltPattern only ever
@@ -73,6 +81,7 @@ describe("facetsFromHits — D1 (tally every array element, not just [0])", () =
       brand: "",
       diameters: undefined as unknown as number[],
       bolt_patterns: [],
+      bolt_patterns_canonical: [],
       finishes: undefined as unknown as Hit["finishes"],
     })
     const facets = facetsFromHits([hit])

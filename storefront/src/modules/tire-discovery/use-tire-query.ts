@@ -127,6 +127,31 @@ export const useTireQuery = () => {
     [push]
   )
 
+  // WB-088 fixwave (mirrors the wheel use-discovery-query.ts twin): commits
+  // one or more scalar filters (price min/max) in a single navigation via the
+  // SAME bprogress `router` this hook already uses, instead of a bare
+  // `next/navigation` router.replace — so price commits show the top
+  // progress bar like every other filter interaction. `router.replace` (not
+  // `push`) because a price commit is a transient scalar edit, not a new
+  // history entry.
+  const replaceScalars = useCallback(
+    (patch: Partial<Record<ScalarFilterKey, number | undefined>>) => {
+      const next = new URLSearchParams(searchParams.toString())
+      for (const key of Object.keys(patch) as ScalarFilterKey[]) {
+        const param = SCALAR_PARAM[key]
+        const value = patch[key]
+        next.delete(param)
+        if (value != null && Number.isFinite(value)) {
+          next.set(param, String(value))
+        }
+      }
+      next.delete("page")
+      const qs = next.toString()
+      router.replace(`${pathname}${qs ? `?${qs}` : ""}`, { scroll: false })
+    },
+    [router, pathname, searchParams]
+  )
+
   const setSort = useCallback(
     (sort: SortOption) => {
       push((sp) => {
@@ -137,6 +162,10 @@ export const useTireQuery = () => {
     [push]
   )
 
+  // WB-088 D13 (mirrors the wheel use-discovery-query.ts): scroll to the top
+  // of the viewport on page change so the new page's results are visible
+  // immediately instead of leaving the shopper at the old scroll offset
+  // (often deep in the grid or at the pagination control itself).
   const setPage = useCallback(
     (page: number) => {
       push(
@@ -146,6 +175,9 @@ export const useTireQuery = () => {
         },
         { keepPage: true }
       )
+      if (typeof window !== "undefined") {
+        window.scrollTo({ top: 0, behavior: "smooth" })
+      }
     },
     [push]
   )
@@ -176,12 +208,13 @@ export const useTireQuery = () => {
     toggleArrayFilter,
     removeArrayFilter,
     setScalarFilter,
+    replaceScalars,
     setSort,
     setPage,
     clearAll,
     clearFit,
     // Helpers
-    isAnyFilterActive: hasAnyFilter(query.filters),
+    isAnyFilterActive: hasActiveQueryOrFilter(query.filters, query.q),
   }
 }
 
@@ -196,5 +229,15 @@ const hasAnyFilter = (f: TireDiscoveryFilters): boolean => {
   if (f.priceMaxCents != null) return true
   return false
 }
+
+/**
+ * Tire twin of `modules/discovery/data/use-discovery-query.ts`'s
+ * `hasActiveQueryOrFilter` (WB-087 D3) — a results page is "active" when
+ * either a filter is set OR a free-text search term is present.
+ */
+export const hasActiveQueryOrFilter = (
+  f: TireDiscoveryFilters,
+  q: string | undefined
+): boolean => hasAnyFilter(f) || !!(q && q.trim())
 
 export { EMPTY_TIRE_FILTERS }

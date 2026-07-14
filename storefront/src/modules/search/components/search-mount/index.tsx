@@ -13,11 +13,17 @@ import {
   DrawerTitle,
 } from "@/components/ui/drawer"
 import SearchDrawer from "../search-drawer"
+import type { TrendingProduct } from "../search-drawer/trending-data"
 
 const isMac = () =>
   typeof navigator !== "undefined" && /Mac|iPhone|iPad/.test(navigator.platform)
 
-const SearchMount = () => {
+type SearchMountProps = {
+  /** Real newest-products for the Trending panel (WB-085 N3), fetched by the server layout. */
+  trendingProducts: TrendingProduct[]
+}
+
+const SearchMount = ({ trendingProducts }: SearchMountProps) => {
   const open = useSearchOpen()
 
   /** Cmd/Ctrl+K opens from anywhere; Esc / drag-to-dismiss / overlay-click are handled by Vaul. */
@@ -48,7 +54,7 @@ const SearchMount = () => {
         <DrawerDescription className="sr-only">
           Find wheels by vehicle, brand, or keyword.
         </DrawerDescription>
-        <SearchDrawer onClose={closeSearch} />
+        <SearchDrawer onClose={closeSearch} trendingProducts={trendingProducts} />
       </DrawerContent>
     </Drawer>
   )

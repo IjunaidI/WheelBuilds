@@ -8,6 +8,7 @@ import {
   formatNumericOption,
   formatOptionalAxis,
   axisKeyFromMetadata,
+  isRealStyleName,
   pickGroupRepresentative,
   slugify,
   variantAxisKey,
@@ -408,5 +409,21 @@ describe("finish as the 7th variant axis", () => {
   it("handle and title drop the finish", () => {
     expect(buildGroupHandle(wheel({ finish: "Matte Black" }))).toBe("petrol-p3b")
     expect(buildGroupTitle(wheel({ finish: "Matte Black" }))).toBe("Petrol P3B")
+  })
+})
+
+// ── WB-087: model name appended to the title when it's a real name ─────────
+
+describe("isRealStyleName + buildGroupTitle style append (WB-087)", () => {
+  it("treats a real model name as a name, codes as codes", () => {
+    expect(isRealStyleName("NOMAD", "058")).toBe(true)
+    expect(isRealStyleName("PR126", "126")).toBe(false)  // run 'PR' = 2, and existing test relies on this
+    expect(isRealStyleName("P3B", "P3B")).toBe(false)
+    expect(isRealStyleName(null, "058")).toBe(false)
+  })
+  it("appends a real style name to the title, keeps handle unchanged", () => {
+    const r = { brand: "Petrol", displayStyleNo: "058", style: "NOMAD", partNumber: "X", title: "raw" } as any
+    expect(buildGroupTitle(r)).toBe("Petrol NOMAD 058")
+    expect(buildGroupHandle(r)).toBe("petrol-058")
   })
 })

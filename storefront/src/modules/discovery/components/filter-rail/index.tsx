@@ -14,7 +14,7 @@ const FilterRail = ({ facets }: FilterRailProps) => (
     aria-label="Filters"
     className="hidden small:block w-[260px] shrink-0 sticky top-4 self-start"
   >
-    <FilterSections facets={facets} />
+    <FilterSections facets={facets} instanceId="rail" />
   </aside>
 )
 

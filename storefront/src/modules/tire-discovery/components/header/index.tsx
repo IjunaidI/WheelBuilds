@@ -16,10 +16,18 @@ import { openSearch } from "@lib/stores/search-store"
 import Icon from "@modules/common/components/icon"
 
 import { useTireQuery } from "../../use-tire-query"
-import { SORT_LABELS, SortOption } from "../../data/types"
+import { FIT_CANDIDATE_CAP, SORT_LABELS, SortOption } from "../../data/types"
 
 type TireHeaderProps = {
   totalCount: number
+  /**
+   * True when fit mode's candidate cap may have hidden additional matches
+   * (WB-088 D7, mirrors the wheel WB-074 D2) — `totalCount` in that case is a
+   * count of the capped candidates checked, not a precise catalog total, so
+   * it must not be presented as one. The copy below says "candidates", not
+   * "matches", so it never claims a precise fit-checked count.
+   */
+  isCapped?: boolean
 }
 
 /**
@@ -30,9 +38,9 @@ type TireHeaderProps = {
  * vehicle with no tire-size data both show the full catalog, so the chip
  * must not claim "FITS YOUR CAR" in those states.
  */
-const TireHeader = ({ totalCount }: TireHeaderProps) => {
+const TireHeader = ({ totalCount, isCapped = false }: TireHeaderProps) => {
   const { active } = useGarage()
-  const { sort, setSort } = useTireQuery()
+  const { sort, setSort, q } = useTireQuery()
   const sp = useSearchParams()
 
   const fitParam = sp.get("fit")
@@ -44,11 +52,17 @@ const TireHeader = ({ totalCount }: TireHeaderProps) => {
       <div className="flex flex-col small:flex-row small:items-end small:justify-between gap-4">
         <div className="min-w-0">
           <Label tone="muted" style={{ display: "block", marginBottom: 6 }}>
-            CATALOG ·{" "}
-            {totalCount.toLocaleString()} {totalCount === 1 ? "RESULT" : "RESULTS"}
+            {isCapped ? (
+              <>CATALOG · TOP {FIT_CANDIDATE_CAP.toLocaleString()} CANDIDATES — REFINE TO NARROW</>
+            ) : (
+              <>
+                CATALOG ·{" "}
+                {totalCount.toLocaleString()} {totalCount === 1 ? "RESULT" : "RESULTS"}
+              </>
+            )}
           </Label>
           <Display size={32} as="h1" className="small:!text-[48px]">
-            All tires
+            {q ? `Results for "${q}"` : "All tires"}
           </Display>
         </div>
         <div className="flex items-center gap-2 small:gap-3 flex-wrap">

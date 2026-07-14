@@ -5,12 +5,15 @@ import FindByVehicle from "./find-by-vehicle"
 import PopularSearches from "./popular-searches"
 import Trending from "./trending"
 import RecentSearches from "./recent-searches"
+import type { TrendingProduct } from "./trending-data"
 
 type SearchDrawerProps = {
   onClose: () => void
+  /** Real newest-products for the Trending panel (WB-085 N3), fetched server-side by the layout. */
+  trendingProducts: TrendingProduct[]
 }
 
-const SearchDrawer = ({ onClose }: SearchDrawerProps) => (
+const SearchDrawer = ({ onClose, trendingProducts }: SearchDrawerProps) => (
   <>
     <Header onClose={onClose} />
     <div
@@ -23,7 +26,7 @@ const SearchDrawer = ({ onClose }: SearchDrawerProps) => (
     >
       <FindByVehicle onClose={onClose} />
       <PopularSearches onClose={onClose} />
-      <Trending onClose={onClose} />
+      <Trending onClose={onClose} products={trendingProducts} />
       <RecentSearches onClose={onClose} />
     </div>
   </>

@@ -30,6 +30,11 @@ export type DiscoveryProduct = {
   /** Normalized finish buckets this product is offered in (multi-valued). */
   finishes: Finish[]
   diameter: number
+  /** All diameters this product is offered in, ascending (WB-088 D5). Feeds
+   *  `diameterLabel` so multi-size products show an honest range/"N sizes"
+   *  instead of the understating `diameter[0]`. Empty when no diameter data
+   *  is available (e.g. some featured/related card mappers). */
+  diameters: number[]
   width: number
   boltPattern: string
   /** Canonical bolt patterns ("{count}x{pcd_mm}") used to badge fit vs the active vehicle. */
@@ -112,6 +117,18 @@ export type FacetCounts = {
 }
 
 export type DiscoveryResult = {
+  /**
+   * Outage discriminant (WB-088 D6). `undefined`/`true` = a real Meilisearch
+   * query ran and this is its honest result (possibly a genuine 0 matches).
+   * `false` = the query itself failed (see `getDiscoveryProducts`'s outer
+   * catch in get-products.ts) and every field below is a synthetic
+   * zero-value placeholder — NOT a real 0-match count. Optional so every
+   * pre-existing success-path consumer that destructures `{ products,
+   * facets }` (home data loaders, etc.) keeps compiling and behaving exactly
+   * as before; only the discovery template needs to branch on it to avoid
+   * telling a shopper "no wheels match these filters" during an infra outage.
+   */
+  ok?: boolean
   products: DiscoveryProduct[]
   totalCount: number
   pageSize: number
@@ -207,7 +224,7 @@ export function parseQueryFromSearchParams(
     },
     sort,
     page: Math.max(1, num("page") ?? 1),
-    q: (Array.isArray(sp.q) ? sp.q[0] : sp.q) || undefined,
+    q: ((Array.isArray(sp.q) ? sp.q[0] : sp.q) ?? "").trim() || undefined,
     ...(vehicleConstraint?.length ? { vehicleConstraint } : {}),
     ...(vehicleFitment ? { vehicleFitment } : {}),
   }

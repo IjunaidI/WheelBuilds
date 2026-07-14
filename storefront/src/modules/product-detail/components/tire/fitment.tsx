@@ -3,6 +3,7 @@
 import SectionHeader from "@modules/common/components/section-header"
 import Chip from "@modules/common/components/chip"
 import Icon from "@modules/common/components/icon"
+import LocalizedClientLink from "@modules/common/components/localized-client-link"
 import { Button } from "@/components/ui/button"
 import { useGarage } from "@lib/garage/use-garage"
 import { openSearch } from "@lib/stores/search-store"
@@ -173,12 +174,12 @@ const TireFitment = ({ product }: TireFitmentProps) => {
 
       <p className="mt-6 text-[12px] text-[var(--ink-soft)] font-[var(--mono)] leading-relaxed">
         Don&apos;t see your vehicle?{" "}
-        <a
-          href="#"
+        <LocalizedClientLink
+          href="/contact"
           className="text-[var(--orange)] font-semibold no-underline hover:underline"
         >
           Submit your vehicle for a fitment check
-        </a>{" "}
+        </LocalizedClientLink>{" "}
         — we usually confirm within 24 hours.
       </p>
     </section>

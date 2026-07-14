@@ -111,7 +111,7 @@ const AdvancedFitmentPanel = ({
               Offset (ET)
             </Label>
             <a
-              href="#"
+              href="#offset-diagram"
               className="text-[11px] text-[var(--graphite)] underline underline-offset-2"
             >
               What is offset?
@@ -150,6 +150,7 @@ const AdvancedFitmentPanel = ({
           </div>
 
           <div
+            id="offset-diagram"
             className="rounded-[4px] px-3.5 pt-3 pb-2 bg-white"
             style={{ border: "1px solid var(--hairline)" }}
           >
@@ -194,8 +195,8 @@ const AdvancedFitmentPanel = ({
             Positive ET tucks the wheel inboard (toward the suspension); lower
             ET pushes it out toward the fender.{" "}
             {isDefault
-              ? "You're on the wheel's default offset — fully cleared."
-              : "This is an override — may require minor fender liner trim. Pros approved."}
+              ? "You're on the wheel's default offset for this size."
+              : "This is an override from the default offset — confirm clearance for your exact setup before ordering."}
           </div>
         </div>
       )}

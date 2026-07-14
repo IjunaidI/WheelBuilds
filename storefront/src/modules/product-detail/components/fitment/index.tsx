@@ -127,7 +127,7 @@ const Fitment = ({ product }: FitmentProps) => {
                       per-variant-correct view for a multi-bore wheel. */}
                   {fitView && !fitViewAllWithinWindow(fitView)
                     ? "Bolt pattern and hub bore clear, but this size is outside the typical size window for your vehicle — confirm offset before ordering."
-                    : "Add this wheel to cart — we'll verify final offset against your build at order review."}
+                    : "Bolt pattern, hub bore, and size are confirmed for your vehicle."}
                 </div>
               </>
             ) : tier === "check" ? (

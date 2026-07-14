@@ -26,9 +26,27 @@ export const FREE_SHIP_THRESHOLD_USD = intEnv(process.env.NEXT_PUBLIC_PDP_FREE_S
 /** Lead-time copy on in-stock sizes. */
 export const SHIP_LEAD_TIME = process.env.NEXT_PUBLIC_PDP_SHIP_LEAD_TIME ?? "ships 2–3 days"
 
-/** Trust-strip cells in the purchase panel. */
-export const TRUST_STRIP: { icon: "shipping" | "shield" | "return"; heading: string; sub: string }[] = [
+/**
+ * Trust-strip cells in the purchase panel. `href` is optional — only the
+ * "Fitment guarantee" cell links out today (to the real fitment-returns
+ * section on /returns); the other cells render as plain text.
+ */
+export const TRUST_STRIP: {
+  icon: "shipping" | "shield" | "return"
+  heading: string
+  sub: string
+  href?: string
+}[] = [
   { icon: "shipping", heading: "Free shipping", sub: `Orders $${FREE_SHIP_THRESHOLD_USD}+` },
-  { icon: "shield", heading: "Fitment guarantee", sub: "Or money back" },
+  {
+    icon: "shield",
+    heading: "Fitment guarantee",
+    // WB-091 P6: "Or money back" overstated an unconditional refund the
+    // returns policy doesn't actually promise — the real policy (see
+    // modules/policies/content.ts "Fitment-related returns") is conditional
+    // (unmounted/unused, contact us before ordering when in doubt).
+    sub: "See our fitment returns policy",
+    href: "/returns#fitment",
+  },
   { icon: "return", heading: "30-day returns", sub: "Unmounted" },
 ]

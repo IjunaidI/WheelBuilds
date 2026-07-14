@@ -7,6 +7,7 @@ import Display from "@modules/common/components/display"
 import Label from "@modules/common/components/label"
 import Chip from "@modules/common/components/chip"
 import Icon from "@modules/common/components/icon"
+import LocalizedClientLink from "@modules/common/components/localized-client-link"
 import { Button } from "@/components/ui/button"
 import { Separator } from "@/components/ui/separator"
 import { addToCart } from "@lib/data/cart"
@@ -313,21 +314,37 @@ const TirePurchasePanel = ({
         <Icon name="arrow-right" size={16} color="white" />
       </Button>
 
-      {/* Trust strip — reused verbatim from the wheel purchase panel. */}
+      {/* Trust strip — reused verbatim from the wheel purchase panel,
+          including the WB-091 P6 linked "Fitment guarantee" cell. */}
       <div className="grid grid-cols-3 gap-4 pt-6 mt-2">
-        {TRUST_STRIP.map((t) => (
-          <div key={t.heading} className="flex items-start gap-2.5">
-            <Icon name={t.icon} size={20} strokeWidth={1.4} />
-            <div>
-              <div className="text-[12px] font-semibold text-[var(--ink)]">
-                {t.heading}
+        {TRUST_STRIP.map((t) => {
+          const body = (
+            <>
+              <Icon name={t.icon} size={20} strokeWidth={1.4} />
+              <div>
+                <div className="text-[12px] font-semibold text-[var(--ink)]">
+                  {t.heading}
+                </div>
+                <div className="text-[10px] text-[var(--ink-soft)] mt-0.5">
+                  {t.sub}
+                </div>
               </div>
-              <div className="text-[10px] text-[var(--ink-soft)] mt-0.5">
-                {t.sub}
-              </div>
+            </>
+          )
+          return t.href ? (
+            <LocalizedClientLink
+              key={t.heading}
+              href={t.href}
+              className="flex items-start gap-2.5 no-underline"
+            >
+              {body}
+            </LocalizedClientLink>
+          ) : (
+            <div key={t.heading} className="flex items-start gap-2.5">
+              {body}
             </div>
-          </div>
-        ))}
+          )
+        })}
       </div>
     </div>
   )

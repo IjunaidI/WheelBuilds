@@ -181,7 +181,7 @@ export const useTireQuery = () => {
     clearAll,
     clearFit,
     // Helpers
-    isAnyFilterActive: hasAnyFilter(query.filters),
+    isAnyFilterActive: hasActiveQueryOrFilter(query.filters, query.q),
   }
 }
 
@@ -196,5 +196,15 @@ const hasAnyFilter = (f: TireDiscoveryFilters): boolean => {
   if (f.priceMaxCents != null) return true
   return false
 }
+
+/**
+ * Tire twin of `modules/discovery/data/use-discovery-query.ts`'s
+ * `hasActiveQueryOrFilter` (WB-087 D3) — a results page is "active" when
+ * either a filter is set OR a free-text search term is present.
+ */
+export const hasActiveQueryOrFilter = (
+  f: TireDiscoveryFilters,
+  q: string | undefined
+): boolean => hasAnyFilter(f) || !!(q && q.trim())
 
 export { EMPTY_TIRE_FILTERS }

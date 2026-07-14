@@ -155,6 +155,7 @@ export const useDiscoveryQuery = () => {
     filters: query.filters,
     sort: query.sort,
     page: query.page,
+    q: query.q,
     toggleArrayFilter,
     removeArrayFilter,
     setScalarFilter,
@@ -162,7 +163,7 @@ export const useDiscoveryQuery = () => {
     setPage,
     clearAll,
     // Helpers
-    isAnyFilterActive: hasAnyFilter(query.filters),
+    isAnyFilterActive: hasActiveQueryOrFilter(query.filters, query.q),
   }
 }
 
@@ -175,5 +176,18 @@ const hasAnyFilter = (f: DiscoveryFilters): boolean => {
   if (f.priceMaxCents != null) return true
   return false
 }
+
+/**
+ * A results page is "active" (filtered away from the bare catalog) when
+ * either a filter is set OR a free-text search term is present (WB-087 D3).
+ * Before this, `isAnyFilterActive` ignored `q` entirely, so a query-only
+ * visit (e.g. from the search drawer) rendered active-chips as empty and
+ * the header/empty-state as if the full, unfiltered catalog were showing —
+ * the active search was invisible and had no way to be cleared.
+ */
+export const hasActiveQueryOrFilter = (
+  f: DiscoveryFilters,
+  q: string | undefined
+): boolean => hasAnyFilter(f) || !!(q && q.trim())
 
 export { EMPTY_FILTERS }

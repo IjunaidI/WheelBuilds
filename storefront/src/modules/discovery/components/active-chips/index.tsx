@@ -23,6 +23,7 @@ const ActiveChips = () => {
     setScalarFilter,
     clearAll,
     isAnyFilterActive,
+    q,
   } = useDiscoveryQuery()
   const { active } = useGarage()
   const router = useRouter()
@@ -38,6 +39,15 @@ const ActiveChips = () => {
     router.replace(`${pathname}?${n.toString()}`)
   }
 
+  // Clears only the free-text search term (WB-087 D3), leaving any other
+  // active filters intact — mirrors `showAll`'s param-surgery pattern.
+  const removeQuery = () => {
+    const n = new URLSearchParams(Array.from(sp.entries()))
+    n.delete("q")
+    n.delete("page")
+    router.replace(`${pathname}?${n.toString()}`)
+  }
+
   if (!isAnyFilterActive && !fitActive) return null
 
   type ChipRow = {
@@ -47,6 +57,14 @@ const ActiveChips = () => {
   }
 
   const chips: ChipRow[] = []
+
+  if (q) {
+    chips.push({
+      key: "q",
+      label: `"${q}"`,
+      onRemove: removeQuery,
+    })
+  }
 
   if (fitActive && active) {
     chips.push({

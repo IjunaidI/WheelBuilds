@@ -32,7 +32,7 @@ type TireHeaderProps = {
  */
 const TireHeader = ({ totalCount }: TireHeaderProps) => {
   const { active } = useGarage()
-  const { sort, setSort } = useTireQuery()
+  const { sort, setSort, q } = useTireQuery()
   const sp = useSearchParams()
 
   const fitParam = sp.get("fit")
@@ -48,7 +48,7 @@ const TireHeader = ({ totalCount }: TireHeaderProps) => {
             {totalCount.toLocaleString()} {totalCount === 1 ? "RESULT" : "RESULTS"}
           </Label>
           <Display size={32} as="h1" className="small:!text-[48px]">
-            All tires
+            {q ? `Results for "${q}"` : "All tires"}
           </Display>
         </div>
         <div className="flex items-center gap-2 small:gap-3 flex-wrap">

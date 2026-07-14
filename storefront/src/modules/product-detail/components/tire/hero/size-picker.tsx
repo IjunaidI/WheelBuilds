@@ -20,9 +20,11 @@ type TireSizePickerProps = {
   onSizeChange: (sizeLabel: string) => void
 }
 
+// "last few sets" was wrong — a size at/under the low-stock threshold (default
+// 4 units) is at most 1 set, not several (WB-090 P2/P18).
 const AVAILABILITY_LABEL: Record<TireSizeOption["availability"], string> = {
   in_stock: `In stock — ${SHIP_LEAD_TIME}`,
-  low_stock: "Low stock — last few sets",
+  low_stock: "Low stock — only a few left",
   out_of_stock: "Out of stock",
 }
 

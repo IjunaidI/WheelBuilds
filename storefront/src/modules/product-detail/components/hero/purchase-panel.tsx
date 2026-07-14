@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { useParams, useRouter } from "next/navigation"
 import { toast } from "sonner"
 import Display from "@modules/common/components/display"
@@ -13,9 +13,11 @@ import { useGarage } from "@lib/garage/use-garage"
 import { variantFitTier } from "@lib/fitment/product-has-fitting-variant"
 import { openSearch } from "@lib/stores/search-store"
 import { addToCart } from "@lib/data/cart"
+import { insufficientStockMessage } from "@lib/util/error-message"
 import { formatCentsUsd } from "@lib/util/money"
 import { OffsetVariant, ProductDetail, SizeOption } from "../../data/types"
-import { DEFAULT_WHEEL_QTY, TRUST_STRIP } from "../../data/pdp-config"
+import { DEFAULT_WHEEL_QTY, LOW_STOCK_THRESHOLD, TRUST_STRIP } from "../../data/pdp-config"
+import { clampQty, stepperCap } from "../../data/qty-bounds"
 
 type PurchasePanelProps = {
   product: ProductDetail
@@ -59,11 +61,25 @@ const PurchasePanel = ({
     : null
   const router = useRouter()
   const { countryCode } = useParams() as { countryCode: string }
-  const [quantity, setQuantity] = useState(DEFAULT_WHEEL_QTY)
+  // Real on-hand quantity for the resolved leaf variant (WB-090 P2/P18) — 0
+  // (genuinely OOS) and undefined (unresolved variant) both fall through
+  // `stepperCap` to the pre-existing flat 99 cap since Add to cart is
+  // already disabled by `canPurchase` in those cases.
+  const available = selectedVariant?.quantity
+  const cap = stepperCap(available)
+  const [quantity, setQuantity] = useState(() => clampQty(DEFAULT_WHEEL_QTY, cap))
   const [buying, setBuying] = useState(false)
 
+  // Re-clamp whenever the effective cap changes (switching to a size/offset
+  // with different — possibly lower — availability) so the stepper can never
+  // carry over a quantity that exceeds the NEWLY selected variant's real
+  // stock.
+  useEffect(() => {
+    setQuantity((q) => clampQty(q, cap))
+  }, [cap])
+
   const stepQty = (delta: number) =>
-    setQuantity((q) => Math.max(1, Math.min(99, q + delta)))
+    setQuantity((q) => clampQty(q + delta, cap))
 
   const canPurchase =
     !!selectedVariant && selectedVariant.availability !== "out_of_stock"
@@ -72,11 +88,19 @@ const PurchasePanel = ({
     if (!selectedVariant) return
     setBuying(true)
     try {
-      await addToCart({
+      const result = await addToCart({
         variantId: selectedVariant.variantId,
         quantity,
         countryCode,
       })
+      if (result?.error) {
+        toast.error("Couldn't add to cart", {
+          description:
+            insufficientStockMessage(result.error, selectedVariant.quantity) ??
+            "Please try again in a moment.",
+        })
+        return
+      }
       toast.success("Added to cart", {
         description: `${quantity} × ${product.name} (${selectedSize.diameter}×${selectedSize.width})`,
       })
@@ -93,11 +117,20 @@ const PurchasePanel = ({
     if (!selectedVariant) return
     setBuying(true)
     try {
-      await addToCart({
+      const result = await addToCart({
         variantId: selectedVariant.variantId,
         quantity,
         countryCode,
       })
+      if (result?.error) {
+        toast.error("Couldn't start checkout", {
+          description:
+            insufficientStockMessage(result.error, selectedVariant.quantity) ??
+            "Please try again in a moment.",
+        })
+        setBuying(false)
+        return
+      }
       router.push(`/${countryCode}/checkout?step=address`)
       // Leave `buying` true through the navigation transition.
     } catch {
@@ -241,6 +274,26 @@ const PurchasePanel = ({
           <Icon name="heart" size={18} />
         </Button>
       </div>
+
+      {/* Only-N-left copy (WB-090 P2/P18) — an exact count instead of the
+          size grid's generic "Low stock" chip, right where the shopper is
+          about to pick a quantity. Suppressed for a genuinely OOS/unresolved
+          variant (available <= 0 or unknown) since canPurchase already
+          disables the buttons in that case. */}
+      {typeof available === "number" &&
+        available > 0 &&
+        available <= LOW_STOCK_THRESHOLD && (
+          <p
+            style={{
+              fontSize: 12,
+              fontWeight: 600,
+              color: "var(--orange)",
+              marginTop: 10,
+            }}
+          >
+            Only {available} left
+          </p>
+        )}
 
       {/* Buy now — skips the cart, jumps straight to checkout. Inverted ink
           treatment so it complements the orange Add-to-cart without competing

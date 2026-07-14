@@ -32,6 +32,8 @@ export type OffsetVariant = {
   centerBoreMm: number | null
   /** Load rating (lb) for this exact variant; null when the vendor omits it. */
   loadRatingLb: number | null
+  /** Real on-hand quantity for this exact variant (WB-090 P2/P18) — drives the purchase panel's qty stepper cap/default and the "Only N left" copy, instead of the panel being inventory-blind. */
+  quantity: number
 }
 
 /** A specific Diameter × Width combination available for this product. */

@@ -37,6 +37,16 @@ function variant(
   } as any
 }
 
+describe("groupVariantsIntoSizes — quantity threading (WB-090 P2/P18)", () => {
+  it("keeps the raw inventory_quantity on each offset variant instead of discarding it after deriving availability", () => {
+    const sizes = groupVariantsIntoSizes(
+      [variant("v_a", 20, 9, 18, "5x114.3", 3, 300)],
+      28
+    )
+    expect(sizes[0].offsetVariants?.[0].quantity).toBe(3)
+  })
+})
+
 describe("groupVariantsIntoSizes — bolt-pattern scoping", () => {
   it("keeps the same Diameter×Width in two patterns as TWO size options", () => {
     const sizes = groupVariantsIntoSizes(
@@ -261,6 +271,7 @@ describe("bestAvailabilityOffset", () => {
     availability,
     centerBoreMm: null,
     loadRatingLb: null,
+    quantity: 10,
   })
 
   it("picks the in-stock offset over a first-listed out-of-stock sibling", () => {

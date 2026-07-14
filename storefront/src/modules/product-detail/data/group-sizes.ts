@@ -110,6 +110,7 @@ export function groupVariantsIntoSizes(
       availability: avail,
       centerBoreMm: numOrNull(m.center_bore_mm),
       loadRatingLb: numOrNull(m.load_rating_lb),
+      quantity: qty,
     }
     const existing = byKey.get(key)
     if (existing) {

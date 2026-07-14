@@ -9,7 +9,7 @@ const size = (
 ): SizeOption => ({
   diameter, width, offsetMm, defaultOffsetMm: offsetMm, boltPattern, weightLb: 25, availability: avail,
   offsetVariants: [{ value: offsetMm, backspaceIn: "", variantId: `v-${diameter}x${width}-${boltPattern}-${offsetMm}`,
-    availability: avail, centerBoreMm: bore, loadRatingLb: null }],
+    availability: avail, centerBoreMm: bore, loadRatingLb: null, quantity: 10 }],
 })
 
 // Multi-offset-variant size factory — for S3/S4 tests that need distinct
@@ -22,7 +22,7 @@ const multiVariantSize = (
   boltPattern, weightLb: 25, availability: "in_stock",
   offsetVariants: variants.map((v) => ({
     value: v.value, backspaceIn: "", variantId: `v-${diameter}x${width}-${boltPattern}-${v.value}`,
-    availability: "in_stock", centerBoreMm: v.bore, loadRatingLb: null,
+    availability: "in_stock", centerBoreMm: v.bore, loadRatingLb: null, quantity: 10,
   })),
 })
 

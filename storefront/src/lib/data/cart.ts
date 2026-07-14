@@ -89,6 +89,11 @@ export async function updateCart(data: HttpTypes.StoreUpdateCart) {
     .catch(medusaError)
 }
 
+// WB-090 P2/P18: RETURN the outcome instead of throwing (mirrors placeOrder/
+// setShippingMethod's WB-079 B2 fix) — Next.js redacts thrown Server Action
+// error messages in production, which would silently swallow the real
+// "insufficient inventory" text the purchase panels need in order to show
+// "Only N in stock — reduce quantity" instead of a generic toast.
 export async function addToCart({
   variantId,
   quantity,
@@ -97,17 +102,22 @@ export async function addToCart({
   variantId: string
   quantity: number
   countryCode: string
-}) {
+}): Promise<{ error?: string }> {
   if (!variantId) {
-    throw new Error("Missing variant ID when adding to cart")
+    return { error: "Missing variant ID when adding to cart." }
   }
 
-  const cart = await getOrSetCart(countryCode)
+  let cart: HttpTypes.StoreCart | undefined | null
+  try {
+    cart = await getOrSetCart(countryCode)
+  } catch (e) {
+    return { error: errText(e) }
+  }
   if (!cart) {
-    throw new Error("Error retrieving or creating cart")
+    return { error: "Error retrieving or creating cart." }
   }
 
-  await sdk.store.cart
+  return sdk.store.cart
     .createLineItem(
       cart.id,
       {
@@ -119,8 +129,9 @@ export async function addToCart({
     )
     .then(() => {
       revalidateTag("cart")
+      return {}
     })
-    .catch(medusaError)
+    .catch((e) => ({ error: errText(e) }))
 }
 
 export async function updateLineItem({

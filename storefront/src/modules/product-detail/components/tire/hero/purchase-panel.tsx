@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { useParams, useRouter } from "next/navigation"
 import { toast } from "sonner"
 import Display from "@modules/common/components/display"
@@ -13,9 +13,11 @@ import { addToCart } from "@lib/data/cart"
 import { useGarage } from "@lib/garage/use-garage"
 import { openSearch } from "@lib/stores/search-store"
 import { tireFitsVehicle, TireFitSpec } from "@lib/fitment/tire-fits-vehicle"
+import { insufficientStockMessage } from "@lib/util/error-message"
 import { formatCentsUsd } from "@lib/util/money"
 import { TireProductDetail, TireSizeOption } from "../../../data/types"
-import { DEFAULT_TIRE_QTY, TRUST_STRIP } from "../../../data/pdp-config"
+import { DEFAULT_TIRE_QTY, LOW_STOCK_THRESHOLD, TRUST_STRIP } from "../../../data/pdp-config"
+import { clampQty, stepperCap } from "../../../data/qty-bounds"
 
 type TirePurchasePanelProps = {
   product: TireProductDetail
@@ -58,11 +60,24 @@ const TirePurchasePanel = ({
     tireFitsVehicle([selectedSpec], active.oemTires)
   const router = useRouter()
   const { countryCode } = useParams() as { countryCode: string }
-  const [quantity, setQuantity] = useState(DEFAULT_TIRE_QTY)
+  // Real on-hand quantity for the selected size's variant (WB-090 P2/P18) —
+  // 0 (genuinely OOS) and undefined (no size resolved yet) both fall through
+  // `stepperCap` to the pre-existing flat 99 cap since Add to cart is
+  // already disabled by `canPurchase` in those cases.
+  const available = selectedSize?.quantity
+  const cap = stepperCap(available)
+  const [quantity, setQuantity] = useState(() => clampQty(DEFAULT_TIRE_QTY, cap))
   const [buying, setBuying] = useState(false)
 
+  // Re-clamp whenever the effective cap changes (switching to a size with
+  // different — possibly lower — availability) so the stepper can never
+  // carry over a quantity that exceeds the NEWLY selected size's real stock.
+  useEffect(() => {
+    setQuantity((q) => clampQty(q, cap))
+  }, [cap])
+
   const stepQty = (delta: number) =>
-    setQuantity((q) => Math.max(1, Math.min(99, q + delta)))
+    setQuantity((q) => clampQty(q + delta, cap))
 
   const canPurchase = !!selectedSize && selectedSize.availability !== "out_of_stock"
 
@@ -70,11 +85,19 @@ const TirePurchasePanel = ({
     if (!selectedSize) return
     setBuying(true)
     try {
-      await addToCart({
+      const result = await addToCart({
         variantId: selectedSize.variantId,
         quantity,
         countryCode,
       })
+      if (result?.error) {
+        toast.error("Couldn't add to cart", {
+          description:
+            insufficientStockMessage(result.error, selectedSize.quantity) ??
+            "Please try again in a moment.",
+        })
+        return
+      }
       toast.success("Added to cart", {
         description: `${quantity} × ${product.name} · ${selectedSize.sizeLabel}`,
       })
@@ -91,11 +114,20 @@ const TirePurchasePanel = ({
     if (!selectedSize) return
     setBuying(true)
     try {
-      await addToCart({
+      const result = await addToCart({
         variantId: selectedSize.variantId,
         quantity,
         countryCode,
       })
+      if (result?.error) {
+        toast.error("Couldn't start checkout", {
+          description:
+            insufficientStockMessage(result.error, selectedSize.quantity) ??
+            "Please try again in a moment.",
+        })
+        setBuying(false)
+        return
+      }
       router.push(`/${countryCode}/checkout?step=address`)
       // Leave `buying` true through the navigation transition.
     } catch {
@@ -219,6 +251,22 @@ const TirePurchasePanel = ({
           <Icon name="heart" size={18} />
         </Button>
       </div>
+
+      {/* Only-N-left copy (WB-090 P2/P18) — mirrors the wheel panel. */}
+      {typeof available === "number" &&
+        available > 0 &&
+        available <= LOW_STOCK_THRESHOLD && (
+          <p
+            style={{
+              fontSize: 12,
+              fontWeight: 600,
+              color: "var(--orange)",
+              marginTop: 10,
+            }}
+          >
+            Only {available} left
+          </p>
+        )}
 
       {/* Buy now — skips the cart, jumps straight to checkout. */}
       <Button

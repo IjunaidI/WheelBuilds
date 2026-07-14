@@ -12,7 +12,7 @@ import { Separator } from "@/components/ui/separator"
 import { addToCart } from "@lib/data/cart"
 import { useGarage } from "@lib/garage/use-garage"
 import { openSearch } from "@lib/stores/search-store"
-import { tireFitsVehicle, TireFitSpec } from "@lib/fitment/tire-fits-vehicle"
+import { tireFitVerdict, TireFitSpec } from "@lib/fitment/tire-fits-vehicle"
 import { insufficientStockMessage } from "@lib/util/error-message"
 import { formatCentsUsd } from "@lib/util/money"
 import { TireProductDetail, TireSizeOption } from "../../../data/types"
@@ -51,7 +51,9 @@ const TirePurchasePanel = ({
   // offered size fits. In fit mode the picker only shows fitting sizes, so the
   // chip reads "fits"; but once the shopper hits "Show all" and picks a
   // non-fitting size, that's a deliberate override (mirrors the wheel PDP's
-  // per-variant chip), so the chip must honestly flip to "MAY NOT FIT".
+  // per-variant chip), so the chip must honestly flip to "MAY NOT FIT". A
+  // vehicle with no OEM tire data on file at all is a THIRD, neutral state
+  // (WB-091 P3) — "no data" must never render as "MAY NOT FIT".
   const selectedSpec: TireFitSpec | null = selectedSize
     ? {
         size: selectedSize.canonicalSize,
@@ -59,10 +61,9 @@ const TirePurchasePanel = ({
         speedRating: selectedSize.speedRating ?? null,
       }
     : null
-  const fits =
-    !!active?.oemTires?.length &&
-    !!selectedSpec &&
-    tireFitsVehicle([selectedSpec], active.oemTires)
+  const verdict = active
+    ? tireFitVerdict(selectedSpec ? [selectedSpec] : [], active.oemTires ?? [])
+    : null
   const router = useRouter()
   const { countryCode } = useParams() as { countryCode: string }
   // Real on-hand quantity for the selected size's variant (WB-090 P2/P18) —
@@ -202,12 +203,19 @@ const TirePurchasePanel = ({
       )}
 
       {/* Fitment chip — same per-selection verdict as the fitment band below,
-          so they can never disagree. */}
+          so they can never disagree. Three states: fits (accent), no data on
+          file (neutral outline — NOT a mismatch claim), and a real mismatch
+          (outline, "MAY NOT FIT"). */}
       <div className="mt-5">
         {active ? (
-          fits ? (
+          verdict === "fits" ? (
             <Chip variant="accent" dot>
               FITS YOUR {active.year} {active.make.toUpperCase()}{" "}
+              {active.model.toUpperCase()}
+            </Chip>
+          ) : verdict === "unknown" ? (
+            <Chip variant="outline">
+              CHECK FIT · NO DATA FOR {active.year} {active.make.toUpperCase()}{" "}
               {active.model.toUpperCase()}
             </Chip>
           ) : (

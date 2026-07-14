@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button"
 import { useGarage } from "@lib/garage/use-garage"
 import { openSearch } from "@lib/stores/search-store"
 import { useSelectedTireFit } from "@lib/stores/selected-tire-fit"
-import { tireFitsVehicle } from "@lib/fitment/tire-fits-vehicle"
+import { tireFitVerdict } from "@lib/fitment/tire-fits-vehicle"
 import { TireFitmentEntry, TireProductDetail } from "../../data/types"
 
 type TireFitmentProps = {
@@ -39,11 +39,16 @@ const TireFitment = ({ product }: TireFitmentProps) => {
     loadIndex: o.loadIndex ?? null,
     speedRating: o.speedRating ?? null,
   }))
-  const activeFits = !active?.oemTires?.length
-    ? null
-    : selectedSpec
-      ? tireFitsVehicle([selectedSpec], active.oemTires)
-      : tireFitsVehicle(productSpecs, active.oemTires)
+  // Three-state verdict (WB-091 P3): "unknown" when the vehicle simply has no
+  // OEM tire data on file is NOT the same as "no" (a disproven mismatch) — a
+  // null/false collapse here previously rendered "runs a different factory
+  // tire size" for vehicles we've never checked at all.
+  const verdict = active
+    ? selectedSpec
+      ? tireFitVerdict([selectedSpec], active.oemTires ?? [])
+      : tireFitVerdict(productSpecs, active.oemTires ?? [])
+    : null
+  const activeFits = verdict === "fits"
 
   return (
     <section className="border-t border-[var(--hairline)] py-16 small:py-20">
@@ -54,13 +59,16 @@ const TireFitment = ({ product }: TireFitmentProps) => {
         marginBottom={32}
       />
 
-      {/* Active vehicle status band */}
+      {/* Active vehicle status band — three states when a vehicle is active
+          (fits / no / unknown), plus the no-active-vehicle prompt. "unknown"
+          shares the neutral hairline/white treatment with "no active vehicle"
+          since neither is a disproven mismatch. */}
       <div
         className="rounded-[var(--radius)] border p-5 mb-8 flex items-center gap-4"
         style={{
           borderColor: activeFits
             ? "var(--orange)"
-            : active && !activeFits
+            : verdict === "no"
               ? "var(--ink-soft)"
               : "var(--hairline)",
           background: activeFits ? "rgba(255,106,0,0.04)" : "white",
@@ -86,7 +94,7 @@ const TireFitment = ({ product }: TireFitmentProps) => {
         </div>
         <div className="flex-1 min-w-0">
           {active ? (
-            activeFits ? (
+            verdict === "fits" ? (
               <>
                 <div className="text-[14px] font-semibold text-[var(--ink)]">
                   Fits your{" "}
@@ -95,6 +103,18 @@ const TireFitment = ({ product }: TireFitmentProps) => {
                 </div>
                 <div className="text-[12px] text-[var(--ink-soft)] mt-0.5">
                   This tire size is a factory fit for your vehicle.
+                </div>
+              </>
+            ) : verdict === "unknown" ? (
+              <>
+                <div className="text-[14px] font-semibold text-[var(--ink)]">
+                  We don&apos;t have factory tire data for your{" "}
+                  {active.year} {active.make} {active.model}
+                  {active.trim ? ` ${active.trim}` : ""} yet.
+                </div>
+                <div className="text-[12px] text-[var(--ink-soft)] mt-0.5">
+                  This isn&apos;t a mismatch — check your door placard for the
+                  factory tire size before ordering.
                 </div>
               </>
             ) : (

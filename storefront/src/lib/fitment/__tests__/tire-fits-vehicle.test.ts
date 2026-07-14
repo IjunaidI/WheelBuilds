@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest"
-import { tireFitsVehicle } from "../tire-fits-vehicle"
+import { tireFitsVehicle, tireFitVerdict } from "../tire-fits-vehicle"
 import type { OemTire } from "@lib/garage/types"
 
 describe("tireFitsVehicle", () => {
@@ -58,5 +58,29 @@ describe("tireFitsVehicle", () => {
     const spec: OemTire = { size: "225/55R18", loadIndex: 96, speedRating: "V" }
     expect(tireFitsVehicle([], [spec])).toBe(false)
     expect(tireFitsVehicle([spec], [])).toBe(false)
+  })
+})
+
+describe("tireFitVerdict", () => {
+  it("is 'unknown' when the vehicle has no OEM tire data on file, even with product specs present", () => {
+    const spec: OemTire = { size: "255/35R19", loadIndex: 96, speedRating: "V" }
+    expect(tireFitVerdict([spec], [])).toBe("unknown")
+  })
+
+  it("is 'fits' when a product spec matches some OEM tire", () => {
+    const spec: OemTire = { size: "255/35R19", loadIndex: 96, speedRating: "V" }
+    const oem: OemTire = { size: "255/35R19", loadIndex: 96, speedRating: "V" }
+    expect(tireFitVerdict([spec], [oem])).toBe("fits")
+  })
+
+  it("is 'no' when the vehicle has OEM tire data but no product spec matches (a real mismatch)", () => {
+    const spec: OemTire = { size: "305/45R22", loadIndex: 118, speedRating: "V" }
+    const oem: OemTire = { size: "225/55R18", loadIndex: 96, speedRating: "V" }
+    expect(tireFitVerdict([spec], [oem])).toBe("no")
+  })
+
+  it("is 'no', not 'unknown', when the vehicle has OEM data but the product has no specs at all", () => {
+    const oem: OemTire = { size: "225/55R18", loadIndex: 96, speedRating: "V" }
+    expect(tireFitVerdict([], [oem])).toBe("no")
   })
 })

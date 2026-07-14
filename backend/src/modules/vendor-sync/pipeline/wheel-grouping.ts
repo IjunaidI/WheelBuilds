@@ -158,13 +158,34 @@ export function buildVariantOptions(
 }
 
 /**
+ * A style is a real human model name (append to the title) vs a bare code.
+ * Heuristic: an alphabetic run of 3+ letters that isn't just the
+ * DisplayStyleNo itself. NOMAD/MAVERICK qualify; PR126/P3B (short letter
+ * runs, or letters that just echo the code) do not. See WB-087.
+ */
+export function isRealStyleName(
+  style: string | null | undefined,
+  displayStyleNo: string
+): boolean {
+  const s = (style ?? "").trim()
+  if (!s) return false
+  if (s.toUpperCase() === (displayStyleNo ?? "").trim().toUpperCase()) return false
+  return /[A-Za-z]{3,}/.test(s) // NOMAD/MAVERICK yes; PR126/P3B no
+}
+
+/**
  * Display title for a wheel product. For per-SKU fallback rows (no
  * DisplayStyleNo), the caller should use the record's `title` field
- * (the CSV PartDescription) instead.
+ * (the CSV PartDescription) instead. When the vendor Style column carries
+ * a real human model name (WB-087) rather than a bare code, it's appended
+ * so e.g. "Petrol NOMAD 058" shows instead of just "Petrol 058".
  */
 export function buildGroupTitle(record: WheelNormalizedRecord): string {
   if (!record.displayStyleNo) {
     return record.title
+  }
+  if (isRealStyleName(record.style, record.displayStyleNo)) {
+    return [record.brand, record.style!.trim(), record.displayStyleNo].join(" ")
   }
   return [record.brand, record.displayStyleNo].join(" ")
 }

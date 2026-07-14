@@ -283,6 +283,12 @@ const medusaConfig = {
               ],
               sortableAttributes: ['price_min', 'created_at', 'title'],
               pagination: { maxTotalHits: 10000 },
+              // WB-088 D9: Meili's default maxValuesPerFacet is 100, so any
+              // facet with more distinct values (brand, tire_sizes) silently
+              // truncates its counts/options past the 100th. Raised to 500 —
+              // an index-config change only (no content re-sync needed), it
+              // takes effect on the next backend boot.
+              faceting: { maxValuesPerFacet: 500 },
             },
             primaryKey: 'id',
             // The plugin falls back to its DEFAULT transformer when ours returns a

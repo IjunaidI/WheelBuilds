@@ -21,6 +21,7 @@ import TextInput from "@modules/common/components/text-input"
 import { useTireQuery } from "../../use-tire-query"
 import { TireFacetCounts, TireType } from "../../data/types"
 import { commitPriceRange } from "@modules/discovery/data/price-range"
+import { filterFacetKeys } from "./filter-facet-keys"
 
 const TIRE_TYPE_LABELS: Record<TireType, string> = {
   passenger: "Passenger",
@@ -178,6 +179,18 @@ const FilterSections = ({ facets, hideClearAll }: FilterSectionsProps) => {
     }
   }
 
+  // WB-088 D9: tire Size is the one facet on this rail with enough distinct
+  // values (now up to 500 post maxValuesPerFacet, see medusa-config.js) that
+  // a flat checklist is impractical to scan. This is purely a client-side
+  // narrowing of the already-loaded `facets.sizes` — it never touches the
+  // URL or re-queries Meilisearch, so it doesn't affect which sizes are
+  // actually selectable/selected (`filters.sizes`/`toggleArrayFilter`).
+  const [sizeQuery, setSizeQuery] = useState("")
+  const filteredSizeKeys = filterFacetKeys(Object.keys(facets.sizes), sizeQuery)
+  const filteredSizeFacetMap = Object.fromEntries(
+    filteredSizeKeys.map((k) => [k, facets.sizes[k]])
+  )
+
   return (
     <>
       <div className="rounded-[var(--radius)] border border-[var(--hairline)] bg-white p-4 mb-4">
@@ -252,12 +265,26 @@ const FilterSections = ({ facets, hideClearAll }: FilterSectionsProps) => {
         <AccordionItem value="size">
           <AccordionTrigger>Size</AccordionTrigger>
           <AccordionContent>
-            <ChecklistSection
-              facetMap={facets.sizes}
-              selected={filters.sizes}
-              onToggle={(v) => toggleArrayFilter("sizes", v)}
-              formatKey={(k) => k}
+            <TextInput
+              type="text"
+              placeholder="Filter sizes (e.g. 225/45R17)"
+              aria-label="Filter tire sizes"
+              value={sizeQuery}
+              onChange={(e) => setSizeQuery(e.target.value)}
+              className="mb-2 h-9 text-[13px]"
             />
+            {filteredSizeKeys.length === 0 ? (
+              <p className="pt-1 text-[12px] text-[var(--ink-soft)]">
+                No sizes match &quot;{sizeQuery}&quot;.
+              </p>
+            ) : (
+              <ChecklistSection
+                facetMap={filteredSizeFacetMap}
+                selected={filters.sizes}
+                onToggle={(v) => toggleArrayFilter("sizes", v)}
+                formatKey={(k) => k}
+              />
+            )}
           </AccordionContent>
         </AccordionItem>
 

@@ -78,6 +78,12 @@ export type FitmentEntry = {
   make: string
   model: string
   trim?: string
+  /** True when the backend narrowed this row to exactly one specific trim
+   *  (as opposed to a multi-trim union that happened to share a trim value)
+   *  — see backend/src/modules/wheel-size/reverse-fitment.ts
+   *  `extractVehicleIdentity` (WB-104 T1). Drives trim-aware YOUR-VEHICLE
+   *  matching (WB-104 T2, lib/fitment/vehicle-entry-match.ts). */
+  trimNarrowed?: boolean
   /** OEM bolt pattern for this vehicle — informational on the fitment row. */
   boltPattern?: string
   /** Notes (lug pattern conflict, requires hub adapter, etc.). */
@@ -90,6 +96,8 @@ export type TireFitmentEntry = {
   make: string
   model: string
   trim?: string
+  /** See `FitmentEntry.trimNarrowed` (WB-104 T1/T2). */
+  trimNarrowed?: boolean
   size: string
 }
 

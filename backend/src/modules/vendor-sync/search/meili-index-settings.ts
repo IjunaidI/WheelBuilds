@@ -12,3 +12,24 @@ export const MEILI_PRODUCT_FIELDS = [
   "variants.sku", "variants.metadata",
   "variants.prices.amount", "variants.prices.currency_code",
 ] as const
+
+/**
+ * Attributes Meilisearch full-text-searches against. Must include 'style' and
+ * 'search_text' (added to the index documents in WB-087 Task 1) or queries
+ * against those fields silently return zero hits — the plugin only searches
+ * fields explicitly listed here, independent of what is indexed (WB-087 D2).
+ */
+export const MEILI_SEARCHABLE_ATTRIBUTES = [
+  "title", "brand", "style", "skus", "search_text",
+] as const
+
+/**
+ * Bidirectional synonym map so common shopper vocabulary ("rims", "tyres")
+ * matches our canonical terms and vice versa (WB-087 L7).
+ */
+export const MEILI_SYNONYMS = {
+  rims: ["wheels"],
+  wheels: ["rims"],
+  tyre: ["tire"],
+  tyres: ["tires"],
+} as const

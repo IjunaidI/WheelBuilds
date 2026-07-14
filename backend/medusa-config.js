@@ -54,7 +54,11 @@ import {
   WHEEL_SIZE_WARM_BATCH,
 } from 'lib/constants';
 import { buildSearchDocument } from 'modules/vendor-sync/search/build-search-document';
-import { MEILI_PRODUCT_FIELDS } from 'modules/vendor-sync/search/meili-index-settings';
+import {
+  MEILI_PRODUCT_FIELDS,
+  MEILI_SEARCHABLE_ATTRIBUTES,
+  MEILI_SYNONYMS,
+} from 'modules/vendor-sync/search/meili-index-settings';
 import { resolveDevMaxRows } from 'lib/dev-max-rows';
 import { buildModuleStatusReport, formatModuleStatusReport } from 'lib/module-status';
 
@@ -259,7 +263,8 @@ const medusaConfig = {
             // 'status' lets the plugin evict drafted products (WB-089 L1).
             fields: MEILI_PRODUCT_FIELDS,
             indexSettings: {
-              searchableAttributes: ['title', 'brand', 'skus'],
+              searchableAttributes: MEILI_SEARCHABLE_ATTRIBUTES,
+              synonyms: MEILI_SYNONYMS,
               displayedAttributes: [
                 'id', 'handle', 'title', 'description', 'thumbnail', 'brand',
                 'finishes', 'skus',

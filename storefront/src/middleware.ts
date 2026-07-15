@@ -195,8 +195,11 @@ export async function middleware(request: NextRequest) {
 export const config = {
   // prevents redirecting on static files + the root metadata routes —
   // robots.txt/sitemap.xml must serve at the domain root, NOT get
-  // country-prefixed into /us/robots.txt (a 404) (WB-082 review fix)
+  // country-prefixed into /us/robots.txt (a 404) (WB-082 review fix).
+  // opengraph-image/twitter-image/icon (WB-095 X1) are next/og ImageResponse
+  // routes at the domain root for the same reason — without the exclusion
+  // they 307 to /us/icon etc. and 404.
   matcher: [
-    "/((?!api|_next/static|favicon.ico|robots\\.txt|sitemap\\.xml|.*\\.png|.*\\.jpg|.*\\.gif|.*\\.svg).*)",
+    "/((?!api|_next/static|favicon.ico|robots\\.txt|sitemap\\.xml|opengraph-image|twitter-image|icon|.*\\.png|.*\\.jpg|.*\\.gif|.*\\.svg).*)",
   ],
 }

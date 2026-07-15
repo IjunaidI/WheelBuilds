@@ -1,18 +1,27 @@
-import { Text, Section, Hr } from '@react-email/components'
+import { Text, Section, Hr, Row, Column, Button } from '@react-email/components'
 import * as React from 'react'
 import { Base } from './base'
 import { OrderDTO, OrderAddressDTO } from '@medusajs/framework/types'
+import { formatUsd } from './format-usd'
 
 export const ORDER_PLACED = 'order-placed'
 
 interface OrderPlacedPreviewProps {
   order: OrderDTO & { display_id: string; summary: { raw_current_order_total: { value: number } } }
   shippingAddress: OrderAddressDTO
+  orderUrl?: string
 }
 
 export interface OrderPlacedTemplateProps {
   order: OrderDTO & { display_id: string; summary: { raw_current_order_total: { value: number } } }
   shippingAddress: OrderAddressDTO
+  /**
+   * Storefront link back to `/order/confirmed/[id]` (built by the
+   * `order.placed` subscriber from `STOREFRONT_URL` + `order.id` — the ONLY
+   * route a guest customer has back to their order). Optional so a caller
+   * missing it degrades to no button rather than a crash.
+   */
+  orderUrl?: string
   preview?: string
 }
 
@@ -21,7 +30,7 @@ export const isOrderPlacedTemplateData = (data: any): data is OrderPlacedTemplat
 
 export const OrderPlacedTemplate: React.FC<OrderPlacedTemplateProps> & {
   PreviewProps: OrderPlacedPreviewProps
-} = ({ order, shippingAddress, preview = 'Your order has been placed!' }) => {
+} = ({ order, shippingAddress, orderUrl, preview = 'Your order has been placed!' }) => {
   return (
     <Base preview={preview}>
       <Section>
@@ -47,7 +56,7 @@ export const OrderPlacedTemplate: React.FC<OrderPlacedTemplateProps> & {
           Order Date: {new Date(order.created_at).toLocaleDateString()}
         </Text>
         <Text style={{ margin: '0 0 20px' }}>
-          Total: {order.summary.raw_current_order_total.value} {order.currency_code}
+          Total: {formatUsd(order.summary.raw_current_order_total.value)}
         </Text>
 
         <Hr style={{ margin: '20px 0' }} />
@@ -71,36 +80,58 @@ export const OrderPlacedTemplate: React.FC<OrderPlacedTemplateProps> & {
           Order Items
         </Text>
 
-        <div style={{
-          width: '100%',
-          borderCollapse: 'collapse',
-          border: '1px solid #ddd',
-          margin: '10px 0'
-        }}>
-          <div style={{
-            display: 'flex',
-            justifyContent: 'space-between',
-            backgroundColor: '#f2f2f2',
-            padding: '8px',
-            borderBottom: '1px solid #ddd'
-          }}>
-            <Text style={{ fontWeight: 'bold' }}>Item</Text>
-            <Text style={{ fontWeight: 'bold' }}>Quantity</Text>
-            <Text style={{ fontWeight: 'bold' }}>Price</Text>
-          </div>
+        {/*
+          @react-email/components has NO `Table` export. `Row`/`Column` each
+          render an Outlook-safe `<table role="presentation"><tr>` / `<td>` —
+          stacking one `Row` per line is the intended (and only) primitive,
+          replacing the flex-div rows Outlook's Word rendering engine can't
+          lay out.
+        */}
+        <Section style={{ border: '1px solid #ddd', margin: '10px 0' }}>
+          <Row style={{ backgroundColor: '#f2f2f2', borderBottom: '1px solid #ddd' }}>
+            <Column style={{ padding: '8px', textAlign: 'left' }}>
+              <Text style={{ fontWeight: 'bold', margin: 0 }}>Item</Text>
+            </Column>
+            <Column style={{ padding: '8px', textAlign: 'center' }}>
+              <Text style={{ fontWeight: 'bold', margin: 0 }}>Quantity</Text>
+            </Column>
+            <Column style={{ padding: '8px', textAlign: 'right' }}>
+              <Text style={{ fontWeight: 'bold', margin: 0 }}>Price</Text>
+            </Column>
+          </Row>
           {order.items.map((item) => (
-            <div key={item.id} style={{
-              display: 'flex',
-              justifyContent: 'space-between',
-              padding: '8px',
-              borderBottom: '1px solid #ddd'
-            }}>
-              <Text>{item.title} - {item.product_title}</Text>
-              <Text>{item.quantity}</Text>
-              <Text>{item.unit_price} {order.currency_code}</Text>
-            </div>
+            <Row key={item.id} style={{ borderBottom: '1px solid #ddd' }}>
+              <Column style={{ padding: '8px', textAlign: 'left' }}>
+                <Text style={{ margin: 0 }}>{item.title} - {item.product_title}</Text>
+              </Column>
+              <Column style={{ padding: '8px', textAlign: 'center' }}>
+                <Text style={{ margin: 0 }}>{item.quantity}</Text>
+              </Column>
+              <Column style={{ padding: '8px', textAlign: 'right' }}>
+                <Text style={{ margin: 0 }}>{formatUsd(item.unit_price)}</Text>
+              </Column>
+            </Row>
           ))}
-        </div>
+        </Section>
+
+        {orderUrl && (
+          <Section style={{ textAlign: 'center', margin: '30px 0 0' }}>
+            <Button
+              style={{
+                backgroundColor: '#000000',
+                borderRadius: '4px',
+                color: '#ffffff',
+                fontSize: '12px',
+                fontWeight: 600,
+                textDecoration: 'none',
+                padding: '12px 20px',
+              }}
+              href={orderUrl}
+            >
+              View your order
+            </Button>
+          </Section>
+        )}
       </Section>
     </Base>
   )
@@ -136,7 +167,8 @@ OrderPlacedTemplate.PreviewProps = {
     province: 'CA',
     postal_code: '12345',
     country_code: 'US'
-  }
+  },
+  orderUrl: 'https://example.com/us/order/confirmed/test-order-id'
 } as OrderPlacedPreviewProps
 
 export default OrderPlacedTemplate

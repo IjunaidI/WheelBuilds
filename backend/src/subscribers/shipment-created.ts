@@ -1,7 +1,8 @@
 import type { SubscriberArgs, SubscriberConfig } from '@medusajs/framework'
 import { Modules, ContainerRegistrationKeys } from '@medusajs/framework/utils'
 import { EmailTemplates } from '../modules/email-notifications/templates'
-import { EMAIL_REPLY_TO } from '../lib/constants'
+import { EMAIL_REPLY_TO, IS_PRODUCTION, STOREFRONT_URL } from '../lib/constants'
+import { isLocalhostUrl } from '../lib/is-localhost-url'
 
 /**
  * Fires on `shipment.created`, emitted by `createOrderShipmentWorkflow`
@@ -63,6 +64,21 @@ export default async function shipmentCreatedHandler({
     quantity: item.quantity,
   }))
 
+  // STOREFRONT_URL silently defaults to http://localhost:8000 (lib/constants.ts)
+  // when unset. That's fine in dev, but in production it means the "View your
+  // order" link in this email is dead — and for a guest checkout, that link is
+  // their ONLY route back to the order. Don't hard-fail the send — just make
+  // it loud in the logs (mirrors auth-password-reset.ts).
+  if (IS_PRODUCTION && isLocalhostUrl(STOREFRONT_URL)) {
+    const logger = container.resolve(ContainerRegistrationKeys.LOGGER)
+    logger.error(
+      `STOREFRONT_URL is unset/localhost ("${STOREFRONT_URL}") in production — ` +
+        'shipping confirmation emails will link back to a dead URL. Set STOREFRONT_URL to the public storefront origin.'
+    )
+  }
+
+  const orderUrl = `${STOREFRONT_URL}/order/confirmed/${order.id}`
+
   try {
     await notificationModuleService.createNotifications({
       to: order.email,
@@ -79,6 +95,7 @@ export default async function shipmentCreatedHandler({
           url: l.tracking_url,
           tracking_number: l.tracking_number,
         })),
+        orderUrl,
         preview: 'Your order is on its way'
       }
     })

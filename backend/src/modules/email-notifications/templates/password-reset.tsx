@@ -41,11 +41,6 @@ export const PasswordResetTemplate = ({
   return (
     <Base preview={preview}>
       <Section className="mt-[32px] text-center">
-        <Text className="text-black text-[22px] font-bold tracking-[0.1em] uppercase mx-auto my-0">
-          Wheel Builds
-        </Text>
-      </Section>
-      <Section className="text-center">
         <Text className="text-black text-[14px] leading-[24px]">
           We received a request to reset your Wheel Builds password.
         </Text>

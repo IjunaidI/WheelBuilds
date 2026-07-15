@@ -1,4 +1,4 @@
-import { Text, Section, Hr, Link } from '@react-email/components'
+import { Text, Section, Hr, Link, Row, Column, Button } from '@react-email/components'
 import * as React from 'react'
 import { Base } from './base'
 
@@ -35,6 +35,7 @@ interface ShippingConfirmationPreviewProps {
   order: ShippingConfirmationOrder
   shippingAddress: ShippingConfirmationAddress
   trackingNumbers?: string[]
+  orderUrl?: string
 }
 
 export interface ShippingConfirmationData {
@@ -42,6 +43,12 @@ export interface ShippingConfirmationData {
   shippingAddress?: ShippingConfirmationAddress
   trackingNumbers?: string[]
   trackingLinks?: ShippingConfirmationTrackingLink[]
+  /**
+   * Storefront link back to `/order/confirmed/[id]` (built by the
+   * `shipment.created` subscriber from `STOREFRONT_URL` + `order.id`).
+   * Optional so a caller missing it degrades to no button rather than a crash.
+   */
+  orderUrl?: string
   preview?: string
 }
 
@@ -50,7 +57,7 @@ export const isShippingConfirmationData = (data: any): data is ShippingConfirmat
 
 export const ShippingConfirmationTemplate: React.FC<ShippingConfirmationData> & {
   PreviewProps: ShippingConfirmationPreviewProps
-} = ({ order, shippingAddress, trackingNumbers, trackingLinks, preview = 'Your order is on its way' }) => {
+} = ({ order, shippingAddress, trackingNumbers, trackingLinks, orderUrl, preview = 'Your order is on its way' }) => {
   return (
     <Base preview={preview}>
       <Section>
@@ -110,34 +117,51 @@ export const ShippingConfirmationTemplate: React.FC<ShippingConfirmationData> & 
           Items Shipped
         </Text>
 
-        <div style={{
-          width: '100%',
-          borderCollapse: 'collapse',
-          border: '1px solid #ddd',
-          margin: '10px 0'
-        }}>
-          <div style={{
-            display: 'flex',
-            justifyContent: 'space-between',
-            backgroundColor: '#f2f2f2',
-            padding: '8px',
-            borderBottom: '1px solid #ddd'
-          }}>
-            <Text style={{ fontWeight: 'bold' }}>Item</Text>
-            <Text style={{ fontWeight: 'bold' }}>Quantity</Text>
-          </div>
+        {/*
+          @react-email/components has NO `Table` export. `Row`/`Column` each
+          render an Outlook-safe `<table role="presentation"><tr>` / `<td>` —
+          stacking one `Row` per line replaces the flex-div rows Outlook's
+          Word rendering engine can't lay out.
+        */}
+        <Section style={{ border: '1px solid #ddd', margin: '10px 0' }}>
+          <Row style={{ backgroundColor: '#f2f2f2', borderBottom: '1px solid #ddd' }}>
+            <Column style={{ padding: '8px', textAlign: 'left' }}>
+              <Text style={{ fontWeight: 'bold', margin: 0 }}>Item</Text>
+            </Column>
+            <Column style={{ padding: '8px', textAlign: 'center' }}>
+              <Text style={{ fontWeight: 'bold', margin: 0 }}>Quantity</Text>
+            </Column>
+          </Row>
           {(order.items ?? []).map((item, n) => (
-            <div key={n} style={{
-              display: 'flex',
-              justifyContent: 'space-between',
-              padding: '8px',
-              borderBottom: '1px solid #ddd'
-            }}>
-              <Text>{item.title}</Text>
-              <Text>{item.quantity}</Text>
-            </div>
+            <Row key={n} style={{ borderBottom: '1px solid #ddd' }}>
+              <Column style={{ padding: '8px', textAlign: 'left' }}>
+                <Text style={{ margin: 0 }}>{item.title}</Text>
+              </Column>
+              <Column style={{ padding: '8px', textAlign: 'center' }}>
+                <Text style={{ margin: 0 }}>{item.quantity}</Text>
+              </Column>
+            </Row>
           ))}
-        </div>
+        </Section>
+
+        {orderUrl && (
+          <Section style={{ textAlign: 'center', margin: '30px 0 0' }}>
+            <Button
+              style={{
+                backgroundColor: '#000000',
+                borderRadius: '4px',
+                color: '#ffffff',
+                fontSize: '12px',
+                fontWeight: 600,
+                textDecoration: 'none',
+                padding: '12px 20px',
+              }}
+              href={orderUrl}
+            >
+              View your order
+            </Button>
+          </Section>
+        )}
       </Section>
     </Base>
   )
@@ -162,6 +186,7 @@ ShippingConfirmationTemplate.PreviewProps = {
     country_code: 'US',
   },
   trackingNumbers: ['1Z999AA10123456784'],
+  orderUrl: 'https://example.com/us/order/confirmed/order_123',
 } as ShippingConfirmationPreviewProps
 
 export default ShippingConfirmationTemplate

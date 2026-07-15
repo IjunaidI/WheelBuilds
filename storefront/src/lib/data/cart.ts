@@ -53,6 +53,19 @@ export async function getOrSetCart(countryCode: string) {
     cart = cartResp.cart
     await setCartId(cart.id)
     revalidateTag("cart")
+  } else {
+    // WB-092 C12: sliding renewal. `setCartId`'s cookie previously only got
+    // written at CREATION and was never refreshed, so its 7-day `maxAge`
+    // counted down from the first add-to-cart forever -- a shopper who
+    // starts a cart on day 0 and comes back to add a second item on day 6
+    // still loses the cart at day 7. Re-set the SAME cart id here (fresh
+    // 7-day window) whenever an EXISTING cart is found. This can only live
+    // in an action path that already mutates cookies -- `getOrSetCart` is
+    // only ever invoked from `addToCart`, a Server Action; plain
+    // `retrieveCart()` is also called directly from Server Components
+    // (checkout/cart pages, the header cart button) mid-render, where
+    // Next.js forbids `cookies().set` outright.
+    await setCartId(cart.id)
   }
 
   if (cart && cart?.region_id !== region.id) {

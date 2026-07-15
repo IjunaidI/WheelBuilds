@@ -10,6 +10,7 @@ import Label from "@modules/common/components/label"
 import { enrichLineItems, retrieveCart } from "@lib/data/cart"
 import { HttpTypes } from "@medusajs/types"
 import { getCustomer } from "@lib/data/customer"
+import { clampStep } from "@modules/checkout/utils/furthest-allowed-step"
 
 export const metadata: Metadata = {
   title: "Checkout",
@@ -36,11 +37,21 @@ export default async function Checkout({
 }) {
   const { countryCode } = await params
   const { step } = await searchParams
-  if (!step) {
-    redirect(`/${countryCode}/checkout?step=address`)
-  }
 
   const cart = await fetchCart()
+
+  // WB-092 C11: clamp a deep-linked `?step=` to the furthest step the cart
+  // state actually allows. Previously only a MISSING step redirected (to
+  // "address") -- an out-of-order `?step=payment` with no address on file
+  // rendered Payment fully open while the Address section showed neither a
+  // summary nor an Edit control, an inert dead end. Steps at or behind the
+  // furthest allowed one (e.g. clicking a completed section's Edit button)
+  // still pass through unchanged.
+  const clampedStep = clampStep(step, cart)
+  if (clampedStep !== step) {
+    redirect(`/${countryCode}/checkout?step=${clampedStep}`)
+  }
+
   const customer = await getCustomer()
 
   // Empty cart / no active cart: render the WB empty state instead of 404.

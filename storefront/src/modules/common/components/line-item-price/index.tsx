@@ -2,6 +2,7 @@ import { clx } from "@medusajs/ui"
 
 import { getPercentageDiff } from "@lib/util/get-precentage-diff"
 import { getPricesForVariant } from "@lib/util/get-product-price"
+import { lineItemAmounts } from "@lib/util/line-item-amounts"
 import { convertToLocale } from "@lib/util/money"
 import { HttpTypes } from "@medusajs/types"
 
@@ -11,17 +12,17 @@ type LineItemPriceProps = {
 }
 
 const LineItemPrice = ({ item, style = "default" }: LineItemPriceProps) => {
-  const { currency_code, calculated_price_number, original_price_number } =
-    getPricesForVariant(item.variant) ?? {}
+  // Source of truth: the stored/charged line total. Never the live variant
+  // price — that drifts after a vendor-sync reprice and is `undefined` for a
+  // discontinued (drafted) product, which used to render a bare "NaN".
+  const { total: currentPrice } = lineItemAmounts(item)
 
-  const adjustmentsSum = (item.adjustments || []).reduce(
-    (acc, adjustment) => adjustment.amount + acc,
-    0
-  )
-
-  const originalPrice = original_price_number * item.quantity
-  const currentPrice = calculated_price_number * item.quantity - adjustmentsSum
-  const hasReducedPrice = currentPrice < originalPrice
+  // Decoration only: an original/strikethrough price, shown only when the
+  // live variant price still resolves.
+  const livePrices = getPricesForVariant(item.variant)
+  const currency_code = livePrices?.currency_code
+  const originalPrice = (livePrices?.original_price_number ?? 0) * item.quantity
+  const hasReducedPrice = originalPrice > 0 && currentPrice < originalPrice
 
   return (
     <div className="flex flex-col gap-x-2 text-ui-fg-subtle items-end">

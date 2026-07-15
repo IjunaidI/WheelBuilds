@@ -132,33 +132,51 @@ const CartDropdown = ({
                   .sort((a, b) =>
                     (a.created_at ?? "") > (b.created_at ?? "") ? -1 : 1
                   )
-                  .map((item) => (
+                  .map((item) => {
+                    const handle = item.variant?.product?.handle
+                    return (
                     <div
                       className="grid grid-cols-[122px_1fr] gap-x-4"
                       key={item.id}
                       data-testid="cart-item"
                     >
-                      <LocalizedClientLink
-                        href={`/products/${item.variant?.product?.handle}`}
-                        className="w-24"
-                      >
-                        <Thumbnail
-                          thumbnail={item.variant?.product?.thumbnail}
-                          images={item.variant?.product?.images}
-                          size="square"
-                        />
-                      </LocalizedClientLink>
+                      {handle ? (
+                        <LocalizedClientLink
+                          href={`/products/${handle}`}
+                          className="w-24"
+                        >
+                          <Thumbnail
+                            thumbnail={item.variant?.product?.thumbnail}
+                            images={item.variant?.product?.images}
+                            size="square"
+                          />
+                        </LocalizedClientLink>
+                      ) : (
+                        <div className="w-24">
+                          <Thumbnail
+                            thumbnail={item.variant?.product?.thumbnail}
+                            images={item.variant?.product?.images}
+                            size="square"
+                          />
+                        </div>
+                      )}
                       <div className="flex flex-col justify-between flex-1">
                         <div className="flex flex-col flex-1">
                           <div className="flex items-start justify-between">
                             <div className="flex flex-col overflow-ellipsis whitespace-nowrap mr-4 w-[180px]">
                               <h3 className="text-base-regular overflow-hidden text-ellipsis">
-                                <LocalizedClientLink
-                                  href={`/products/${item.variant?.product?.handle}`}
-                                  data-testid="product-link"
-                                >
-                                  {item.title}
-                                </LocalizedClientLink>
+                                {handle ? (
+                                  <LocalizedClientLink
+                                    href={`/products/${handle}`}
+                                    data-testid="product-link"
+                                  >
+                                    {item.title}
+                                  </LocalizedClientLink>
+                                ) : (
+                                  <span data-testid="product-link">
+                                    {item.title}
+                                  </span>
+                                )}
                               </h3>
                               <LineItemOptions
                                 variant={item.variant}
@@ -186,7 +204,7 @@ const CartDropdown = ({
                         </DeleteButton>
                       </div>
                     </div>
-                  ))}
+                  )})}
               </div>
               <div className="p-4 flex flex-col gap-y-4 text-small-regular">
                 <div className="flex items-center justify-between">

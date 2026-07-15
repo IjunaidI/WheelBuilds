@@ -48,19 +48,34 @@ const Item = ({ item, type = "full" }: ItemProps) => {
   return (
     <Table.Row className="w-full" data-testid="product-row">
       <Table.Cell className="!pl-0 p-4 w-24">
-        <LocalizedClientLink
-          href={`/products/${handle}`}
-          className={clx("flex", {
-            "w-16": type === "preview",
-            "small:w-24 w-12": type === "full",
-          })}
-        >
-          <Thumbnail
-            thumbnail={item.variant?.product?.thumbnail}
-            images={item.variant?.product?.images}
-            size="square"
-          />
-        </LocalizedClientLink>
+        {handle ? (
+          <LocalizedClientLink
+            href={`/products/${handle}`}
+            className={clx("flex", {
+              "w-16": type === "preview",
+              "small:w-24 w-12": type === "full",
+            })}
+          >
+            <Thumbnail
+              thumbnail={item.variant?.product?.thumbnail}
+              images={item.variant?.product?.images}
+              size="square"
+            />
+          </LocalizedClientLink>
+        ) : (
+          <div
+            className={clx("flex", {
+              "w-16": type === "preview",
+              "small:w-24 w-12": type === "full",
+            })}
+          >
+            <Thumbnail
+              thumbnail={item.variant?.product?.thumbnail}
+              images={item.variant?.product?.images}
+              size="square"
+            />
+          </div>
+        )}
       </Table.Cell>
 
       <Table.Cell className="text-left">

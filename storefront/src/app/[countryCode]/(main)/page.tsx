@@ -16,7 +16,9 @@ export async function generateMetadata(): Promise<Metadata> {
   const { facets } = await getHomeCatalog()
   const brandCount = Object.keys(facets.brands).length
   return {
-    title: "Wheel Builds — Premium Aftermarket Wheels & Fitment",
+    // Already brand-first — `absolute` opts out of the root template's
+    // "%s | Wheel Builds" suffix so this doesn't double up (WB-095 X1).
+    title: { absolute: "Wheel Builds — Premium Aftermarket Wheels & Fitment" },
     description: homeMetaDescription(brandCount || undefined),
   }
 }

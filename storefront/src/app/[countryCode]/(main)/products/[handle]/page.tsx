@@ -36,9 +36,18 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     (product.kind === "wheel"
       ? `${product.brand} ${product.name} wheels — sizes, finishes, live fitment check.`
       : product.description)
+  // Suffix comes from the root `metadata.title.template` (WB-095 X1) — don't
+  // hand-roll "| Wheel Builds" here or it doubles up.
+  const title = `${product.brand} ${product.name}`
+  // Vendor CDN thumbnail if present; omitting `images` when it's not lets
+  // Next fall back to the site-level opengraph-image/twitter-image instead
+  // of emitting a broken/empty image entry.
+  const images = product.thumbnail ? [product.thumbnail] : undefined
   return {
-    title: `${product.brand} ${product.name} | Wheel Builds`,
+    title,
     description,
+    openGraph: { title, description, images },
+    twitter: { card: "summary_large_image", title, description, images },
   }
 }
 

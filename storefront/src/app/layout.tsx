@@ -28,6 +28,10 @@ const inter = Inter({
 
 export const metadata: Metadata = {
   metadataBase: new URL(getBaseURL()),
+  title: {
+    template: "%s | Wheel Builds",
+    default: "Wheel Builds — Wheels & Tires With Live Fitment",
+  },
 }
 
 export default function RootLayout(props: { children: React.ReactNode }) {

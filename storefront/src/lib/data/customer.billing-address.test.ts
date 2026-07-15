@@ -45,7 +45,8 @@ vi.mock("next/cache", () => ({
   revalidateTag: vi.fn(),
 }))
 
-import { billingAddressPayload, updateCustomerBillingAddress } from "./customer"
+import { billingAddressPayload } from "./billing-address-payload"
+import { updateCustomerBillingAddress } from "./customer"
 
 function formDataWith(fields: Record<string, string>) {
   const fd = new FormData()

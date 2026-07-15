@@ -6,6 +6,7 @@ import { HttpTypes } from "@medusajs/types"
 import { revalidateTag } from "next/cache"
 import { redirect } from "next/navigation"
 import { cache } from "react"
+import { billingAddressPayload } from "./billing-address-payload"
 import { transferCartToCustomer } from "./cart"
 import { getAuthHeaders, removeAuthToken, setAuthToken } from "./cookies"
 
@@ -220,27 +221,6 @@ export const updateCustomerAddress = async (
     .catch((err) => {
       return { success: false, error: err.toString() }
     })
-}
-
-// Pure -- reads the `billing_address.*`-prefixed field names the
-// profile-billing-address form actually submits (WB-093 A2). Unlike
-// `updateCustomerAddress`/`addCustomerAddress` above, which read UNPREFIXED
-// names, this always stamps `is_default_billing: true` since it only ever
-// backs the single billing-address slot.
-export const billingAddressPayload = (formData: FormData) => {
-  return {
-    first_name: formData.get("billing_address.first_name") as string,
-    last_name: formData.get("billing_address.last_name") as string,
-    company: formData.get("billing_address.company") as string,
-    address_1: formData.get("billing_address.address_1") as string,
-    address_2: formData.get("billing_address.address_2") as string,
-    city: formData.get("billing_address.city") as string,
-    postal_code: formData.get("billing_address.postal_code") as string,
-    province: formData.get("billing_address.province") as string,
-    country_code: formData.get("billing_address.country_code") as string,
-    phone: formData.get("billing_address.phone") as string,
-    is_default_billing: true,
-  }
 }
 
 // Dedicated find-or-create action for the billing address (WB-093 A2). Do

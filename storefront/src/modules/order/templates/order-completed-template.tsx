@@ -9,6 +9,7 @@ import Help from "@modules/order/components/help"
 import Items from "@modules/order/components/items"
 import ShippingDetails from "@modules/order/components/shipping-details"
 import PaymentDetails from "@modules/order/components/payment-details"
+import { convertToLocale } from "@lib/util/money"
 import { HttpTypes } from "@medusajs/types"
 
 type OrderCompletedTemplateProps = {
@@ -20,15 +21,32 @@ type OrderCompletedTemplateProps = {
  * confirmation chip, and watermark wheel; below that, the FitmentVerified
  * card + estimated delivery + order details.
  *
- * Delivery-timeline ETA is computed at view time (today + 3 business days)
- * since we don't have a real fulfillment ETA wired yet.
+ * C5: the delivery-timeline ETA anchors to `order.created_at` (the order we're
+ * showing), not `new Date()` at view time — the latter silently pushes the
+ * window out every time the confirmation page is reloaded or revisited. The
+ * shipping line below it is derived from the actual chosen
+ * `order.shipping_methods[0]` (name + the amount actually paid), not a
+ * hardcoded "FREE 2-3 DAY SHIPPING · UPS GROUND" line that may not match what
+ * the customer picked or paid for.
  */
 export default function OrderCompletedTemplate({
   order,
 }: OrderCompletedTemplateProps) {
   const firstName = order.shipping_address?.first_name ?? "there"
-  const etaStart = addBusinessDays(new Date(), 3)
-  const etaEnd = addBusinessDays(new Date(), 5)
+  const orderDate = new Date(order.created_at)
+  const etaStart = addBusinessDays(orderDate, 3)
+  const etaEnd = addBusinessDays(orderDate, 5)
+  const shippingMethod = order.shipping_methods?.[0]
+  const shippingLine = shippingMethod
+    ? `${shippingMethod.name} · ${
+        (shippingMethod.total ?? 0) === 0
+          ? "FREE"
+          : convertToLocale({
+              amount: shippingMethod.total ?? 0,
+              currency_code: order.currency_code,
+            })
+      }`
+    : null
 
   return (
     <div className="bg-white">
@@ -76,9 +94,9 @@ export default function OrderCompletedTemplate({
             className="text-[14px] small:text-[16px] mt-5 max-w-[540px] leading-[1.5]"
             style={{ color: "rgba(255,255,255,0.75)" }}
           >
-            We&apos;ve sent a confirmation to{" "}
-            <strong className="text-white">{order.email}</strong>. Tracking will
-            hit your phone the moment we hand it to the carrier.
+            A confirmation for this order is on its way to{" "}
+            <strong className="text-white">{order.email}</strong>. We&apos;ll
+            email you tracking as soon as it ships.
           </p>
         </div>
       </div>
@@ -94,7 +112,7 @@ export default function OrderCompletedTemplate({
               {formatRange(etaStart, etaEnd)}
             </Display>
             <div className="font-[var(--mono)] text-[11px] tracking-[0.04em] text-[var(--graphite)] mt-2 uppercase">
-              FREE 2–3 DAY SHIPPING · UPS GROUND
+              {shippingLine ?? "Shipping method to be confirmed"}
             </div>
           </div>
 

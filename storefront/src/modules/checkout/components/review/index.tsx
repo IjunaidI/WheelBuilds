@@ -4,6 +4,7 @@ import { Heading, Text, clx } from "@medusajs/ui"
 import { useEffect, useState } from "react"
 
 import { checkStockAvailability } from "@lib/data/cart"
+import LocalizedClientLink from "@modules/common/components/localized-client-link"
 import ErrorMessage from "../error-message"
 import PaymentButton from "../payment-button"
 import { useSearchParams } from "next/navigation"
@@ -66,9 +67,28 @@ const Review = ({ cart }: { cart: any }) => {
             <div className="w-full">
               <Text className="txt-medium-plus text-ui-fg-base mb-1">
                 By clicking the Place Order button, you confirm that you have
-                read, understand and accept our Terms of Use, Terms of Sale and
-                Returns Policy and acknowledge that you have read Wheel
-                Builds&apos; Privacy Policy.
+                read, understand and accept our{" "}
+                <LocalizedClientLink
+                  href="/terms"
+                  className="underline underline-offset-2"
+                >
+                  Terms of Use, Terms of Sale
+                </LocalizedClientLink>{" "}
+                and{" "}
+                <LocalizedClientLink
+                  href="/returns"
+                  className="underline underline-offset-2"
+                >
+                  Returns Policy
+                </LocalizedClientLink>{" "}
+                and acknowledge that you have read Wheel Builds&apos;{" "}
+                <LocalizedClientLink
+                  href="/privacy"
+                  className="underline underline-offset-2"
+                >
+                  Privacy Policy
+                </LocalizedClientLink>
+                .
               </Text>
             </div>
           </div>

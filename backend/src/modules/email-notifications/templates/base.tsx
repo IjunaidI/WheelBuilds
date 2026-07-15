@@ -35,7 +35,7 @@ export const Base: React.FC<BaseProps> = ({ preview, branded = true, children })
               <>
                 <Hr style={{ margin: '26px 0 16px' }} />
                 <Text style={{ fontSize: '12px', color: '#666666', margin: '0 0 6px', textAlign: 'center' }}>
-                  Questions about your order? Reply to this email — a real person answers.
+                  Questions? Reply to this email.
                 </Text>
                 <Text style={{ fontSize: '12px', color: '#666666', margin: 0, textAlign: 'center' }}>
                   © {new Date().getFullYear()} Wheel Builds. All rights reserved.

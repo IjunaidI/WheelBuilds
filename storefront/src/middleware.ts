@@ -1,6 +1,7 @@
 import { HttpTypes } from "@medusajs/types"
 import { notFound } from "next/navigation"
 import { NextRequest, NextResponse } from "next/server"
+import { regionRedirectTarget } from "@lib/util/region-redirect"
 
 const BACKEND_URL = process.env.NEXT_PUBLIC_MEDUSA_BACKEND_URL
 const PUBLISHABLE_API_KEY = process.env.NEXT_PUBLIC_MEDUSA_PUBLISHABLE_KEY
@@ -145,6 +146,37 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(
       `${request.nextUrl.origin}/${fallbackRegion}${redirectPath}${queryString}`,
       307
+    )
+  }
+
+  // WB-095 X2: `/de` (and gb/dk/se/fr/es/it) is a REAL, resolvable region --
+  // seed.ts seeds a EUR region covering those countries alongside `us`, so
+  // `regionMap.has("de")` is true and the urlHasCountryCode check just below
+  // would happily return NextResponse.next(), serving a live, indexable,
+  // EUR-priced duplicate of every US page. The store operates single-region
+  // (US-only, USD-only catalog -- WB-071 F-D), so every non-default region
+  // prefix permanently redirects into the default region instead.
+  //
+  // Placed AFTER the fail-open block above (not folded into it): during a
+  // backend outage / cold region cache, `/de/...` must keep passing through
+  // untouched (WB-081) -- that early-return already happened by the time we
+  // get here, so this rule only ever runs against a healthy, resolved region
+  // map. `regionRedirectTarget` itself takes no region map argument, so this
+  // is gated purely on `code !== DEFAULT_REGION`, never on
+  // `regionMap.has(code)` -- see its doc comment for why that distinction is
+  // the entire bug. 301 (permanent): unlike the 307s elsewhere in this file
+  // (which depend on session-ish state -- cart_id/onboarding cookies, a
+  // possibly-stale region cache), a non-default region prefix is a
+  // permanent policy decision that will not change request-to-request.
+  const regionRedirect = regionRedirectTarget(
+    request.nextUrl.pathname,
+    request.nextUrl.search,
+    DEFAULT_REGION
+  )
+  if (regionRedirect) {
+    return NextResponse.redirect(
+      `${request.nextUrl.origin}${regionRedirect}`,
+      301
     )
   }
 

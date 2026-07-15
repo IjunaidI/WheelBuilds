@@ -221,3 +221,67 @@ export const updateCustomerAddress = async (
       return { success: false, error: err.toString() }
     })
 }
+
+// Pure -- reads the `billing_address.*`-prefixed field names the
+// profile-billing-address form actually submits (WB-093 A2). Unlike
+// `updateCustomerAddress`/`addCustomerAddress` above, which read UNPREFIXED
+// names, this always stamps `is_default_billing: true` since it only ever
+// backs the single billing-address slot.
+export const billingAddressPayload = (formData: FormData) => {
+  return {
+    first_name: formData.get("billing_address.first_name") as string,
+    last_name: formData.get("billing_address.last_name") as string,
+    company: formData.get("billing_address.company") as string,
+    address_1: formData.get("billing_address.address_1") as string,
+    address_2: formData.get("billing_address.address_2") as string,
+    city: formData.get("billing_address.city") as string,
+    postal_code: formData.get("billing_address.postal_code") as string,
+    province: formData.get("billing_address.province") as string,
+    country_code: formData.get("billing_address.country_code") as string,
+    phone: formData.get("billing_address.phone") as string,
+    is_default_billing: true,
+  }
+}
+
+// Dedicated find-or-create action for the billing address (WB-093 A2). Do
+// NOT wrap/extend `updateCustomerAddress`: that action has no billing
+// awareness, and reusing it here would risk stamping/clobbering
+// `is_default_billing` on some OTHER address if it were ever bound with an
+// unrelated addressId. Instead this looks up the customer's current
+// `is_default_billing` address itself -- update it if one exists, else
+// create a new one -- so the general address book (edit-address-modal.tsx)
+// can never collide with the billing flow.
+export const updateCustomerBillingAddress = async (
+  _currentState: Record<string, unknown>,
+  formData: FormData
+): Promise<any> => {
+  const address = billingAddressPayload(formData)
+  const authHeaders = await getAuthHeaders()
+
+  const customer = await sdk.store.customer
+    .retrieve({}, authHeaders)
+    .then(({ customer }) => customer)
+    .catch(() => null)
+
+  const billingAddress = customer?.addresses?.find(
+    (addr) => addr.is_default_billing
+  )
+
+  try {
+    if (billingAddress) {
+      await sdk.store.customer.updateAddress(
+        billingAddress.id,
+        address,
+        {},
+        authHeaders
+      )
+    } else {
+      await sdk.store.customer.createAddress(address, {}, authHeaders)
+    }
+
+    revalidateTag("customer")
+    return { success: true, error: null }
+  } catch (err: any) {
+    return { success: false, error: err.toString() }
+  }
+}

@@ -1,18 +1,6 @@
-import { ImageResponse } from "next/og"
-import { getAntonioFontData } from "@lib/og/get-antonio-font"
-import { WORDMARK, WordmarkScene } from "@lib/og/wordmark-scene"
-
-export const alt = "Wheel Builds — fitment-first wheel & tire builds"
-export const size = { width: 1200, height: 630 }
-export const contentType = "image/png"
-
-export default async function Image() {
-  const fontData = await getAntonioFontData(WORDMARK)
-
-  return new ImageResponse(<WordmarkScene fontLoaded={!!fontData} />, {
-    ...size,
-    fonts: fontData
-      ? [{ name: "Antonio", data: fontData, weight: 700, style: "normal" }]
-      : undefined,
-  })
-}
+// Twitter's `summary_large_image` card uses the same 1200x630 aspect as the
+// OG image, and this route rendered byte-identical output to
+// opengraph-image.tsx (same scene, same font, same size). Re-export instead
+// of maintaining two copies of the same file (review finding, WB-095 Task 1
+// fix wave).
+export { default, alt, size, contentType } from "./opengraph-image"

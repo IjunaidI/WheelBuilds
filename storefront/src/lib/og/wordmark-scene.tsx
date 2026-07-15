@@ -53,7 +53,10 @@ export function WordmarkScene({ fontLoaded }: { fontLoaded: boolean }) {
           <div
             style={{
               display: "flex",
-              fontFamily: fontLoaded ? "Antonio" : undefined,
+              // Conditional spread, never `fontFamily: fontLoaded ? "Antonio" : undefined` —
+              // satori treats a present-but-undefined fontFamily as a crash
+              // (`.split()` on undefined), not a fallback. See get-antonio-font.ts.
+              ...(fontLoaded ? { fontFamily: "Antonio" } : {}),
               fontWeight: 700,
               fontSize: 124,
               lineHeight: 1,

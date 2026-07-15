@@ -199,7 +199,17 @@ export const config = {
   // opengraph-image/twitter-image/icon (WB-095 X1) are next/og ImageResponse
   // routes at the domain root for the same reason — without the exclusion
   // they 307 to /us/icon etc. and 404.
+  //
+  // NOTE: no `favicon.ico` literal here (removed in the WB-095 Task 1 fix
+  // wave). That exclusion existed to let Next's static-file short-circuit
+  // serve `public/favicon.ico`, but Task 1 deleted that file in favor of the
+  // dynamic `app/icon.tsx` route above. With the literal still excluded,
+  // `/favicon.ico` bypassed this middleware and fell through to
+  // `[countryCode]/page.tsx` with countryCode="favicon.ico", rendering the
+  // full homepage as 200 HTML instead of 404ing. Browsers resolve the actual
+  // favicon via the `<link rel="icon">` tag Next emits from `app/icon.tsx`,
+  // not a literal `/favicon.ico` request.
   matcher: [
-    "/((?!api|_next/static|favicon.ico|robots\\.txt|sitemap\\.xml|opengraph-image|twitter-image|icon|.*\\.png|.*\\.jpg|.*\\.gif|.*\\.svg).*)",
+    "/((?!api|_next/static|robots\\.txt|sitemap\\.xml|opengraph-image|twitter-image|icon|.*\\.png|.*\\.jpg|.*\\.gif|.*\\.svg).*)",
   ],
 }

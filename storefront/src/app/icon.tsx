@@ -11,7 +11,7 @@ export const size = { width: 32, height: 32 }
 export const contentType = "image/png"
 
 export default async function Icon() {
-  const fontData = await getAntonioFontData(GLYPH)
+  const fontData = await getAntonioFontData()
 
   return new ImageResponse(
     (
@@ -29,7 +29,10 @@ export default async function Icon() {
         <div
           style={{
             display: "flex",
-            fontFamily: fontData ? "Antonio" : undefined,
+            // Conditional spread, never `fontFamily: fontData ? "Antonio" : undefined` —
+            // satori treats a present-but-undefined fontFamily as a crash
+            // (`.split()` on undefined), not a fallback. See get-antonio-font.ts.
+            ...(fontData ? { fontFamily: "Antonio" } : {}),
             fontWeight: 700,
             fontSize: 22,
             lineHeight: 1,

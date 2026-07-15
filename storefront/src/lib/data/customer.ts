@@ -2,10 +2,12 @@
 
 import { sdk } from "@lib/config"
 import medusaError from "@lib/util/medusa-error"
+import { passwordError } from "@lib/util/password"
 import { HttpTypes } from "@medusajs/types"
 import { revalidateTag } from "next/cache"
 import { redirect } from "next/navigation"
 import { cache } from "react"
+import { billingAddressPayload } from "./billing-address-payload"
 import { transferCartToCustomer } from "./cart"
 import { getAuthHeaders, removeAuthToken, setAuthToken } from "./cookies"
 
@@ -36,6 +38,14 @@ export async function signup(_currentState: unknown, formData: FormData) {
     first_name: formData.get("first_name") as string,
     last_name: formData.get("last_name") as string,
     phone: formData.get("phone") as string,
+  }
+
+  // A9: @medusajs/auth-emailpass does not enforce a minimum password length
+  // itself (verified 2.13.6), so the storefront must reject short passwords
+  // server-side too -- the client-side minLength is not a security boundary.
+  const pwError = passwordError(password)
+  if (pwError) {
+    return pwError
   }
 
   try {
@@ -124,6 +134,13 @@ export async function resetPassword(_currentState: unknown, formData: FormData) 
     return "Passwords do not match."
   }
 
+  // A9: same server-side floor as signup() -- @medusajs/auth-emailpass does
+  // not enforce a minimum length itself.
+  const pwError = passwordError(password)
+  if (pwError) {
+    return pwError
+  }
+
   try {
     await sdk.auth.updateProvider(
       "customer",
@@ -144,8 +161,7 @@ export async function resetPassword(_currentState: unknown, formData: FormData) 
 
 export async function signout(countryCode: string) {
   await sdk.auth.logout()
-  removeAuthToken()
-  revalidateTag("auth")
+  await removeAuthToken()
   revalidateTag("customer")
   redirect(`/${countryCode}/account`)
 }
@@ -220,4 +236,47 @@ export const updateCustomerAddress = async (
     .catch((err) => {
       return { success: false, error: err.toString() }
     })
+}
+
+// Dedicated find-or-create action for the billing address (WB-093 A2). Do
+// NOT wrap/extend `updateCustomerAddress`: that action has no billing
+// awareness, and reusing it here would risk stamping/clobbering
+// `is_default_billing` on some OTHER address if it were ever bound with an
+// unrelated addressId. Instead this looks up the customer's current
+// `is_default_billing` address itself -- update it if one exists, else
+// create a new one -- so the general address book (edit-address-modal.tsx)
+// can never collide with the billing flow.
+export const updateCustomerBillingAddress = async (
+  _currentState: Record<string, unknown>,
+  formData: FormData
+): Promise<any> => {
+  const address = billingAddressPayload(formData)
+  const authHeaders = await getAuthHeaders()
+
+  const customer = await sdk.store.customer
+    .retrieve({}, authHeaders)
+    .then(({ customer }) => customer)
+    .catch(() => null)
+
+  const billingAddress = customer?.addresses?.find(
+    (addr) => addr.is_default_billing
+  )
+
+  try {
+    if (billingAddress) {
+      await sdk.store.customer.updateAddress(
+        billingAddress.id,
+        address,
+        {},
+        authHeaders
+      )
+    } else {
+      await sdk.store.customer.createAddress(address, {}, authHeaders)
+    }
+
+    revalidateTag("customer")
+    return { success: true, error: null }
+  } catch (err: any) {
+    return { success: false, error: err.toString() }
+  }
 }

@@ -6,9 +6,15 @@ import LocalizedClientLink from "@modules/common/components/localized-client-lin
 import { convertToLocale } from "@lib/util/money"
 import { HttpTypes } from "@medusajs/types"
 
+import { hiddenProductCount } from "./hidden-product-count"
+
 type OrderCardProps = {
   order: HttpTypes.StoreOrder
 }
+
+// Must match the `.slice(0, SHOWN_PRODUCTS)` below -- hiddenProductCount
+// derives both the "+N more" gate and its count from this same number.
+const SHOWN_PRODUCTS = 3
 
 const OrderCard = ({ order }: OrderCardProps) => {
   const numberOfLines = useMemo(() => {
@@ -19,8 +25,8 @@ const OrderCard = ({ order }: OrderCardProps) => {
     )
   }, [order])
 
-  const numberOfProducts = useMemo(() => {
-    return order.items?.length ?? 0
+  const hiddenCount = useMemo(() => {
+    return hiddenProductCount(order.items, SHOWN_PRODUCTS)
   }, [order])
 
   return (
@@ -43,7 +49,7 @@ const OrderCard = ({ order }: OrderCardProps) => {
         }`}</span>
       </div>
       <div className="grid grid-cols-2 small:grid-cols-4 gap-4 my-4">
-        {order.items?.slice(0, 3).map((i) => {
+        {order.items?.slice(0, SHOWN_PRODUCTS).map((i) => {
           return (
             <div
               key={i.id}
@@ -64,10 +70,10 @@ const OrderCard = ({ order }: OrderCardProps) => {
             </div>
           )
         })}
-        {numberOfProducts > 4 && (
+        {hiddenCount > 0 && (
           <div className="w-full h-full flex flex-col items-center justify-center">
             <span className="text-small-regular text-ui-fg-base">
-              + {numberOfLines - 4}
+              + {hiddenCount}
             </span>
             <span className="text-small-regular text-ui-fg-base">more</span>
           </div>

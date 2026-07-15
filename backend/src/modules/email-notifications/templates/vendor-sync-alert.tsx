@@ -39,7 +39,7 @@ export const VendorSyncAlertTemplate: React.FC<VendorSyncAlertData> & {
   PreviewProps: VendorSyncAlertData
 } = ({ failedRuns, staleVendors, preview = 'Vendor sync needs attention' }) => {
   return (
-    <Base preview={preview}>
+    <Base preview={preview} branded={false}>
       <Section>
         <Text style={{ fontSize: '24px', fontWeight: 'bold', textAlign: 'center', margin: '0 0 30px' }}>
           Vendor Sync Alert

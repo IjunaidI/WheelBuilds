@@ -9,9 +9,11 @@ import SkeletonLineItem from "@modules/skeletons/components/skeleton-line-item"
 
 type ItemsTemplateProps = {
   items?: HttpTypes.StoreCartLineItem[]
+  // WB-092 fixwave C1: threaded down to Item -> LineItemPrice/LineItemUnitPrice.
+  currencyCode: string
 }
 
-const ItemsPreviewTemplate = ({ items }: ItemsTemplateProps) => {
+const ItemsPreviewTemplate = ({ items, currencyCode }: ItemsTemplateProps) => {
   const hasOverflow = items && items.length > 4
 
   return (
@@ -29,7 +31,14 @@ const ItemsPreviewTemplate = ({ items }: ItemsTemplateProps) => {
                   return (a.created_at ?? "") > (b.created_at ?? "") ? -1 : 1
                 })
                 .map((item) => {
-                  return <Item key={item.id} item={item} type="preview" />
+                  return (
+                    <Item
+                      key={item.id}
+                      item={item}
+                      type="preview"
+                      currencyCode={currencyCode}
+                    />
+                  )
                 })
             : repeat(5).map((i) => {
                 return <SkeletonLineItem key={i} />

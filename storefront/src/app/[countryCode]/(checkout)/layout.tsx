@@ -32,26 +32,37 @@ export default function CheckoutLayout({
               className="hidden small:inline-block"
               style={{ width: 1, height: 14, background: "var(--hairline)" }}
             />
-            <a
-              href="tel:+18555557433"
-              className="text-[12px] font-medium text-[var(--graphite)] hover:text-[var(--ink)] no-underline"
+            <LocalizedClientLink
+              href="/contact"
+              className="inline-flex items-center gap-1.5 text-[12px] font-medium text-[var(--graphite)] hover:text-[var(--ink)] no-underline"
             >
-              <span className="hidden small:inline">Need help? </span>
-              <span className="small:hidden inline-flex items-center gap-1.5">
+              <span className="small:hidden inline-flex items-center">
                 <Icon name="shield" size={14} strokeWidth={1.6} />
               </span>
-              <span className="hidden xsmall:inline">(855) 555-RIDE</span>
-            </a>
+              <span className="hidden small:inline">Need help? </span>
+              <span className="hidden xsmall:inline">Contact us</span>
+            </LocalizedClientLink>
           </div>
         </nav>
       </div>
       <div className="relative" data-testid="checkout-container">{children}</div>
       <div className="border-t border-[var(--hairline)] py-6 px-5 small:px-10 flex flex-col small:flex-row gap-4 small:gap-0 justify-between items-center bg-white">
         <div className="font-[var(--mono)] text-[10px] tracking-[0.06em] text-[var(--ink-soft)] uppercase text-center small:text-left">
-          © {new Date().getFullYear()} WHEEL/BUILDS · TERMS · PRIVACY · REFUND POLICY
+          © {new Date().getFullYear()} WHEEL/BUILDS ·{" "}
+          <LocalizedClientLink href="/terms" className="hover:text-[var(--ink)] underline underline-offset-2">
+            TERMS
+          </LocalizedClientLink>{" "}
+          ·{" "}
+          <LocalizedClientLink href="/privacy" className="hover:text-[var(--ink)] underline underline-offset-2">
+            PRIVACY
+          </LocalizedClientLink>{" "}
+          ·{" "}
+          <LocalizedClientLink href="/returns" className="hover:text-[var(--ink)] underline underline-offset-2">
+            REFUND POLICY
+          </LocalizedClientLink>
         </div>
         <div className="flex items-center gap-2">
-          {["VISA", "MC", "AMEX", "DISC", "APPLE", "GPAY"].map((n) => (
+          {["VISA", "MC", "AMEX", "DISC"].map((n) => (
             <span
               key={n}
               className="font-[var(--mono)] text-[10px] text-[var(--graphite)] px-2 py-1 rounded-sm bg-white"

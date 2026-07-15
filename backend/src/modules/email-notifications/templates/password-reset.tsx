@@ -1,4 +1,4 @@
-import { Button, Link, Section, Text, Hr } from '@react-email/components'
+import { Button, Link, Section, Text } from '@react-email/components'
 import { Base } from './base'
 
 /**
@@ -41,11 +41,6 @@ export const PasswordResetTemplate = ({
   return (
     <Base preview={preview}>
       <Section className="mt-[32px] text-center">
-        <Text className="text-black text-[22px] font-bold tracking-[0.1em] uppercase mx-auto my-0">
-          Wheel Builds
-        </Text>
-      </Section>
-      <Section className="text-center">
         <Text className="text-black text-[14px] leading-[24px]">
           We received a request to reset your Wheel Builds password.
         </Text>
@@ -73,10 +68,9 @@ export const PasswordResetTemplate = ({
           </Link>
         </Text>
       </Section>
-      <Hr className="border border-solid border-[#eaeaea] my-[26px] mx-0 w-full" />
       <Text className="text-[#666666] text-[12px] leading-[24px]">
         If you didn't request this, you can safely ignore this email — your password will
-        not be changed. This link expires shortly.
+        not be changed. This link expires in 15 minutes.
       </Text>
     </Base>
   )

@@ -2,6 +2,7 @@ import { deleteLineItem } from "@lib/data/cart"
 import { Spinner, Trash } from "@medusajs/icons"
 import { clx } from "@medusajs/ui"
 import { useState } from "react"
+import { toast } from "sonner"
 
 const DeleteButton = ({
   id,
@@ -16,9 +17,15 @@ const DeleteButton = ({
 
   const handleDelete = async (id: string) => {
     setIsDeleting(true)
-    await deleteLineItem(id).catch((err) => {
-      setIsDeleting(false)
-    })
+    // WB-092 C9: deleteLineItem now RETURNS { error } instead of throwing.
+    // This button is reused by both the full cart table and the mini-cart
+    // popover, neither of which has a shared inline-error slot, so surface
+    // failures via a toast instead.
+    const res = await deleteLineItem(id)
+    setIsDeleting(false)
+    if (res?.error) {
+      toast.error(res.error)
+    }
   }
 
   return (

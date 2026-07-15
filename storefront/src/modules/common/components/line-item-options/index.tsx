@@ -1,6 +1,8 @@
 import { HttpTypes } from "@medusajs/types"
 import { Text } from "@medusajs/ui"
 
+import { variantOptionsLabel } from "./variant-options-label"
+
 type LineItemOptionsProps = {
   variant: HttpTypes.StoreProductVariant | undefined
   "data-testid"?: string
@@ -18,7 +20,7 @@ const LineItemOptions = ({
       data-value={dataValue}
       className="inline-block txt-medium text-ui-fg-subtle w-full overflow-hidden text-ellipsis"
     >
-      Variant: {variant?.title}
+      Variant: {variantOptionsLabel(variant)}
     </Text>
   )
 }

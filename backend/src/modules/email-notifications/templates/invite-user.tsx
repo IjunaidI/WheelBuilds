@@ -1,4 +1,4 @@
-import { Button, Link, Section, Text, Hr } from '@react-email/components'
+import { Button, Link, Section, Text } from '@react-email/components'
 import { Base } from './base'
 
 /**
@@ -38,11 +38,6 @@ export const InviteUserEmail = ({
   return (
     <Base preview={preview}>
       <Section className="mt-[32px] text-center">
-        <Text className="text-black text-[22px] font-bold tracking-[0.1em] uppercase mx-auto my-0">
-          Wheel Builds
-        </Text>
-      </Section>
-      <Section className="text-center">
         <Text className="text-black text-[14px] leading-[24px]">
           You&apos;ve been invited to be an administrator on <strong>Wheel Builds</strong>.
         </Text>
@@ -70,11 +65,9 @@ export const InviteUserEmail = ({
           </Link>
         </Text>
       </Section>
-      <Hr className="border border-solid border-[#eaeaea] my-[26px] mx-0 w-full" />
       <Text className="text-[#666666] text-[12px] leading-[24px]">
         If you were not expecting this invitation, you can ignore this email, as the
-        invitation will expire in 24 hours. If you are concerned about your account's safety,
-        please reply to this email to get in touch with us.
+        invitation will expire in 24 hours.
       </Text>
     </Base>
   )

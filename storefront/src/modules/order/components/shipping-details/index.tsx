@@ -1,14 +1,16 @@
-import { convertToLocale } from "@lib/util/money"
 import { HttpTypes } from "@medusajs/types"
 import { Heading, Text } from "@medusajs/ui"
 
 import Divider from "@modules/common/components/divider"
+import { formatShippingMethod } from "./format-shipping-method"
 
 type ShippingDetailsProps = {
   order: HttpTypes.StoreOrder
 }
 
 const ShippingDetails = ({ order }: ShippingDetailsProps) => {
+  const shippingMethod = formatShippingMethod(order)
+
   return (
     <div>
       <Heading level="h2" className="flex flex-row text-3xl-regular my-6">
@@ -56,14 +58,7 @@ const ShippingDetails = ({ order }: ShippingDetailsProps) => {
         >
           <Text className="txt-medium-plus text-ui-fg-base mb-1">Method</Text>
           <Text className="txt-medium text-ui-fg-subtle">
-            {(order as any).shipping_methods[0]?.name} (
-            {convertToLocale({
-              amount: order.shipping_methods?.[0].total ?? 0,
-              currency_code: order.currency_code,
-            })
-              .replace(/,/g, "")
-              .replace(/\./g, ",")}
-            )
+            {shippingMethod.name} ({shippingMethod.amountLabel})
           </Text>
         </div>
       </div>

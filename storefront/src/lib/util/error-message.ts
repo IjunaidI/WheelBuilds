@@ -49,3 +49,27 @@ export function insufficientStockMessage(
   if (!looksInsufficient) return null
   return `Only ${available} in stock — reduce quantity`
 }
+
+/**
+ * Classifies a thrown SDK error as "the resource genuinely doesn't exist"
+ * (404) vs. everything else (5xx, network failure, malformed request, etc).
+ *
+ * This is the discriminant `retrieveCart` (WB-092 C3a) and `retrieveOrder`
+ * (WB-092 C8) need: a 404 is the expected "no active cart" / "bad order id"
+ * case and should degrade to `null` so the caller's empty-state /
+ * `notFound()` branch renders. Anything else is an outage and must be
+ * rethrown — collapsing both into the same `null` is exactly the bug this
+ * fixes (a backend 5xx used to render "you don't have anything in your
+ * cart" to a customer who actually has one).
+ *
+ * Checks both error shapes seen in this codebase: the real
+ * `@medusajs/js-sdk` `FetchError` (a bare `.status` number) and the
+ * axios-style shape `medusaError` already expects (`.response.status`), so
+ * it's safe to use regardless of which client threw. A network failure
+ * (fetch itself rejects — no response, no status at all) falls through to
+ * `false`, i.e. "not a 404" — correctly triggering the rethrow path.
+ */
+export function isNotFoundError(error: any): boolean {
+  const status = error?.status ?? error?.response?.status
+  return status === 404
+}

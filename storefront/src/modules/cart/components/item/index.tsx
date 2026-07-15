@@ -14,14 +14,19 @@ import LocalizedClientLink from "@modules/common/components/localized-client-lin
 import Spinner from "@modules/common/icons/spinner"
 import Thumbnail from "@modules/products/components/thumbnail"
 import { useState } from "react"
-import { maxSelectableQty } from "./max-qty"
+import { variantThumbnail } from "@lib/util/variant-thumbnail"
+import { hasSufficientStock, maxSelectableQty } from "./max-qty"
 
 type ItemProps = {
   item: HttpTypes.StoreCartLineItem
   type?: "full" | "preview"
+  // WB-092 fixwave C1: threaded down to LineItemPrice/LineItemUnitPrice so a
+  // discontinued/unpriced variant still renders "$X.XX" instead of a bare
+  // number (the item itself has no currency_code, only the cart does).
+  currencyCode: string
 }
 
-const Item = ({ item, type = "full" }: ItemProps) => {
+const Item = ({ item, type = "full", currencyCode }: ItemProps) => {
   const [updating, setUpdating] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -31,36 +36,70 @@ const Item = ({ item, type = "full" }: ItemProps) => {
     setError(null)
     setUpdating(true)
 
-    const message = await updateLineItem({
+    // WB-092 C9: updateLineItem now RETURNS { error } instead of throwing
+    // (Next.js redacts thrown Server Action messages in production), so read
+    // the result directly rather than `.catch`ing a redacted error.
+    const res = await updateLineItem({
       lineId: item.id,
       quantity,
     })
-      .catch((err) => {
-        setError(err.message)
-      })
-      .finally(() => {
-        setUpdating(false)
-      })
+
+    setUpdating(false)
+
+    if (res?.error) {
+      setError(res.error)
+    }
   }
 
+  // WB-092 C7: prefer the per-finish image over the product-representative
+  // thumbnail, so a Bronze buyer's cart line doesn't show a Black wheel.
+  const thumbnail = variantThumbnail(item.variant)
+
   const maxQuantity = maxSelectableQty(item.variant as any, item.quantity)
+
+  // WB-092 C2: display-only OOS/insufficient badge — mirrors the same
+  // manage_inventory/allow_backorder rules as maxQuantity above via
+  // hasSufficientStock, but does NOT feed back into maxQuantity. The WB-034
+  // qty-selector cap (which floors at the current quantity so a stock drop
+  // can never make an already-in-cart quantity unselectable) is unchanged;
+  // this only surfaces that the line is now over live availability.
+  const insufficientStock = !hasSufficientStock(item.variant as any, item.quantity)
+  const availableQty = Math.max(
+    0,
+    (item.variant as any)?.inventory_quantity ?? 0
+  )
 
   return (
     <Table.Row className="w-full" data-testid="product-row">
       <Table.Cell className="!pl-0 p-4 w-24">
-        <LocalizedClientLink
-          href={`/products/${handle}`}
-          className={clx("flex", {
-            "w-16": type === "preview",
-            "small:w-24 w-12": type === "full",
-          })}
-        >
-          <Thumbnail
-            thumbnail={item.variant?.product?.thumbnail}
-            images={item.variant?.product?.images}
-            size="square"
-          />
-        </LocalizedClientLink>
+        {handle ? (
+          <LocalizedClientLink
+            href={`/products/${handle}`}
+            className={clx("flex", {
+              "w-16": type === "preview",
+              "small:w-24 w-12": type === "full",
+            })}
+          >
+            <Thumbnail
+              thumbnail={thumbnail}
+              images={item.variant?.product?.images}
+              size="square"
+            />
+          </LocalizedClientLink>
+        ) : (
+          <div
+            className={clx("flex", {
+              "w-16": type === "preview",
+              "small:w-24 w-12": type === "full",
+            })}
+          >
+            <Thumbnail
+              thumbnail={thumbnail}
+              images={item.variant?.product?.images}
+              size="square"
+            />
+          </div>
+        )}
       </Table.Cell>
 
       <Table.Cell className="text-left">
@@ -71,6 +110,14 @@ const Item = ({ item, type = "full" }: ItemProps) => {
           {item.product_title}
         </Text>
         <LineItemOptions variant={item.variant} data-testid="product-variant" />
+        {insufficientStock && (
+          <Text
+            className="text-rose-500 text-small-regular mt-1"
+            data-testid="product-insufficient-stock-badge"
+          >
+            {availableQty > 0 ? `Only ${availableQty} left in stock` : "Out of stock"}
+          </Text>
+        )}
       </Table.Cell>
 
       {type === "full" && (
@@ -102,7 +149,7 @@ const Item = ({ item, type = "full" }: ItemProps) => {
 
       {type === "full" && (
         <Table.Cell className="hidden small:table-cell">
-          <LineItemUnitPrice item={item} style="tight" />
+          <LineItemUnitPrice item={item} style="tight" currencyCode={currencyCode} />
         </Table.Cell>
       )}
 
@@ -115,10 +162,10 @@ const Item = ({ item, type = "full" }: ItemProps) => {
           {type === "preview" && (
             <span className="flex gap-x-1 ">
               <Text className="text-ui-fg-muted">{item.quantity}x </Text>
-              <LineItemUnitPrice item={item} style="tight" />
+              <LineItemUnitPrice item={item} style="tight" currencyCode={currencyCode} />
             </span>
           )}
-          <LineItemPrice item={item} style="tight" />
+          <LineItemPrice item={item} style="tight" currencyCode={currencyCode} />
         </span>
       </Table.Cell>
     </Table.Row>

@@ -2,12 +2,13 @@
 
 import { sdk } from "@lib/config"
 import medusaError from "@lib/util/medusa-error"
-import { extractMedusaMessage } from "@lib/util/error-message"
+import { extractMedusaMessage, isNotFoundError } from "@lib/util/error-message"
 import { HttpTypes } from "@medusajs/types"
 import { omit } from "lodash"
 import { revalidateTag } from "next/cache"
 import { redirect } from "next/navigation"
 import { getAuthHeaders, getCartId, removeCartId, setCartId } from "./cookies"
+import { findInsufficientLines } from "./find-insufficient-lines"
 import { getProductsById } from "./products"
 import { getRegion } from "./regions"
 
@@ -21,8 +22,17 @@ export async function retrieveCart() {
   return await sdk.store.cart
     .retrieve(cartId, {}, { next: { tags: ["cart"] }, ...(await getAuthHeaders()) })
     .then(({ cart }) => cart)
-    .catch(() => {
-      return null
+    .catch((err) => {
+      // WB-092 C3a: a genuine 404 (cart deleted/completed/never existed) is
+      // the expected "no active cart" case -- null lets callers render their
+      // empty-cart state. Anything else (5xx, network failure) must NOT be
+      // swallowed here: that used to render "you don't have anything in
+      // your cart" to a customer who actually has one, masking a backend
+      // outage. Rethrow so the nearest `error.tsx` boundary takes over.
+      if (isNotFoundError(err)) {
+        return null
+      }
+      throw err
     })
 }
 
@@ -43,6 +53,19 @@ export async function getOrSetCart(countryCode: string) {
     cart = cartResp.cart
     await setCartId(cart.id)
     revalidateTag("cart")
+  } else {
+    // WB-092 C12: sliding renewal. `setCartId`'s cookie previously only got
+    // written at CREATION and was never refreshed, so its 7-day `maxAge`
+    // counted down from the first add-to-cart forever -- a shopper who
+    // starts a cart on day 0 and comes back to add a second item on day 6
+    // still loses the cart at day 7. Re-set the SAME cart id here (fresh
+    // 7-day window) whenever an EXISTING cart is found. This can only live
+    // in an action path that already mutates cookies -- `getOrSetCart` is
+    // only ever invoked from `addToCart`, a Server Action; plain
+    // `retrieveCart()` is also called directly from Server Components
+    // (checkout/cart pages, the header cart button) mid-render, where
+    // Next.js forbids `cookies().set` outright.
+    await setCartId(cart.id)
   }
 
   if (cart && cart?.region_id !== region.id) {
@@ -134,47 +157,58 @@ export async function addToCart({
     .catch((e) => ({ error: errText(e) }))
 }
 
+// WB-092 C9: mirrors addToCart's B2 shape (RETURN { error } instead of
+// throwing) -- Next.js redacts thrown Server Action error messages in
+// production, so `.catch(medusaError)` here used to reach the customer as a
+// generic masked error via item/index.tsx's `.catch((err) => setError(err.message))`.
 export async function updateLineItem({
   lineId,
   quantity,
 }: {
   lineId: string
   quantity: number
-}) {
+}): Promise<{ error?: string }> {
   if (!lineId) {
-    throw new Error("Missing lineItem ID when updating line item")
+    return { error: "Missing lineItem ID when updating line item" }
   }
 
   const cartId = await getCartId()
   if (!cartId) {
-    throw new Error("Missing cart ID when updating line item")
+    return { error: "Missing cart ID when updating line item" }
   }
 
-  await sdk.store.cart
+  return sdk.store.cart
     .updateLineItem(cartId, lineId, { quantity }, {}, await getAuthHeaders())
     .then(() => {
       revalidateTag("cart")
+      return {}
     })
-    .catch(medusaError)
+    .catch((e) => ({ error: errText(e) }))
 }
 
-export async function deleteLineItem(lineId: string) {
+// WB-092 C9: same B2 conversion as updateLineItem above. DeleteButton
+// (reused by both the full cart table and the mini-cart popover) surfaces
+// the returned error via a sonner toast since neither surface has a shared
+// inline-error slot.
+export async function deleteLineItem(
+  lineId: string
+): Promise<{ error?: string }> {
   if (!lineId) {
-    throw new Error("Missing lineItem ID when deleting line item")
+    return { error: "Missing lineItem ID when deleting line item" }
   }
 
   const cartId = await getCartId()
   if (!cartId) {
-    throw new Error("Missing cart ID when deleting line item")
+    return { error: "Missing cart ID when deleting line item" }
   }
 
-  await sdk.store.cart
+  return sdk.store.cart
     .deleteLineItem(cartId, lineId, await getAuthHeaders())
     .then(() => {
       revalidateTag("cart")
+      return {}
     })
-    .catch(medusaError)
-  revalidateTag("cart")
+    .catch((e) => ({ error: errText(e) }))
 }
 
 export async function enrichLineItems(
@@ -273,17 +307,24 @@ export async function initiatePaymentSession(
     .catch((e) => ({ error: errText(e) }))
 }
 
-export async function applyPromotions(codes: string[]) {
+// WB-092 C9: same B2 conversion as updateLineItem/deleteLineItem above.
+// Delegates to updateCart (left throwing per its other callers), so the
+// thrown Error's `.message` -- already extracted by updateCart's own
+// `.catch(medusaError)` -- is what errText falls through to here.
+export async function applyPromotions(
+  codes: string[]
+): Promise<{ error?: string }> {
   const cartId = await getCartId()
   if (!cartId) {
-    throw new Error("No existing cart found")
+    return { error: "No existing cart found" }
   }
 
-  await updateCart({ promo_codes: codes })
+  return updateCart({ promo_codes: codes })
     .then(() => {
       revalidateTag("cart")
+      return {}
     })
-    .catch(medusaError)
+    .catch((e) => ({ error: errText(e) }))
 }
 
 export async function submitPromotionForm(
@@ -291,11 +332,8 @@ export async function submitPromotionForm(
   formData: FormData
 ) {
   const code = formData.get("code") as string
-  try {
-    await applyPromotions([code])
-  } catch (e: any) {
-    return e.message
-  }
+  const res = await applyPromotions([code])
+  return res?.error
 }
 
 // TODO: Pass a POJO instead of a form entity here
@@ -349,6 +387,57 @@ export async function setAddresses(currentState: unknown, formData: FormData) {
   redirect(
     `/${formData.get("shipping_address.country_code")}/checkout?step=delivery`
   )
+}
+
+// WB-092 C2: preflight before payment CAPTURE. The Stripe provider is
+// capture:true and StripePaymentButton.handlePayment calls
+// stripe.confirmCardPayment (the REAL charge) before placeOrder() ever runs —
+// so without this check, an out-of-stock line only surfaces AFTER the card
+// is already charged (placeOrder's "if you were charged, it will be
+// reversed" below is a reversal, not a prevention). Callers (every payment
+// button's handlePayment, plus the Review step on mount) must await this
+// FIRST and bail out — without calling the provider — when it errors.
+//
+// Mirrors placeOrder's B2 shape: RETURN { error } instead of throwing, since
+// Next.js redacts thrown Server Action messages in production.
+//
+// Fails OPEN, never throws: a transient fetch failure here must not itself
+// block a real, in-stock checkout — only a confirmed insufficient-stock line
+// (computed from data we actually got back) blocks the charge.
+export async function checkStockAvailability(
+  cart: HttpTypes.StoreCart | null | undefined
+): Promise<{ error?: string }> {
+  if (!cart?.items?.length || !cart.region_id) {
+    return {}
+  }
+
+  let liveVariants: HttpTypes.StoreProductVariant[]
+  try {
+    const productIds = Array.from(
+      new Set(cart.items.map((item) => item.product_id).filter((id): id is string => !!id))
+    )
+    if (!productIds.length) return {}
+
+    const products = await getProductsById({
+      ids: productIds,
+      regionId: cart.region_id,
+    })
+    liveVariants = (products ?? []).flatMap((p) => p.variants ?? [])
+  } catch (e) {
+    console.error("checkStockAvailability: failed to fetch live stock:", e)
+    return {}
+  }
+
+  const insufficient = findInsufficientLines(cart.items, liveVariants)
+  if (!insufficient.length) return {}
+
+  const first = insufficient[0]
+  return {
+    error:
+      first.available > 0
+        ? `Only ${first.available} left of ${first.title} — reduce the quantity to continue.`
+        : `${first.title} is out of stock — remove it to continue.`,
+  }
 }
 
 export async function placeOrder(): Promise<{ error: string } | undefined> {

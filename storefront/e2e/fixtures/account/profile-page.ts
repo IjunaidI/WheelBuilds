@@ -11,12 +11,10 @@ export class ProfilePage extends AccountPage {
   accountBillingAddressEditor: Locator
 
   nameEditButton: Locator
-  emailEditButton: Locator
   phoneEditButton: Locator
   billingAddressEditButton: Locator
 
   nameSaveButton: Locator
-  emailSaveButton: Locator
   phoneSaveButton: Locator
   billingAddressSaveButton: Locator
 
@@ -25,17 +23,21 @@ export class ProfilePage extends AccountPage {
   savedPhone: Locator
   savedBillingAddress: Locator
 
+  // Email (A3): read-only display + a link out to support, no inline
+  // edit/save form -- Medusa's store customer.update doesn't touch login
+  // credentials, so an inline "editor" here could never actually change how
+  // the customer signs in. See emailContactLink below, sourced from
+  // account-email-editor's own contents.
+  emailContactLink: Locator
+
   nameSuccessMessage: Locator
-  emailSuccessMessage: Locator
   phoneSuccessMessage: Locator
   billingAddressSuccessMessage: Locator
 
   nameErrorMessage: Locator
-  emailErrorMessage: Locator
   phoneErrorMessage: Locator
   billingAddressErrorMessage: Locator
 
-  emailInput: Locator
   firstNameInput: Locator
   lastNameInput: Locator
 
@@ -71,13 +73,11 @@ export class ProfilePage extends AccountPage {
     )
 
     this.nameEditButton = this.accountNameEditor.getByTestId("edit-button")
-    this.emailEditButton = this.accountEmailEditor.getByTestId("edit-button")
     this.phoneEditButton = this.accountPhoneEditor.getByTestId("edit-button")
     this.billingAddressEditButton =
       this.accountBillingAddressEditor.getByTestId("edit-button")
 
     this.nameSaveButton = this.accountNameEditor.getByTestId("save-button")
-    this.emailSaveButton = this.accountEmailEditor.getByTestId("save-button")
     this.phoneSaveButton = this.accountPhoneEditor.getByTestId("save-button")
     this.billingAddressSaveButton =
       this.accountBillingAddressEditor.getByTestId("save-button")
@@ -87,17 +87,16 @@ export class ProfilePage extends AccountPage {
     this.savedPhone = this.accountPhoneEditor.getByTestId("current-info")
     this.savedBillingAddress =
       this.accountBillingAddressEditor.getByTestId("current-info")
+    this.emailContactLink = this.accountEmailEditor.getByRole("link", {
+      name: /contact us/i,
+    })
     this.nameSuccessMessage =
       this.accountNameEditor.getByTestId("success-message")
-    this.emailSuccessMessage =
-      this.accountEmailEditor.getByTestId("success-message")
     this.phoneSuccessMessage =
       this.accountPhoneEditor.getByTestId("success-message")
     this.billingAddressSuccessMessage =
       this.accountBillingAddressEditor.getByTestId("success-message")
     this.nameErrorMessage = this.accountNameEditor.getByTestId("error-message")
-    this.emailErrorMessage =
-      this.accountEmailEditor.getByTestId("error-message")
     this.phoneErrorMessage =
       this.accountPhoneEditor.getByTestId("error-message")
     this.billingAddressErrorMessage =
@@ -116,7 +115,6 @@ export class ProfilePage extends AccountPage {
 
     this.firstNameInput = page.getByTestId("first-name-input")
     this.lastNameInput = page.getByTestId("last-name-input")
-    this.emailInput = page.getByTestId("email-input")
     this.phoneInput = page.getByTestId("phone-input")
 
     this.billingAddress1Input = page.getByTestId("billing-address-1-input")

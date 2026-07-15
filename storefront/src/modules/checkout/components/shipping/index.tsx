@@ -92,55 +92,86 @@ const Shipping: React.FC<ShippingProps> = ({
       </div>
       {isOpen ? (
         <div data-testid="delivery-options-container">
-          <div className="pb-8">
-            <RadioGroup value={selectedShippingMethod?.id} onChange={set}>
-              {availableShippingMethods?.map((option) => {
-                return (
-                  <RadioGroup.Option
-                    key={option.id}
-                    value={option.id}
-                    data-testid="delivery-option-radio"
-                    className={clx(
-                      "flex items-center justify-between text-small-regular cursor-pointer py-4 border rounded-rounded px-8 mb-2 hover:shadow-borders-interactive-with-active",
-                      {
-                        "border-ui-border-interactive":
-                          option.id === selectedShippingMethod?.id,
-                      }
-                    )}
-                  >
-                    <div className="flex items-center gap-x-4">
-                      <Radio
-                        checked={option.id === selectedShippingMethod?.id}
-                      />
-                      <span className="text-base-regular">{option.name}</span>
-                    </div>
-                    <span className="justify-self-end text-ui-fg-base">
-                      {convertToLocale({
-                        amount: option.amount!,
-                        currency_code: cart?.currency_code,
-                      })}
-                    </span>
-                  </RadioGroup.Option>
-                )
-              })}
-            </RadioGroup>
-          </div>
+          {(availableShippingMethods?.length ?? 0) === 0 ? (
+            // WB-092 C13: previously the options list just rendered empty and
+            // the Continue button stayed disabled with no explanation -- a
+            // shopper with no eligible shipping options had no way to tell
+            // "nothing loaded yet" from "we can't ship here at all".
+            <div
+              className="pb-8 text-small-regular text-ui-fg-subtle"
+              data-testid="no-shipping-options-message"
+            >
+              <Text className="txt-medium-plus text-ui-fg-base mb-1">
+                No delivery options are available for this address.
+              </Text>
+              <Text className="txt-medium text-ui-fg-subtle">
+                This usually means the address isn&apos;t covered by one of
+                our shipping zones yet. Double-check the address in the
+                previous step, or contact us and we&apos;ll get it sorted.
+              </Text>
+            </div>
+          ) : (
+            <>
+              <div className="pb-8">
+                <RadioGroup value={selectedShippingMethod?.id} onChange={set}>
+                  {availableShippingMethods?.map((option) => {
+                    return (
+                      <RadioGroup.Option
+                        key={option.id}
+                        value={option.id}
+                        data-testid="delivery-option-radio"
+                        className={clx(
+                          "flex items-center justify-between text-small-regular cursor-pointer py-4 border rounded-rounded px-8 mb-2 hover:shadow-borders-interactive-with-active",
+                          {
+                            "border-ui-border-interactive":
+                              option.id === selectedShippingMethod?.id,
+                          }
+                        )}
+                      >
+                        <div className="flex items-center gap-x-4">
+                          <Radio
+                            checked={option.id === selectedShippingMethod?.id}
+                          />
+                          <div className="flex flex-col">
+                            <span className="text-base-regular">
+                              {option.name}
+                            </span>
+                            {option.type?.description && (
+                              <span className="text-ui-fg-subtle text-small-regular">
+                                {option.type.description}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                        <span className="justify-self-end text-ui-fg-base">
+                          {convertToLocale({
+                            amount: option.amount!,
+                            currency_code: cart?.currency_code,
+                          })}
+                        </span>
+                      </RadioGroup.Option>
+                    )
+                  })}
+                </RadioGroup>
+              </div>
 
-          <ErrorMessage
-            error={error}
-            data-testid="delivery-option-error-message"
-          />
+              <ErrorMessage
+                error={error}
+                data-testid="delivery-option-error-message"
+              />
 
-          <Button
-            size="large"
-            className="mt-6"
-            onClick={handleSubmit}
-            isLoading={isLoading}
-            disabled={!cart.shipping_methods?.[0]}
-            data-testid="submit-delivery-option-button"
-          >
-            Continue to payment
-          </Button>
+              <Button
+                size="large"
+                className="mt-6"
+                onClick={handleSubmit}
+                isLoading={isLoading}
+                disabled={!cart.shipping_methods?.[0]}
+                data-testid="submit-delivery-option-button"
+              >
+                Continue to payment
+              </Button>
+            </>
+          )}
         </div>
       ) : (
         <div>

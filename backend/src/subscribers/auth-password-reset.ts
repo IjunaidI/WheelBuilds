@@ -2,19 +2,7 @@ import type { SubscriberArgs, SubscriberConfig } from '@medusajs/framework'
 import { ContainerRegistrationKeys, Modules } from '@medusajs/framework/utils'
 import { EmailTemplates } from '../modules/email-notifications/templates'
 import { EMAIL_REPLY_TO, IS_PRODUCTION, STOREFRONT_URL } from '../lib/constants'
-
-/**
- * True when `url` resolves to a loopback host (localhost/127.0.0.1) — i.e. the
- * `STOREFRONT_URL` default from lib/constants.ts, which only makes sense in dev.
- */
-function isLocalhostUrl(url: string): boolean {
-  try {
-    const { hostname } = new URL(url)
-    return hostname === 'localhost' || hostname === '127.0.0.1'
-  } catch {
-    return false
-  }
-}
+import { isLocalhostUrl } from '../lib/is-localhost-url'
 
 /**
  * Fires on `auth.password_reset`, emitted by `generateResetPasswordTokenWorkflow`

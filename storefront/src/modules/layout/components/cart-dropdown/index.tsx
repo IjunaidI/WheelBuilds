@@ -12,6 +12,7 @@ import LineItemPrice from "@modules/common/components/line-item-price"
 import LocalizedClientLink from "@modules/common/components/localized-client-link"
 import Thumbnail from "@modules/products/components/thumbnail"
 import Icon from "@modules/common/components/icon"
+import { variantThumbnail } from "@lib/util/variant-thumbnail"
 import {
   Popover,
   PopoverAnchor,
@@ -132,33 +133,54 @@ const CartDropdown = ({
                   .sort((a, b) =>
                     (a.created_at ?? "") > (b.created_at ?? "") ? -1 : 1
                   )
-                  .map((item) => (
+                  .map((item) => {
+                    const handle = item.variant?.product?.handle
+                    // WB-092 C7: prefer the per-finish image over the
+                    // product-representative thumbnail in the mini-cart too.
+                    const thumbnail = variantThumbnail(item.variant)
+                    return (
                     <div
                       className="grid grid-cols-[122px_1fr] gap-x-4"
                       key={item.id}
                       data-testid="cart-item"
                     >
-                      <LocalizedClientLink
-                        href={`/products/${item.variant?.product?.handle}`}
-                        className="w-24"
-                      >
-                        <Thumbnail
-                          thumbnail={item.variant?.product?.thumbnail}
-                          images={item.variant?.product?.images}
-                          size="square"
-                        />
-                      </LocalizedClientLink>
+                      {handle ? (
+                        <LocalizedClientLink
+                          href={`/products/${handle}`}
+                          className="w-24"
+                        >
+                          <Thumbnail
+                            thumbnail={thumbnail}
+                            images={item.variant?.product?.images}
+                            size="square"
+                          />
+                        </LocalizedClientLink>
+                      ) : (
+                        <div className="w-24">
+                          <Thumbnail
+                            thumbnail={thumbnail}
+                            images={item.variant?.product?.images}
+                            size="square"
+                          />
+                        </div>
+                      )}
                       <div className="flex flex-col justify-between flex-1">
                         <div className="flex flex-col flex-1">
                           <div className="flex items-start justify-between">
                             <div className="flex flex-col overflow-ellipsis whitespace-nowrap mr-4 w-[180px]">
                               <h3 className="text-base-regular overflow-hidden text-ellipsis">
-                                <LocalizedClientLink
-                                  href={`/products/${item.variant?.product?.handle}`}
-                                  data-testid="product-link"
-                                >
-                                  {item.title}
-                                </LocalizedClientLink>
+                                {handle ? (
+                                  <LocalizedClientLink
+                                    href={`/products/${handle}`}
+                                    data-testid="product-link"
+                                  >
+                                    {item.title}
+                                  </LocalizedClientLink>
+                                ) : (
+                                  <span data-testid="product-link">
+                                    {item.title}
+                                  </span>
+                                )}
                               </h3>
                               <LineItemOptions
                                 variant={item.variant}
@@ -173,7 +195,11 @@ const CartDropdown = ({
                               </span>
                             </div>
                             <div className="flex justify-end">
-                              <LineItemPrice item={item} style="tight" />
+                              <LineItemPrice
+                                item={item}
+                                style="tight"
+                                currencyCode={cartState.currency_code}
+                              />
                             </div>
                           </div>
                         </div>
@@ -186,7 +212,7 @@ const CartDropdown = ({
                         </DeleteButton>
                       </div>
                     </div>
-                  ))}
+                  )})}
               </div>
               <div className="p-4 flex flex-col gap-y-4 text-small-regular">
                 <div className="flex items-center justify-between">

@@ -26,7 +26,7 @@ const ProfileEmail: React.FC<MyInformationProps> = ({ customer }) => {
         </div>
       </div>
       <p className="text-ui-fg-subtle text-small-regular mt-2">
-        This is the email you use to sign in and can't be changed here.{" "}
+        This is the email you use to sign in and can&apos;t be changed here.{" "}
         <LocalizedClientLink href="/contact" className="underline">
           Contact us
         </LocalizedClientLink>{" "}

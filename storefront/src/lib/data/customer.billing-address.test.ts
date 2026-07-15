@@ -66,7 +66,6 @@ const FULL_FIELDS = {
   "billing_address.postal_code": "SW1A 1AA",
   "billing_address.province": "London",
   "billing_address.country_code": "gb",
-  "billing_address.phone": "555-1234",
 }
 
 describe("billingAddressPayload (WB-093 A2)", () => {
@@ -83,7 +82,6 @@ describe("billingAddressPayload (WB-093 A2)", () => {
       postal_code: "SW1A 1AA",
       province: "London",
       country_code: "gb",
-      phone: "555-1234",
       is_default_billing: true,
     })
   })

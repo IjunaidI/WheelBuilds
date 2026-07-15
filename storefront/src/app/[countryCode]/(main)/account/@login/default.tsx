@@ -1,20 +1,16 @@
-// WB-093 A5: `@login` has no nested routes -- just this slot's root
-// `page.tsx` (the sign-in form). Next can't match this slot against any of
-// `@dashboard`'s nested paths (`/account/profile`, `/account/orders`,
-// `/account/orders/details/:id`, `/account/addresses`). Without a
-// `default.tsx`, a hard navigation/refresh to any of those routes 404s the
-// WHOLE `account` layout, because Next has no fallback to render for the
-// unmatched `@login` slot (this reproduces regardless of auth state -- it's
-// a routing-match problem, not an auth check).
+// WB-093 A5 (review fix 1): `account/layout.tsx` renders exactly ONE of
+// `dashboard`/`login` (`customer ? dashboard : login`) -- the other slot's
+// subtree is discarded outright, its own `notFound()` guards never run. On a
+// hard navigation/refresh to a nested `@dashboard` path (e.g.
+// `/account/profile`, `/account/orders/details/:id`) while logged OUT, Next
+// can't match the URL against `@login` (which has no nested routes), so it
+// falls back to rendering THIS slot's `default.tsx` instead -- this is the
+// reachable fallback, not `@dashboard/default.tsx`.
 //
-// `null` is the correct fallback here: whenever this slot's content would
-// actually be used, either (a) the customer is authenticated and
-// `account/layout.tsx` picks the `dashboard` slot instead (`customer ?
-// dashboard : login`) -- this content is discarded -- or (b) the customer
-// is NOT authenticated and the matched `@dashboard/**/page.tsx` itself
-// guards on `getCustomer()`/`notFound()` (see e.g. `addresses/page.tsx`),
-// so a real, logged-out visitor hitting a deep dashboard URL sees that
-// page's own 404, not this slot's content anyway.
-export default function LoginDefault() {
-  return null
-}
+// `null` was wrong: it rendered an empty account shell (no nav, no content,
+// just the footer) for every logged-out visitor hitting `/account/*` via a
+// bookmark or browser history -- middleware doesn't gate `/account/*`. The
+// fix is to render the same thing a fresh visit to `/account` would show:
+// the sign-in form. This is safe for authed users too -- the layout discards
+// this slot entirely when `customer` is truthy, so it never renders then.
+export { default } from "./page"

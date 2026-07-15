@@ -6,10 +6,12 @@
  * `labels: FulfillmentLabelDTO[]` and `retrieveOrder`'s `fields` now
  * requests `*fulfillments,*fulfillments.labels`. Rather than fight the stale
  * .d.ts with an `any` cast, this module declares its own narrow shape for
- * just the properties it reads. Because `labels` is OPTIONAL on
- * `FulfillmentLike`, the real (label-less-typed) `StoreOrderFulfillment[]`
- * is still structurally assignable at the call site -- no cast needed there
- * either.
+ * just the properties it reads. `labels` being OPTIONAL on `FulfillmentLike`
+ * doesn't save the call site from a cast, though: `FulfillmentLike` and
+ * `StoreOrderFulfillment` share zero declared properties, which trips TS's
+ * "weak type" check on a direct assignment -- see the
+ * `as unknown as FulfillmentLike[]` (and its own comment) at the call site in
+ * `order-details/index.tsx`.
  */
 export type FulfillmentLabelLike = {
   tracking_number?: string | null

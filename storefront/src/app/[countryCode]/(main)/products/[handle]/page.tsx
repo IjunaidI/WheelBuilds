@@ -31,23 +31,36 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   // WB-090 P10: an empty vendor description used to ship an empty <meta
   // name="description">. Wheel-only templated fallback (tires aren't in
   // scope for this fix); a wheel with a real description is unaffected.
+  // `product.name` already begins with the brand (see buildGroupTitle /
+  // buildTireGroupTitle in vendor-sync, and retitle-wheels.ts's backfill) —
+  // prepending `product.brand` again here doubled it, e.g. "American Force
+  // Cast American Force Cast 004". Verified live: 100% of sampled wheel +
+  // tire products' titles already start with metadata.brand.
   const description =
     product.description ||
     (product.kind === "wheel"
-      ? `${product.brand} ${product.name} wheels — sizes, finishes, live fitment check.`
+      ? `${product.name} wheels — sizes, finishes, live fitment check.`
       : product.description)
   // Suffix comes from the root `metadata.title.template` (WB-095 X1) — don't
   // hand-roll "| Wheel Builds" here or it doubles up.
-  const title = `${product.brand} ${product.name}`
-  // Vendor CDN thumbnail if present; omitting `images` when it's not lets
-  // Next fall back to the site-level opengraph-image/twitter-image instead
-  // of emitting a broken/empty image entry.
+  const title = product.name
+  // Vendor CDN thumbnail if present. When absent, the `images` key must be
+  // OMITTED (not set to `undefined`) — Next's static-file fallback only
+  // engages via `!source.openGraph.hasOwnProperty('images')`
+  // (node_modules/next/dist/lib/metadata/resolve-metadata.js), and the
+  // `{ images }` shorthand sets that key to `undefined` while still leaving
+  // it present, which skips the fallback and emits no og:image at all.
   const images = product.thumbnail ? [product.thumbnail] : undefined
   return {
     title,
     description,
-    openGraph: { title, description, images },
-    twitter: { card: "summary_large_image", title, description, images },
+    openGraph: { title, description, ...(images ? { images } : {}) },
+    twitter: {
+      card: "summary_large_image",
+      title,
+      description,
+      ...(images ? { images } : {}),
+    },
   }
 }
 

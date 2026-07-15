@@ -2,6 +2,7 @@
 
 import { sdk } from "@lib/config"
 import medusaError from "@lib/util/medusa-error"
+import { passwordError } from "@lib/util/password"
 import { HttpTypes } from "@medusajs/types"
 import { revalidateTag } from "next/cache"
 import { redirect } from "next/navigation"
@@ -37,6 +38,14 @@ export async function signup(_currentState: unknown, formData: FormData) {
     first_name: formData.get("first_name") as string,
     last_name: formData.get("last_name") as string,
     phone: formData.get("phone") as string,
+  }
+
+  // A9: @medusajs/auth-emailpass does not enforce a minimum password length
+  // itself (verified 2.13.6), so the storefront must reject short passwords
+  // server-side too -- the client-side minLength is not a security boundary.
+  const pwError = passwordError(password)
+  if (pwError) {
+    return pwError
   }
 
   try {
@@ -125,6 +134,13 @@ export async function resetPassword(_currentState: unknown, formData: FormData) 
     return "Passwords do not match."
   }
 
+  // A9: same server-side floor as signup() -- @medusajs/auth-emailpass does
+  // not enforce a minimum length itself.
+  const pwError = passwordError(password)
+  if (pwError) {
+    return pwError
+  }
+
   try {
     await sdk.auth.updateProvider(
       "customer",
@@ -145,8 +161,7 @@ export async function resetPassword(_currentState: unknown, formData: FormData) 
 
 export async function signout(countryCode: string) {
   await sdk.auth.logout()
-  removeAuthToken()
-  revalidateTag("auth")
+  await removeAuthToken()
   revalidateTag("customer")
   redirect(`/${countryCode}/account`)
 }

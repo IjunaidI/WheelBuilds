@@ -101,6 +101,11 @@ const medusaConfig = {
       authCors: AUTH_CORS,
       storeCors: STORE_CORS,
       jwtSecret: JWT_SECRET,
+      // A15: Medusa 2.13.6 defaults jwtExpiresIn to "1d" when unset (verified
+      // in the installed framework source). The storefront's _medusa_jwt
+      // cookie is set for 7d, so without this the JWT itself expired a day
+      // before the cookie did and sessions silently died on day 2.
+      jwtExpiresIn: "7d",
       cookieSecret: COOKIE_SECRET
     },
     build: {

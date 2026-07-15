@@ -37,14 +37,19 @@ const ResetPassword = ({ token, email, countryCode }: Props) => {
             type="password"
             autoComplete="new-password"
             required
+            minLength={8}
             data-testid="password-input"
           />
+          <span className="text-ui-fg-subtle text-small-regular">
+            Must be at least 8 characters.
+          </span>
           <Input
             label="Confirm password"
             name="confirm"
             type="password"
             autoComplete="new-password"
             required
+            minLength={8}
             data-testid="confirm-password-input"
           />
         </div>

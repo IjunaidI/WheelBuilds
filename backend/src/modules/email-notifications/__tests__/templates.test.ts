@@ -2,10 +2,12 @@ import * as React from 'react'
 import { renderTemplate } from './render-template'
 import { Base } from '../templates/base'
 import { OrderPlacedTemplate } from '../templates/order-placed'
+import { OrderCanceledTemplate } from '../templates/order-canceled'
 import { ShippingConfirmationTemplate } from '../templates/shipping-confirmation'
 import { InviteUserEmail } from '../templates/invite-user'
 import { PasswordResetTemplate } from '../templates/password-reset'
 import { VendorSyncAlertTemplate } from '../templates/vendor-sync-alert'
+import { generateEmailTemplate, EmailTemplates } from '../templates'
 
 /**
  * The wordmark `<Text>` in `base.tsx` is the only place any of these
@@ -80,6 +82,58 @@ describe('OrderPlacedTemplate (WB-094 A7)', () => {
   })
 })
 
+describe('OrderCanceledTemplate (WB-094 Task 3 — order.canceled coverage)', () => {
+  it('renders the order id, canceled items, hedged refund line, and the order link', async () => {
+    const html = await renderTemplate(React.createElement(OrderCanceledTemplate, OrderCanceledTemplate.PreviewProps))
+
+    expect(count(html, UPPERCASE_MARKER)).toBe(1)
+    expect(html).toContain('Order Canceled')
+    expect(html).toContain('ORD-123')
+    expect(html).toContain('Item 1')
+    expect(html).toContain('Item 2')
+
+    // Honesty constraint: hedge on refund, no invented amount/timeline.
+    expect(html).toContain("If you were charged, we&#x27;ll process the refund to your original payment method")
+    expect(html).not.toMatch(/\$\d/) // no dollar amount anywhere in this email
+
+    expect(html).toContain('View your order')
+    expect(html).toContain('href="https://example.com/us/order/confirmed/test-order-id"')
+  })
+
+  it('omits the order-link button when no orderUrl is supplied', async () => {
+    const { orderUrl, ...rest } = OrderCanceledTemplate.PreviewProps as any
+    const html = await renderTemplate(React.createElement(OrderCanceledTemplate, rest))
+    expect(html).not.toContain('View your order')
+  })
+
+  it('falls back to a generic greeting when no shippingAddress is supplied', async () => {
+    const { shippingAddress, ...rest } = OrderCanceledTemplate.PreviewProps as any
+    const html = await renderTemplate(React.createElement(OrderCanceledTemplate, rest))
+    expect(html).toContain('Dear there')
+  })
+})
+
+describe('generateEmailTemplate (WB-094 Task 3 — order.canceled wiring)', () => {
+  it('renders OrderCanceledTemplate for EmailTemplates.ORDER_CANCELED', async () => {
+    const element = generateEmailTemplate(EmailTemplates.ORDER_CANCELED, OrderCanceledTemplate.PreviewProps)
+    const html = await renderTemplate(element as React.ReactElement)
+    expect(html).toContain('Order Canceled')
+    expect(html).toContain('ORD-123')
+  })
+
+  it('throws MedusaError when ORDER_CANCELED data has no order', () => {
+    expect(() => generateEmailTemplate(EmailTemplates.ORDER_CANCELED, {})).toThrow(
+      /Invalid data for template "order-canceled"/
+    )
+  })
+
+  it('still throws MedusaError for an unknown template key (unchanged behavior)', () => {
+    expect(() => generateEmailTemplate('not-a-real-template', {})).toThrow(
+      /Unknown template key: "not-a-real-template"/
+    )
+  })
+})
+
 describe('ShippingConfirmationTemplate (WB-094 A7)', () => {
   it('renders Outlook-safe item rows and the order-link button', async () => {
     const html = await renderTemplate(
@@ -113,6 +167,14 @@ describe('invite-user / password-reset (WB-094 A7 — no duplicate wordmark)', (
   it('PasswordResetTemplate renders exactly one wordmark (base header, not a local duplicate)', async () => {
     const html = await renderTemplate(React.createElement(PasswordResetTemplate, PasswordResetTemplate.PreviewProps))
     expect(count(html, UPPERCASE_MARKER)).toBe(1)
+  })
+})
+
+describe('PasswordResetTemplate (WB-094 Task 3 — honest 15-minute expiry)', () => {
+  it('states the real 15-minute TTL instead of the vague "expires shortly"', async () => {
+    const html = await renderTemplate(React.createElement(PasswordResetTemplate, PasswordResetTemplate.PreviewProps))
+    expect(html).toContain('This link expires in 15 minutes.')
+    expect(html).not.toContain('expires shortly')
   })
 })
 

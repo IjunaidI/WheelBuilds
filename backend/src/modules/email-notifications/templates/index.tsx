@@ -2,6 +2,7 @@ import { ReactNode } from 'react'
 import { MedusaError } from '@medusajs/framework/utils'
 import { InviteUserEmail, INVITE_USER, isInviteUserData } from './invite-user'
 import { OrderPlacedTemplate, ORDER_PLACED, isOrderPlacedTemplateData } from './order-placed'
+import { OrderCanceledTemplate, ORDER_CANCELED, isOrderCanceledData } from './order-canceled'
 import { ShippingConfirmationTemplate, SHIPPING_CONFIRMATION, isShippingConfirmationData } from './shipping-confirmation'
 import { PasswordResetTemplate, PASSWORD_RESET, isPasswordResetData } from './password-reset'
 import { VendorSyncAlertTemplate, VENDOR_SYNC_ALERT, isVendorSyncAlertData } from './vendor-sync-alert'
@@ -9,6 +10,7 @@ import { VendorSyncAlertTemplate, VENDOR_SYNC_ALERT, isVendorSyncAlertData } fro
 export const EmailTemplates = {
   INVITE_USER,
   ORDER_PLACED,
+  ORDER_CANCELED,
   SHIPPING_CONFIRMATION,
   PASSWORD_RESET,
   VENDOR_SYNC_ALERT
@@ -35,6 +37,15 @@ export function generateEmailTemplate(templateKey: string, data: unknown): React
         )
       }
       return <OrderPlacedTemplate {...data} />
+
+    case EmailTemplates.ORDER_CANCELED:
+      if (!isOrderCanceledData(data)) {
+        throw new MedusaError(
+          MedusaError.Types.INVALID_DATA,
+          `Invalid data for template "${EmailTemplates.ORDER_CANCELED}"`
+        )
+      }
+      return <OrderCanceledTemplate {...data} />
 
     case EmailTemplates.SHIPPING_CONFIRMATION:
       if (!isShippingConfirmationData(data)) {
@@ -71,4 +82,4 @@ export function generateEmailTemplate(templateKey: string, data: unknown): React
   }
 }
 
-export { InviteUserEmail, OrderPlacedTemplate, ShippingConfirmationTemplate, PasswordResetTemplate, VendorSyncAlertTemplate }
+export { InviteUserEmail, OrderPlacedTemplate, OrderCanceledTemplate, ShippingConfirmationTemplate, PasswordResetTemplate, VendorSyncAlertTemplate }

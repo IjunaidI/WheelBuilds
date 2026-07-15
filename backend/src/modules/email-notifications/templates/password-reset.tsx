@@ -71,7 +71,7 @@ export const PasswordResetTemplate = ({
       <Hr className="border border-solid border-[#eaeaea] my-[26px] mx-0 w-full" />
       <Text className="text-[#666666] text-[12px] leading-[24px]">
         If you didn't request this, you can safely ignore this email — your password will
-        not be changed. This link expires shortly.
+        not be changed. This link expires in 15 minutes.
       </Text>
     </Base>
   )

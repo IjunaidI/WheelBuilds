@@ -29,7 +29,18 @@ const Review = ({ cart }: { cart: any }) => {
   // sees the warning as soon as they reach Review, before they even click
   // Place order (the payment buttons re-check right before charging; this is
   // belt-and-suspenders visibility, not the enforcement point).
+  //
+  // WB-092 fixwave C3: <Review> is mounted at EVERY checkout step (it's one
+  // of four always-rendered SectionShells in checkout-form), so an ungated
+  // effect fired this preflight -- a Server Action that serializes the whole
+  // enriched cart plus a live product fetch -- on the address/delivery/
+  // payment steps too, for a result that's never shown until Review is
+  // actually open. Gate on isOpen so it only runs when the step is active;
+  // the click-time gate in the payment buttons remains the real enforcement.
   useEffect(() => {
+    if (!isOpen) {
+      return
+    }
     let cancelled = false
     checkStockAvailability(cart).then((res) => {
       if (!cancelled) setStockError(res?.error ?? null)
@@ -38,7 +49,7 @@ const Review = ({ cart }: { cart: any }) => {
       cancelled = true
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [cart?.id])
+  }, [cart?.id, isOpen])
 
   return (
     <div className="bg-white">

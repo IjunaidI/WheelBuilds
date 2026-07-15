@@ -8,9 +8,11 @@ import SkeletonLineItem from "@modules/skeletons/components/skeleton-line-item"
 
 type ItemsProps = {
   items: HttpTypes.StoreCartLineItem[] | HttpTypes.StoreOrderLineItem[] | null
+  // WB-092 fixwave C1: threaded down to Item -> LineItemPrice/LineItemUnitPrice.
+  currencyCode: string
 }
 
-const Items = ({ items }: ItemsProps) => {
+const Items = ({ items, currencyCode }: ItemsProps) => {
   return (
     <div className="flex flex-col">
       <Divider className="!mb-0" />
@@ -22,7 +24,9 @@ const Items = ({ items }: ItemsProps) => {
                   return (a.created_at ?? "") > (b.created_at ?? "") ? -1 : 1
                 })
                 .map((item) => {
-                  return <Item key={item.id} item={item} />
+                  return (
+                    <Item key={item.id} item={item} currencyCode={currencyCode} />
+                  )
                 })
             : repeat(5).map((i) => {
                 return <SkeletonLineItem key={i} />

@@ -1,5 +1,6 @@
 import { getPercentageDiff } from "@lib/util/get-precentage-diff"
 import { getPricesForVariant } from "@lib/util/get-product-price"
+import { hasReducedPrice as computeHasReducedPrice } from "@lib/util/has-reduced-price"
 import { lineItemAmounts } from "@lib/util/line-item-amounts"
 import { convertToLocale } from "@lib/util/money"
 import { HttpTypes } from "@medusajs/types"
@@ -8,11 +9,16 @@ import { clx } from "@medusajs/ui"
 type LineItemUnitPriceProps = {
   item: HttpTypes.StoreCartLineItem | HttpTypes.StoreOrderLineItem
   style?: "default" | "tight"
+  // WB-092 fixwave C1: currency must come from the cart/order, not the live
+  // variant (which is null for a discontinued/unpriced variant) — see
+  // line-item-price for the full rationale.
+  currencyCode: string
 }
 
 const LineItemUnitPrice = ({
   item,
   style = "default",
+  currencyCode,
 }: LineItemUnitPriceProps) => {
   // Source of truth: the stored/charged unit price, not the live variant
   // price (see line-item-price for why — vendor-sync drift + NaN on a
@@ -22,9 +28,12 @@ const LineItemUnitPrice = ({
   // Decoration only: an original/strikethrough unit price, shown only when
   // the live variant price still resolves.
   const livePrices = getPricesForVariant(item.variant)
-  const currency_code = livePrices?.currency_code
   const originalUnitPrice = livePrices?.original_price_number ?? 0
-  const hasReducedPrice = originalUnitPrice > 0 && unitPrice < originalUnitPrice
+  // WB-092 fixwave C4: same live-vs-live rule as line-item-price -- a
+  // fabricated discount must not appear just because the list price rose
+  // after the item was added (stored < new live original, no active sale).
+  // See @lib/util/has-reduced-price for the (tested) decision + rationale.
+  const hasReducedPrice = computeHasReducedPrice(livePrices)
 
   return (
     <div className="flex flex-col text-ui-fg-muted justify-center h-full">
@@ -38,7 +47,10 @@ const LineItemUnitPrice = ({
               className="line-through"
               data-testid="product-unit-original-price"
             >
-              {convertToLocale({ amount: originalUnitPrice, currency_code })}
+              {convertToLocale({
+                amount: originalUnitPrice,
+                currency_code: currencyCode,
+              })}
             </span>
           </p>
           {style === "default" && (
@@ -54,7 +66,7 @@ const LineItemUnitPrice = ({
         })}
         data-testid="product-unit-price"
       >
-        {convertToLocale({ amount: unitPrice, currency_code })}
+        {convertToLocale({ amount: unitPrice, currency_code: currencyCode })}
       </span>
     </div>
   )

@@ -125,7 +125,7 @@ export default function OrderCompletedTemplate({
               style={{ border: "1px solid var(--hairline)" }}
               data-testid="order-complete-container"
             >
-              <Items items={order.items} />
+              <Items items={order.items} currencyCode={order.currency_code} />
               <div className="py-4">
                 <CartTotals totals={order} />
               </div>

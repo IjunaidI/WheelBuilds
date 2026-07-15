@@ -31,16 +31,19 @@ const Item = ({ item, type = "full" }: ItemProps) => {
     setError(null)
     setUpdating(true)
 
-    const message = await updateLineItem({
+    // WB-092 C9: updateLineItem now RETURNS { error } instead of throwing
+    // (Next.js redacts thrown Server Action messages in production), so read
+    // the result directly rather than `.catch`ing a redacted error.
+    const res = await updateLineItem({
       lineId: item.id,
       quantity,
     })
-      .catch((err) => {
-        setError(err.message)
-      })
-      .finally(() => {
-        setUpdating(false)
-      })
+
+    setUpdating(false)
+
+    if (res?.error) {
+      setError(res.error)
+    }
   }
 
   const maxQuantity = maxSelectableQty(item.variant as any, item.quantity)

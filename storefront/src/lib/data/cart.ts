@@ -144,47 +144,58 @@ export async function addToCart({
     .catch((e) => ({ error: errText(e) }))
 }
 
+// WB-092 C9: mirrors addToCart's B2 shape (RETURN { error } instead of
+// throwing) -- Next.js redacts thrown Server Action error messages in
+// production, so `.catch(medusaError)` here used to reach the customer as a
+// generic masked error via item/index.tsx's `.catch((err) => setError(err.message))`.
 export async function updateLineItem({
   lineId,
   quantity,
 }: {
   lineId: string
   quantity: number
-}) {
+}): Promise<{ error?: string }> {
   if (!lineId) {
-    throw new Error("Missing lineItem ID when updating line item")
+    return { error: "Missing lineItem ID when updating line item" }
   }
 
   const cartId = await getCartId()
   if (!cartId) {
-    throw new Error("Missing cart ID when updating line item")
+    return { error: "Missing cart ID when updating line item" }
   }
 
-  await sdk.store.cart
+  return sdk.store.cart
     .updateLineItem(cartId, lineId, { quantity }, {}, await getAuthHeaders())
     .then(() => {
       revalidateTag("cart")
+      return {}
     })
-    .catch(medusaError)
+    .catch((e) => ({ error: errText(e) }))
 }
 
-export async function deleteLineItem(lineId: string) {
+// WB-092 C9: same B2 conversion as updateLineItem above. DeleteButton
+// (reused by both the full cart table and the mini-cart popover) surfaces
+// the returned error via a sonner toast since neither surface has a shared
+// inline-error slot.
+export async function deleteLineItem(
+  lineId: string
+): Promise<{ error?: string }> {
   if (!lineId) {
-    throw new Error("Missing lineItem ID when deleting line item")
+    return { error: "Missing lineItem ID when deleting line item" }
   }
 
   const cartId = await getCartId()
   if (!cartId) {
-    throw new Error("Missing cart ID when deleting line item")
+    return { error: "Missing cart ID when deleting line item" }
   }
 
-  await sdk.store.cart
+  return sdk.store.cart
     .deleteLineItem(cartId, lineId, await getAuthHeaders())
     .then(() => {
       revalidateTag("cart")
+      return {}
     })
-    .catch(medusaError)
-  revalidateTag("cart")
+    .catch((e) => ({ error: errText(e) }))
 }
 
 export async function enrichLineItems(
@@ -283,17 +294,24 @@ export async function initiatePaymentSession(
     .catch((e) => ({ error: errText(e) }))
 }
 
-export async function applyPromotions(codes: string[]) {
+// WB-092 C9: same B2 conversion as updateLineItem/deleteLineItem above.
+// Delegates to updateCart (left throwing per its other callers), so the
+// thrown Error's `.message` -- already extracted by updateCart's own
+// `.catch(medusaError)` -- is what errText falls through to here.
+export async function applyPromotions(
+  codes: string[]
+): Promise<{ error?: string }> {
   const cartId = await getCartId()
   if (!cartId) {
-    throw new Error("No existing cart found")
+    return { error: "No existing cart found" }
   }
 
-  await updateCart({ promo_codes: codes })
+  return updateCart({ promo_codes: codes })
     .then(() => {
       revalidateTag("cart")
+      return {}
     })
-    .catch(medusaError)
+    .catch((e) => ({ error: errText(e) }))
 }
 
 export async function submitPromotionForm(
@@ -301,11 +319,8 @@ export async function submitPromotionForm(
   formData: FormData
 ) {
   const code = formData.get("code") as string
-  try {
-    await applyPromotions([code])
-  } catch (e: any) {
-    return e.message
-  }
+  const res = await applyPromotions([code])
+  return res?.error
 }
 
 // TODO: Pass a POJO instead of a form entity here

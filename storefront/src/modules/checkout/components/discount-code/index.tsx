@@ -28,12 +28,19 @@ const DiscountCode: React.FC<DiscountCodeProps> = ({ cart }) => {
   const [isOpen, setIsOpen] = React.useState(false)
 
   const { items = [], promotions = [] } = cart
-  const removePromotionCode = async (code: string) => {
-    await applyPromotions(retainedPromoCodes(promotions, code))
-  }
-
   const [errorMessage, setErrorMessage] = React.useState<string | null>(null)
   const [pendingCode, setPendingCode] = React.useState<string | null>(null)
+
+  // WB-092 C9: applyPromotions now RETURNS { error } instead of throwing --
+  // both call sites below previously had no `.catch` at all, so a failure
+  // was an unhandled promise rejection (removal) or crossed the Next.js
+  // Server Action boundary and got redacted anyway (add).
+  const removePromotionCode = async (code: string) => {
+    const res = await applyPromotions(retainedPromoCodes(promotions, code))
+    if (res?.error) {
+      setErrorMessage(res.error)
+    }
+  }
 
   const addPromotionCode = async (formData: FormData) => {
     const code = formData.get("code")
@@ -41,7 +48,15 @@ const DiscountCode: React.FC<DiscountCodeProps> = ({ cart }) => {
     setErrorMessage(null)
     setPendingCode(code.toString())
     const input = document.getElementById("promotion-input") as HTMLInputElement
-    await applyPromotions([...retainedPromoCodes(promotions), code.toString()])
+    const res = await applyPromotions([
+      ...retainedPromoCodes(promotions),
+      code.toString(),
+    ])
+    if (res?.error) {
+      setErrorMessage(res.error)
+      setPendingCode(null)
+      return
+    }
     if (input) input.value = ""
   }
 

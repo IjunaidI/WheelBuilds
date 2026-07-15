@@ -24,8 +24,8 @@ type StorePageProps = {
  * (getDiscoveryProducts) — see `modules/discovery/data/get-products.ts`.
  *
  * The legacy `modules/store/` (`StoreTemplate`, `PaginatedProducts`,
- * `RefinementList`) is retained because other routes (categories, collections)
- * still import from it.
+ * `RefinementList`) was deleted in WB-086 D1 — it was already orphaned
+ * (this page has rendered `DiscoveryTemplate` since Discovery shipped).
  */
 export default async function StorePage({ searchParams, params }: StorePageProps) {
   const sp = await searchParams

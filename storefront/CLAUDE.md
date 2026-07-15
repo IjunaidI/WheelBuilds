@@ -40,7 +40,7 @@ storefront/src/
 │   │   ├── page.tsx      # Home — composes the design's home sections
 │   │   ├── store/        # catalog
 │   │   ├── products/[handle]/
-│   │   └── categories/, collections/, cart/, account/, order/
+│   │   └── cart/, account/, order/
 │   └── (checkout)/       # separate layout for the checkout flow
 ├── components/ui/        # shadcn primitives (drawer, sheet, dialog, dropdown-menu, tooltip, sonner, command, button)
 ├── lib/
@@ -57,7 +57,7 @@ storefront/src/
 │   ├── home/components/      # home page sections
 │   ├── layout/               # nav, footer, cart-button, cart-dropdown, garage-pill, side-menu (orphaned)
 │   ├── search/               # search-drawer, search-mount, search-trigger, actions, results template
-│   ├── products/, cart/, checkout/, account/, order/, categories/, collections/, store/
+│   ├── products/, cart/, checkout/, account/, order/
 │   └── skeletons/
 └── styles/
     ├── globals.css       # tailwind layer + shadcn token overrides (mapped to WB palette)
@@ -141,7 +141,7 @@ Loaded via `next/font/google` in [`app/layout.tsx`](src/app/layout.tsx): Antonio
 
 - `next.config.js` has `eslint.ignoreDuringBuilds: true` and `typescript.ignoreBuildErrors: true`. Type and lint errors will **not** fail the build.
 - Run `pnpm lint` and `npx tsc --noEmit` separately to catch them.
-- Pre-existing TS errors (**5-error baseline**): `lib/data/collections.ts` (1), `lib/data/onboarding.ts` (1), `modules/products/components/product-onboarding-cta/index.tsx` (1), `modules/products/components/related-products/index.tsx` (2). These are genuine Medusa SDK type drift — safe to leave; don't try to "fix" them as part of unrelated work.
+- Pre-existing TS errors (**4-error baseline**): `lib/data/onboarding.ts` (1), `modules/products/components/product-onboarding-cta/index.tsx` (1), `modules/products/components/related-products/index.tsx` (2). These are genuine Medusa SDK type drift — safe to leave; don't try to "fix" them as part of unrelated work.
 - **⚠️ The former `lib/data/customer.ts` (5) + `lib/data/orders.ts` (2) errors were NOT harmless drift — they flagged a real auth bug.** `getAuthHeaders()` is `async` (it awaits `cookies()` in Next 15); those files passed it **un-awaited** (`...getAuthHeaders()`), so a pending Promise was spread → the `Authorization: Bearer` header was dropped → `getCustomer()` always returned `null` → `/account` always rendered the login form and login appeared to do nothing. Fixed by awaiting `getAuthHeaders()` at every call site (matching `cart.ts`, which was already correct), which dropped the baseline 14→12→5. **Don't reintroduce the un-awaited form** — and treat "harmless tsc drift" claims with suspicion when they sit on an auth/data path.
 - A pre-existing eslint warning lives in `modules/checkout/components/shipping-address/index.tsx`. Same advice.
 - Backend must be running for `pnpm dev` to unblock (the `await-backend` shim polls port 9000). For storefront-only iteration, use `pnpm build:next` to skip the wait.
@@ -246,8 +246,6 @@ src/modules/discovery/
 4. `vehicleConstraint?: string[]` on `DiscoveryQuery` is LIVE: fit mode appends bolt-pattern Meilisearch clauses, then post-filters candidates through the real per-variant check (`productFitTier` — WB-060/WB-074/WB-077; windows travel via the `fitb/fitd/fitw/fito` URL params).
 5. `useDiscoveryQuery` only manipulates URL params — no change there.
 
-`modules/store/` is **retained** (not deleted) because `SortOptions`, `RefinementList`, and `PaginatedProducts` are still imported by the categories page, collections page, `lib/data/products.ts`, `lib/util/sort-products.ts`, `modules/categories/templates`, and `modules/collections/templates`.
-
 The Vehicle band's fit toggle is live (feeds `DiscoveryQuery.vehicleConstraint`). Remaining rail follow-up: the Price section's TextInputs should become a `<Slider>` once a real min/max range is surfaced from Meilisearch.
 
 ## Product Detail (PDP)
@@ -316,7 +314,7 @@ No `TODO(integration)` anchors remain on the PDP (add-to-cart/Buy Now wired — 
 
 Save-to-wishlist on `purchase-panel.tsx` stays a plain toast (no wishlist backend yet — not tagged `TODO(integration)`).
 
-`modules/products/` is **retained** (not deleted) because `Thumbnail` is imported by `modules/account/components/order-card`, `modules/cart/components/item`, `modules/checkout/templates/checkout-summary`, `modules/layout/components/cart-dropdown`, and `modules/order/components/item`.
+`modules/products/` is kept for **`Thumbnail` only** — imported by `modules/account/components/order-card`, `modules/cart/components/item`, `modules/checkout/templates/checkout-summary`, `modules/layout/components/cart-dropdown`, and `modules/order/components/item`. The legacy full-PDP template (`modules/products/templates/`), `product-preview/`, and `lib/util/sort-products.ts` were deleted in WB-086 D1 (zero live importers; the live PDP is `modules/product-detail/`). That deletion orphaned `image-gallery`, `product-actions`, `product-tabs`, `product-onboarding-cta`, and `related-products` — none are reachable from a live route anymore, but they're left in place (out of that sweep's scope); `related-products` and `product-onboarding-cta` still contribute to the TS baseline below.
 
 ## Gotchas
 

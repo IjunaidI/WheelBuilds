@@ -36,12 +36,21 @@ export const retrieveOrder = cache(async function (id: string) {
     })
 })
 
+// WB-093 A6: previously resolved to a bare `orders` array, so a customer
+// with more than `limit` (default 10) orders had no way to reach the 11th+
+// -- it silently disappeared from the site with no pager and no signal that
+// more existed. `sdk.store.order.list`'s response is a Medusa
+// `PaginatedResponse` (`StoreOrderListResponse`) that already carries
+// `count` (the real total, independent of how many rows this page
+// returned) -- pass it through so callers can compute a page count. See
+// `ordersPageParams` (./orders-page-params.ts) for the `{limit, offset}`
+// math on the request side.
 export const listOrders = cache(async function (
   limit: number = 10,
   offset: number = 0
 ) {
   return sdk.store.order
     .list({ limit, offset }, { next: { tags: ["order"] }, ...(await getAuthHeaders()) })
-    .then(({ orders }) => orders)
+    .then(({ orders, count }) => ({ orders, count }))
     .catch((err) => medusaError(err))
 })

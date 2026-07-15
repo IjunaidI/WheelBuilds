@@ -12,7 +12,9 @@ export const metadata: Metadata = {
 
 export default async function OverviewTemplate() {
   const customer = await getCustomer().catch(() => null)
-  const orders = (await listOrders().catch(() => null)) || null
+  // WB-093 A6: listOrders now resolves { orders, count } (see
+  // lib/data/orders.ts); this overview only ever needed the array.
+  const orders = (await listOrders().catch(() => null))?.orders ?? null
 
   if (!customer) {
     notFound()

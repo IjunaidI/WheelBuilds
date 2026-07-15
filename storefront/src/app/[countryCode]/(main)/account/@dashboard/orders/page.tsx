@@ -4,14 +4,28 @@ import OrderOverview from "@modules/account/components/order-overview"
 import LocalizedClientLink from "@modules/common/components/localized-client-link"
 import { notFound } from "next/navigation"
 import { listOrders } from "@lib/data/orders"
+import { ordersPageParams } from "@lib/data/orders-page-params"
 
 export const metadata: Metadata = {
   title: "Orders",
   description: "Overview of your previous orders.",
 }
 
-export default async function Orders() {
-  const orders = await listOrders()
+type OrdersPageProps = {
+  // WB-093 A6: Next 15 -- `searchParams` is a Promise, must be awaited.
+  searchParams: Promise<{ page?: string }>
+}
+
+export default async function Orders({ searchParams }: OrdersPageProps) {
+  const sp = await searchParams
+  // Mirrors the discovery route's `Math.max(1, num("page") ?? 1)` parsing
+  // convention (modules/discovery/data/types.ts); ordersPageParams clamps
+  // again defensively so an out-of-range/garbage value can never reach
+  // listOrders as a negative offset.
+  const rawPage = Number(sp?.page)
+  const page = Number.isFinite(rawPage) ? Math.max(1, rawPage) : 1
+  const { limit, offset } = ordersPageParams(page)
+  const { orders, count } = await listOrders(limit, offset)
 
   if (!orders) {
     notFound()
@@ -35,7 +49,12 @@ export default async function Orders() {
         </p>
       </div>
       <div>
-        <OrderOverview orders={orders} />
+        <OrderOverview
+          orders={orders}
+          count={count}
+          page={page}
+          limit={limit}
+        />
       </div>
     </div>
   )

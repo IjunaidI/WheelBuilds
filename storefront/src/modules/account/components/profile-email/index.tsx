@@ -1,75 +1,38 @@
-"use client"
-
-import React, { useEffect } from "react"
-import { useFormState } from "react-dom"
-
-import Input from "@modules/common/components/input"
-
-import AccountInfo from "../account-info"
+import LocalizedClientLink from "@modules/common/components/localized-client-link"
 import { HttpTypes } from "@medusajs/types"
-// import { updateCustomer } from "@lib/data/customer"
 
 type MyInformationProps = {
   customer: HttpTypes.StoreCustomer
 }
 
+// Changing a customer's login email is an auth-identity change, not a
+// profile-field edit -- Medusa's store customer.update doesn't touch the
+// identity/credential record, so a form here could never actually change
+// how the customer logs in. Rather than fake a working editor (the previous
+// version called nothing and always reported success), this renders the
+// email read-only and points the customer at support. Revisit if/when a real
+// email-change flow (re-verification, identity update) is built.
 const ProfileEmail: React.FC<MyInformationProps> = ({ customer }) => {
-  const [successState, setSuccessState] = React.useState(false)
-
-  // TODO: It seems we don't support updating emails now?
-  const updateCustomerEmail = (
-    _currentState: Record<string, unknown>,
-    formData: FormData
-  ) => {
-    const customer = {
-      email: formData.get("email") as string,
-    }
-
-    try {
-      // await updateCustomer(customer)
-      return { success: true, error: null }
-    } catch (error: any) {
-      return { success: false, error: error.toString() }
-    }
-  }
-
-  const [state, formAction] = useFormState(updateCustomerEmail, {
-    error: false,
-    success: false,
-  })
-
-  const clearState = () => {
-    setSuccessState(false)
-  }
-
-  useEffect(() => {
-    setSuccessState(state.success)
-  }, [state])
-
   return (
-    <form action={formAction} className="w-full">
-      <AccountInfo
-        label="Email"
-        currentInfo={`${customer.email}`}
-        isSuccess={successState}
-        isError={!!state.error}
-        errorMessage={state.error}
-        clearState={clearState}
-        data-testid="account-email-editor"
-      >
-        <div className="grid grid-cols-1 gap-y-2">
-          <Input
-            label="Email"
-            name="email"
-            type="email"
-            autoComplete="email"
-            required
-            defaultValue={customer.email}
-            data-testid="email-input"
-          />
+    <div className="text-small-regular" data-testid="account-email-editor">
+      <div className="flex items-end justify-between">
+        <div className="flex flex-col">
+          <span className="uppercase text-ui-fg-base">Email</span>
+          <div className="flex items-center flex-1 basis-0 justify-end gap-x-4">
+            <span className="font-semibold" data-testid="current-info">
+              {customer.email}
+            </span>
+          </div>
         </div>
-      </AccountInfo>
-    </form>
+      </div>
+      <p className="text-ui-fg-subtle text-small-regular mt-2">
+        This is the email you use to sign in and can't be changed here.{" "}
+        <LocalizedClientLink href="/contact" className="underline">
+          Contact us
+        </LocalizedClientLink>{" "}
+        if you need it updated.
+      </p>
+    </div>
   )
 }
 

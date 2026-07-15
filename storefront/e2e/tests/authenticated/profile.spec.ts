@@ -14,7 +14,7 @@ test.describe("Account profile tests", () => {
     })
 
     await test.step("update the saved profile phone number", async () => {
-      await expect(profilePage.savedPhone).toHaveText("null")
+      await expect(profilePage.savedPhone).toHaveText("")
       await profilePage.phoneEditButton.click()
       await profilePage.phoneInput.fill("8888888888")
       await profilePage.phoneSaveButton.click()
@@ -89,7 +89,7 @@ test.describe("Account profile tests", () => {
     })
 
     await test.step("update the saved profile phone number", async () => {
-      await expect(profilePage.savedPhone).toHaveText("null")
+      await expect(profilePage.savedPhone).toHaveText("")
       await profilePage.phoneEditButton.click()
       await profilePage.phoneInput.fill("8888888888")
       await profilePage.phoneSaveButton.click()
@@ -186,53 +186,33 @@ test.describe("Account profile tests", () => {
     })
   })
 
-  test("Check if changing email address updates user correctly", async ({
-    loginPage,
+  test("Email is shown read-only with a link to contact support (A3)", async ({
     accountProfilePage: profilePage,
     accountOverviewPage: accountPage,
   }) => {
-    await test.step("Update the user email", async () => {
+    // A3 -- the email "editor" used to call nothing and always report
+    // success (`updateCustomer` was commented out), so a customer who
+    // "changed" their email here would find it silently unchanged and their
+    // login untouched. There is no real email-change flow yet (that's an
+    // auth-identity project, not a profile-field edit), so the field is
+    // read-only with a path to support instead of a fake form.
+    await test.step("Navigate to the account Profile page", async () => {
       await accountPage.goto()
       await accountPage.welcomeMessage.waitFor({ state: "visible" })
       await accountPage.profileLink.click()
       await profilePage.profileWrapper.waitFor({ state: "visible" })
-      await profilePage.emailEditButton.click()
-      await profilePage.emailInput.fill("test-111@example.com")
-      await profilePage.emailSaveButton.click()
-      await profilePage.emailSuccessMessage.waitFor({ state: "visible" })
     })
 
-    await test.step("Try logging in again with the old email", async () => {
-      await profilePage.logoutLink.click()
-      await loginPage.container.waitFor({ state: "visible" })
-      await loginPage.emailInput.fill("test@example.com")
-      await loginPage.passwordInput.fill("password")
-      await loginPage.signInButton.click()
-      await loginPage.errorMessage.waitFor({ state: "visible" })
-    })
-
-    await test.step("Login with the new email", async () => {
-      await loginPage.emailInput.fill("test-111@example.com")
-      await loginPage.signInButton.click()
-      await accountPage.welcomeMessage.waitFor({ state: "visible" })
-    })
-
-    await test.step("Set the email back to test@example.com", async () => {
-      await accountPage.profileLink.click()
-      await profilePage.profileWrapper.waitFor({ state: "visible" })
-      await profilePage.emailEditButton.click()
-      await profilePage.emailInput.fill("test@example.com")
-      await profilePage.emailSaveButton.click()
-      await profilePage.emailSuccessMessage.waitFor({ state: "visible" })
-    })
-
-    await test.step("Try logging out and logging in with the first email", async () => {
-      await profilePage.logoutLink.click()
-      await loginPage.container.waitFor({ state: "visible" })
-      await loginPage.emailInput.fill("test@example.com")
-      await loginPage.passwordInput.fill("password")
-      await loginPage.signInButton.click()
-      await accountPage.welcomeMessage.waitFor({ state: "visible" })
+    await test.step("Email is displayed but not editable", async () => {
+      await expect(profilePage.savedEmail).toHaveText("test@example.com")
+      await expect(
+        profilePage.accountEmailEditor.getByTestId("edit-button")
+      ).toHaveCount(0)
+      await expect(profilePage.emailContactLink).toBeVisible()
+      await expect(profilePage.emailContactLink).toHaveAttribute(
+        "href",
+        /\/contact$/
+      )
     })
   })
 })

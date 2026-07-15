@@ -14,6 +14,7 @@ import LocalizedClientLink from "@modules/common/components/localized-client-lin
 import Spinner from "@modules/common/icons/spinner"
 import Thumbnail from "@modules/products/components/thumbnail"
 import { useState } from "react"
+import { variantThumbnail } from "@lib/util/variant-thumbnail"
 import { hasSufficientStock, maxSelectableQty } from "./max-qty"
 
 type ItemProps = {
@@ -46,6 +47,10 @@ const Item = ({ item, type = "full" }: ItemProps) => {
     }
   }
 
+  // WB-092 C7: prefer the per-finish image over the product-representative
+  // thumbnail, so a Bronze buyer's cart line doesn't show a Black wheel.
+  const thumbnail = variantThumbnail(item.variant)
+
   const maxQuantity = maxSelectableQty(item.variant as any, item.quantity)
 
   // WB-092 C2: display-only OOS/insufficient badge — mirrors the same
@@ -72,7 +77,7 @@ const Item = ({ item, type = "full" }: ItemProps) => {
             })}
           >
             <Thumbnail
-              thumbnail={item.variant?.product?.thumbnail}
+              thumbnail={thumbnail}
               images={item.variant?.product?.images}
               size="square"
             />
@@ -85,7 +90,7 @@ const Item = ({ item, type = "full" }: ItemProps) => {
             })}
           >
             <Thumbnail
-              thumbnail={item.variant?.product?.thumbnail}
+              thumbnail={thumbnail}
               images={item.variant?.product?.images}
               size="square"
             />

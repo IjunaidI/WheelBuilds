@@ -12,6 +12,7 @@ import LineItemPrice from "@modules/common/components/line-item-price"
 import LocalizedClientLink from "@modules/common/components/localized-client-link"
 import Thumbnail from "@modules/products/components/thumbnail"
 import Icon from "@modules/common/components/icon"
+import { variantThumbnail } from "@lib/util/variant-thumbnail"
 import {
   Popover,
   PopoverAnchor,
@@ -134,6 +135,9 @@ const CartDropdown = ({
                   )
                   .map((item) => {
                     const handle = item.variant?.product?.handle
+                    // WB-092 C7: prefer the per-finish image over the
+                    // product-representative thumbnail in the mini-cart too.
+                    const thumbnail = variantThumbnail(item.variant)
                     return (
                     <div
                       className="grid grid-cols-[122px_1fr] gap-x-4"
@@ -146,7 +150,7 @@ const CartDropdown = ({
                           className="w-24"
                         >
                           <Thumbnail
-                            thumbnail={item.variant?.product?.thumbnail}
+                            thumbnail={thumbnail}
                             images={item.variant?.product?.images}
                             size="square"
                           />
@@ -154,7 +158,7 @@ const CartDropdown = ({
                       ) : (
                         <div className="w-24">
                           <Thumbnail
-                            thumbnail={item.variant?.product?.thumbnail}
+                            thumbnail={thumbnail}
                             images={item.variant?.product?.images}
                             size="square"
                           />

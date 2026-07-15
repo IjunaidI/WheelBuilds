@@ -5,6 +5,7 @@ import { HttpTypes } from "@medusajs/types"
 import Addresses from "@modules/checkout/components/addresses"
 import ExpressPay from "@modules/checkout/components/express-pay"
 import { isExpressPayEnabled } from "@modules/checkout/components/express-pay/config"
+import CheckoutLoadError from "@modules/checkout/components/load-error"
 import Payment from "@modules/checkout/components/payment"
 import Review from "@modules/checkout/components/review"
 import SectionShell from "@modules/checkout/components/section-shell"
@@ -30,7 +31,9 @@ export default async function CheckoutForm({
     })
 
   if (!shippingMethods || !paymentMethods) {
-    return null
+    // WB-092 C3b: was `return null` -- a blank page mid-checkout with no
+    // explanation. Render an explicit, WB-styled retry block instead.
+    return <CheckoutLoadError />
   }
 
   return (

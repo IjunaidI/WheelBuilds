@@ -2,7 +2,7 @@
 
 import { sdk } from "@lib/config"
 import medusaError from "@lib/util/medusa-error"
-import { extractMedusaMessage } from "@lib/util/error-message"
+import { extractMedusaMessage, isNotFoundError } from "@lib/util/error-message"
 import { HttpTypes } from "@medusajs/types"
 import { omit } from "lodash"
 import { revalidateTag } from "next/cache"
@@ -22,8 +22,17 @@ export async function retrieveCart() {
   return await sdk.store.cart
     .retrieve(cartId, {}, { next: { tags: ["cart"] }, ...(await getAuthHeaders()) })
     .then(({ cart }) => cart)
-    .catch(() => {
-      return null
+    .catch((err) => {
+      // WB-092 C3a: a genuine 404 (cart deleted/completed/never existed) is
+      // the expected "no active cart" case -- null lets callers render their
+      // empty-cart state. Anything else (5xx, network failure) must NOT be
+      // swallowed here: that used to render "you don't have anything in
+      // your cart" to a customer who actually has one, masking a backend
+      // outage. Rethrow so the nearest `error.tsx` boundary takes over.
+      if (isNotFoundError(err)) {
+        return null
+      }
+      throw err
     })
 }
 

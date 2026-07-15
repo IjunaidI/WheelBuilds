@@ -1,5 +1,9 @@
 import { describe, it, expect } from "vitest"
-import { extractMedusaMessage, insufficientStockMessage } from "../error-message"
+import {
+  extractMedusaMessage,
+  insufficientStockMessage,
+  isNotFoundError,
+} from "../error-message"
 
 const respErr = (data: unknown) => ({ response: { data } })
 
@@ -52,5 +56,33 @@ describe("insufficientStockMessage", () => {
   it("returns null when there is no message at all", () => {
     expect(insufficientStockMessage({ request: {} }, 3)).toBeNull()
     expect(insufficientStockMessage(undefined, 3)).toBeNull()
+  })
+})
+
+describe("isNotFoundError (WB-092 C3a/C8 discriminant)", () => {
+  it("classifies a bare FetchError-shaped 404 (@medusajs/js-sdk's real error shape) as not-found", () => {
+    expect(isNotFoundError({ status: 404, message: "Not Found" })).toBe(true)
+  })
+  it("classifies an axios-style response.status 404 as not-found", () => {
+    expect(isNotFoundError({ response: { status: 404 } })).toBe(true)
+  })
+  it("does NOT classify a 500 as not-found (must rethrow / propagate)", () => {
+    expect(isNotFoundError({ status: 500, message: "Internal Server Error" })).toBe(false)
+  })
+  it("does NOT classify an axios-style response.status 500 as not-found", () => {
+    expect(isNotFoundError({ response: { status: 500 } })).toBe(false)
+  })
+  it("does NOT classify a bare network failure (no status at all) as not-found", () => {
+    expect(isNotFoundError(new TypeError("Failed to fetch"))).toBe(false)
+    expect(isNotFoundError({ request: {} })).toBe(false)
+  })
+  it("does NOT classify a 400/401/403 as not-found", () => {
+    expect(isNotFoundError({ status: 400 })).toBe(false)
+    expect(isNotFoundError({ status: 401 })).toBe(false)
+    expect(isNotFoundError({ status: 403 })).toBe(false)
+  })
+  it("handles null/undefined without throwing", () => {
+    expect(isNotFoundError(null)).toBe(false)
+    expect(isNotFoundError(undefined)).toBe(false)
   })
 })

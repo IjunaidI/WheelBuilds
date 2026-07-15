@@ -18,6 +18,17 @@
 // those must be async, and this needs to stay sync + side-effect-free to be
 // unit-testable without Next's request machinery, and to be safely callable
 // from Edge middleware.
+//
+// Accepted side effect (review, Minor 2): because this is gated on
+// "2-letter code != defaultRegion" and NOT on `regionMap.has(code)` (see
+// above -- that gate is unavailable, it's the exact bug this file fixes),
+// ANY 2-letter first segment now 301s into `/us/...` -- including garbage
+// like `/xx/store`, which previously 307'd into `/us/xx/store` and 404'd.
+// A stray 2-letter typo now permanently (301, browser-cached) resolves to a
+// real page instead of a clean 404. Accepted deliberately: the set of
+// possible 2-letter collisions is small, none of them are real routes, and
+// restoring the 404 would require the has()-gated check that reinstates the
+// `/de` bug. Not worth a special case.
 const COUNTRY_CODE_SEGMENT = /^[a-z]{2}$/
 
 /**

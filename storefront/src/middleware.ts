@@ -168,12 +168,33 @@ export async function middleware(request: NextRequest) {
   // (which depend on session-ish state -- cart_id/onboarding cookies, a
   // possibly-stale region cache), a non-default region prefix is a
   // permanent policy decision that will not change request-to-request.
+  //
+  // `regionMap.has(DEFAULT_REGION)` guard (review fix): this validates the
+  // DESTINATION, not the source -- it never inspects `code`/`de`, so it does
+  // NOT reinstate the has()-gated bug described above (that would gate on
+  // the URL's own code and never fire for `de` at all). What it prevents is
+  // an emergent loop between THIS rule and getCountryCode's fallback chain
+  // (~line 101) whenever DEFAULT_REGION itself isn't a key in the map:
+  // getCountryCode then falls back to `regionMap.keys().next().value` (the
+  // first seeded region, e.g. "dk"), `urlHasCountryCode` is false for
+  // `/us/...`, the existing 307 rule sends it to `/dk/...`, and THIS rule
+  // then sees `dk !== "us"` and 301s back toward `/us/...` -- an unbounded
+  // ping-pong. Same failure mode the WB-081 block above already guards
+  // against for a misconfigured DEFAULT_REGION (see the comment at the top
+  // of that block) -- this is that identical class of bug, one rule lower.
+  // Triggers: (a) any bootstrap where seed.ts's Europe-only default ran
+  // without vendor-sync's `ensureUsRegion` (CLAUDE.md's documented `pnpm ib`
+  // path with no VENDOR_WHEELPROS_*_ENABLED); (b) the "United States" region
+  // renamed/deleted in admin; (c) a NEXT_PUBLIC_DEFAULT_REGION typo (e.g.
+  // "usa") even with both real regions present. When DEFAULT_REGION isn't
+  // resolvable this rule disables itself and behavior reverts to exactly
+  // pre-WB-095-X2 (a single 307 into the first available region).
   const regionRedirect = regionRedirectTarget(
     request.nextUrl.pathname,
     request.nextUrl.search,
     DEFAULT_REGION
   )
-  if (regionRedirect) {
+  if (regionRedirect && regionMap.has(DEFAULT_REGION)) {
     return NextResponse.redirect(
       `${request.nextUrl.origin}${regionRedirect}`,
       301

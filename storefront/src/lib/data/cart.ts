@@ -8,6 +8,7 @@ import { omit } from "lodash"
 import { revalidateTag } from "next/cache"
 import { redirect } from "next/navigation"
 import { getAuthHeaders, getCartId, removeCartId, setCartId } from "./cookies"
+import { findInsufficientLines } from "./find-insufficient-lines"
 import { getProductsById } from "./products"
 import { getRegion } from "./regions"
 
@@ -349,6 +350,57 @@ export async function setAddresses(currentState: unknown, formData: FormData) {
   redirect(
     `/${formData.get("shipping_address.country_code")}/checkout?step=delivery`
   )
+}
+
+// WB-092 C2: preflight before payment CAPTURE. The Stripe provider is
+// capture:true and StripePaymentButton.handlePayment calls
+// stripe.confirmCardPayment (the REAL charge) before placeOrder() ever runs —
+// so without this check, an out-of-stock line only surfaces AFTER the card
+// is already charged (placeOrder's "if you were charged, it will be
+// reversed" below is a reversal, not a prevention). Callers (every payment
+// button's handlePayment, plus the Review step on mount) must await this
+// FIRST and bail out — without calling the provider — when it errors.
+//
+// Mirrors placeOrder's B2 shape: RETURN { error } instead of throwing, since
+// Next.js redacts thrown Server Action messages in production.
+//
+// Fails OPEN, never throws: a transient fetch failure here must not itself
+// block a real, in-stock checkout — only a confirmed insufficient-stock line
+// (computed from data we actually got back) blocks the charge.
+export async function checkStockAvailability(
+  cart: HttpTypes.StoreCart | null | undefined
+): Promise<{ error?: string }> {
+  if (!cart?.items?.length || !cart.region_id) {
+    return {}
+  }
+
+  let liveVariants: HttpTypes.StoreProductVariant[]
+  try {
+    const productIds = Array.from(
+      new Set(cart.items.map((item) => item.product_id).filter((id): id is string => !!id))
+    )
+    if (!productIds.length) return {}
+
+    const products = await getProductsById({
+      ids: productIds,
+      regionId: cart.region_id,
+    })
+    liveVariants = (products ?? []).flatMap((p) => p.variants ?? [])
+  } catch (e) {
+    console.error("checkStockAvailability: failed to fetch live stock:", e)
+    return {}
+  }
+
+  const insufficient = findInsufficientLines(cart.items, liveVariants)
+  if (!insufficient.length) return {}
+
+  const first = insufficient[0]
+  return {
+    error:
+      first.available > 0
+        ? `Only ${first.available} left of ${first.title} — reduce the quantity to continue.`
+        : `${first.title} is out of stock — remove it to continue.`,
+  }
 }
 
 export async function placeOrder(): Promise<{ error: string } | undefined> {

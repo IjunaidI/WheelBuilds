@@ -1,7 +1,10 @@
 "use client"
 
 import { Heading, Text, clx } from "@medusajs/ui"
+import { useEffect, useState } from "react"
 
+import { checkStockAvailability } from "@lib/data/cart"
+import ErrorMessage from "../error-message"
 import PaymentButton from "../payment-button"
 import { useSearchParams } from "next/navigation"
 
@@ -10,6 +13,8 @@ const Review = ({ cart }: { cart: any }) => {
 
   const isOpen = searchParams.get("step") === "review"
 
+  const [stockError, setStockError] = useState<string | null>(null)
+
   const paidByGiftcard =
     cart?.gift_cards && cart?.gift_cards?.length > 0 && cart?.total === 0
 
@@ -17,6 +22,22 @@ const Review = ({ cart }: { cart: any }) => {
     cart.shipping_address &&
     cart.shipping_methods.length > 0 &&
     (cart.payment_collection || paidByGiftcard)
+
+  // WB-092 C2: run the same stock preflight the payment buttons gate on, but
+  // on MOUNT — so a customer who has drifted out of stock while shopping
+  // sees the warning as soon as they reach Review, before they even click
+  // Place order (the payment buttons re-check right before charging; this is
+  // belt-and-suspenders visibility, not the enforcement point).
+  useEffect(() => {
+    let cancelled = false
+    checkStockAvailability(cart).then((res) => {
+      if (!cancelled) setStockError(res?.error ?? null)
+    })
+    return () => {
+      cancelled = true
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cart?.id])
 
   return (
     <div className="bg-white">
@@ -33,6 +54,12 @@ const Review = ({ cart }: { cart: any }) => {
           Review
         </Heading>
       </div>
+      {isOpen && (
+        <ErrorMessage
+          error={stockError}
+          data-testid="stock-availability-error-message"
+        />
+      )}
       {isOpen && previousStepsCompleted && (
         <>
           <div className="flex items-start gap-x-1 w-full mb-6">

@@ -8,7 +8,7 @@ import React, { useState } from "react"
 import { unstable_rethrow } from "next/navigation"
 import ErrorMessage from "../error-message"
 import Spinner from "@modules/common/icons/spinner"
-import { placeOrder } from "@lib/data/cart"
+import { checkStockAvailability, placeOrder } from "@lib/data/cart"
 import { HttpTypes } from "@medusajs/types"
 import { isManual, isPaypal, isStripe } from "@lib/constants"
 
@@ -55,7 +55,11 @@ const PaymentButton: React.FC<PaymentButtonProps> = ({
       return process.env.NODE_ENV === "production" ? (
         <Button disabled>Select a payment method</Button>
       ) : (
-        <ManualTestPaymentButton notReady={notReady} data-testid={dataTestId} />
+        <ManualTestPaymentButton
+          notReady={notReady}
+          cart={cart}
+          data-testid={dataTestId}
+        />
       )
     case isPaypal(paymentSession?.provider_id):
       return (
@@ -135,6 +139,18 @@ const StripePaymentButton = ({
 
   const handlePayment = async () => {
     setSubmitting(true)
+
+    // WB-092 C2: stock preflight BEFORE the real charge. Stripe here is
+    // capture:true and confirmCardPayment below IS the charge — placeOrder()
+    // only runs after, so without this gate an out-of-stock line surfaces
+    // AFTER the customer's card is already captured. Never call
+    // confirmCardPayment when this errors.
+    const stockCheck = await checkStockAvailability(cart)
+    if (stockCheck?.error) {
+      setErrorMessage(stockCheck.error)
+      setSubmitting(false)
+      return
+    }
 
     if (!stripe || !elements || !card || !cart) {
       setSubmitting(false)
@@ -269,6 +285,15 @@ const PayPalPaymentButton = ({
     _data: OnApproveData,
     actions: OnApproveActions
   ) => {
+    // WB-092 C2: stock preflight BEFORE authorizing the PayPal order (the
+    // real charge). Never call actions.order.authorize() when this errors.
+    const stockCheck = await checkStockAvailability(cart)
+    if (stockCheck?.error) {
+      setErrorMessage(stockCheck.error)
+      setSubmitting(false)
+      return
+    }
+
     actions?.order
       ?.authorize()
       .then((authorization) => {
@@ -309,7 +334,13 @@ const PayPalPaymentButton = ({
   }
 }
 
-const ManualTestPaymentButton = ({ notReady }: { notReady: boolean }) => {
+const ManualTestPaymentButton = ({
+  cart,
+  notReady,
+}: {
+  cart: HttpTypes.StoreCart
+  notReady: boolean
+}) => {
   const [submitting, setSubmitting] = useState(false)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
 
@@ -335,8 +366,17 @@ const ManualTestPaymentButton = ({ notReady }: { notReady: boolean }) => {
     }
   }
 
-  const handlePayment = () => {
+  const handlePayment = async () => {
     setSubmitting(true)
+
+    // WB-092 C2: stock preflight BEFORE "charging" (this test button skips
+    // straight to placeOrder, so this is the only gate it has).
+    const stockCheck = await checkStockAvailability(cart)
+    if (stockCheck?.error) {
+      setErrorMessage(stockCheck.error)
+      setSubmitting(false)
+      return
+    }
 
     onPaymentCompleted()
   }

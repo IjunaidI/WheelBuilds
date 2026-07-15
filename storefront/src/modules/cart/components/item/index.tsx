@@ -14,7 +14,7 @@ import LocalizedClientLink from "@modules/common/components/localized-client-lin
 import Spinner from "@modules/common/icons/spinner"
 import Thumbnail from "@modules/products/components/thumbnail"
 import { useState } from "react"
-import { maxSelectableQty } from "./max-qty"
+import { hasSufficientStock, maxSelectableQty } from "./max-qty"
 
 type ItemProps = {
   item: HttpTypes.StoreCartLineItem
@@ -44,6 +44,18 @@ const Item = ({ item, type = "full" }: ItemProps) => {
   }
 
   const maxQuantity = maxSelectableQty(item.variant as any, item.quantity)
+
+  // WB-092 C2: display-only OOS/insufficient badge — mirrors the same
+  // manage_inventory/allow_backorder rules as maxQuantity above via
+  // hasSufficientStock, but does NOT feed back into maxQuantity. The WB-034
+  // qty-selector cap (which floors at the current quantity so a stock drop
+  // can never make an already-in-cart quantity unselectable) is unchanged;
+  // this only surfaces that the line is now over live availability.
+  const insufficientStock = !hasSufficientStock(item.variant as any, item.quantity)
+  const availableQty = Math.max(
+    0,
+    (item.variant as any)?.inventory_quantity ?? 0
+  )
 
   return (
     <Table.Row className="w-full" data-testid="product-row">
@@ -86,6 +98,14 @@ const Item = ({ item, type = "full" }: ItemProps) => {
           {item.product_title}
         </Text>
         <LineItemOptions variant={item.variant} data-testid="product-variant" />
+        {insufficientStock && (
+          <Text
+            className="text-rose-500 text-small-regular mt-1"
+            data-testid="product-insufficient-stock-badge"
+          >
+            {availableQty > 0 ? `Only ${availableQty} left in stock` : "Out of stock"}
+          </Text>
+        )}
       </Table.Cell>
 
       {type === "full" && (

@@ -34,8 +34,6 @@ describe("regionRedirectTarget (WB-095 X2)", () => {
     // today. Prove the pure function does not consult any map at all: it
     // must return a redirect target for "de" regardless of what a region
     // map (that legitimately contains "de") says about it.
-    const regionMapContainingDe = new Map([["de", { id: "reg_eur" } as any]])
-    expect(regionMapContainingDe.has("de")).toBe(true)
     expect(regionRedirectTarget("/de/store", "", "us")).not.toBeNull()
     expect(regionRedirectTarget("/de/store", "", "us")).toBe("/us/store")
   })

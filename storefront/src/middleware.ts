@@ -199,6 +199,17 @@ export async function middleware(request: NextRequest) {
       `${request.nextUrl.origin}${regionRedirect}`,
       301
     )
+  } else if (regionRedirect) {
+    // Review fix (Minor 2): the self-disable above (comment block up top)
+    // was silent -- a NEXT_PUBLIC_DEFAULT_REGION typo or a deleted "us"
+    // region would revert this SEO fix in production with zero signal.
+    // Fires once per request that already matches the redirect's own source
+    // condition (a non-default 2-letter prefix) -- a narrower slice of
+    // traffic than the WB-081 fail-open log above, which fires for every
+    // request site-wide during an outage, so this is no worse a hot path.
+    console.error(
+      `Middleware.ts: region redirect computed for "${request.nextUrl.pathname}" but DEFAULT_REGION ("${DEFAULT_REGION}") is not in the resolved region map -- disabling the redirect for this request and falling through to the pre-WB-095-X2 fallback chain.`
+    )
   }
 
   const countryCode = regionMap && (await getCountryCode(request, regionMap))

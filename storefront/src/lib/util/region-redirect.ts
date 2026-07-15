@@ -20,15 +20,27 @@
 // from Edge middleware.
 //
 // Accepted side effect (review, Minor 2): because this is gated on
-// "2-letter code != defaultRegion" and NOT on `regionMap.has(code)` (see
-// above -- that gate is unavailable, it's the exact bug this file fixes),
-// ANY 2-letter first segment now 301s into `/us/...` -- including garbage
-// like `/xx/store`, which previously 307'd into `/us/xx/store` and 404'd.
-// A stray 2-letter typo now permanently (301, browser-cached) resolves to a
-// real page instead of a clean 404. Accepted deliberately: the set of
-// possible 2-letter collisions is small, none of them are real routes, and
-// restoring the 404 would require the has()-gated check that reinstates the
-// `/de` bug. Not worth a special case.
+// "2-letter code != defaultRegion" and NOT on `regionMap.has(code)`, ANY
+// 2-letter first segment now 301s into `/us/...` -- including garbage like
+// `/xx/store`, which previously 307'd into `/us/xx/store` and 404'd. A
+// stray 2-letter typo now permanently (301, browser-cached) resolves to a
+// real page instead of a clean 404.
+//
+// Corrected rationale (review): a has()-gated SOURCE check --
+// `code !== defaultRegion && regionMap.has(code)` -- IS available here, and
+// would NOT reinstate the `/de` bug: `regionMap.has("de")` is true (it's a
+// real seeded EUR region, see the file header), so that check would still
+// fire and redirect `/de`; `regionMap.has("xx")` is false, so it would
+// correctly sit out for garbage, letting `/xx` fall through to the
+// pre-existing 307-then-404 path exactly as before. It's rejected anyway,
+// for a durability reason: gating the redirect on the region map makes the
+// 301 track admin state. If the EUR region is ever deleted, `has("de")`
+// goes false and every previously-indexed/browser-cached `/de` URL would
+// start 404ing instead of continuing to resolve to `/us`. Gating on the raw
+// segment instead means the redirect survives that deletion -- durable for
+// real, previously-indexed URLs, at the cost of a permanent soft-404 for
+// the small, fixed set of 2-letter typos that were never real routes
+// anyway. Not worth a special case.
 const COUNTRY_CODE_SEGMENT = /^[a-z]{2}$/
 
 /**

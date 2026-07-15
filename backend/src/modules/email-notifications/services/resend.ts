@@ -93,20 +93,31 @@ export class ResendNotificationService extends AbstractNotificationProviderServi
       scheduledAt: emailOptions.scheduledAt
     }
 
-    // Send the email via Resend
+    // Send the email via Resend. resend.emails.send() RESOLVES { data, error } —
+    // it does not reject for an invalid API key / unverified sender domain / rate
+    // limit / validation error. Discarding the return value (as before) means those
+    // failures were silently recorded as SUCCESS. Only a thrown rejection is treated
+    // as a genuine transport failure below (network error, etc.).
+    let error: { name?: string; message?: string } | null = null
     try {
-      await this.resend.emails.send(message)
-      this.logger_.log(
-        `Successfully sent "${notification.template}" email to ${notification.to} via Resend`
-      )
-      return {} // Return an empty object on success
-    } catch (error) {
-      const errorCode = error.code
-      const responseError = error.response?.body?.errors?.[0]
+      ;({ error } = await this.resend.emails.send(message))
+    } catch (transportError) {
       throw new MedusaError(
         MedusaError.Types.UNEXPECTED_STATE,
-        `Failed to send "${notification.template}" email to ${notification.to} via Resend: ${errorCode} - ${responseError?.message ?? 'unknown error'}`
+        `Failed to send "${notification.template}" email to ${notification.to} via Resend: ${transportError?.message ?? 'unknown transport error'}`
       )
     }
+
+    if (error) {
+      throw new MedusaError(
+        MedusaError.Types.UNEXPECTED_STATE,
+        `Resend rejected "${notification.template}" to ${notification.to}: ${error.name ?? 'error'} — ${error.message ?? 'unknown'}`
+      )
+    }
+
+    this.logger_.log(
+      `Successfully sent "${notification.template}" email to ${notification.to} via Resend`
+    )
+    return {} // Return an empty object on success
   }
 }

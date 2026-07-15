@@ -19,7 +19,12 @@ export const retrieveOrder = cache(async function (id: string) {
   return sdk.store.order
     .retrieve(
       id,
-      { fields: "*payment_collections.payments" },
+      // WB-093 A4: gains `*fulfillments,*fulfillments.labels` so tracking
+      // numbers/URLs (FulfillmentLabelDTO.tracking_number/tracking_url) are
+      // actually present -- previously only payment_collections.payments
+      // was requested, so no fulfillment/tracking data reached the account
+      // order-detail or confirmation templates at all.
+      { fields: "*payment_collections.payments,*fulfillments,*fulfillments.labels" },
       { next: { tags: ["order"] }, ...(await getAuthHeaders()) }
     )
     .then(({ order }) => order)

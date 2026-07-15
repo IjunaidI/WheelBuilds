@@ -1,5 +1,6 @@
 import { Metadata } from "next"
 
+import { canonicalUrl } from "@lib/util/canonical"
 import ProductDetailTemplate from "@modules/product-detail/templates"
 import TireDetailTemplate from "@modules/product-detail/templates/tire-detail"
 import {
@@ -61,6 +62,11 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
       description,
       ...(images ? { images } : {}),
     },
+    // WB-095 X2: pinned to DEFAULT_REGION regardless of the country code
+    // this request happened to resolve to (WB-071 F-D single-region lock).
+    // `handle` is region-agnostic, so the same product's canonical is
+    // identical no matter which /<countryCode>/products/<handle> served it.
+    alternates: { canonical: canonicalUrl(`/products/${handle}`) },
   }
 }
 

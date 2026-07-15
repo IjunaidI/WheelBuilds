@@ -1,6 +1,7 @@
 import { Metadata } from "next"
 import { redirect } from "next/navigation"
 
+import { canonicalUrl } from "@lib/util/canonical"
 import { getTireDiscoveryProducts } from "@modules/tire-discovery/data/get-tire-products"
 import { parseTireQueryFromSearchParams, DEFAULT_PAGE_SIZE } from "@modules/tire-discovery/data/types"
 import TireDiscoveryTemplate from "@modules/tire-discovery/templates"
@@ -9,6 +10,9 @@ import { clampPage, withClampedPage } from "@modules/discovery/data/clamp-page"
 export const metadata: Metadata = {
   title: "All tires",
   description: "Explore the full Wheel Builds tire catalog.",
+  // WB-095 X2: pinned to DEFAULT_REGION regardless of the country code this
+  // request happened to resolve to (WB-071 F-D single-region lock).
+  alternates: { canonical: canonicalUrl("/tires") },
 }
 
 type TiresPageProps = {

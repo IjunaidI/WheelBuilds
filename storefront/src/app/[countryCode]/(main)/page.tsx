@@ -1,5 +1,6 @@
 import { Metadata } from "next"
 
+import { canonicalUrl } from "@lib/util/canonical"
 import Hero from "@modules/home/components/hero"
 import NewDropsRow from "@modules/home/components/new-drops-row"
 import ShopByStyle from "@modules/home/components/shop-by-style"
@@ -20,6 +21,9 @@ export async function generateMetadata(): Promise<Metadata> {
     // "%s | Wheel Builds" suffix so this doesn't double up (WB-095 X1).
     title: { absolute: "Wheel Builds — Premium Aftermarket Wheels & Fitment" },
     description: homeMetaDescription(brandCount || undefined),
+    // WB-095 X2: pinned to DEFAULT_REGION regardless of the country code
+    // this request happened to resolve to (WB-071 F-D single-region lock).
+    alternates: { canonical: canonicalUrl("/") },
   }
 }
 

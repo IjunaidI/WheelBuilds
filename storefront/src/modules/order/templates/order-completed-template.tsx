@@ -9,6 +9,7 @@ import Help from "@modules/order/components/help"
 import Items from "@modules/order/components/items"
 import ShippingDetails from "@modules/order/components/shipping-details"
 import PaymentDetails from "@modules/order/components/payment-details"
+import PurchaseTracker from "@modules/order/components/purchase-tracker"
 import { convertToLocale } from "@lib/util/money"
 import { HttpTypes } from "@medusajs/types"
 
@@ -50,6 +51,12 @@ export default function OrderCompletedTemplate({
 
   return (
     <div className="bg-white">
+      <PurchaseTracker
+        orderId={order.id}
+        value={order.total ?? 0}
+        currency={order.currency_code}
+        itemCount={order.items?.length ?? 0}
+      />
       {/* Dark hero */}
       <div
         className="relative overflow-hidden text-white px-5 small:px-10 py-12 small:py-16"

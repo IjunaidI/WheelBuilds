@@ -6,6 +6,7 @@ import CartTotals from "@modules/common/components/cart-totals"
 import Divider from "@modules/common/components/divider"
 import DiscountCode from "@modules/checkout/components/discount-code"
 import LocalizedClientLink from "@modules/common/components/localized-client-link"
+import { track } from "@lib/analytics/track"
 import { HttpTypes } from "@medusajs/types"
 
 type SummaryProps = {
@@ -38,6 +39,14 @@ const Summary = ({ cart }: SummaryProps) => {
       <LocalizedClientLink
         href={"/checkout?step=" + step}
         data-testid="checkout-button"
+        onClick={() =>
+          track("begin_checkout", {
+            cart_id: cart.id,
+            value: cart.total ?? 0,
+            currency: cart.currency_code,
+            item_count: cart.items?.length ?? 0,
+          })
+        }
       >
         <Button className="w-full h-10">Go to checkout</Button>
       </LocalizedClientLink>

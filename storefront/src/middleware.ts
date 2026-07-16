@@ -1,7 +1,8 @@
 import { HttpTypes } from "@medusajs/types"
-import { notFound } from "next/navigation"
 import { NextRequest, NextResponse } from "next/server"
 import { regionRedirectTarget } from "@lib/util/region-redirect"
+import { countryCodeRedirectPath } from "@lib/util/country-code-path"
+import { resolveCartRedirect } from "@lib/util/cart-redirect"
 
 const BACKEND_URL = process.env.NEXT_PUBLIC_MEDUSA_BACKEND_URL
 const PUBLISHABLE_API_KEY = process.env.NEXT_PUBLIC_MEDUSA_PUBLISHABLE_KEY
@@ -61,11 +62,23 @@ async function getRegionMap(): Promise<Map<
     return null
   }
 
-  // A healthy backend with zero regions is a real configuration error — 404.
-  // (Kept OUTSIDE the try/catch so notFound()'s control-flow throw isn't
-  // swallowed by the network-failure fallback above.)
+  // A healthy backend with zero regions is a real configuration error, but
+  // `notFound()` is unsupported in Edge Middleware -- there's no route
+  // boundary here to catch its control-flow throw, so it crashed the
+  // middleware invocation outright (WB-096 X8 bug 3) instead of producing a
+  // 404 page. Log it and return null instead: the caller (middleware(),
+  // below) already treats a null region map as "fail open" (WB-081) --
+  // passthrough for already-country-coded paths, redirect-to-default-region
+  // for the rest -- which is the same "keep serving something" behavior we
+  // want for this equally-unhealthy-backend-configuration case. Kept OUTSIDE
+  // the try/catch above so this genuinely-zero-regions case is logged with
+  // its own distinct message rather than being folded into the
+  // network-failure log.
   if (!regions?.length) {
-    notFound()
+    console.error(
+      "Middleware.ts: Medusa backend responded but returned zero regions — failing open (no country-code redirect) instead of throwing notFound(), which Edge Middleware cannot catch."
+    )
+    return null
   }
 
   // Create a map of country codes to regions.
@@ -214,8 +227,22 @@ export async function middleware(request: NextRequest) {
 
   const countryCode = regionMap && (await getCountryCode(request, regionMap))
 
-  const urlHasCountryCode =
-    countryCode && request.nextUrl.pathname.split("/")[1] === countryCode
+  // WB-096 X8 bug 2: `countryCodeRedirectPath` compares lowercased on both
+  // sides (getCountryCode always resolves a lowercase code) -- the old
+  // inline check here compared the pathname's RAW segment against that
+  // lowercase code, so a valid UPPERCASE prefix ("/US") read as having no
+  // country code at all, and the "prepend" branch below then prepended
+  // "/us" onto the still-raw "/US/store", producing "/us/US/store" instead
+  // of "/us/store". See country-code-path.ts for the full writeup.
+  const countryCodeRedirect = countryCode
+    ? countryCodeRedirectPath(
+        request.nextUrl.pathname,
+        request.nextUrl.search,
+        countryCode
+      )
+    : null
+
+  const urlHasCountryCode = !!countryCode && countryCodeRedirect === null
 
   // check if one of the country codes is in the url
   if (
@@ -226,25 +253,40 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next()
   }
 
-  const redirectPath =
-    request.nextUrl.pathname === "/" ? "" : request.nextUrl.pathname
+  // Base redirect target: the country-code correction (missing OR
+  // wrong-cased prefix) if one is needed, otherwise the request's own URL
+  // unchanged -- e.g. the URL is already fully canonical and only a cart
+  // cookie needs setting (see `cartRedirect` below).
+  let redirectUrl = countryCodeRedirect
+    ? `${request.nextUrl.origin}${countryCodeRedirect}`
+    : request.nextUrl.href
 
-  const queryString = request.nextUrl.search ? request.nextUrl.search : ""
+  // WB-096 X8 bug 1: `resolveCartRedirect` decouples "should we redirect to
+  // the address step" (only when no step is set yet) from "should we set
+  // the cart cookie" (whenever it's missing, regardless of step) -- see
+  // cart-redirect.ts. The old code gated both on the same condition
+  // (`cartId && !checkoutStep`), so a `?cart_id=X&step=<already-set>` link
+  // with no cookie yet fell through every branch untouched and hit the
+  // self-redirect fallback below.
+  const cartRedirect = resolveCartRedirect(cartId, checkoutStep, !!cartIdCookie)
 
-  let redirectUrl = request.nextUrl.href
-
-  let response = NextResponse.redirect(redirectUrl, 307)
-
-  // If no country code is set, we redirect to the relevant region.
-  if (!urlHasCountryCode && countryCode) {
-    redirectUrl = `${request.nextUrl.origin}/${countryCode}${redirectPath}${queryString}`
-    response = NextResponse.redirect(`${redirectUrl}`, 307)
+  if (cartRedirect.appendStep) {
+    redirectUrl = `${redirectUrl}&step=address`
   }
 
-  // If a cart_id is in the params, we set it as a cookie and redirect to the address step.
-  if (cartId && !checkoutStep) {
-    redirectUrl = `${redirectUrl}&step=address`
-    response = NextResponse.redirect(`${redirectUrl}`, 307)
+  // WB-096 X8 bug 1 (continued): never redirect to the exact URL we were
+  // already given -- that equality is precisely what turned "nothing left
+  // to correct but the cookie" into an infinite self-redirect. When no
+  // country-code or cart-step correction changed the target, fall through
+  // to `next()` instead of `redirect()`; the cart cookie (if any) is still
+  // set below regardless of which response type this ends up being.
+  const needsRedirect = redirectUrl !== request.nextUrl.href
+
+  let response = needsRedirect
+    ? NextResponse.redirect(redirectUrl, 307)
+    : NextResponse.next()
+
+  if (cartRedirect.setCookie && cartId) {
     response.cookies.set("_medusa_cart_id", cartId, { maxAge: 60 * 60 * 24 })
   }
 
@@ -273,7 +315,16 @@ export const config = {
   // full homepage as 200 HTML instead of 404ing. Browsers resolve the actual
   // favicon via the `<link rel="icon">` tag Next emits from `app/icon.tsx`,
   // not a literal `/favicon.ico` request.
+  //
+  // `_next/image` (WB-096 X7): latent today, not yet reachable, because
+  // `next.config.js` sets `images.unoptimized: true`, so next/image never
+  // proxies through Next's `/_next/image` optimizer endpoint in this app --
+  // only `_next/static` traffic exists to exclude. If that flag is ever
+  // flipped on, every optimizer request would otherwise route through this
+  // middleware, get read as a country-code-less path, and get redirected
+  // into `/us/_next/image?...` (a 404) instead of serving the image.
+  // Excluded pre-emptively so that future flip is safe by default.
   matcher: [
-    "/((?!api|_next/static|robots\\.txt|sitemap\\.xml|opengraph-image|twitter-image|icon|.*\\.png|.*\\.jpg|.*\\.gif|.*\\.svg).*)",
+    "/((?!api|_next/static|_next/image|robots\\.txt|sitemap\\.xml|opengraph-image|twitter-image|icon|.*\\.png|.*\\.jpg|.*\\.gif|.*\\.svg).*)",
   ],
 }

@@ -153,3 +153,80 @@ describe("middleware -- region-redirect vs getCountryCode-fallback loop guard (r
     expect(res2.headers.get("location")).toBeNull() // NextResponse.next() -- no redirect
   })
 })
+
+describe("middleware -- WB-096 X8 edge fixes", () => {
+  beforeEach(() => {
+    vi.resetModules()
+    process.env = { ...ORIGINAL_ENV }
+    process.env.NEXT_PUBLIC_MEDUSA_BACKEND_URL = "http://backend.test"
+    process.env.NEXT_PUBLIC_MEDUSA_PUBLISHABLE_KEY = "pk_test"
+    delete process.env.NEXT_PUBLIC_DEFAULT_REGION // -> "us"
+  })
+
+  afterEach(() => {
+    vi.unstubAllGlobals()
+    process.env = { ...ORIGINAL_ENV }
+  })
+
+  it("(a) a cookieless ?cart_id=X&step=payment deep link sets the cart cookie and does NOT redirect to itself -- the self-redirect-loop bug", async () => {
+    stubRegionsFetch([{ id: "reg_us", countries: ["us"] }])
+    const { middleware } = await import("./middleware")
+
+    // No `_medusa_cart_id` cookie attached -- this is exactly the shape of
+    // the bug report: a payment-step deep link arriving cookieless.
+    const req = new NextRequest(
+      new Request("http://localhost/us/store?cart_id=cart_123&step=payment")
+    )
+    const res = await middleware(req)
+
+    // Must NOT redirect to itself (or at all, here): the URL is already
+    // canonical and the step is already specified -- only the cookie needs
+    // setting. Pre-fix, this fell through every branch and hit the
+    // fallback `NextResponse.redirect(request.nextUrl.href, 307)`, a
+    // redirect whose target is byte-identical to the incoming URL.
+    expect(res.headers.get("location")).toBeNull()
+    expect(res.cookies.get("_medusa_cart_id")?.value).toBe("cart_123")
+  })
+
+  it("(a) control: a cookieless ?cart_id=X with NO step yet still redirects once, to the address step, and sets the cookie", async () => {
+    stubRegionsFetch([{ id: "reg_us", countries: ["us"] }])
+    const { middleware } = await import("./middleware")
+
+    const req = new NextRequest(
+      new Request("http://localhost/us/store?cart_id=cart_123")
+    )
+    const res = await middleware(req)
+
+    expect(res.headers.get("location")).toBe(
+      "http://localhost/us/store?cart_id=cart_123&step=address"
+    )
+    expect(res.cookies.get("_medusa_cart_id")?.value).toBe("cart_123")
+  })
+
+  it("(b) /US/store redirects to /us/store, never /us/US/store -- the uppercase-prefix case mismatch", async () => {
+    stubRegionsFetch([{ id: "reg_us", countries: ["us"] }])
+    const { middleware } = await import("./middleware")
+
+    const req = new NextRequest(new Request("http://localhost/US/store"))
+    const res = await middleware(req)
+
+    expect(res.headers.get("location")).toBe("http://localhost/us/store")
+  })
+
+  it("(c) zero regions from a healthy backend does not throw -- passes through instead of notFound() (unsupported in Edge Middleware)", async () => {
+    stubRegionsFetch([])
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {})
+    const { middleware } = await import("./middleware")
+
+    const req = new NextRequest(new Request("http://localhost/us/store"))
+
+    await expect(middleware(req)).resolves.not.toThrow()
+    const res = await middleware(req)
+
+    // Already 2-letter-prefixed -> WB-081 fail-open passthrough: next(),
+    // no redirect.
+    expect(res.headers.get("location")).toBeNull()
+    expect(errorSpy).toHaveBeenCalled()
+    errorSpy.mockRestore()
+  })
+})

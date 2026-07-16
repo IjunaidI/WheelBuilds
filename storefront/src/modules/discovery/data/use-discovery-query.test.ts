@@ -6,7 +6,7 @@
 // exercises the exported `hasActiveQueryOrFilter` helper the hook's
 // `isAnyFilterActive` is built from.
 import { describe, it, expect } from "vitest"
-import { hasActiveQueryOrFilter } from "./use-discovery-query"
+import { hasActiveQueryOrFilter, clearAllTarget } from "./use-discovery-query"
 
 describe("hasActiveQueryOrFilter (WB-087 D3)", () => {
   it("q alone counts as an active query (WB-087 D3)", () => {
@@ -84,5 +84,21 @@ describe("hasActiveQueryOrFilter (WB-087 D3)", () => {
         "   "
       )
     ).toBe(false)
+  })
+})
+
+// WB-099 Task 1 — `clearAll` used to hardcode `/${countryCode}/store`, so on
+// a future pinned-filter page (e.g. `/brands/fuel`) "Clear all filters" would
+// navigate AWAY to the unscoped `/store`, dropping the brand pin entirely.
+// `clearAllTarget` is the pure decision `clearAll` now pushes to: the CURRENT
+// base path (whatever page mounted the discovery rail), so clearing filters
+// re-runs that same page's server-side pin instead of leaving it.
+describe("clearAllTarget (WB-099)", () => {
+  it("stays on a pinned brand page", () => {
+    expect(clearAllTarget("/us/brands/fuel")).toBe("/us/brands/fuel")
+  })
+
+  it("stays on /store unchanged (no regression for the existing catalog page)", () => {
+    expect(clearAllTarget("/us/store")).toBe("/us/store")
   })
 })

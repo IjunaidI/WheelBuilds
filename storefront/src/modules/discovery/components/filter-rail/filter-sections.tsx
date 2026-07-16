@@ -117,6 +117,13 @@ type FilterSectionsProps = {
    * duplicate `id`/`htmlFor` pairs used to exist in the DOM simultaneously.
    */
   instanceId?: string
+  /**
+   * WB-099 Task 1: omits the Brand accordion section entirely. Used by a
+   * server-pinned brand page (e.g. `/brands/fuel`) where a shopper shouldn't
+   * be able to uncheck the pinned brand or add a second one. Defaults to
+   * `false` so `/store` (which lets shoppers pick any brand) is unchanged.
+   */
+  hideBrand?: boolean
 }
 
 /**
@@ -127,6 +134,7 @@ const FilterSections = ({
   facets,
   hideClearAll,
   instanceId = "rail",
+  hideBrand = false,
 }: FilterSectionsProps) => {
   const { active } = useGarage()
   const router = useRouter()
@@ -251,21 +259,25 @@ const FilterSections = ({
         defaultValue={["brand", "diameter", "finish"]}
         className="rounded-[var(--radius)] border border-[var(--hairline)] bg-white px-4"
       >
-        <AccordionItem value="brand">
-          <AccordionTrigger>Brand</AccordionTrigger>
-          <AccordionContent>
-            <ChecklistSection
-              facetMap={facets.brands}
-              selected={filters.brands}
-              onToggle={(v) => toggleArrayFilter("brands", v)}
-              formatKey={(k) => k}
-              instanceId={instanceId}
-              sectionId="brand"
-            />
-          </AccordionContent>
-        </AccordionItem>
+        {!hideBrand && (
+          <>
+            <AccordionItem value="brand">
+              <AccordionTrigger>Brand</AccordionTrigger>
+              <AccordionContent>
+                <ChecklistSection
+                  facetMap={facets.brands}
+                  selected={filters.brands}
+                  onToggle={(v) => toggleArrayFilter("brands", v)}
+                  formatKey={(k) => k}
+                  instanceId={instanceId}
+                  sectionId="brand"
+                />
+              </AccordionContent>
+            </AccordionItem>
 
-        <Separator />
+            <Separator />
+          </>
+        )}
 
         <AccordionItem value="diameter">
           <AccordionTrigger>Diameter</AccordionTrigger>

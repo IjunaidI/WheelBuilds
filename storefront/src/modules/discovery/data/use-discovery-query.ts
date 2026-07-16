@@ -13,7 +13,7 @@
  */
 
 import { useCallback, useMemo } from "react"
-import { useParams, usePathname, useSearchParams } from "next/navigation"
+import { usePathname, useSearchParams } from "next/navigation"
 import { useRouter } from "@bprogress/next/app" // bprogress router → filter/sort/pagination changes show the top progress bar
 import {
   DiscoveryFilters,
@@ -60,7 +60,6 @@ export const useDiscoveryQuery = () => {
   const router = useRouter()
   const pathname = usePathname()
   const searchParams = useSearchParams()
-  const { countryCode } = useParams() as { countryCode: string }
 
   const query: DiscoveryQuery = useMemo(
     () => parseQueryFromSearchParams(searchParamsToRecord(searchParams)),
@@ -182,9 +181,17 @@ export const useDiscoveryQuery = () => {
     [push]
   )
 
+  // WB-099 Task 1: `clearAll` used to hardcode `/${countryCode}/store` — fine
+  // while `/store` was the only page mounting the discovery rail, but a
+  // future pinned-filter page (e.g. `/brands/fuel`) would navigate AWAY to
+  // the unscoped `/store`, dropping the brand pin. Clearing filters must stay
+  // on whatever page mounted the rail so a server-side pin (brand/style)
+  // re-applies instead of vanishing. `clearAllTarget` is the pure decision;
+  // `pathname` (from `usePathname()`, used by `push()` above) never includes
+  // the query string, so this preserves `/store` byte-for-byte too.
   const clearAll = useCallback(() => {
-    router.push(`/${countryCode}/store`, { scroll: false })
-  }, [router, countryCode])
+    router.push(clearAllTarget(pathname), { scroll: false })
+  }, [router, pathname])
 
   return {
     query,
@@ -226,5 +233,19 @@ export const hasActiveQueryOrFilter = (
   f: DiscoveryFilters,
   q: string | undefined
 ): boolean => hasAnyFilter(f) || !!(q && q.trim())
+
+/**
+ * WB-099 Task 1: pure decision for where `clearAll` navigates to. Before
+ * this, `clearAll` hardcoded `/${countryCode}/store` — correct while `/store`
+ * was the only page that mounted the discovery rail, but wrong for a future
+ * pinned-filter page like `/brands/fuel`, where it would navigate away to the
+ * unscoped `/store` and drop the brand pin. `usePathname()` (Next.js) never
+ * includes the query string, so "the current base path" IS the pathname —
+ * this is the identity function, extracted so the decision has a name and a
+ * test that doesn't require mocking `next/navigation`.
+ */
+export function clearAllTarget(pathname: string): string {
+  return pathname
+}
 
 export { EMPTY_FILTERS }

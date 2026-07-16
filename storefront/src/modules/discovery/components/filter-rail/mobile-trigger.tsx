@@ -27,6 +27,8 @@ type MobileFilterTriggerProps = {
    * (possibly wrong) `totalCount`.
    */
   isCapped?: boolean
+  /** WB-099 Task 1: omits the Brand section (pinned-brand pages, e.g. `/brands/fuel`). */
+  hideBrand?: boolean
 }
 
 /**
@@ -38,6 +40,7 @@ const MobileFilterTrigger = ({
   facets,
   totalCount,
   isCapped = false,
+  hideBrand = false,
 }: MobileFilterTriggerProps) => {
   const [open, setOpen] = useState(false)
   const { filters, isAnyFilterActive, clearAll } = useDiscoveryQuery()
@@ -104,7 +107,12 @@ const MobileFilterTrigger = ({
           </div>
 
           <div className="flex-1 overflow-y-auto p-5">
-            <FilterSections facets={facets} hideClearAll instanceId="drawer" />
+            <FilterSections
+              facets={facets}
+              hideClearAll
+              instanceId="drawer"
+              hideBrand={hideBrand}
+            />
           </div>
 
           <div className="flex gap-2 p-4 border-t border-[var(--hairline)] bg-white">

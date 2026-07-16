@@ -16,6 +16,13 @@ type DiscoveryTemplateProps = {
   fit?: boolean
   /** Active diameter filter (WB-088 D5), threaded to the grid's cards. */
   activeDiameters?: number[]
+  /**
+   * WB-099 Task 1: omits the Brand facet section from BOTH the desktop rail
+   * and the mobile drawer. For a future server-pinned brand page (e.g.
+   * `/brands/fuel`) a shopper shouldn't be able to uncheck the pinned brand
+   * or add a second one. Defaults to `false` so `/store` is unchanged.
+   */
+  hideBrand?: boolean
 }
 
 /**
@@ -46,6 +53,7 @@ const DiscoveryTemplate = ({
   currentPage,
   fit = false,
   activeDiameters,
+  hideBrand = false,
 }: DiscoveryTemplateProps) => {
   // result.totalCount already reflects only the candidates that were
   // fetched/checked (bounded by FIT_CANDIDATE_CAP in fit mode — see
@@ -62,9 +70,10 @@ const DiscoveryTemplate = ({
         facets={result.facets}
         totalCount={result.totalCount}
         isCapped={result.isCapped}
+        hideBrand={hideBrand}
       />
       <div className="flex items-start gap-8">
-        <FilterRail facets={result.facets} />
+        <FilterRail facets={result.facets} hideBrand={hideBrand} />
         <div className="flex-1 min-w-0">
           {result.ok === false ? (
             <DiscoveryOutage />

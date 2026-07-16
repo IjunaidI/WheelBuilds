@@ -377,8 +377,9 @@ const FilterSections = ({
           <AccordionTrigger>Price</AccordionTrigger>
           <AccordionContent>
             <div className="grid grid-cols-2 gap-2 pt-1">
-              <Field label="Min">
+              <Field label="Min" htmlFor={`filter-${instanceId}-price-min`}>
                 <TextInput
+                  id={`filter-${instanceId}-price-min`}
                   type="number"
                   inputMode="numeric"
                   placeholder="$0"
@@ -388,8 +389,9 @@ const FilterSections = ({
                   onKeyDown={onPriceKeyDown}
                 />
               </Field>
-              <Field label="Max">
+              <Field label="Max" htmlFor={`filter-${instanceId}-price-max`}>
                 <TextInput
+                  id={`filter-${instanceId}-price-max`}
                   type="number"
                   inputMode="numeric"
                   placeholder="$300"

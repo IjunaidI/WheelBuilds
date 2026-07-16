@@ -5,20 +5,29 @@
  * project when that rule was missed).
  *
  * `ProductLike` is a small structural type (name/brand/thumbnail/description/
- * priceCents/sizeOptions) rather than an import of `ProductDetail` or
- * `TireProductDetail` — both real shapes already satisfy it, so the same
- * builder serves both the wheel and tire PDP templates without a wheel/tire
- * branch in here.
+ * leaf) rather than an import of `ProductDetail` or `TireProductDetail` —
+ * both real shapes already satisfy it once mapped through
+ * `pickDefaultLeaf`/`pickDefaultTireLeaf` (`data/pick-default-leaf.ts`), so
+ * the same builder serves both the wheel and tire PDP templates without a
+ * wheel/tire branch in here.
+ *
+ * Fix wave (Important 1/2): `offers.price` and `offers.availability` both
+ * come from `product.leaf` — the SAME single variant/size the PDP hero
+ * renders by default (see `pickDefaultLeaf`'s doc for why that's
+ * deterministic server-side). Price and availability sourced from the same
+ * leaf can never disagree, which dissolves the reason the old
+ * `purchasablePriceCents` + `wheelSizesForJsonLd` (a "global cheapest
+ * purchasable offset across every finish/bolt-pattern" heuristic) existed —
+ * that heuristic coincided with the page's actual rendered price/stock only
+ * by luck (live-verified: 60% mismatch across 60 wheel products).
  *
  * Price-unit trap (see root CLAUDE.md "Price-unit convention"): Medusa's
  * catalog + this storefront's own price displays are dollars; the
- * Meilisearch index and `DiscoveryProduct.priceCents` (which `ProductDetail`
- * extends) are INTEGER CENTS. schema.org `offers.price` must be MAJOR UNITS
- * (dollars) — `centsToMajorUnits` does that conversion once, here, so no
- * caller can accidentally advertise a 100x price to Google.
+ * Meilisearch index and `DiscoveryProduct.priceCents` are INTEGER CENTS.
+ * schema.org `offers.price` must be MAJOR UNITS (dollars) —
+ * `centsToMajorUnits` does that conversion once, here, so no caller can
+ * accidentally advertise a 100x price to Google.
  */
-
-import { rank } from "../../data/group-sizes"
 
 export type JsonLdStockState = "in_stock" | "low_stock" | "out_of_stock"
 
@@ -26,28 +35,37 @@ export type SchemaAvailability =
   | "https://schema.org/InStock"
   | "https://schema.org/OutOfStock"
 
-/** One size/variant's own stock state + its own representative price (cents). */
-export type SizeLike = {
+/**
+ * The single leaf variant/size the PDP renders by default — see
+ * `data/pick-default-leaf.ts`. `null` when the product has no purchasable
+ * leaf at all (the Hero's own "no purchasable options" state).
+ */
+export type RenderedLeaf = {
   availability: JsonLdStockState
-  priceCents: number
-}
+  /**
+   * Cents, or `null` when this exact leaf has no live price right now —
+   * mirrors `price-truth.ts`'s `headlinePriceCents` contract (never a
+   * sibling/product-level price substituted in its place).
+   */
+  priceCents: number | null
+  /** Medusa variant id for this exact leaf — feeds `Product.sku`. */
+  variantId?: string
+} | null
 
 export type ProductLike = {
   name: string
   brand: string
-  /** Vendor CDN thumbnail; null renders no `image`. */
+  /** Vendor CDN thumbnail; used when `images` is omitted/empty. */
   thumbnail: string | null
   description?: string
   /**
-   * INTEGER CENTS — see the price-unit note above. This is the product-level
-   * "from" price (`get-product.ts`'s `fromCents`/`mapTireDetail`'s
-   * `priceCents` — a plain MIN across every variant, ignoring stock). It's
-   * used only as the LAST-RESORT fallback in `productJsonLd`, not the
-   * primary price source — see `purchasablePriceCents`.
+   * Extra gallery images (e.g. per-finish imagery) beyond `thumbnail` —
+   * Google prefers multiple images per product (Minor 3). Optional; falls
+   * back to `[thumbnail]` when omitted or empty.
    */
-  priceCents: number
-  /** Every size/variant this product currently offers, each carrying its own real stock state + price. */
-  sizeOptions: SizeLike[]
+  images?: string[]
+  /** See `RenderedLeaf` above. */
+  leaf: RenderedLeaf
 }
 
 export type Crumb = {
@@ -59,19 +77,6 @@ export type Crumb = {
 /** `36999` (cents) -> `"369.99"` (dollars, 2 decimals, string per common schema.org Offer.price practice). */
 export function centsToMajorUnits(cents: number): string {
   return (cents / 100).toFixed(2)
-}
-
-/**
- * The best (most-purchasable) stock state across a product's sizes/variants
- * — reuses `group-sizes.ts`'s own `in_stock > low_stock > out_of_stock` rank
- * so this never disagrees with what the purchase panel already computes.
- * `null` (not a guessed default) when there's no size data at all.
- */
-export function bestAvailability(
-  states: JsonLdStockState[]
-): JsonLdStockState | null {
-  if (states.length === 0) return null
-  return states.reduce((best, s) => (rank[s] > rank[best] ? s : best))
 }
 
 /**
@@ -89,96 +94,45 @@ export function toSchemaAvailability(
 }
 
 /**
- * The headline price to advertise: the cheapest PURCHASABLE (non-out-of-stock,
- * positive-price) size, so it can never disagree with `bestAvailability`'s
- * InStock claim. A real production case (performance-replicas-101,
- * live-verified WB-095 Task 5): the globally cheapest offset was
- * out_of_stock while pricier siblings were genuinely buyable — a plain
- * "min across every variant" (which is what `ProductDetail.priceCents` /
- * `TireProductDetail.priceCents` already are, for the card-level "from"
- * price elsewhere in the app) would have advertised a dead SKU's price
- * alongside an honest "InStock". Falls back to the cheapest priced size
- * regardless of stock when nothing is purchasable (an all-OOS product still
- * has SOME historical price worth showing), and to `fallback` only when no
- * size carries a usable price at all.
- */
-export function purchasablePriceCents(
-  sizes: SizeLike[],
-  fallback: number
-): number {
-  const positivePriced = sizes.filter((s) => s.priceCents > 0)
-  const purchasable = positivePriced.filter((s) => s.availability !== "out_of_stock")
-  const pool = purchasable.length ? purchasable : positivePriced
-  return pool.length ? Math.min(...pool.map((s) => s.priceCents)) : fallback
-}
-
-/**
- * Adapts a wheel PDP's `SizeOption[]` into the `SizeLike[]` `productJsonLd`
- * needs — flattened to each size's `offsetVariants` (the real leaf SKUs),
- * NOT the `SizeOption`'s own `priceCentsOverride`/`availability` rollups.
- *
- * Why leaf-level: multiple sibling offsets (each a distinct real SKU with
- * its own price + stock) collapse into ONE `SizeOption` whenever they share
- * a Diameter×Width×BoltPattern (`group-sizes.ts`'s `groupVariantsIntoSizes`).
- * That function's `priceCentsOverride` is a stock-BLIND `Math.min` across
- * every sibling offset, while `.availability` IS stock-aware (best-of-rank)
- * — so the rollup's own price can silently be a hidden out-of-stock
- * offset's price with no way to tell from the rollup alone (live-verified,
- * performance-replicas-101: the size-level rollup was `{low_stock,
- * priceCentsOverride: 15100}`, but that $151.00 belonged to the ONE
- * out-of-stock offset among three; the two low_stock offsets were $220/$333).
- * Reading only the rollup would silently re-introduce the exact dead-SKU
- * price bug `purchasablePriceCents` exists to prevent. Tires need no
- * equivalent adapter — `TireSizeOption` already carries a plain,
- * always-present `priceCents` per (un-nested) size.
- */
-export function wheelSizesForJsonLd(
-  sizeOptions: {
-    availability: JsonLdStockState
-    priceCentsOverride?: number
-    offsetVariants?: { availability: JsonLdStockState; priceCents?: number }[]
-  }[],
-  productPriceCents: number
-): SizeLike[] {
-  return sizeOptions.flatMap((size) => {
-    const sizeFallback = size.priceCentsOverride ?? productPriceCents
-    if (size.offsetVariants && size.offsetVariants.length > 0) {
-      return size.offsetVariants.map((o) => ({
-        availability: o.availability,
-        priceCents: o.priceCents ?? sizeFallback,
-      }))
-    }
-    return [{ availability: size.availability, priceCents: sizeFallback }]
-  })
-}
-
-/**
  * `Product` JSON-LD for the PDP. `product.name` already begins with the
  * brand (vendor-sync's `buildGroupTitle`/`buildTireGroupTitle`) — `name`
  * here is `product.name` alone; `brand` is the separate field, never
  * concatenated (mirrors the Task 2 title-doubling fix in generateMetadata).
  *
- * `offers` is omitted entirely when no usable price exists — a genuinely
- * price-less product must not advertise a fabricated $0.00 (the same
- * honesty rule `canPurchasePrice`/the purchase panels already apply).
+ * `price` and `availability` both come from `product.leaf` — the single
+ * variant/size the PDP hero renders by default (see `pick-default-leaf.ts`).
+ * Sourcing both from the SAME leaf means they can never disagree with each
+ * other, or with what the page itself shows (Important 1/2 of the WB-095
+ * Task 5 fix wave).
+ *
+ * `offers` is omitted entirely when no usable price exists on that leaf — a
+ * genuinely price-less product must not advertise a fabricated $0.00 (the
+ * same honesty rule `canPurchasePrice`/the purchase panels already apply),
+ * and there is deliberately no sibling/product-level price fallback here —
+ * see `RenderedLeaf`'s doc and `price-truth.ts`'s "no sibling fallback" rule.
  */
 export function productJsonLd(
   product: ProductLike,
   url: string
 ): Record<string, unknown> {
-  const availability = toSchemaAvailability(
-    bestAvailability(product.sizeOptions.map((s) => s.availability))
-  )
-  const priceCents = purchasablePriceCents(product.sizeOptions, product.priceCents)
-  const hasPrice = priceCents > 0
+  const { leaf } = product
+  const availability = leaf ? toSchemaAvailability(leaf.availability) : null
+  const hasPrice = leaf?.priceCents != null
+
+  const images = product.images?.length
+    ? product.images
+    : product.thumbnail
+      ? [product.thumbnail]
+      : []
 
   return {
     "@context": "https://schema.org",
     "@type": "Product",
     name: product.name,
     ...(product.brand ? { brand: { "@type": "Brand", name: product.brand } } : {}),
-    ...(product.thumbnail ? { image: [product.thumbnail] } : {}),
+    ...(images.length ? { image: images } : {}),
     ...(product.description ? { description: product.description } : {}),
+    ...(leaf?.variantId ? { sku: leaf.variantId } : {}),
     url,
     ...(hasPrice
       ? {
@@ -186,7 +140,7 @@ export function productJsonLd(
             "@type": "Offer",
             url,
             priceCurrency: "USD",
-            price: centsToMajorUnits(priceCents),
+            price: centsToMajorUnits(leaf!.priceCents as number),
             ...(availability ? { availability } : {}),
           },
         }

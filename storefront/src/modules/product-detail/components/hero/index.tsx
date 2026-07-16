@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react"
 import { OffsetVariant, ProductDetail, SizeOption } from "../../data/types"
 import { sizesForBoltPattern, pickDefaultSize, boresFor, loadsForBore, resolveLeafVariant, boltPatternsForFinish, findBySizeKey } from "../../data/group-sizes"
 import { headlinePriceCents } from "../../data/price-truth"
+import { pickDefaultSelection } from "../../data/pick-default-leaf"
 import Gallery from "./gallery"
 import VariantPicker from "./variant-picker"
 import PurchasePanel from "./purchase-panel"
@@ -39,6 +40,15 @@ const Hero = ({ product }: HeroProps) => {
   const { active } = useGarage()
   const fitParam = searchParams.get("fit") === "1"
 
+  // The non-fit-mode default chain (finish -> bolt pattern -> size -> offset),
+  // shared with `productJsonLd` via `pickDefaultSelection` so the two
+  // surfaces can't drift apart (WB-095 Task 5 fix wave). Only used to seed
+  // the `useState`s below — every one of them is discarded by React after
+  // the first render, same as the inline expressions they replace used to
+  // be. `product` is stable for the Hero's lifetime (a new PDP navigation
+  // remounts the component), so this only ever runs once in practice.
+  const initialSelection = useMemo(() => pickDefaultSelection(product), [product])
+
   const fitView = useMemo(
     () => (fitParam && active ? buildFitView(product, active) : null),
     [fitParam, active, product]
@@ -61,7 +71,7 @@ const Hero = ({ product }: HeroProps) => {
 
   const finishOptions = useFilter ? fitView!.finishOptions : product.finishOptions
   const [activeFinishRaw, setActiveFinishRaw] = useState<string>(
-    finishOptions[0]?.raw ?? "—"
+    initialSelection.finishRaw
   )
   const activeFinish = useMemo(
     () => finishOptions.find((f) => f.raw === activeFinishRaw) ?? finishOptions[0],
@@ -81,7 +91,7 @@ const Hero = ({ product }: HeroProps) => {
   const boltPatternOptions = useFilter ? fitView!.boltPatterns : finishBoltPatterns
 
   const [selectedBoltPattern, setSelectedBoltPattern] = useState<string>(
-    boltPatternOptions[0] ?? product.boltPattern
+    initialSelection.boltPattern
   )
 
   // Re-snap the finish when the visible finish set changes (fit mode toggling on
@@ -108,14 +118,13 @@ const Hero = ({ product }: HeroProps) => {
     [finishSizeOptions, selectedBoltPattern]
   )
 
-  // Default to the first in-stock size in the visible (pattern-scoped) set.
-  // null when the product (or the selected bolt pattern) has no sizes at all —
-  // a variant-less product must not crash the hero (B8).
-  const defaultSize = useMemo<SizeOption | null>(
-    () => pickDefaultSize(visibleSizes),
-    [visibleSizes]
+  // Default to the first in-stock size in the visible (pattern-scoped) set —
+  // `initialSelection.size` (`pickDefaultSelection`, mount-time only; see
+  // above). null when the product (or the selected bolt pattern) has no
+  // sizes at all — a variant-less product must not crash the hero (B8).
+  const [selectedSize, setSelectedSize] = useState<SizeOption | null>(
+    initialSelection.size
   )
-  const [selectedSize, setSelectedSize] = useState<SizeOption | null>(defaultSize)
 
   // Re-snap when the visible size set changes — either the bolt pattern
   // changed (the old size belongs to a pattern no longer shown) or the
@@ -149,7 +158,14 @@ const Hero = ({ product }: HeroProps) => {
   // so it always marks the TRUE default, never the fit-mode auto-pick (P17).
   const wheelDefaultOffsetMm = selectedSize?.defaultOffsetMm ?? selectedSize?.offsetMm ?? 0
   const defaultOffsetMm = fittingDefaultOffsetMm ?? wheelDefaultOffsetMm
-  const [selectedOffsetMm, setSelectedOffsetMm] = useState<number>(defaultOffsetMm)
+  // Initial value: `initialSelection.offsetMm` (mount-time only; see above) —
+  // equal to `wheelDefaultOffsetMm` on the very first render since
+  // `selectedSize` is itself seeded from `initialSelection.size` and
+  // `fittingDefaultOffsetMm` is always `undefined` pre-hydration (fit mode
+  // is never the SSR default).
+  const [selectedOffsetMm, setSelectedOffsetMm] = useState<number>(
+    initialSelection.offsetMm ?? 0
+  )
 
   // When the size changes, snap the offset back to the new size's default pick.
   useEffect(() => {

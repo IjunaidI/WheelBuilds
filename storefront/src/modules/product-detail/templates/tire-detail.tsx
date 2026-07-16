@@ -9,6 +9,8 @@ import TireFitment from "../components/tire/fitment"
 import TireRelated from "../components/tire/related"
 import FitmentContextSetter from "@modules/common/components/fitment-context-setter"
 import ProductStructuredData from "../components/structured-data"
+import { pickDefaultTireLeaf } from "../data/pick-default-leaf"
+import { headlinePriceCents } from "../data/price-truth"
 
 type TireDetailTemplateProps = {
   product: TireProductDetail
@@ -30,13 +32,31 @@ const TireDetailTemplate = ({
   related,
 }: TireDetailTemplateProps) => {
   const productUrl = canonicalUrl(`/products/${product.handle}`)
+
+  // The exact size the tire Hero renders by default (WB-095 Task 5 fix wave,
+  // Important 1) — mirrors `pickDefaultLeaf` on the wheel side; see
+  // `data/pick-default-leaf.ts`.
+  const defaultLeaf = pickDefaultTireLeaf(product)
+
   return (
     <section
       className="px-5 pt-6 pb-16 xsmall:px-8 small:px-20 small:pt-8 small:pb-20"
       style={{ maxWidth: 1600, margin: "0 auto" }}
     >
       <ProductStructuredData
-        product={product}
+        product={{
+          name: product.name,
+          brand: product.brand,
+          thumbnail: product.thumbnail,
+          description: product.description,
+          leaf: defaultLeaf
+            ? {
+                availability: defaultLeaf.availability,
+                priceCents: headlinePriceCents(defaultLeaf.priceCents),
+                variantId: defaultLeaf.variantId,
+              }
+            : null,
+        }}
         url={productUrl}
         breadcrumbs={[
           { name: "Home", url: canonicalUrl("/") },

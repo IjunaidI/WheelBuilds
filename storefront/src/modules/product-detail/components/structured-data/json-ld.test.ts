@@ -2,10 +2,7 @@ import { describe, it, expect } from "vitest"
 import {
   productJsonLd,
   breadcrumbJsonLd,
-  bestAvailability,
   toSchemaAvailability,
-  purchasablePriceCents,
-  wheelSizesForJsonLd,
   toJsonLdScript,
   centsToMajorUnits,
   type ProductLike,
@@ -16,11 +13,7 @@ const baseProduct: ProductLike = {
   brand: "American Force",
   thumbnail: "https://cdn.example.com/wheel.jpg",
   description: "Forged monoblock wheel.",
-  priceCents: 36999,
-  sizeOptions: [
-    { availability: "in_stock", priceCents: 36999 },
-    { availability: "out_of_stock", priceCents: 29999 },
-  ],
+  leaf: { availability: "in_stock", priceCents: 36999, variantId: "variant_01" },
 }
 
 const url = "https://example.com/us/products/004-death-metal"
@@ -30,18 +23,6 @@ describe("centsToMajorUnits", () => {
     expect(centsToMajorUnits(36999)).toBe("369.99")
     expect(centsToMajorUnits(100)).toBe("1.00")
     expect(centsToMajorUnits(5)).toBe("0.05")
-  })
-})
-
-describe("bestAvailability", () => {
-  it("ranks in_stock > low_stock > out_of_stock, mirroring group-sizes.ts's rank", () => {
-    expect(bestAvailability(["out_of_stock", "in_stock"])).toBe("in_stock")
-    expect(bestAvailability(["out_of_stock", "low_stock"])).toBe("low_stock")
-    expect(bestAvailability(["out_of_stock", "out_of_stock"])).toBe("out_of_stock")
-  })
-
-  it("returns null (not a guess) for an empty list", () => {
-    expect(bestAvailability([])).toBeNull()
   })
 })
 
@@ -55,106 +36,6 @@ describe("toSchemaAvailability", () => {
   })
   it("passes null through rather than guessing", () => {
     expect(toSchemaAvailability(null)).toBeNull()
-  })
-})
-
-describe("purchasablePriceCents", () => {
-  // Real production case (performance-replicas-101, live-verified): the
-  // globally cheapest offset ($151.00) is out_of_stock; $220.00 and $333.00
-  // are the genuinely purchasable (low_stock) offsets. A plain "min across
-  // everything" would advertise $151.00 as InStock, pairing a live-purchase
-  // claim with a dead SKU's price.
-  const mixedStock = [
-    { availability: "low_stock" as const, priceCents: 33300 },
-    { availability: "low_stock" as const, priceCents: 22000 },
-    { availability: "out_of_stock" as const, priceCents: 15100 },
-  ]
-
-  it("picks the cheapest PURCHASABLE (non-out-of-stock) price, ignoring a cheaper dead SKU", () => {
-    expect(purchasablePriceCents(mixedStock, 0)).toBe(22000)
-  })
-
-  it("falls back to the cheapest priced size when nothing is in stock", () => {
-    const allOos = [
-      { availability: "out_of_stock" as const, priceCents: 36900 },
-      { availability: "out_of_stock" as const, priceCents: 22000 },
-    ]
-    expect(purchasablePriceCents(allOos, 0)).toBe(22000)
-  })
-
-  it("ignores non-positive prices when picking the purchasable minimum", () => {
-    const zeroPriced = [
-      { availability: "in_stock" as const, priceCents: 0 },
-      { availability: "in_stock" as const, priceCents: 15000 },
-    ]
-    expect(purchasablePriceCents(zeroPriced, 0)).toBe(15000)
-  })
-
-  it("falls back to the given fallback when no size carries a usable price", () => {
-    expect(purchasablePriceCents([], 36999)).toBe(36999)
-    expect(purchasablePriceCents([{ availability: "in_stock", priceCents: 0 }], 36999)).toBe(36999)
-  })
-})
-
-describe("wheelSizesForJsonLd", () => {
-  // The real production shape (performance-replicas-101, live-verified):
-  // multiple sibling offsets — each its own real SKU with its own price +
-  // stock — collapse into ONE SizeOption (same Diameter×Width×BoltPattern).
-  // `SizeOption.priceCentsOverride`/`.availability` are already rollups (a
-  // stock-blind MIN price, and a best-of-stock rank) computed by
-  // `group-sizes.ts`'s `groupVariantsIntoSizes` — reading only those two
-  // rollup fields would re-introduce the exact dead-SKU-price bug
-  // `purchasablePriceCents` exists to prevent, because the rollup min price
-  // can itself already be a hidden out-of-stock offset's price with no way
-  // to tell. So this flattens to the OFFSET level (the real leaf SKUs) —
-  // `purchasablePriceCents` then sees each offset's true own price + stock.
-  it("flattens each size's offsetVariants into per-offset entries (the real leaf SKUs)", () => {
-    const out = wheelSizesForJsonLd(
-      [
-        {
-          availability: "low_stock",
-          priceCentsOverride: 15100,
-          offsetVariants: [
-            { availability: "low_stock", priceCents: 33300 },
-            { availability: "low_stock", priceCents: 22000 },
-            { availability: "out_of_stock", priceCents: 15100 },
-          ],
-        },
-      ],
-      36999
-    )
-    expect(out).toEqual([
-      { availability: "low_stock", priceCents: 33300 },
-      { availability: "low_stock", priceCents: 22000 },
-      { availability: "out_of_stock", priceCents: 15100 },
-    ])
-  })
-
-  it("an offset with no own price falls back to its size's priceCentsOverride, then the product's priceCents", () => {
-    const out = wheelSizesForJsonLd(
-      [
-        {
-          availability: "in_stock",
-          priceCentsOverride: 22000,
-          offsetVariants: [{ availability: "in_stock" }],
-        },
-      ],
-      36999
-    )
-    expect(out).toEqual([{ availability: "in_stock", priceCents: 22000 }])
-  })
-
-  it("falls back to a single size-level entry when a size carries no offsetVariants at all", () => {
-    const out = wheelSizesForJsonLd(
-      [{ availability: "in_stock", priceCentsOverride: 22000 }],
-      36999
-    )
-    expect(out).toEqual([{ availability: "in_stock", priceCents: 22000 }])
-  })
-
-  it("size-level fallback uses the product's own priceCents when the size has no override either", () => {
-    const out = wheelSizesForJsonLd([{ availability: "in_stock" }], 36999)
-    expect(out).toEqual([{ availability: "in_stock", priceCents: 36999 }])
   })
 })
 
@@ -174,55 +55,81 @@ describe("productJsonLd", () => {
     expect(ld.offers.price).toBe("369.99")
   })
 
-  it("maps availability from the real best-of-siblings stock state (one in-stock size beats an out-of-stock sibling)", () => {
-    const ld = productJsonLd(baseProduct, url) as any
-    expect(ld.offers.availability).toBe("https://schema.org/InStock")
-  })
-
-  it("never pairs a dead (out-of-stock) SKU's price with an InStock claim — picks the cheapest PURCHASABLE size instead", () => {
-    const mixed: ProductLike = {
+  it("prices and stocks the offer from the SAME leaf — never a sibling's price or a global cheapest-across-the-product heuristic", () => {
+    // The rendered leaf is in_stock at $220.00 — a cheaper sibling elsewhere
+    // on the product (e.g. a different finish/bolt-pattern's $151.00
+    // out-of-stock offset) must have NO influence here at all; there's no
+    // sibling data even passed in, by construction.
+    const rendered: ProductLike = {
       ...baseProduct,
-      // Overall/"from" priceCents (what get-product.ts computes) happens to
-      // be the out-of-stock $151.00 offset — the real live bug this test
-      // pins (performance-replicas-101).
-      priceCents: 15100,
-      sizeOptions: [
-        { availability: "low_stock", priceCents: 33300 },
-        { availability: "low_stock", priceCents: 22000 },
-        { availability: "out_of_stock", priceCents: 15100 },
-      ],
+      leaf: { availability: "low_stock", priceCents: 22000 },
     }
-    const ld = productJsonLd(mixed, url) as any
+    const ld = productJsonLd(rendered, url) as any
     expect(ld.offers.price).toBe("220.00")
     expect(ld.offers.availability).toBe("https://schema.org/InStock")
   })
 
-  it("maps an all-out-of-stock product to OutOfStock — never hardcoded InStock", () => {
+  it("maps availability from the rendered leaf's own stock state", () => {
+    const ld = productJsonLd(baseProduct, url) as any
+    expect(ld.offers.availability).toBe("https://schema.org/InStock")
+  })
+
+  it("maps an out-of-stock leaf to OutOfStock — never hardcoded InStock", () => {
     const oos: ProductLike = {
       ...baseProduct,
-      sizeOptions: [{ availability: "out_of_stock", priceCents: 36999 }],
+      leaf: { availability: "out_of_stock", priceCents: 36999 },
     }
     const ld = productJsonLd(oos, url) as any
     expect(ld.offers.availability).toBe("https://schema.org/OutOfStock")
   })
 
-  it("omits availability rather than guessing when no size/stock data exists", () => {
-    const noSizes: ProductLike = { ...baseProduct, sizeOptions: [] }
-    const ld = productJsonLd(noSizes, url) as any
-    expect(ld.offers.availability).toBeUndefined()
-  })
-
-  it("omits the offers block entirely for a genuinely price-less product instead of a fabricated $0.00", () => {
-    const noPrice: ProductLike = {
-      ...baseProduct,
-      priceCents: 0,
-      sizeOptions: [{ availability: "out_of_stock", priceCents: 0 }],
-    }
-    const ld = productJsonLd(noPrice, url) as any
+  it("omits offers entirely (price AND availability) when the rendered leaf is unresolved (null) — mirrors the Hero's own 'no purchasable options' state", () => {
+    const noLeaf: ProductLike = { ...baseProduct, leaf: null }
+    const ld = productJsonLd(noLeaf, url) as any
     expect(ld.offers).toBeUndefined()
   })
 
-  it("omits image when the product has none", () => {
+  it("omits offers entirely for a genuinely price-less leaf instead of a fabricated $0.00 or a sibling's price — the honest 'Price unavailable' case the page itself renders", () => {
+    const priceless: ProductLike = {
+      ...baseProduct,
+      leaf: { availability: "in_stock", priceCents: null },
+    }
+    const ld = productJsonLd(priceless, url) as any
+    expect(ld.offers).toBeUndefined()
+  })
+
+  it("includes sku from the rendered leaf's variantId when present", () => {
+    const ld = productJsonLd(baseProduct, url) as any
+    expect(ld.sku).toBe("variant_01")
+  })
+
+  it("omits sku when the rendered leaf carries no variantId", () => {
+    const noVariantId: ProductLike = {
+      ...baseProduct,
+      leaf: { availability: "in_stock", priceCents: 36999 },
+    }
+    const ld = productJsonLd(noVariantId, url) as any
+    expect(ld.sku).toBeUndefined()
+  })
+
+  it("prefers the caller-supplied images (e.g. per-finish gallery images) over the bare thumbnail", () => {
+    const withImages: ProductLike = {
+      ...baseProduct,
+      images: ["https://cdn.example.com/black.jpg", "https://cdn.example.com/bronze.jpg"],
+    }
+    const ld = productJsonLd(withImages, url) as any
+    expect(ld.image).toEqual([
+      "https://cdn.example.com/black.jpg",
+      "https://cdn.example.com/bronze.jpg",
+    ])
+  })
+
+  it("falls back to [thumbnail] when images is omitted or empty", () => {
+    const ld = productJsonLd({ ...baseProduct, images: [] }, url) as any
+    expect(ld.image).toEqual(["https://cdn.example.com/wheel.jpg"])
+  })
+
+  it("omits image when the product has neither images nor a thumbnail", () => {
     const noImage: ProductLike = { ...baseProduct, thumbnail: null }
     const ld = productJsonLd(noImage, url) as any
     expect(ld.image).toBeUndefined()

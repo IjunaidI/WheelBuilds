@@ -8,7 +8,8 @@ import Specs from "../components/specs"
 import Fitment from "../components/fitment"
 import Related from "../components/related"
 import ProductStructuredData from "../components/structured-data"
-import { wheelSizesForJsonLd } from "../components/structured-data/json-ld"
+import { pickDefaultLeaf } from "../data/pick-default-leaf"
+import { headlinePriceCents } from "../data/price-truth"
 
 type ProductDetailTemplateProps = {
   product: ProductDetail
@@ -27,6 +28,25 @@ const ProductDetailTemplate = ({
   // Same absolute, `us`-pinned URL builder as Task 3's `alternates.canonical`
   // (generateMetadata in the page — untouched here; JSON-LD is not metadata).
   const productUrl = canonicalUrl(`/products/${product.handle}`)
+
+  // The exact leaf variant the Hero renders by default (WB-095 Task 5 fix
+  // wave, Important 1) — same function the Hero itself now seeds its
+  // initial finish/bolt-pattern/size/offset state from (see
+  // `components/hero/index.tsx` + `data/pick-default-leaf.ts`), so the
+  // structured data's price + availability can never disagree with the
+  // page's own default render.
+  const defaultLeaf = pickDefaultLeaf(product)
+  // Per-finish vendor imagery beyond the thumbnail (Minor 3) — Google
+  // prefers multiple images. Deduped; thumbnail-only when a wheel has no
+  // finish images at all.
+  const images = Array.from(
+    new Set(
+      [product.thumbnail, ...product.finishOptions.map((f) => f.imageUrl)].filter(
+        (u): u is string => !!u
+      )
+    )
+  )
+
   return (
     <section
       className="px-5 pt-6 pb-16 xsmall:px-8 small:px-20 small:pt-8 small:pb-20"
@@ -34,12 +54,18 @@ const ProductDetailTemplate = ({
     >
       <ProductStructuredData
         product={{
-          ...product,
-          // A size's own price (falls back to the product's own priceCents
-          // when unset), never the raw SizeOption/priceCentsOverride shape —
-          // see wheelSizesForJsonLd's own doc + purchasablePriceCents (the
-          // dead-SKU-price guard, live-verified on performance-replicas-101).
-          sizeOptions: wheelSizesForJsonLd(product.sizeOptions, product.priceCents),
+          name: product.name,
+          brand: product.brand,
+          thumbnail: product.thumbnail,
+          description: product.description,
+          images,
+          leaf: defaultLeaf
+            ? {
+                availability: defaultLeaf.availability,
+                priceCents: headlinePriceCents(defaultLeaf.priceCents),
+                variantId: defaultLeaf.variantId,
+              }
+            : null,
         }}
         url={productUrl}
         breadcrumbs={[

@@ -1,7 +1,11 @@
 import { breadcrumbJsonLd, productJsonLd, toJsonLdScript, Crumb, ProductLike } from "./json-ld"
 
 type ProductStructuredDataProps = {
-  /** Structurally satisfied by both `ProductDetail` (wheel) and `TireProductDetail` (tire) — see json-ld.ts. */
+  /**
+   * Built by each PDP template from its own `ProductDetail` (wheel) /
+   * `TireProductDetail` (tire) via `pickDefaultLeaf`/`pickDefaultTireLeaf`
+   * (`data/pick-default-leaf.ts`) — see json-ld.ts's `RenderedLeaf` doc.
+   */
   product: ProductLike
   /** Absolute canonical URL for this exact PDP (reuse `canonicalUrl(\`/products/${handle}\`)`, same as the Task 3 `alternates.canonical`). */
   url: string

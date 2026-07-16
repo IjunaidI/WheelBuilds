@@ -22,6 +22,13 @@ describe("buildTireSizeOptions", () => {
       variantId: "var_1", priceCents: 46200, availability: "in_stock", quantity: 8,
     })
   })
+
+  it("threads the variant's real sku (WB-098 Task 3) — undefined, never fabricated, when absent", () => {
+    const [withSku] = buildTireSizeOptions([{ ...variant(), sku: "TIRE-305-45-R22" }] as any)
+    expect(withSku.sku).toBe("TIRE-305-45-R22")
+    const [noSku] = buildTireSizeOptions([variant()] as any) // no `sku` key
+    expect(noSku.sku).toBeUndefined()
+  })
   it("marks out_of_stock at qty 0 and low_stock at/under the threshold", () => {
     expect(buildTireSizeOptions([variant({ qty: 0 })] as any)[0].availability).toBe("out_of_stock")
     expect(buildTireSizeOptions([variant({ qty: 2 })] as any)[0].availability).toBe("low_stock")

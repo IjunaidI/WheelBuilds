@@ -26,6 +26,8 @@ export type OffsetVariant = {
   priceCents?: number
   /** Medusa variant id for this exact size × offset. Drives the cart line item. */
   variantId: string
+  /** Real vendor part number for this exact variant (WB-098) — Medusa's actual `sku` column, set by vendor-sync (`sku: r.partNumber`). `undefined` when the variant carries none; never the internal `variantId` used as a stand-in. */
+  sku?: string
   /** Per-offset stock state — checked before add-to-cart so an out-of-stock ET hiding under an in-stock size cell can't be purchased. */
   availability: "in_stock" | "low_stock" | "out_of_stock"
   /** Center bore (mm) for this exact variant; null when the vendor omits it. */

@@ -63,7 +63,7 @@ const ProductDetailTemplate = ({
             ? {
                 availability: defaultLeaf.availability,
                 priceCents: headlinePriceCents(defaultLeaf.priceCents),
-                variantId: defaultLeaf.variantId,
+                sku: defaultLeaf.sku,
               }
             : null,
         }}

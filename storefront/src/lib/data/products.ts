@@ -46,8 +46,13 @@ export const getProductByHandle = cache(async function (
         // variant's own shipping weight comes back undefined and
         // groupVariantsIntoSizes falls back to the single product-level +weight
         // for every size, so all sizes show the same weight.
+        // +variants.sku (WB-098 Task 3) is the same class: Medusa's Store API
+        // drops the plain scalar `sku` column unless it's explicitly named, so
+        // without it every variant's real vendor part number comes back
+        // undefined and the PDP has nothing to surface/copy or feed into the
+        // Product JSON-LD.
         fields:
-          "*variants.calculated_price,+variants.inventory_quantity,+collection_id,+weight,+variants.weight,+metadata",
+          "*variants.calculated_price,+variants.inventory_quantity,+collection_id,+weight,+variants.weight,+variants.sku,+metadata",
       },
       { next: { tags: ["products"] } }
     )

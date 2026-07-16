@@ -14,6 +14,8 @@ export type TireSizeOption = {
   plyRating: string | null
   constructionType: string | null
   variantId: string
+  /** Real vendor part number for this size's variant (WB-098) — Medusa's actual `sku` column. `undefined` when absent; never the internal `variantId` used as a stand-in. */
+  sku?: string
   priceCents: number
   availability: TireAvailability
   /** Real on-hand quantity for this size's variant (WB-090 P2/P18) — drives the purchase panel's qty stepper cap/default and the "Only N left" copy. */
@@ -40,6 +42,7 @@ export function buildTireSizeOptions(variants: any[]): TireSizeOption[] {
       plyRating: optStr(m.ply_rating),
       constructionType: optStr(m.construction_type),
       variantId: String(v.id ?? ""),
+      sku: optStr(v.sku) ?? undefined,
       priceCents: Math.round(num((v.calculated_price as any)?.calculated_amount) * 100),
       availability: availabilityOf(num(v.inventory_quantity), LOW_STOCK_THRESHOLD),
       quantity: num(v.inventory_quantity),

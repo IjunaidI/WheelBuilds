@@ -48,8 +48,15 @@ export type RenderedLeaf = {
    * sibling/product-level price substituted in its place).
    */
   priceCents: number | null
-  /** Medusa variant id for this exact leaf — feeds `Product.sku`. */
-  variantId?: string
+  /**
+   * The real vendor part number (Medusa's actual `sku` column,
+   * `data/types.ts`'s `OffsetVariant.sku` / `TireSizeOption.sku`) for this
+   * exact leaf — feeds `Product.sku`. `undefined` when this leaf carries no
+   * sku, in which case `productJsonLd` omits the field entirely rather than
+   * falling back to the internal Medusa variant id (WB-098 Task 3 — that
+   * fallback was the old fake).
+   */
+  sku?: string
 } | null
 
 export type ProductLike = {
@@ -132,7 +139,7 @@ export function productJsonLd(
     ...(product.brand ? { brand: { "@type": "Brand", name: product.brand } } : {}),
     ...(images.length ? { image: images } : {}),
     ...(product.description ? { description: product.description } : {}),
-    ...(leaf?.variantId ? { sku: leaf.variantId } : {}),
+    ...(leaf?.sku ? { sku: leaf.sku } : {}),
     url,
     ...(hasPrice
       ? {

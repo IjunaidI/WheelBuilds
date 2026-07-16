@@ -8,6 +8,7 @@ import Label from "@modules/common/components/label"
 import Chip from "@modules/common/components/chip"
 import Icon from "@modules/common/components/icon"
 import LocalizedClientLink from "@modules/common/components/localized-client-link"
+import CopySku from "@modules/common/components/copy-sku"
 import { Button } from "@/components/ui/button"
 import { Separator } from "@/components/ui/separator"
 import { useGarage } from "@lib/garage/use-garage"
@@ -375,6 +376,12 @@ const PurchasePanel = ({
         {lineTotalCents !== null ? `Buy now · ${formatUsd(lineTotalCents)}` : "Price unavailable"}
         <Icon name="arrow-right" size={16} color="white" />
       </Button>
+
+      {/* Copy-to-clipboard SKU row (WB-098 Task 3) — the SELECTED variant's
+          real vendor part number (Medusa's actual `sku` column), not the
+          internal variant id. Hidden entirely when the resolved variant
+          carries no sku rather than rendering "SKU: undefined". */}
+      {selectedVariant?.sku && <CopySku sku={selectedVariant.sku} />}
 
       {/* Trust strip — compressed for the purchase panel. WB-091 P6: cells
           with an `href` (currently just "Fitment guarantee") link out to the

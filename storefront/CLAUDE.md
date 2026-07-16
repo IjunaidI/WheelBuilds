@@ -68,7 +68,7 @@ storefront/src/
 
 The new design uses a single root class `.frame` that scopes its CSS variables (`--orange`, `--ink`, `--hairline`, …) and class selectors (`.display`, `.label`, `.btn`, `.wheel`, …). It's applied **once** at [`app/[countryCode]/(main)/layout.tsx`](src/app/[countryCode]/(main)/layout.tsx). Do not re-apply `.frame` on children — they're already inside it.
 
-`(checkout)` routes are intentionally outside `.frame`. If you ever need design tokens in checkout, either wrap that layout in `.frame` too, or hoist `.frame` to the top-level `app/layout.tsx`.
+`(checkout)` routes are also inside `.frame` — [`(checkout)/layout.tsx`](src/app/[countryCode]/(checkout)/layout.tsx) applies `className="frame w-full bg-white relative small:min-h-screen"` on its own root div (a separate `.frame` mount from `(main)/layout.tsx`, not a shared one), so WB design tokens resolve there too.
 
 ## Naming convention — no `wb-` prefix
 

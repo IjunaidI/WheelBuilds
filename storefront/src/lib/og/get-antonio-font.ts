@@ -22,7 +22,8 @@ import { join } from "node:path"
  * self-hosted, don't reach for raw Google Fonts requests) — the old fetch
  * here was a redundant second round-trip for the same asset family.
  *
- * `antonio-700.ttf` below is Antonio 700 (SIL OFL licensed), subset via
+ * `antonio-700.ttf` below is Antonio 700 (SIL OFL licensed — see `OFL.txt`
+ * alongside this file for the license text and copyright), subset via
  * Google's `css2?family=Antonio:wght@700&text=...` API to just the glyphs
  * the wordmark scene and the favicon glyph render ("WHEEL/BUILDS" + "W"),
  * which keeps the vendored file to ~2KB instead of the full character set.

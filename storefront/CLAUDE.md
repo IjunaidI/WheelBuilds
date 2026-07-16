@@ -49,14 +49,13 @@ storefront/src/
 │   ├── stores/           # tiny client-side stores (search-open, recent-searches)
 │   ├── data/             # Medusa API calls (cart, customer, orders, regions, products…)
 │   ├── meilisearch.ts    # server-only MeiliSearch client (Discovery adapter)
-│   ├── search-client.ts  # client-side InstantSearch wrapper (legacy; kept for any client widgets)
 │   ├── utils.ts          # cn() helper for shadcn / WB primitives
 │   └── util/             # legacy util/ dir — env, money, etc.
 ├── modules/
 │   ├── common/components/    # WB composed primitives: Label, Display, SectionHeader, MicroLink, Chip, VehicleTile,
 │   │                         # Wheel, Icon, Logo, ImgPlaceholder, LocalizedClientLink
 │   ├── home/components/      # home page sections
-│   ├── layout/               # nav, footer, cart-button, cart-dropdown, garage-pill, side-menu (orphaned)
+│   ├── layout/               # nav, footer, cart-button, cart-dropdown, garage-pill
 │   ├── search/               # search-drawer, search-mount, search-trigger, actions, results template
 │   ├── products/, cart/, checkout/, account/, order/
 │   └── skeletons/
@@ -151,7 +150,7 @@ Loaded via `next/font/google` in [`app/layout.tsx`](src/app/layout.tsx): Antonio
 
 Three flavors of styling coexist now; pick by where you are:
 
-- **Legacy Medusa modules** (cart, checkout, account, products, side-menu) use Tailwind utilities exclusively. Keep using them when extending those files — don't mix in WB classes.
+- **Legacy Medusa modules** (cart, checkout, account, products) use Tailwind utilities exclusively. Keep using them when extending those files — don't mix in WB classes.
 - **shadcn primitives** in [src/components/ui/](src/components/ui) use Tailwind utilities that resolve to the WB palette via the shadcn token aliases in `tailwind.config.js` (`bg-primary`, `text-foreground`, `border-border`, …). Don't hand-edit these files.
 - **WB composed primitives** ([src/modules/common/components/](src/modules/common/components/)) and **page sections** inside `.frame` should reach for:
   1. A WB composed primitive first (`<Display>`, `<Label>`, `<SectionHeader>`, `<MicroLink>`, `<Chip>`, `<VehicleTile>`).
@@ -319,7 +318,6 @@ Save-to-wishlist on `purchase-panel.tsx` stays a plain toast (no wishlist backen
 
 ## Gotchas
 
-- **`SideMenu`** ([modules/layout/components/side-menu](src/modules/layout/components/side-menu/index.tsx)) is orphaned — the new nav uses [`MobileMenu`](src/modules/layout/components/mobile-menu/index.tsx) (Vaul drawer) instead. SideMenu still references `/search` which no longer exists. Harmless dead code — delete during a cleanup pass.
 - **Cart dropdown** is on shadcn [`<Popover>`](src/components/ui/popover.tsx) (via Radix portal); the inner content uses `className="frame"` so WB tokens resolve. The dropdown trigger is a `<PopoverAnchor asChild>` wrapping the cart link, which lets the link still navigate to `/cart` on click while the panel opens on hover.
 - **The cart preview's "Go to cart" button** is still the legacy `@medusajs/ui` `<Button>` (not the new shadcn `<Button>`). It's only used inside the cart-dropdown chrome; swap when convenient. Other cart/account/checkout legacy pages still use Medusa-UI components everywhere — that's intentional, they're outside `.frame`.
 - **Featured-products module** has been deleted (it was dead code — never imported by the home page after the catalog-wiring refactor).

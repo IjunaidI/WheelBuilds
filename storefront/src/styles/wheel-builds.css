@@ -307,28 +307,6 @@
   vertical-align: 2px;
 }
 
-.frame .field {
-  height: 44px;
-  border: 1px solid var(--hairline);
-  background: white;
-  padding: 0 14px;
-  font-size: 14px;
-  color: var(--ink);
-  border-radius: 4px;
-  outline: none;
-  appearance: none;
-  -webkit-appearance: none;
-  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'><path d='M1 1L5 5L9 1' stroke='%230F0F10' stroke-width='1.5' fill='none'/></svg>");
-  background-repeat: no-repeat;
-  background-position: right 14px center;
-  padding-right: 36px;
-  font-family: inherit;
-}
-.frame .field.input {
-  background-image: none;
-  padding-right: 14px;
-}
-
 .frame .divider {
   border-top: 1px solid var(--hairline);
 }
@@ -352,6 +330,10 @@
 }
 .frame .nav-link.active {
   border-bottom-color: var(--orange);
+}
+.frame .nav-link:focus-visible {
+  outline: 2px solid var(--orange);
+  outline-offset: 2px;
 }
 
 /* Vehicle hero tile */
@@ -379,6 +361,10 @@
 .frame .vehicle-tile.inactive {
   border-color: var(--hairline);
 }
+.frame .vehicle-tile:focus-visible {
+  outline: 2px solid var(--orange);
+  outline-offset: 2px;
+}
 
 /* Product card */
 .frame .product-card {
@@ -395,6 +381,10 @@
   border-color: var(--ink);
   transform: translateY(-2px);
   box-shadow: 0 18px 40px -24px rgba(15, 15, 16, 0.35);
+}
+.frame .product-card:focus-visible {
+  outline: 2px solid var(--orange);
+  outline-offset: 2px;
 }
 
 /* Style tile (Shop by Style) */
@@ -416,6 +406,10 @@
   border-color: var(--ink);
   transform: translateY(-2px);
 }
+.frame .style-tile:focus-visible {
+  outline: 2px solid var(--orange);
+  outline-offset: 2px;
+}
 
 /* Brand chip */
 .frame .brand-chip {
@@ -432,6 +426,10 @@
 .frame .brand-chip:hover {
   background: white;
   border-color: var(--ink);
+}
+.frame .brand-chip:focus-visible {
+  outline: 2px solid var(--orange);
+  outline-offset: 2px;
 }
 
 /* Build-gallery overlay chip */

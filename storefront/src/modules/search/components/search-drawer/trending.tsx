@@ -40,7 +40,7 @@ const Trending = ({ onClose, products }: TrendingProps) => {
             onClose()
             router.push(`/${countryCode}/store`)
           }}
-          className="h-auto p-0 text-[11px] font-semibold uppercase tracking-[0.04em] text-[var(--orange)] no-underline hover:no-underline"
+          className="h-auto p-0 text-[11px] font-semibold uppercase tracking-[0.04em] text-[var(--orange-deep)] no-underline hover:no-underline"
         >
           See all
         </Button>
@@ -74,7 +74,7 @@ const Trending = ({ onClose, products }: TrendingProps) => {
               </Display>
             </div>
             <Display size={15} as="div">
-              <span style={{ color: "var(--orange)" }}>$</span>
+              <span style={{ color: "var(--orange-deep)" }}>$</span>
               {formatCentsUsd(p.priceCents).slice(1)}
             </Display>
             <Icon name="arrow-right" size={14} color="#8A8A8E" />

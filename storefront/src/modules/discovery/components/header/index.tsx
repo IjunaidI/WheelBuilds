@@ -97,7 +97,7 @@ const DiscoveryHeader = ({ totalCount, isCapped = false }: DiscoveryHeaderProps)
                     onSelect={() => setSort(value)}
                     className={
                       sort === value
-                        ? "text-[var(--orange)] font-semibold"
+                        ? "text-[var(--orange-deep)] font-semibold"
                         : ""
                     }
                   >

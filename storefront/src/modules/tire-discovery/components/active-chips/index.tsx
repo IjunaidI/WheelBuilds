@@ -156,7 +156,7 @@ const TireActiveChips = () => {
         variant="link"
         size="sm"
         onClick={clearAll}
-        className="h-auto p-0 text-[12px] font-semibold uppercase tracking-[0.06em] text-[var(--orange)] no-underline hover:no-underline ml-2"
+        className="h-auto p-0 text-[12px] font-semibold uppercase tracking-[0.06em] text-[var(--orange-deep)] no-underline hover:no-underline ml-2"
       >
         Clear all
       </Button>

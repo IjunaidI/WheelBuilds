@@ -295,7 +295,7 @@ const TirePurchasePanel = ({
             style={{
               fontSize: 12,
               fontWeight: 600,
-              color: "var(--orange)",
+              color: "var(--orange-deep)",
               marginTop: 10,
             }}
           >

@@ -41,7 +41,7 @@ export default function ContactPage() {
                 href={`mailto:${SUPPORT_EMAIL}`}
                 style={{
                   fontSize: 18,
-                  color: "var(--orange)",
+                  color: "var(--orange-deep)",
                   textDecoration: "none",
                   fontWeight: 600,
                 }}

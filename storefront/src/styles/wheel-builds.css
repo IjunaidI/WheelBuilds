@@ -2,10 +2,23 @@
 
 .frame {
   --orange: #FF6A00;
-  --orange-deep: #E55A00;
+  /* Sub-18px accent TEXT only (WB-096 X6) — 4.75:1 on #FAFAF8, see
+     contrastRatio test (contrast-ratio.test.ts). --orange itself stays
+     untouched: it backs white-on-orange surfaces (btn-primary, tag-new,
+     fits-chip, wheel-glow, brand-mark .dot) where the relevant pair is
+     white-on-#FF6A00, not orange-on-page. NOTE: #C64400, not the ~#D14A00
+     first floated for this token — #D14A00 measures 4.28:1 on #FAFAF8 (fails
+     AA); #C64400 was picked because it clears 4.5:1 with margin at the same hue. */
+  --orange-deep: #C64400;
+  /* Hover state of orange CTAs (unrelated to --orange-deep above — renamed
+     from a same-named token to avoid the accent-text value colliding with
+     this background role). */
+  --orange-hover: #E55A00;
   --ink: #0F0F10;
   --graphite: #3A3A3D;
-  --ink-soft: #8A8A8E;
+  /* WB-096 X6: darkened #8A8A8E -> #6E6E73 for AA text contrast (4.85:1 on
+     #FAFAF8). Confirmed text-only via grep before darkening — see DESIGN.md §2. */
+  --ink-soft: #6E6E73;
   --hairline: #E6E6E8;
   --surface: #FFFFFF;
   --soft: #F7F7F8;
@@ -48,7 +61,7 @@
   text-transform: uppercase;
   letter-spacing: 0.08em;
   font-size: 11px;
-  color: var(--orange);
+  color: var(--orange-deep);
 }
 
 .frame .label-muted {
@@ -86,7 +99,7 @@
   text-transform: uppercase;
 }
 .frame .btn-primary:hover {
-  background: var(--orange-deep);
+  background: var(--orange-hover);
   transform: translateY(-1px);
 }
 

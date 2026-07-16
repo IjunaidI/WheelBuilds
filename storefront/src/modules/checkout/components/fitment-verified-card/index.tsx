@@ -60,14 +60,14 @@ const FitmentVerifiedCard = ({ items }: FitmentVerifiedCardProps) => {
           {allFit ? "FITMENT CHECKED" : "FITMENT PARTIALLY VERIFIED"}
         </span>
         {allFit && (
-          <span className="inline-flex items-center gap-1.5 font-[var(--mono)] text-[10px] tracking-[0.06em] text-[var(--orange)]">
+          <span className="inline-flex items-center gap-1.5 font-[var(--mono)] text-[10px] tracking-[0.06em] text-[var(--orange-deep)]">
             <Icon name="shield" size={11} color="#FF6A00" strokeWidth={2} />
             GUARANTEED
           </span>
         )}
       </div>
       <div className="px-4 py-3.5">
-        <div className="font-[var(--mono)] text-[9px] uppercase tracking-[0.08em] text-[var(--orange)] mb-1">
+        <div className="font-[var(--mono)] text-[9px] uppercase tracking-[0.08em] text-[var(--orange-deep)] mb-1">
           VEHICLE
         </div>
         <div className="font-[var(--display)] text-[18px] text-[var(--ink)] tracking-[-0.005em] mb-3">

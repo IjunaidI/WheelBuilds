@@ -22,17 +22,24 @@ All tokens live as CSS variables on `.frame` ([storefront/src/styles/wheel-build
 
 | Token | Value | Role |
 |---|---|---|
-| `--orange` | `#FF6A00` | Accent — CTAs, NEW tags, prices, fitment-OK chips, active states, the orange tick in trust points |
-| `--orange-deep` | `#E55A00` | Hover state of orange CTAs |
+| `--orange` | `#FF6A00` | Accent — CTAs, NEW tags, prices, fitment-OK chips, active states, the orange tick in trust points. Almost always a background/border under **white** text (`btn-primary`, `tag-new`, `fits-chip`, `wheel-glow`, `brand-mark .dot`) — that pair is fine as-is. |
+| `--orange-deep` | `#C64400` | Sub-18px accent **text** (labels, micro-links, small prices/eyebrows) — `--orange` itself is only ~2.9:1 on white, well under AA, so anything under 18px reads this token instead. See the contrast rule below. |
+| `--orange-hover` | `#E55A00` | Hover state of orange CTAs (`btn-primary:hover`). Was previously misnamed `--orange-deep` before WB-096 X6 split the name; renamed to stop colliding with the accent-text token above. |
 | `--ink` | `#0F0F10` | Body text, display type, primary borders |
 | `--graphite` | `#3A3A3D` | Secondary text, descriptions, link rest state |
-| `--ink-soft` | `#8A8A8E` | Tertiary text, monospace labels, disabled. Renamed from `--muted` because shadcn's design tokens own that name. |
+| `--ink-soft` | `#6E6E73` | Tertiary text, monospace labels, disabled. Renamed from `--muted` because shadcn's design tokens own that name. Darkened from `#8A8A8E` in WB-096 X6 for AA contrast — a few non-text usages (borders, background dots, an icon fill) ride the same darker value; none needed pinning to the old one. |
 | `--hairline` | `#E6E6E8` | Borders, dividers |
 | `--surface` | `#FFFFFF` | Card / sheet background |
 | `--soft` | `#F7F7F8` | Chips, brand tiles, inset surfaces |
 | Page bg | `#FAFAF8` + 80×80px grid | The faint blueprint paper set on `.frame` |
 
 **Rule of thumb for orange:** if it doesn't communicate "do this," "this is new," or "this is for sale," it shouldn't be orange. Don't use it as a decorative color.
+
+**Contrast (WCAG AA, added WB-096 X6).** Text on `.frame`'s page background or white card surfaces must hit **4.5:1** (normal text) / 3:1 (large text, ~18px+ bold or ~24px+ regular). `--orange` fails that at small sizes (~2.9:1) because it's tuned to sit under white on a saturated fill, not over the pale page background — so:
+- **Sub-18px accent text** (labels, micro-links, small eyebrows/prices) uses `--orange-deep` (4.75:1 on `#FAFAF8`), never `--orange`.
+- **18px+ bold/display accent text** (nav links, product-card prices, big variant swatches) stays on `--orange` — it's a documented, narrow exception at the large-text boundary, not fully re-verified to 3:1 in every instance; flagged for a future pass rather than widened here.
+- **Backgrounds/borders/glows carrying white text** (`btn-primary`, `tag-new`, `fits-chip`, `wheel-glow`, `brand-mark .dot`) are a different contrast pair (white-on-`#FF6A00`) and are unaffected — don't "fix" these by swapping in `--orange-deep`.
+- `--ink-soft` at its new value clears 4.5:1 on `#FAFAF8` for its text roles (tertiary text, mono labels, disabled). A pure `contrastRatio(fg, bg)` helper pins both values in [`src/lib/contrast-ratio.test.ts`](src/lib/contrast-ratio.test.ts) so a future edit can't silently regress them.
 
 ### Typography
 
@@ -98,7 +105,7 @@ All classes are scoped under `.frame .foo` selectors, so the names are short. Us
 ### Typography
 
 - **`display`** — Antonio 900, uppercase, tight letter-spacing. Use for headlines, section titles, big numbers. *Wrapped by [`<Display>`](src/modules/common/components/display/index.tsx).*
-- **`label`** — Mono 600, uppercase, 11px, orange. Use for section eyebrows and emphasized small caps. *Wrapped by [`<Label>`](src/modules/common/components/label/index.tsx).*
+- **`label`** — Mono 600, uppercase, 11px, `--orange-deep` (WB-096 X6 — 11px text needs the AA-compliant deep orange, not `--orange`). Use for section eyebrows and emphasized small caps. *Wrapped by [`<Label>`](src/modules/common/components/label/index.tsx).*
 - **`label-muted`** — Same as `label` but `--ink-soft` color. Use for column headings in the footer, secondary tags. *Wrapped by [`<Label tone="muted">`](src/modules/common/components/label/index.tsx).*
 
 ### Buttons & CTAs

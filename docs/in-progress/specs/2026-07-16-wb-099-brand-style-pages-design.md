@@ -1,0 +1,35 @@
+# WB-099 · Brand & style landing pages — design
+
+> G12 Wave A (discovery & merchandising), chunk 2 of 3. Finding **WB-099** ([spec §WB-099](2026-07-13-ux-completeness-fixes-design.md)).
+> Scouted against current `main` (`8035b6c`) 2026-07-16 — evidence inline. **Storefront only.** Depends on WB-086 (done — the `/collections` retirement + brand-collection lookup), supersedes WB-085's interim repoint.
+
+## Problem
+Brands are the site's top-nav concept but have no landing surface. The nav's "Brands" and "Style" links both point at `/store` as a WB-085 interim ([nav-items.ts:5-8](../../../storefront/src/modules/layout/components/nav-items.ts#L5-L8)); the footer, home ShopByBrand, and home ShopByStyle all link raw `/store?brands=<title>` / `/store?<param>=<values>`. A shopper who picks a brand lands on a generic filtered `/store` with no brand identity, no hero, no indexable brand URL.
+
+## Decisions (defaults)
+- **Both brands and styles get pages** (approved) — closes both interim nav links. Styles are the cheaper of the two (a static array, no backend round-trip).
+- **Thin reuse of the discovery engine, not a fork.** `DiscoveryTemplate` is already path-agnostic (filter/pagination pushes use `usePathname()` — [use-discovery-query.ts:60-82](../../../storefront/src/modules/discovery/data/use-discovery-query.ts#L60-L82)). A brand/style page mirrors `/store/page.tsx`'s 3-line composition with a pinned filter + a hero.
+- **Slug = the Medusa brand-collection handle** (WB-086's mechanism). `getCollectionByHandle(slug).title` is byte-identical to the Meili `brand` facet value (`ensureBrandCollection` sets `title: brand` verbatim from the same vendor string). No new slugify/matching logic. `/styles/[slug]` resolves against the in-code `STYLE_DEFS` array directly.
+- **The Brand facet is hidden on a pinned brand page** — a `/brands/[slug]` page shouldn't let a shopper uncheck the pinned brand or add a second (that's what `/store` is for). All other facets (diameter, bolt pattern, finish, price, vehicle fit) stay live. Styles keep their full rail (a style is a preset, not a lock).
+- **Wheels-only for brand/style pages in this chunk.** The nav "Brands"/"Style" are wheel-catalog concepts; tire brand landing is a follow-up if wanted. The `/tires?brands=` breadcrumbs stay as-is.
+
+## Design (storefront only)
+1. **Two shared fixes to the discovery hook** (used by every reuse below):
+   - `useDiscoveryQuery.clearAll` hardcodes `router.push(\`/${countryCode}/store\`)` ([use-discovery-query.ts:185-187](../../../storefront/src/modules/discovery/data/use-discovery-query.ts#L185-L187)) — parameterize it to the current base path (via `usePathname()`), so "Clear all" on `/brands/fuel` stays on `/brands/fuel` (a brand page's clear-all preserves the pinned brand; a `/store` clear-all is unchanged).
+   - The Brand accordion section ([filter-sections.tsx:254-266](../../../storefront/src/modules/discovery/components/filter-rail/filter-sections.tsx#L254-L266)) gets a `hideBrand?: boolean` prop threaded from the page so a pinned brand page omits it. Default false (store unchanged).
+2. **`lib/data/collections.ts` gains `listBrandCollections()`** — an unfiltered `store.collection.list` returning `{title, handle}[]` (the forward title→handle map). Nothing does this today (only the single-handle `getCollectionByHandle` exists). Used by the `/brands` index tiles.
+3. **`/brands` index** (`app/[countryCode]/(main)/brands/page.tsx`): a hero + a grid of brand tiles. Counts come from `getHomeCatalog().facets.brands` (the full live brand→count map — a shared `react.cache` hit, no extra Meili call); each tile links `/brands/<handle>` by joining the count map with `listBrandCollections()`. `generateMetadata` + `canonicalUrl("/brands")` + a sitemap entry.
+4. **`/brands/[slug]`** (`brands/[slug]/page.tsx`): `getCollectionByHandle(slug)` → unknown handle `notFound()`; pin `filters.brands=[collection.title]` → `getDiscoveryProducts(query)` → a brand hero (brand name + count) above `<DiscoveryTemplate hideBrand>`. `parseQueryFromSearchParams` still reads the URL for the OTHER facets/sort/page (so a brand page is fully filterable within the brand). `generateMetadata` (brand name in title/description) + `canonicalUrl(\`/brands/${slug}\`)`.
+5. **`/styles/[slug]`** (`styles/[slug]/page.tsx`): resolve `slug` (kebab-case of the `STYLE_DEFS` label) against the in-code array ([style-map.ts:25-32](../../../storefront/src/modules/home/components/shop-by-style/style-map.ts#L25-L32)); unknown → `notFound()`; pin the def's `{param: values}` filter → same reuse (full rail — a style is a preset, not a lock). `generateMetadata` + canonical + sitemap. (Two of six defs pin `brands` internally — that's fine, they render as a style-labelled brand grid.)
+6. **Repoint the surfaces** (the scout found 7 that touch `?brands=`/style params; repoint the landing-page ones, leave PDP breadcrumbs pointing at the brand page too): nav Brands→`/brands`, Style→`/styles` (or the first style / a `/styles` index — see below); footer "All Brands"→`/brands` + per-brand `footerBrandLinks`→`/brands/<handle>`; home ShopByBrand tiles→`/brands/<handle>` + "View all brands"→`/brands`; home ShopByStyle tiles→`/styles/<slug>`; the wheel PDP breadcrumb's brand crumb→`/brands/<handle>`. Keep the tire surfaces (`/tires?brands=`) as-is.
+7. **`/styles` index**: a thin index page listing the `STYLE_DEFS` presets with counts (reusing `styleTiles(facets)`), linking `/styles/<slug>`; the nav "Style" link points here.
+8. **Sitemap** ([app/sitemap.ts](../../../storefront/src/app/sitemap.ts)): add `/brands` + one entry per brand handle + `/styles` + one per style slug, on the `us` prefix, alongside the statics.
+
+## Verify
+`npx vitest run` — new units: the style-slug resolver (kebab label → def, unknown → null); a brand-tile join (count map × handle list → tiles, brands with a count but no collection handle handled). `npx tsc --noEmit` at/below the **2-error baseline**; `npx next build`; `npx next lint`. Live smoke: nav Brands → `/brands` lists every live brand with counts; a tile → `/brands/<handle>` shows a brand hero + a grid matching `/store?brands=<title>`; the Brand facet is absent there but diameter/finish/price/fit work; "Clear all" on a brand page keeps the brand; an unknown `/brands/bogus` 404s; nav Style → `/styles` → a style page pins the preset; `<head>` carries a per-page canonical on `/us`; the sitemap lists the brand + style URLs. Grep: no landing surface still points at `/store?brands=` except the tire breadcrumbs (intentional).
+
+## Deploy
+Storefront rebuild. No backend change, no migration, no re-sync. (New static/dynamic routes are generated at build.)
+
+## Out of scope
+Tire brand landing pages (`/tires` brand surfaces stay `?brands=`). A real style taxonomy/facet in the index (styles remain the curated `STYLE_DEFS` presets — when a real facet lands, only that array changes). Per-brand hero art/imagery (the hero is brand name + count + the discovery grid; brand logos are a photography follow-up). Brand descriptions/SEO copy (no source).

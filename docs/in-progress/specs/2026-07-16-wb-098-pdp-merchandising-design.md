@@ -1,0 +1,30 @@
+# WB-098 · PDP merchandising completeness — design
+
+> G12 Wave A (discovery & merchandising), chunk 1 of 3. Finding **WB-098** ([spec §WB-098](2026-07-13-ux-completeness-fixes-design.md)).
+> Scouted against current `main` (`8035b6c`) 2026-07-16 — evidence inline. **Storefront only, no backend work.**
+
+## Problem
+The PDP omits the standard wheel-commerce decision info. The price row says only "PER WHEEL" while the default quantity is 4, so a shopper never sees the set total. SKUs never render. Lead time lives only inside a hover `<TooltipContent>` ([variant-picker.tsx:130-139](../../../storefront/src/modules/product-detail/components/hero/variant-picker.tsx#L130-L139)) — invisible on touch — and the CTA area is silent on it. The special-order signal (`vendor_inv_order_type` ∈ `ST|N2|SO`, written to every variant's metadata at [build-metadata.ts:46-53](../../../backend/src/modules/vendor-sync/pipeline/build-metadata.ts#L46-L53)) is **already arriving** in the storefront's variant metadata but nothing reads it. The tire load/speed numbers render as bare values (`118S`) with no legend. And `backspaceIn` is a real `OffsetVariant` field ([types.ts:20](../../../storefront/src/modules/product-detail/data/types.ts#L20)) wired to two live UI slots — but [group-sizes.ts:163](../../../storefront/src/modules/product-detail/data/group-sizes.ts#L163) hardcodes it to `""`, so both slots have always shown blank.
+
+## Decisions (defaults)
+- **Everything is surfacing data that already exists — no backend, no vendor-sync, no migration.** The scout confirmed every gap is either already-computed client state, already-rendered numbers, or already-arriving metadata. The only data-layer touch is one field-string addition (`+variants.sku`).
+- **SO is the only order-type worth flagging.** `vendor_inv_order_type` ∈ `ST` (stock) / `N2` / `SO` (special order). Surface a warning only for `SO`; `ST`/`N2` are normal.
+- **Set-price row shows only when qty > 1.** At qty 1 the "× 1 = " line is noise.
+- **Copy + thresholds go in `pdp-config.ts`** (the existing env-overridable display-defaults surface), matching the `SHIP_LEAD_TIME`/`TRUST_STRIP` convention — not hardcoded in components.
+
+## Design (storefront only)
+1. **Set-price row.** `unitPriceCents` and `lineTotalCents` (= `unitPriceCents * quantity`) are already computed in [hero/index.tsx:241](../../../storefront/src/modules/product-detail/components/hero/index.tsx#L241) / [purchase-panel.tsx:101](../../../storefront/src/modules/product-detail/components/hero/purchase-panel.tsx#L101) (used only in button labels today). Add a labeled row under the "PER WHEEL" price — `"$X × N = $Y per set"` — rendered only when `quantity > 1` and a price exists. Same for the tire purchase panel.
+2. **SKU row.** Add `+variants.sku` to the `getProductByHandle` fields string ([products.ts:49-50](../../../storefront/src/lib/data/products.ts#L49-L50) — the same class of explicit scalar as the already-added `+variants.weight`); add `sku?: string` to `OffsetVariant` + `TireSizeOption`; extract `v.sku` in `group-sizes.ts` / `tire-size-options.ts`. Render a click-to-copy SKU row (`navigator.clipboard.writeText`, a copied-toast) near the CTA. The real value is the vendor part number (backend sets `sku: r.partNumber`). **Also drop the JSON-LD SKU fake**: [json-ld.ts:135](../../../storefront/src/modules/product-detail/components/structured-data/json-ld.ts#L135) currently fakes `Product.sku` with the internal Medusa `variantId` — now that the real leaf `sku` is available, feed it the real one.
+3. **Lead time + SO at the CTA.** Surface `SHIP_LEAD_TIME` in the purchase panel keyed to the selected variant's availability (in_stock → the lead-time line; out_of_stock → not shown). Read `vendor_inv_order_type` from metadata into an `isSpecialOrder` flag on the variant/size (metadata already arrives — proven by sibling keys `load_rating_lb`/`center_bore_mm` already read from the same blob); when the selected variant is `SO`, render a distinct "Special order — extended lead time" line (config copy). Wheel + tire.
+4. **Tire load/speed legend.** Static explanatory copy next to the already-rendered "Load index 118S" stat ([tire/hero/size-picker.tsx:168-186](../../../storefront/src/modules/product-detail/components/tire/hero/size-picker.tsx#L168-L186)) — "load index / speed rating" decoded. Pure copy, no data change.
+5. **Backspacing.** Replace `group-sizes.ts:163`'s `backspaceIn: ""` with a pure `deriveBackspacing(widthIn, offsetMm)` → `width/2 + offsetMm/25.4 + 0.5`, formatted `X.XX"`. Both existing consumers ([auto-fitment-card.tsx:61](../../../storefront/src/modules/product-detail/components/hero/auto-fitment-card.tsx#L61), [advanced-fitment-panel.tsx:174](../../../storefront/src/modules/product-detail/components/hero/advanced-fitment-panel.tsx#L174)) activate immediately. `lipDepthIn`/`hubToLockIn` stay `"—"` (no source — out of scope).
+6. **Config.** New `pdp-config.ts` constants for the SO copy, the set-of-N template, and (reuse) the lead-time string.
+
+## Verify
+`npx vitest run` — new units: `deriveBackspacing` (a known vector — 9" wide × +15mm offset → `(9/2)+0.5+(15/25.4)` = `5.59"`; the plan pins the exact rounding); the set-price framing (qty>1 shows, qty=1 hides; price-less hides); `isSpecialOrder` mapping (`SO`→true, `ST`/`N2`→false). `npx tsc --noEmit` at/below the **2-error baseline**; `npx next build`; `npx next lint`. Live smoke: a wheel PDP shows the set total at qty 4, a copyable SKU, the lead-time line at the CTA (not just on hover), a real backspacing value; a tire PDP shows the load/speed legend; find (or seed) an `SO` variant and confirm the special-order warning renders. Grep: `+variants.sku` present; `backspaceIn: ""` gone; JSON-LD `sku` no longer the variantId.
+
+## Deploy
+Storefront rebuild. No backend change, no migration, no re-sync.
+
+## Out of scope
+`lipDepthIn`/`hubToLockIn` (no data source). Any change to how stock is computed (that's WB-100). A quantity-preset "buy a set of 4" one-click (the stepper already defaults to 4). Real per-vehicle OEM offset seeding (WB-062 follow-up).

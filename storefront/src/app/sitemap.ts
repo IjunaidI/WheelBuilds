@@ -1,5 +1,5 @@
 import { MetadataRoute } from "next"
-import { getBaseURL } from "@lib/util/env"
+import { getBaseURL, isFallbackBaseUrl } from "@lib/util/env"
 import { meili, PRODUCTS_INDEX } from "@lib/meilisearch"
 
 /**
@@ -17,10 +17,11 @@ const SCAN_CAP = 10_000 // index maxTotalHits — the hard ceiling for offset pa
 
 export const revalidate = 86400 // rebuild daily
 
-type SitemapHit = { handle?: string; product_type?: string }
+type SitemapHit = { handle?: string; product_type?: string; created_at?: string }
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
-  const base = getBaseURL().replace(/\/$/, "")
+  const rawBase = getBaseURL()
+  const base = rawBase.replace(/\/$/, "")
   const at = (p: string) => `${base}/${COUNTRY}${p}`
 
   const statics: MetadataRoute.Sitemap = [
@@ -34,6 +35,22 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     { url: at("/terms"), changeFrequency: "yearly", priority: 0.1 },
   ]
 
+  // WB-095 X3: check-env-variables.js now requires NEXT_PUBLIC_BASE_URL, so
+  // this branch should be unreachable from a real build. It's a
+  // belt-and-braces second layer for any path that calls sitemap() without
+  // going through next.config.js's gate (e.g. a direct import/unit test):
+  // skip the Meilisearch product scan -- which could otherwise multiply a
+  // loopback host across thousands of URLs -- and log loudly so it can't be
+  // missed in build/server logs. The 8 static entries above still resolve
+  // against the same (fallback) base; there's no other host to build them
+  // from, so this caps the blast radius rather than eliminating it outright.
+  if (isFallbackBaseUrl(rawBase)) {
+    console.error(
+      "[sitemap] NEXT_PUBLIC_BASE_URL is unset (falling back to https://localhost:8000) — emitting statics-only and skipping the Meilisearch product scan. Set NEXT_PUBLIC_BASE_URL to fix."
+    )
+    return statics
+  }
+
   const products: MetadataRoute.Sitemap = []
   try {
     const index = meili.index(PRODUCTS_INDEX)
@@ -41,18 +58,32 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       const res = await index.search("", {
         limit: PAGE_SIZE,
         offset,
-        attributesToRetrieve: ["handle", "product_type"],
+        attributesToRetrieve: ["handle", "product_type", "created_at"],
         filter: 'product_type IN ["wheel", "tire"]',
       })
       const hits = res.hits as SitemapHit[]
       for (const h of hits) {
-        if (h.handle) {
-          products.push({
-            url: at(`/products/${h.handle}`),
-            changeFrequency: "weekly",
-            priority: 0.6,
-          })
+        if (!h.handle) {
+          continue
         }
+        const entry: MetadataRoute.Sitemap[number] = {
+          url: at(`/products/${h.handle}`),
+          changeFrequency: "weekly",
+          priority: 0.6,
+        }
+        // WB-095 X3: `created_at` IS in the index's displayedAttributes
+        // (medusa-config.js's Meili `settings.products.indexSettings`) and
+        // confirmed present live for wheel/tire docs -- but stamp it only
+        // when the hit actually carries a parseable value. Never fall back
+        // to `new Date()`: that would tell crawlers every URL changed on
+        // every deploy, which is false.
+        if (h.created_at) {
+          const created = new Date(h.created_at)
+          if (!Number.isNaN(created.getTime())) {
+            entry.lastModified = created
+          }
+        }
+        products.push(entry)
       }
       if (hits.length < PAGE_SIZE) break
     }

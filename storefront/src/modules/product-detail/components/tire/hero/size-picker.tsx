@@ -8,7 +8,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip"
 import { TireSizeOption } from "../../../data/types"
-import { SHIP_LEAD_TIME } from "../../../data/pdp-config"
+import { SHIP_LEAD_TIME, TIRE_LOAD_SPEED_LEGEND } from "../../../data/pdp-config"
 
 type TireSizePickerProps = {
   rimDiameters: number[]
@@ -184,6 +184,15 @@ const TireSizePicker = ({
             accent={selectedSize.availability !== "out_of_stock"}
           />
         </div>
+      )}
+
+      {/* Load/speed legend (WB-098 Task 4) — static copy explaining the
+          "Load index 118S" stat's two halves; not derived from the selected
+          size's actual numbers. */}
+      {selectedSize?.loadIndex != null && (
+        <p className="-mt-2 text-[10px] text-[var(--ink-soft)]">
+          {TIRE_LOAD_SPEED_LEGEND}
+        </p>
       )}
     </div>
   )

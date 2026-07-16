@@ -1,5 +1,6 @@
 import { num, availabilityOf } from "../group-sizes"
 import { LOW_STOCK_THRESHOLD } from "../pdp-config"
+import { isSpecialOrder } from "../order-signal"
 
 export type TireAvailability = "in_stock" | "low_stock" | "out_of_stock"
 
@@ -20,6 +21,8 @@ export type TireSizeOption = {
   availability: TireAvailability
   /** Real on-hand quantity for this size's variant (WB-090 P2/P18) — drives the purchase panel's qty stepper cap/default and the "Only N left" copy. */
   quantity: number
+  /** True when this size's variant `vendor_inv_order_type` metadata is `"SO"` (WB-098 Task 4) — a vendor special-order item, carrying a materially longer lead time than the standard ship window. */
+  isSpecialOrder?: boolean
 }
 
 const optNum = (v: unknown): number | null =>
@@ -46,6 +49,7 @@ export function buildTireSizeOptions(variants: any[]): TireSizeOption[] {
       priceCents: Math.round(num((v.calculated_price as any)?.calculated_amount) * 100),
       availability: availabilityOf(num(v.inventory_quantity), LOW_STOCK_THRESHOLD),
       quantity: num(v.inventory_quantity),
+      isSpecialOrder: isSpecialOrder(m.vendor_inv_order_type),
     }
   })
   return opts.sort(

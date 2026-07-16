@@ -23,6 +23,7 @@ import { DEFAULT_TIRE_QTY, LOW_STOCK_THRESHOLD, TRUST_STRIP } from "../../../dat
 import { clampQty, stepperCap } from "../../../data/qty-bounds"
 import { canPurchasePrice } from "../../../data/price-truth"
 import { setPriceLine } from "../../../data/set-price"
+import { leadTimeLine } from "../../../data/order-signal"
 
 type TirePurchasePanelProps = {
   product: TireProductDetail
@@ -103,6 +104,14 @@ const TirePurchasePanel = ({
   // — mirrors the wheel panel exactly, same unitPriceCents/quantity as
   // lineTotalCents above.
   const setPrice = setPriceLine(unitPriceCents, quantity)
+  // Lead-time / special-order line at the CTA (WB-098 Task 4) — the SELECTED
+  // size's own availability + SO flag, out of the hover-only tooltip
+  // (size-picker.tsx's TooltipContent) so it's visible on touch too. No
+  // selectedSize yet -> nothing to promise.
+  const isSpecialOrder = selectedSize?.isSpecialOrder ?? false
+  const leadTime = selectedSize
+    ? leadTimeLine({ availability: selectedSize.availability, isSpecialOrder })
+    : null
 
   const handleAddToCart = async () => {
     if (!selectedSize) return
@@ -315,6 +324,35 @@ const TirePurchasePanel = ({
           <Icon name="heart" size={18} />
         </Button>
       </div>
+
+      {/* Lead-time / special-order line (WB-098 Task 4) — mirrors the wheel
+          panel exactly (see its comment for the amber-token reasoning). */}
+      {leadTime && (
+        <p
+          style={
+            isSpecialOrder
+              ? {
+                  fontSize: 12,
+                  fontWeight: 600,
+                  color: "#8A6508",
+                  background: "rgba(184,134,11,0.08)",
+                  border: "1px solid rgba(184,134,11,0.35)",
+                  borderRadius: "var(--radius)",
+                  padding: "6px 10px",
+                  marginTop: 10,
+                  display: "inline-block",
+                }
+              : {
+                  fontSize: 12,
+                  fontWeight: 600,
+                  color: "var(--ink-soft)",
+                  marginTop: 10,
+                }
+          }
+        >
+          {leadTime}
+        </p>
+      )}
 
       {/* Only-N-left copy (WB-090 P2/P18) — mirrors the wheel panel. */}
       {typeof available === "number" &&

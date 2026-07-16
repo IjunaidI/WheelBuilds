@@ -46,7 +46,7 @@ const FitBanner = ({ filtered, aggressive = false, vehicleLabel, onShowAll, onOn
   // Amber (check) treatment only while filtered AND aggressive; otherwise the
   // existing orange accent (fits, or the "showing everything" warning state).
   const amber = filtered && aggressive
-  const linkColor = amber ? "#8A6508" : "var(--orange)"
+  const linkColor = amber ? "#8A6508" : "var(--orange-deep)"
 
   return (
     <div

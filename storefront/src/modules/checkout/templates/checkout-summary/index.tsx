@@ -107,7 +107,7 @@ const LineItemRow = ({
       </div>
       <div className="flex-1 min-w-0">
         {item.variant?.product?.collection && (
-          <div className="font-[var(--mono)] text-[9px] uppercase tracking-[0.08em] text-[var(--orange)] mb-0.5">
+          <div className="font-[var(--mono)] text-[9px] uppercase tracking-[0.08em] text-[var(--orange-deep)] mb-0.5">
             {item.variant.product.collection.title}
           </div>
         )}
@@ -128,7 +128,7 @@ const LineItemRow = ({
           className="font-[var(--display)] text-[16px] text-[var(--ink)]"
           style={{ fontWeight: 900 }}
         >
-          <span style={{ color: "var(--orange)" }}>$</span>
+          <span style={{ color: "var(--orange-deep)" }}>$</span>
           {total.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
         </div>
         {item.quantity && item.quantity > 1 && (
@@ -207,7 +207,7 @@ const Row = ({
     <span className="text-[13px] text-[var(--graphite)]">{label}</span>
     <span
       className="text-[14px] font-medium"
-      style={{ color: accent ? "var(--orange)" : "var(--ink)" }}
+      style={{ color: accent ? "var(--orange-deep)" : "var(--ink)" }}
     >
       {value}
     </span>

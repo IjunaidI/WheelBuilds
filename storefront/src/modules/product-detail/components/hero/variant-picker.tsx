@@ -94,6 +94,7 @@ const VariantPicker = ({
                   <button
                     type="button"
                     aria-disabled={disabled}
+                    aria-pressed={active}
                     onClick={() => {
                       // Native `disabled` was removed so the button stays
                       // focusable/tabbable and its Tooltip is keyboard- and
@@ -157,6 +158,7 @@ const VariantPicker = ({
                   key={bp}
                   type="button"
                   onClick={() => onBoltPatternChange(bp)}
+                  aria-pressed={active}
                   className={cn(
                     "h-10 px-4 rounded-[var(--radius)] border text-[13px] font-semibold transition-colors",
                     active

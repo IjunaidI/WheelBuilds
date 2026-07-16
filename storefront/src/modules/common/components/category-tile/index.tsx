@@ -33,7 +33,7 @@ const CategoryTile = ({ label, href, count, finish = "black" }: CategoryTileProp
       )}
       <span
         className="inline-flex items-center gap-1.5 text-[12px] font-semibold uppercase tracking-[0.06em]"
-        style={{ marginTop: 32, display: "inline-flex", color: "var(--orange)" }}
+        style={{ marginTop: 32, display: "inline-flex", color: "var(--orange-deep)" }}
       >
         Explore
         <Icon name="arrow-right" size={14} color="#FF6A00" strokeWidth={2} />

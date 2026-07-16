@@ -7,6 +7,32 @@ const requiredEnvs = [
     description:
       "Learn how to create a publishable key: https://docs.medusajs.com/v2/resources/storefront-development/publishable-api-keys",
   },
+  {
+    key: "NEXT_PUBLIC_BASE_URL",
+    // WB-095 X3: unset here silently poisons metadataBase, canonical URLs,
+    // robots.ts's sitemap: line, and every URL in sitemap.ts with the
+    // https://localhost:8000 fallback -- a prod deploy would publish
+    // loopback canonicals to Google.
+    description:
+      "Your storefront's public URL, e.g. https://your-store.com. Feeds metadataBase, canonical URLs, robots.txt, and sitemap.xml.",
+  },
+  {
+    key: "NEXT_PUBLIC_MEDUSA_BACKEND_URL",
+    description:
+      "Your Medusa backend's public URL, e.g. https://your-backend.up.railway.app.",
+  },
+  {
+    key: "NEXT_PUBLIC_SEARCH_ENDPOINT",
+    // WB-095 X3: unset here points Discovery at loopback; the adapter
+    // swallows the failure and ships a silently empty catalog (sitemap
+    // included).
+    description:
+      "Your Meilisearch host, e.g. https://your-search.up.railway.app. Discovery and sitemap.xml both read from here.",
+  },
+  {
+    key: "NEXT_PUBLIC_SEARCH_API_KEY",
+    description: "The Meilisearch search-only API key for the above host.",
+  },
 ]
 
 function checkEnvVariables() {

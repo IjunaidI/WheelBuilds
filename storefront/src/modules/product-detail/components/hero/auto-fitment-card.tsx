@@ -65,7 +65,7 @@ const AutoFitmentCard = ({
       <button
         type="button"
         onClick={onResetToDefault}
-        className="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-[11px] font-semibold uppercase tracking-[0.06em] text-[var(--orange)] hover:bg-[rgba(255,106,0,0.06)] rounded shrink-0"
+        className="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-[11px] font-semibold uppercase tracking-[0.06em] text-[var(--orange-deep)] hover:bg-[rgba(255,106,0,0.06)] rounded shrink-0"
       >
         <Icon name="return" size={12} color="#FF6A00" strokeWidth={2.5} />
         Reset to default

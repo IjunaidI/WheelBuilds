@@ -97,7 +97,7 @@ const TireHeader = ({ totalCount, isCapped = false }: TireHeaderProps) => {
                     onSelect={() => setSort(value)}
                     className={
                       sort === value
-                        ? "text-[var(--orange)] font-semibold"
+                        ? "text-[var(--orange-deep)] font-semibold"
                         : ""
                     }
                   >

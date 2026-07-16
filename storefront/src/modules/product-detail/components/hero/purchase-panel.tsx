@@ -14,6 +14,7 @@ import { useGarage } from "@lib/garage/use-garage"
 import { chipFitTier } from "@lib/fitment/product-has-fitting-variant"
 import { openSearch } from "@lib/stores/search-store"
 import { addToCart } from "@lib/data/cart"
+import { track } from "@lib/analytics/track"
 import { insufficientStockMessage } from "@lib/util/error-message"
 import { formatCentsUsd } from "@lib/util/money"
 import { OffsetVariant, ProductDetail, SizeOption } from "../../data/types"
@@ -119,6 +120,13 @@ const PurchasePanel = ({
       toast.success("Added to cart", {
         description: `${quantity} × ${product.name} (${selectedSize.diameter}×${selectedSize.width})`,
       })
+      track("add_to_cart", {
+        product_id: product.id,
+        product_handle: product.handle,
+        quantity,
+        value: lineTotalCents !== null ? lineTotalCents / 100 : 0,
+        currency: "USD",
+      })
     } catch {
       toast.error("Couldn't add to cart", {
         description: "Please try again in a moment.",
@@ -146,6 +154,13 @@ const PurchasePanel = ({
         setBuying(false)
         return
       }
+      track("begin_checkout", {
+        product_id: product.id,
+        product_handle: product.handle,
+        quantity,
+        value: lineTotalCents !== null ? lineTotalCents / 100 : 0,
+        currency: "USD",
+      })
       router.push(`/${countryCode}/checkout?step=address`)
       // Leave `buying` true through the navigation transition.
     } catch {
@@ -326,7 +341,7 @@ const PurchasePanel = ({
             style={{
               fontSize: 12,
               fontWeight: 600,
-              color: "var(--orange)",
+              color: "var(--orange-deep)",
               marginTop: 10,
             }}
           >

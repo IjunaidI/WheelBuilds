@@ -160,7 +160,7 @@ After the config change, existing products must be backfilled into Meilisearch (
 
 File: [`storefront/src/modules/discovery/data/get-products.ts`](../../../storefront/src/modules/discovery/data/get-products.ts) (the integration seam at ~line 81). Keep all types stable so no consumer changes.
 
-- Rewrite `getDiscoveryProducts(query)` to query Meilisearch via the existing client ([`search-client.ts`](../../../storefront/src/lib/search-client.ts)):
+- Rewrite `getDiscoveryProducts(query)` to query Meilisearch via the existing client (`lib/search-client.ts` (later removed in WB-096)):
   - Build the `filter` expression from `DiscoveryFilters` (brand / finish / diameters / boltPatterns / price range). Note: `DiscoveryFilters` has **no width filter** — width is indexed for fitment/PDP but not exposed as a browse facet.
   - `sort` from `sortableAttributes`; paginate (`DEFAULT_PAGE_SIZE`).
   - Request `facets`; map `facetDistribution` -> the existing `FacetCounts` shape. Use **disjunctive faceting** (each facet counted with the *other* filters applied), as the file's own comment already calls for.

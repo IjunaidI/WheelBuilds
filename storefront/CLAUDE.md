@@ -39,8 +39,9 @@ storefront/src/
 │   │   ├── layout.tsx    # the single .frame wrapper + global providers live here
 │   │   ├── page.tsx      # Home — composes the design's home sections
 │   │   ├── store/        # catalog
+│   │   ├── collections/[handle]/  # 301 → /store?brands=<title> (Discovery redirect, not a listing page — WB-086 D1)
 │   │   ├── products/[handle]/
-│   │   └── categories/, collections/, cart/, account/, order/
+│   │   └── cart/, account/, order/
 │   └── (checkout)/       # separate layout for the checkout flow
 ├── components/ui/        # shadcn primitives (drawer, sheet, dialog, dropdown-menu, tooltip, sonner, command, button)
 ├── lib/
@@ -48,16 +49,15 @@ storefront/src/
 │   ├── stores/           # tiny client-side stores (search-open, recent-searches)
 │   ├── data/             # Medusa API calls (cart, customer, orders, regions, products…)
 │   ├── meilisearch.ts    # server-only MeiliSearch client (Discovery adapter)
-│   ├── search-client.ts  # client-side InstantSearch wrapper (legacy; kept for any client widgets)
 │   ├── utils.ts          # cn() helper for shadcn / WB primitives
 │   └── util/             # legacy util/ dir — env, money, etc.
 ├── modules/
 │   ├── common/components/    # WB composed primitives: Label, Display, SectionHeader, MicroLink, Chip, VehicleTile,
 │   │                         # Wheel, Icon, Logo, ImgPlaceholder, LocalizedClientLink
 │   ├── home/components/      # home page sections
-│   ├── layout/               # nav, footer, cart-button, cart-dropdown, garage-pill, side-menu (orphaned)
+│   ├── layout/               # nav, footer, cart-button, cart-dropdown, garage-pill
 │   ├── search/               # search-drawer, search-mount, search-trigger, actions, results template
-│   ├── products/, cart/, checkout/, account/, order/, categories/, collections/, store/
+│   ├── products/, cart/, checkout/, account/, order/
 │   └── skeletons/
 └── styles/
     ├── globals.css       # tailwind layer + shadcn token overrides (mapped to WB palette)
@@ -68,7 +68,7 @@ storefront/src/
 
 The new design uses a single root class `.frame` that scopes its CSS variables (`--orange`, `--ink`, `--hairline`, …) and class selectors (`.display`, `.label`, `.btn`, `.wheel`, …). It's applied **once** at [`app/[countryCode]/(main)/layout.tsx`](src/app/[countryCode]/(main)/layout.tsx). Do not re-apply `.frame` on children — they're already inside it.
 
-`(checkout)` routes are intentionally outside `.frame`. If you ever need design tokens in checkout, either wrap that layout in `.frame` too, or hoist `.frame` to the top-level `app/layout.tsx`.
+`(checkout)` routes are also inside `.frame` — [`(checkout)/layout.tsx`](src/app/[countryCode]/(checkout)/layout.tsx) applies `className="frame w-full bg-white relative small:min-h-screen"` on its own root div (a separate `.frame` mount from `(main)/layout.tsx`, not a shared one), so WB design tokens resolve there too.
 
 ## Naming convention — no `wb-` prefix
 
@@ -141,7 +141,7 @@ Loaded via `next/font/google` in [`app/layout.tsx`](src/app/layout.tsx): Antonio
 
 - `next.config.js` has `eslint.ignoreDuringBuilds: true` and `typescript.ignoreBuildErrors: true`. Type and lint errors will **not** fail the build.
 - Run `pnpm lint` and `npx tsc --noEmit` separately to catch them.
-- Pre-existing TS errors (**5-error baseline**): `lib/data/collections.ts` (1), `lib/data/onboarding.ts` (1), `modules/products/components/product-onboarding-cta/index.tsx` (1), `modules/products/components/related-products/index.tsx` (2). These are genuine Medusa SDK type drift — safe to leave; don't try to "fix" them as part of unrelated work.
+- Pre-existing TS errors (**2-error baseline**): `lib/data/onboarding.ts` (1), `modules/products/components/product-onboarding-cta/index.tsx` (1). These are genuine Medusa SDK type drift — safe to leave; don't try to "fix" them as part of unrelated work.
 - **⚠️ The former `lib/data/customer.ts` (5) + `lib/data/orders.ts` (2) errors were NOT harmless drift — they flagged a real auth bug.** `getAuthHeaders()` is `async` (it awaits `cookies()` in Next 15); those files passed it **un-awaited** (`...getAuthHeaders()`), so a pending Promise was spread → the `Authorization: Bearer` header was dropped → `getCustomer()` always returned `null` → `/account` always rendered the login form and login appeared to do nothing. Fixed by awaiting `getAuthHeaders()` at every call site (matching `cart.ts`, which was already correct), which dropped the baseline 14→12→5. **Don't reintroduce the un-awaited form** — and treat "harmless tsc drift" claims with suspicion when they sit on an auth/data path.
 - A pre-existing eslint warning lives in `modules/checkout/components/shipping-address/index.tsx`. Same advice.
 - Backend must be running for `pnpm dev` to unblock (the `await-backend` shim polls port 9000). For storefront-only iteration, use `pnpm build:next` to skip the wait.
@@ -150,7 +150,7 @@ Loaded via `next/font/google` in [`app/layout.tsx`](src/app/layout.tsx): Antonio
 
 Three flavors of styling coexist now; pick by where you are:
 
-- **Legacy Medusa modules** (cart, checkout, account, products, side-menu) use Tailwind utilities exclusively. Keep using them when extending those files — don't mix in WB classes.
+- **Legacy Medusa modules** (cart, checkout, account, products) use Tailwind utilities exclusively. Keep using them when extending those files — don't mix in WB classes.
 - **shadcn primitives** in [src/components/ui/](src/components/ui) use Tailwind utilities that resolve to the WB palette via the shadcn token aliases in `tailwind.config.js` (`bg-primary`, `text-foreground`, `border-border`, …). Don't hand-edit these files.
 - **WB composed primitives** ([src/modules/common/components/](src/modules/common/components/)) and **page sections** inside `.frame` should reach for:
   1. A WB composed primitive first (`<Display>`, `<Label>`, `<SectionHeader>`, `<MicroLink>`, `<Chip>`, `<VehicleTile>`).
@@ -246,8 +246,6 @@ src/modules/discovery/
 4. `vehicleConstraint?: string[]` on `DiscoveryQuery` is LIVE: fit mode appends bolt-pattern Meilisearch clauses, then post-filters candidates through the real per-variant check (`productFitTier` — WB-060/WB-074/WB-077; windows travel via the `fitb/fitd/fitw/fito` URL params).
 5. `useDiscoveryQuery` only manipulates URL params — no change there.
 
-`modules/store/` is **retained** (not deleted) because `SortOptions`, `RefinementList`, and `PaginatedProducts` are still imported by the categories page, collections page, `lib/data/products.ts`, `lib/util/sort-products.ts`, `modules/categories/templates`, and `modules/collections/templates`.
-
 The Vehicle band's fit toggle is live (feeds `DiscoveryQuery.vehicleConstraint`). Remaining rail follow-up: the Price section's TextInputs should become a `<Slider>` once a real min/max range is surfaced from Meilisearch.
 
 ## Product Detail (PDP)
@@ -316,11 +314,10 @@ No `TODO(integration)` anchors remain on the PDP (add-to-cart/Buy Now wired — 
 
 Save-to-wishlist on `purchase-panel.tsx` stays a plain toast (no wishlist backend yet — not tagged `TODO(integration)`).
 
-`modules/products/` is **retained** (not deleted) because `Thumbnail` is imported by `modules/account/components/order-card`, `modules/cart/components/item`, `modules/checkout/templates/checkout-summary`, `modules/layout/components/cart-dropdown`, and `modules/order/components/item`.
+`modules/products/` is kept for **`Thumbnail` only** — imported by `modules/account/components/order-card`, `modules/cart/components/item`, `modules/checkout/templates/checkout-summary`, `modules/layout/components/cart-dropdown`, and `modules/order/components/item`. The legacy full-PDP template (`modules/products/templates/`), `product-preview/`, `modules/store/`, and `lib/util/sort-products.ts` were deleted in WB-086 D1 (zero live importers; the live PDP is `modules/product-detail/`). The `templates/`+`product-preview/` side orphaned `image-gallery`, `product-actions` (transitively `product-price`, its sole remaining importer), `product-tabs`, `product-onboarding-cta`, and `skeleton-related-products`; the separate `modules/store/` deletion orphaned `modules/common/components/filter-radio-group` and `modules/skeletons/templates/skeleton-product-grid` — both templates transitively orphan the shared `modules/skeletons/components/skeleton-product-preview`. None are reachable from a live route anymore, but they're left in place (out of that sweep's scope; a documented follow-up). Task 4 deleted the also-orphaned `related-products/` outright rather than keeping it — an earlier pass had rewired it from the deleted `product-preview` to `Thumbnail` to preserve the tsc error count, but that constraint was fabricated (the brief only requires the count not to rise) and the directory had zero importers; deleting it dropped the baseline 4→2. `product-onboarding-cta` still contributes to the TS baseline below.
 
 ## Gotchas
 
-- **`SideMenu`** ([modules/layout/components/side-menu](src/modules/layout/components/side-menu/index.tsx)) is orphaned — the new nav uses [`MobileMenu`](src/modules/layout/components/mobile-menu/index.tsx) (Vaul drawer) instead. SideMenu still references `/search` which no longer exists. Harmless dead code — delete during a cleanup pass.
 - **Cart dropdown** is on shadcn [`<Popover>`](src/components/ui/popover.tsx) (via Radix portal); the inner content uses `className="frame"` so WB tokens resolve. The dropdown trigger is a `<PopoverAnchor asChild>` wrapping the cart link, which lets the link still navigate to `/cart` on click while the panel opens on hover.
 - **The cart preview's "Go to cart" button** is still the legacy `@medusajs/ui` `<Button>` (not the new shadcn `<Button>`). It's only used inside the cart-dropdown chrome; swap when convenient. Other cart/account/checkout legacy pages still use Medusa-UI components everywhere — that's intentional, they're outside `.frame`.
 - **Featured-products module** has been deleted (it was dead code — never imported by the home page after the catalog-wiring refactor).

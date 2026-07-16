@@ -99,6 +99,7 @@ const Header = ({ onClose }: HeaderProps) => {
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           placeholder="Search wheels, brands, fitments…"
+          aria-label="Search wheels, brands, fitments"
           type="search"
           autoComplete="off"
           spellCheck={false}

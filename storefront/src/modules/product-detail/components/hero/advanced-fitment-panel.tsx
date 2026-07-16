@@ -81,7 +81,7 @@ const AdvancedFitmentPanel = ({
       >
         <span className="inline-flex items-center gap-2.5 flex-wrap">
           <span
-            className="font-[var(--mono)] text-[10px] tracking-[0.08em] text-[var(--orange)] px-1.5 py-0.5 rounded-sm"
+            className="font-[var(--mono)] text-[10px] tracking-[0.08em] text-[var(--orange-deep)] px-1.5 py-0.5 rounded-sm"
             style={{ background: "rgba(255,106,0,0.08)" }}
           >
             PRO
@@ -176,7 +176,7 @@ const AdvancedFitmentPanel = ({
               { l: "Hub-to-lock", v: current.hubToLockIn ?? "—" },
             ].map((s) => (
               <div key={s.l} className="bg-white px-3 py-2.5">
-                <div className="text-[9px] font-[var(--mono)] font-semibold uppercase tracking-[0.06em] text-[var(--orange)] mb-1">
+                <div className="text-[9px] font-[var(--mono)] font-semibold uppercase tracking-[0.06em] text-[var(--orange-deep)] mb-1">
                   {s.l}
                 </div>
                 <div className="font-[var(--display)] font-black text-[16px] text-[var(--ink)]">

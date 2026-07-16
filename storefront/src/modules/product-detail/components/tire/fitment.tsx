@@ -182,7 +182,7 @@ const TireFitment = ({ product }: TireFitmentProps) => {
         Don&apos;t see your vehicle?{" "}
         <LocalizedClientLink
           href="/contact"
-          className="text-[var(--orange)] font-semibold no-underline hover:underline"
+          className="text-[var(--orange-deep)] font-semibold no-underline hover:underline"
         >
           Submit your vehicle for a fitment check
         </LocalizedClientLink>{" "}

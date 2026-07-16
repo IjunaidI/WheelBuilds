@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react"
 import { TireProductDetail, TireSizeOption } from "../../../data/types"
 import { sizesForRim, pickDefaultTireSize } from "../../../data/tire/tire-size-options"
+import { pickDefaultTireLeaf } from "../../../data/pick-default-leaf"
 import { headlinePriceCents } from "../../../data/price-truth"
 import { useGarage } from "@lib/garage/use-garage"
 import { tireFitsVehicle } from "@lib/fitment/tire-fits-vehicle"
@@ -65,9 +66,12 @@ const TireHero = ({ product }: TireHeroProps) => {
     setShowAll(false)
   }, [activeId])
 
+  // Same helper `productJsonLd`'s tire path calls (`pick-default-leaf.ts`) so
+  // the two surfaces can't drift apart (WB-095 Task 5 fix wave) — it's a
+  // thin wrapper around `pickDefaultTireSize`, unchanged in behavior.
   const defaultSize = useMemo<TireSizeOption | undefined>(
-    () => pickDefaultTireSize(product.sizeOptions),
-    [product.sizeOptions]
+    () => pickDefaultTireLeaf(product),
+    [product]
   )
 
   const [selectedRim, setSelectedRim] = useState<number>(

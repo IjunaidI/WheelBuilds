@@ -1,5 +1,6 @@
 import { Metadata } from "next"
 
+import { canonicalUrl } from "@lib/util/canonical"
 import ProductDetailTemplate from "@modules/product-detail/templates"
 import TireDetailTemplate from "@modules/product-detail/templates/tire-detail"
 import {
@@ -31,14 +32,41 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   // WB-090 P10: an empty vendor description used to ship an empty <meta
   // name="description">. Wheel-only templated fallback (tires aren't in
   // scope for this fix); a wheel with a real description is unaffected.
+  // `product.name` already begins with the brand (see buildGroupTitle /
+  // buildTireGroupTitle in vendor-sync, and retitle-wheels.ts's backfill) —
+  // prepending `product.brand` again here doubled it, e.g. "American Force
+  // Cast American Force Cast 004". Verified live: 100% of sampled wheel +
+  // tire products' titles already start with metadata.brand.
   const description =
     product.description ||
     (product.kind === "wheel"
-      ? `${product.brand} ${product.name} wheels — sizes, finishes, live fitment check.`
+      ? `${product.name} wheels — sizes, finishes, live fitment check.`
       : product.description)
+  // Suffix comes from the root `metadata.title.template` (WB-095 X1) — don't
+  // hand-roll "| Wheel Builds" here or it doubles up.
+  const title = product.name
+  // Vendor CDN thumbnail if present. When absent, the `images` key must be
+  // OMITTED (not set to `undefined`) — Next's static-file fallback only
+  // engages via `!source.openGraph.hasOwnProperty('images')`
+  // (node_modules/next/dist/lib/metadata/resolve-metadata.js), and the
+  // `{ images }` shorthand sets that key to `undefined` while still leaving
+  // it present, which skips the fallback and emits no og:image at all.
+  const images = product.thumbnail ? [product.thumbnail] : undefined
   return {
-    title: `${product.brand} ${product.name} | Wheel Builds`,
+    title,
     description,
+    openGraph: { title, description, ...(images ? { images } : {}) },
+    twitter: {
+      card: "summary_large_image",
+      title,
+      description,
+      ...(images ? { images } : {}),
+    },
+    // WB-095 X2: pinned to DEFAULT_REGION regardless of the country code
+    // this request happened to resolve to (WB-071 F-D single-region lock).
+    // `handle` is region-agnostic, so the same product's canonical is
+    // identical no matter which /<countryCode>/products/<handle> served it.
+    alternates: { canonical: canonicalUrl(`/products/${handle}`) },
   }
 }
 

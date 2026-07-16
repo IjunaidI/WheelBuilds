@@ -1,6 +1,7 @@
 import { Metadata } from "next"
 import { redirect } from "next/navigation"
 
+import { canonicalUrl } from "@lib/util/canonical"
 import DiscoveryTemplate from "@modules/discovery/templates"
 import {
   getDiscoveryProducts,
@@ -12,6 +13,9 @@ import { DEFAULT_PAGE_SIZE } from "@modules/discovery/data/types"
 export const metadata: Metadata = {
   title: "All wheels",
   description: "Explore the full Wheel Builds catalog.",
+  // WB-095 X2: pinned to DEFAULT_REGION regardless of the country code this
+  // request happened to resolve to (WB-071 F-D single-region lock).
+  alternates: { canonical: canonicalUrl("/store") },
 }
 
 type StorePageProps = {
@@ -24,8 +28,8 @@ type StorePageProps = {
  * (getDiscoveryProducts) — see `modules/discovery/data/get-products.ts`.
  *
  * The legacy `modules/store/` (`StoreTemplate`, `PaginatedProducts`,
- * `RefinementList`) is retained because other routes (categories, collections)
- * still import from it.
+ * `RefinementList`) was deleted in WB-086 D1 — it was already orphaned
+ * (this page has rendered `DiscoveryTemplate` since Discovery shipped).
  */
 export default async function StorePage({ searchParams, params }: StorePageProps) {
   const sp = await searchParams

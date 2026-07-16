@@ -27,7 +27,10 @@ const MicroLink = ({
   className,
   children,
 }: MicroLinkProps) => {
-  const color = tone === "accent" ? "var(--orange)" : "var(--ink)"
+  // WB-096 X6: --orange-deep — this is 12px mono accent text, needs the
+  // 4.5:1 AA floor. The trailing arrow icon keeps its own hardcoded fill
+  // below (icon glyph, not text — out of this task's scope).
+  const color = tone === "accent" ? "var(--orange-deep)" : "var(--ink)"
   return (
     <LocalizedClientLink
       href={href}

@@ -11,6 +11,7 @@ import LocalizedClientLink from "@modules/common/components/localized-client-lin
 import { Button } from "@/components/ui/button"
 import { Separator } from "@/components/ui/separator"
 import { addToCart } from "@lib/data/cart"
+import { track } from "@lib/analytics/track"
 import { useGarage } from "@lib/garage/use-garage"
 import { openSearch } from "@lib/stores/search-store"
 import { tireFitVerdict, TireFitSpec } from "@lib/fitment/tire-fits-vehicle"
@@ -117,6 +118,13 @@ const TirePurchasePanel = ({
       toast.success("Added to cart", {
         description: `${quantity} × ${product.name} · ${selectedSize.sizeLabel}`,
       })
+      track("add_to_cart", {
+        product_id: product.id,
+        product_handle: product.handle,
+        quantity,
+        value: lineTotalCents !== null ? lineTotalCents / 100 : 0,
+        currency: "USD",
+      })
     } catch {
       toast.error("Couldn't add to cart", {
         description: "Please try again in a moment.",
@@ -144,6 +152,13 @@ const TirePurchasePanel = ({
         setBuying(false)
         return
       }
+      track("begin_checkout", {
+        product_id: product.id,
+        product_handle: product.handle,
+        quantity,
+        value: lineTotalCents !== null ? lineTotalCents / 100 : 0,
+        currency: "USD",
+      })
       router.push(`/${countryCode}/checkout?step=address`)
       // Leave `buying` true through the navigation transition.
     } catch {
@@ -295,7 +310,7 @@ const TirePurchasePanel = ({
             style={{
               fontSize: 12,
               fontWeight: 600,
-              color: "var(--orange)",
+              color: "var(--orange-deep)",
               marginTop: 10,
             }}
           >

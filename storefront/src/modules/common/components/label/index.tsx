@@ -11,7 +11,10 @@ type LabelProps = {
 }
 
 const toneColor: Record<NonNullable<LabelProps["tone"]>, string> = {
-  accent: "var(--orange)",
+  // WB-096 X6: --orange-deep, not --orange — this is 11px accent text and
+  // needs the 4.5:1 AA floor. The orange leading bar below stays on --orange
+  // (decorative background, not text).
+  accent: "var(--orange-deep)",
   muted: "var(--ink-soft)",
   ink: "var(--ink)",
 }

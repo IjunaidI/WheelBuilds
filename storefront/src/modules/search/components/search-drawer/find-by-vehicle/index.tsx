@@ -163,7 +163,7 @@ const FindByVehicle = ({ onClose }: FindByVehicleProps) => {
                   fontSize: 11,
                   fontFamily: "var(--mono)",
                   letterSpacing: "0.04em",
-                  color: "var(--orange)",
+                  color: "var(--orange-deep)",
                   textDecoration: "underline",
                   background: "none",
                   border: "none",

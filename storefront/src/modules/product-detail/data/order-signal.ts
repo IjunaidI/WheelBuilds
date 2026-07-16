@@ -12,7 +12,11 @@
  * anything else, including the key being absent) render exactly as before.
  */
 
-import { SHIP_LEAD_TIME, SPECIAL_ORDER_LEAD_TIME } from "./pdp-config"
+import {
+  SHIP_LEAD_TIME,
+  SPECIAL_ORDER_LEAD_TIME,
+  SPECIAL_ORDER_UNAVAILABLE,
+} from "./pdp-config"
 
 export type LeadTimeAvailability = "in_stock" | "low_stock" | "out_of_stock"
 
@@ -32,16 +36,28 @@ export function isSpecialOrder(invOrderType: unknown): boolean {
  * The lead-time line for the purchase-panel CTA area — out of the
  * hover-only tooltip (WB-098 Task 4) so it's visible on touch too.
  *
- * Special order takes priority over availability: a real SO fulfillment
- * still carries the vendor's extended lead time regardless of what the
- * on-hand quantity happens to read, so the warning renders even for an
- * `out_of_stock` SO leaf (the buy button itself is disabled by the existing,
- * unrelated `canPurchasePrice` gate — this only decides what the CTA's
- * lead-time copy says).
+ * Three distinct outcomes, in priority order:
  *
- * `low_stock` is treated the same as `in_stock` — it is still a buyable,
- * ships-soon variant, just a low count; only `out_of_stock` (and non-SO) has
- * no lead time left to promise.
+ * 1. **`isSpecialOrder && out_of_stock`** — WB-098 Task 4 fix-wave (Important
+ *    review finding). Special-order stock in this vendor feed is essentially
+ *    ALWAYS `qty: 0` (special-order stock is never counted on-hand), so this
+ *    is the common real-world SO case, not an edge case. In this state
+ *    `canPurchasePrice` disables Add to cart — so the old behavior (falling
+ *    into the branch below and returning `SPECIAL_ORDER_LEAD_TIME`, "…
+ *    extended lead time") read as "you can still order this, it'll just take
+ *    longer" sitting right below a disabled button: a false promise. This
+ *    branch must be checked BEFORE the general SO branch, or that branch
+ *    would swallow it. Returns `SPECIAL_ORDER_UNAVAILABLE` — still names it
+ *    as special-order (honest, explains WHY it's out of stock) but does not
+ *    imply a self-serve, actionable lead time.
+ * 2. **`isSpecialOrder` and buyable (`in_stock`/`low_stock`)** — a real SO
+ *    fulfillment still carries the vendor's extended lead time regardless of
+ *    the on-hand count; the shopper CAN act (the button is enabled), so the
+ *    lead-time promise is honest here. Returns `SPECIAL_ORDER_LEAD_TIME`.
+ * 3. **`out_of_stock`, not SO** — nothing to promise. Returns `null`.
+ * 4. **Everything else** (`in_stock`/`low_stock`, not SO) — the normal ships
+ *    copy. `low_stock` is treated the same as `in_stock` — still a buyable,
+ *    ships-soon variant, just a low count. Returns `SHIP_LEAD_TIME`.
  */
 export function leadTimeLine({
   availability,
@@ -50,6 +66,9 @@ export function leadTimeLine({
   availability: LeadTimeAvailability
   isSpecialOrder: boolean
 }): string | null {
+  if (isSpecialOrder && availability === "out_of_stock") {
+    return SPECIAL_ORDER_UNAVAILABLE
+  }
   if (isSpecialOrder) return SPECIAL_ORDER_LEAD_TIME
   if (availability === "out_of_stock") return null
   return SHIP_LEAD_TIME

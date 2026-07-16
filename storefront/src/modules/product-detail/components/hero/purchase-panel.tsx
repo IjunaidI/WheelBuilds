@@ -19,7 +19,12 @@ import { track } from "@lib/analytics/track"
 import { insufficientStockMessage } from "@lib/util/error-message"
 import { formatCentsUsd } from "@lib/util/money"
 import { OffsetVariant, ProductDetail, SizeOption } from "../../data/types"
-import { DEFAULT_WHEEL_QTY, LOW_STOCK_THRESHOLD, TRUST_STRIP } from "../../data/pdp-config"
+import {
+  DEFAULT_WHEEL_QTY,
+  LOW_STOCK_THRESHOLD,
+  SPECIAL_ORDER_LEAD_TIME,
+  TRUST_STRIP,
+} from "../../data/pdp-config"
 import { clampQty, stepperCap } from "../../data/qty-bounds"
 import { canPurchasePrice } from "../../data/price-truth"
 import { setPriceLine } from "../../data/set-price"
@@ -114,6 +119,14 @@ const PurchasePanel = ({
     availability: selectedVariant?.availability ?? selectedSize.availability,
     isSpecialOrder,
   })
+  // Only the ACTIONABLE special-order case (a real lead time on a variant
+  // the shopper can still add to cart) gets the amber warning treatment
+  // below. The OOS+SO case (`SPECIAL_ORDER_UNAVAILABLE`) renders with the
+  // same plain/muted style as a normal ships-soon line — WB-098 Task 4
+  // fix-wave (Important review finding): that cell is informational, not a
+  // "heads up, act carefully" warning, since Add to cart is already disabled
+  // for it.
+  const isActionableSpecialOrder = leadTime === SPECIAL_ORDER_LEAD_TIME
 
   const handleAddToCart = async () => {
     if (!selectedVariant) return
@@ -355,13 +368,16 @@ const PurchasePanel = ({
 
       {/* Lead-time / special-order line (WB-098 Task 4) — moved out of the
           hover-only tooltip so it's visible at the CTA, including on touch.
-          Special order gets a visually distinct warning treatment, reusing
-          the existing amber "CHECK FIT" tokens (rgba(184,134,11,*) / #8A6508)
-          from the fit chip below and fit-banner.tsx — not a new color. */}
+          Only the ACTIONABLE special-order case (real lead time, addable)
+          gets a visually distinct warning treatment, reusing the existing
+          amber "CHECK FIT" tokens (rgba(184,134,11,*) / #8A6508) from the fit
+          chip below and fit-banner.tsx — not a new color. The OOS+SO case
+          (fix-wave) reuses the plain muted style since there's no button to
+          warn the shopper about acting on. */}
       {leadTime && (
         <p
           style={
-            isSpecialOrder
+            isActionableSpecialOrder
               ? {
                   fontSize: 12,
                   fontWeight: 600,

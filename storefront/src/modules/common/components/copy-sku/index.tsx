@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { toast } from "sonner"
 import Label from "@modules/common/components/label"
 
@@ -19,13 +19,31 @@ type CopySkuProps = {
  */
 const CopySku = ({ sku, className }: CopySkuProps) => {
   const [copied, setCopied] = useState(false)
+  // Holds the pending "Copied" -> "Copy" revert timer so a rapid re-click (or
+  // an unmount, e.g. the shopper switches variants right after copying) can
+  // clear it instead of letting it fire against stale/unmounted state.
+  const revertTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+
+  useEffect(() => {
+    return () => {
+      if (revertTimeoutRef.current) {
+        clearTimeout(revertTimeoutRef.current)
+      }
+    }
+  }, [])
 
   const handleCopy = async () => {
     try {
       await navigator.clipboard.writeText(sku)
       setCopied(true)
       toast.success("Copied", { description: sku })
-      window.setTimeout(() => setCopied(false), 2000)
+      if (revertTimeoutRef.current) {
+        clearTimeout(revertTimeoutRef.current)
+      }
+      revertTimeoutRef.current = setTimeout(() => {
+        setCopied(false)
+        revertTimeoutRef.current = null
+      }, 2000)
     } catch {
       toast.error("Couldn't copy", {
         description: "Please copy it manually.",

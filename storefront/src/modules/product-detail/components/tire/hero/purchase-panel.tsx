@@ -19,7 +19,12 @@ import { tireFitVerdict, TireFitSpec } from "@lib/fitment/tire-fits-vehicle"
 import { insufficientStockMessage } from "@lib/util/error-message"
 import { formatCentsUsd } from "@lib/util/money"
 import { TireProductDetail, TireSizeOption } from "../../../data/types"
-import { DEFAULT_TIRE_QTY, LOW_STOCK_THRESHOLD, TRUST_STRIP } from "../../../data/pdp-config"
+import {
+  DEFAULT_TIRE_QTY,
+  LOW_STOCK_THRESHOLD,
+  SPECIAL_ORDER_LEAD_TIME,
+  TRUST_STRIP,
+} from "../../../data/pdp-config"
 import { clampQty, stepperCap } from "../../../data/qty-bounds"
 import { canPurchasePrice } from "../../../data/price-truth"
 import { setPriceLine } from "../../../data/set-price"
@@ -112,6 +117,10 @@ const TirePurchasePanel = ({
   const leadTime = selectedSize
     ? leadTimeLine({ availability: selectedSize.availability, isSpecialOrder })
     : null
+  // Only the ACTIONABLE special-order case (a real lead time on a size the
+  // shopper can still add to cart) gets the amber warning treatment below —
+  // mirrors the wheel panel (see its comment for the fix-wave reasoning).
+  const isActionableSpecialOrder = leadTime === SPECIAL_ORDER_LEAD_TIME
 
   const handleAddToCart = async () => {
     if (!selectedSize) return
@@ -326,11 +335,12 @@ const TirePurchasePanel = ({
       </div>
 
       {/* Lead-time / special-order line (WB-098 Task 4) — mirrors the wheel
-          panel exactly (see its comment for the amber-token reasoning). */}
+          panel exactly (see its comment for the amber-token reasoning and the
+          fix-wave's isActionableSpecialOrder distinction). */}
       {leadTime && (
         <p
           style={
-            isSpecialOrder
+            isActionableSpecialOrder
               ? {
                   fontSize: 12,
                   fontWeight: 600,

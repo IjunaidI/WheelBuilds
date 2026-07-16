@@ -38,6 +38,23 @@ export const SPECIAL_ORDER_LEAD_TIME =
   "Special order — extended lead time"
 
 /**
+ * CTA-area copy when the selected variant/size is BOTH vendor special-order
+ * AND out of stock (WB-098 Task 4 fix-wave — Important review finding).
+ * Special-order stock in this vendor feed is essentially always `qty: 0`
+ * (special-order stock is never counted on-hand), so this combination is the
+ * COMMON real-world SO case, not an edge case — see `order-signal.ts`'s
+ * `leadTimeLine`. In that state `canPurchasePrice` disables Add to cart, so
+ * `SPECIAL_ORDER_LEAD_TIME`'s "extended lead time" wording would falsely
+ * promise a self-serve order the shopper has no button to act on. This copy
+ * stays honest (still names it as special-order, so the shopper understands
+ * WHY it's out of stock) without implying orderability through a disabled
+ * control.
+ */
+export const SPECIAL_ORDER_UNAVAILABLE =
+  process.env.NEXT_PUBLIC_PDP_SPECIAL_ORDER_UNAVAILABLE ??
+  "Special order — contact us to order"
+
+/**
  * Trailing noun on the set-total row under the per-unit price (WB-098 Task
  * 2), e.g. "$369.99 × 4 = $1,479.96 per set". Wheels and tires both sell in
  * sets of 4 today so one shared const covers both panels; split into

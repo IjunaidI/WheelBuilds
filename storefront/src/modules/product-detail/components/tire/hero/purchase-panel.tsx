@@ -21,6 +21,7 @@ import { TireProductDetail, TireSizeOption } from "../../../data/types"
 import { DEFAULT_TIRE_QTY, LOW_STOCK_THRESHOLD, TRUST_STRIP } from "../../../data/pdp-config"
 import { clampQty, stepperCap } from "../../../data/qty-bounds"
 import { canPurchasePrice } from "../../../data/price-truth"
+import { setPriceLine } from "../../../data/set-price"
 
 type TirePurchasePanelProps = {
   product: TireProductDetail
@@ -97,6 +98,10 @@ const TirePurchasePanel = ({
   // Pre-multiplied line total; null propagates "Price unavailable" into both
   // buy buttons instead of a fabricated $0.00 line.
   const lineTotalCents = unitPriceCents !== null ? unitPriceCents * quantity : null
+  // "$X × N = $Y per set" sub-line under the PER TIRE price (WB-098 Task 2)
+  // — mirrors the wheel panel exactly, same unitPriceCents/quantity as
+  // lineTotalCents above.
+  const setPrice = setPriceLine(unitPriceCents, quantity)
 
   const handleAddToCart = async () => {
     if (!selectedSize) return
@@ -203,6 +208,14 @@ const TirePurchasePanel = ({
           </>
         )}
       </div>
+
+      {/* Set-total sub-line (WB-098 Task 2) — mirrors the wheel panel;
+          hidden for a qty-1 selection or an unpriced size. */}
+      {setPrice.show && (
+        <div className="mt-1.5">
+          <Label tone="muted">{setPrice.text}</Label>
+        </div>
+      )}
 
       {product.description && (
         <p

@@ -21,6 +21,7 @@ import { OffsetVariant, ProductDetail, SizeOption } from "../../data/types"
 import { DEFAULT_WHEEL_QTY, LOW_STOCK_THRESHOLD, TRUST_STRIP } from "../../data/pdp-config"
 import { clampQty, stepperCap } from "../../data/qty-bounds"
 import { canPurchasePrice } from "../../data/price-truth"
+import { setPriceLine } from "../../data/set-price"
 
 type PurchasePanelProps = {
   product: ProductDetail
@@ -99,6 +100,10 @@ const PurchasePanel = ({
   // Pre-multiplied line total; null propagates "Price unavailable" into both
   // buy buttons instead of a fabricated $0.00 line.
   const lineTotalCents = unitPriceCents !== null ? unitPriceCents * quantity : null
+  // "$X × N = $Y per set" sub-line under the PER WHEEL price (WB-098 Task 2)
+  // — same unitPriceCents/quantity as lineTotalCents above, just formatted
+  // for display instead of fed to the buy buttons.
+  const setPrice = setPriceLine(unitPriceCents, quantity)
 
   const handleAddToCart = async () => {
     if (!selectedVariant) return
@@ -211,6 +216,15 @@ const PurchasePanel = ({
           </>
         )}
       </div>
+
+      {/* Set-total sub-line (WB-098 Task 2) — only when qty > 1 and the
+          unit price resolved; hidden for a qty-1 selection or an unpriced
+          variant (setPriceLine already covers both via `show`). */}
+      {setPrice.show && (
+        <div className="mt-1.5">
+          <Label tone="muted">{setPrice.text}</Label>
+        </div>
+      )}
 
       {/* WB-090 P10: guard the empty description (mirrors the tire panel's
           `{product.description && …}`) instead of rendering a blank <p>. */}

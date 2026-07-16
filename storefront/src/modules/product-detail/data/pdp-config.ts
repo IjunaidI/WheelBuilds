@@ -27,6 +27,15 @@ export const FREE_SHIP_THRESHOLD_USD = intEnv(process.env.NEXT_PUBLIC_PDP_FREE_S
 export const SHIP_LEAD_TIME = process.env.NEXT_PUBLIC_PDP_SHIP_LEAD_TIME ?? "ships 2–3 days"
 
 /**
+ * Trailing noun on the set-total row under the per-unit price (WB-098 Task
+ * 2), e.g. "$369.99 × 4 = $1,479.96 per set". Wheels and tires both sell in
+ * sets of 4 today so one shared const covers both panels; split into
+ * per-panel consts if the wording ever needs to diverge (e.g. "per set of 4
+ * tires").
+ */
+export const SET_PRICE_SUFFIX = process.env.NEXT_PUBLIC_PDP_SET_PRICE_SUFFIX ?? "per set"
+
+/**
  * Trust-strip cells in the purchase panel. `href` is optional — only the
  * "Fitment guarantee" cell links out today (to the real fitment-returns
  * section on /returns); the other cells render as plain text.

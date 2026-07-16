@@ -24,13 +24,18 @@ const CopySku = ({ sku, className }: CopySkuProps) => {
   // clear it instead of letting it fire against stale/unmounted state.
   const revertTimeoutRef = useRef<NodeJS.Timeout | null>(null)
 
+  // Reset to "Copy" whenever the selected variant's `sku` changes (the panels
+  // reuse this instance as the shopper switches size/offset — without this the
+  // "Copied" label would carry over onto a different SKU that was never copied),
+  // and clear the pending revert timer on that switch and on unmount.
   useEffect(() => {
+    setCopied(false)
     return () => {
       if (revertTimeoutRef.current) {
         clearTimeout(revertTimeoutRef.current)
       }
     }
-  }, [])
+  }, [sku])
 
   const handleCopy = async () => {
     try {

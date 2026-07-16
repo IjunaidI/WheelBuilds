@@ -1,6 +1,7 @@
 import { HttpTypes } from "@medusajs/types"
 import { OffsetVariant, SizeOption } from "./types"
 import { LOW_STOCK_THRESHOLD } from "./pdp-config"
+import { deriveBackspacing } from "./backspacing"
 
 /** Coerce an unknown to a finite number, else 0. Shared by the PDP loader. */
 export const num = (v: unknown): number =>
@@ -160,7 +161,7 @@ export function groupVariantsIntoSizes(
       variantWeightGrams > 0 ? gramsToLb(variantWeightGrams) : productWeightLb
     const offset: OffsetVariant = {
       value: offsetMm,
-      backspaceIn: "",
+      backspaceIn: deriveBackspacing(width, offsetMm),
       priceCents: priceCents > 0 ? priceCents : undefined,
       variantId: v.id,
       availability: avail,

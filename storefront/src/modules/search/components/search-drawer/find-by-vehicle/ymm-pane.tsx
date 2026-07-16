@@ -292,8 +292,9 @@ const YmmPane = ({ onClose }: YmmPaneProps) => {
   return (
     <form onSubmit={submit}>
       <div className="grid grid-cols-2 gap-2 mb-2">
-        <Field label="Make">
+        <Field label="Make" htmlFor="ymm-make">
           <Select
+            id="ymm-make"
             value={make}
             onChange={(e) => {
               setMake(e.target.value)
@@ -314,8 +315,9 @@ const YmmPane = ({ onClose }: YmmPaneProps) => {
             ))}
           </Select>
         </Field>
-        <Field label="Model">
+        <Field label="Model" htmlFor="ymm-model">
           <Select
+            id="ymm-model"
             value={model}
             onChange={(e) => {
               setModel(e.target.value)
@@ -339,8 +341,9 @@ const YmmPane = ({ onClose }: YmmPaneProps) => {
             ))}
           </Select>
         </Field>
-        <Field label="Year">
+        <Field label="Year" htmlFor="ymm-year">
           <Select
+            id="ymm-year"
             value={year}
             onChange={(e) => {
               setYear(e.target.value)
@@ -363,8 +366,9 @@ const YmmPane = ({ onClose }: YmmPaneProps) => {
             ))}
           </Select>
         </Field>
-        <Field label="Trim">
+        <Field label="Trim" htmlFor="ymm-trim">
           <Select
+            id="ymm-trim"
             value={modificationSlug}
             onChange={(e) => setModificationSlug(e.target.value)}
             disabled={!year || loadingMods}

@@ -5,6 +5,7 @@ import Display from "@modules/common/components/display"
 import Chip from "@modules/common/components/chip"
 import TireFitBadge from "./tire-fit-badge"
 import { TireDiscoveryProduct } from "../../data/types"
+import { showOutOfStock } from "@modules/discovery/data/show-out-of-stock"
 import { formatCentsUsd } from "@lib/util/money"
 
 /** "18\"–22\"" for a range, "22\"" for one, "" for none. Exported for tests. */
@@ -43,6 +44,16 @@ const TireProductCard = ({ product }: TireProductCardProps) => {
           </div>
         )}
         <TireFitBadge fitSpecs={product.fitSpecs} />
+        {showOutOfStock(product.inStock) && (
+          <div className="absolute bottom-2.5 right-2.5">
+            <Chip
+              size="sm"
+              className="bg-[var(--ink-soft)] text-white hover:bg-[var(--ink-soft)]"
+            >
+              OUT OF STOCK
+            </Chip>
+          </div>
+        )}
       </div>
 
       <div className="p-3 flex flex-col gap-1">

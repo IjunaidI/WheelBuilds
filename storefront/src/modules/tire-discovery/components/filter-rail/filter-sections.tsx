@@ -254,6 +254,26 @@ const FilterSections = ({
         ) : null}
       </div>
 
+      {/* WB-100: single scalar toggle (not a ChecklistSection — there's no
+          per-value distribution to check off), bound to filters.inStockOnly
+          via the same replaceScalars path the price inputs commit through.
+          Default off (unchecked). Mirrors the wheel FilterSections twin. */}
+      <div className="rounded-[var(--radius)] border border-[var(--hairline)] bg-white p-4 mb-4 flex items-center gap-2.5">
+        <Checkbox
+          id={`filter-${instanceId}-in-stock-only`}
+          checked={!!filters.inStockOnly}
+          onCheckedChange={(checked) =>
+            replaceScalars({ inStockOnly: checked === true ? true : undefined })
+          }
+        />
+        <label
+          htmlFor={`filter-${instanceId}-in-stock-only`}
+          className="text-[13px] font-semibold text-[var(--ink)] cursor-pointer select-none"
+        >
+          In stock only
+        </label>
+      </div>
+
       <Accordion
         type="multiple"
         defaultValue={["brand", "rim-diameter", "tire-type"]}

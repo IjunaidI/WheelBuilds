@@ -7,6 +7,7 @@ import Chip from "@modules/common/components/chip"
 import FitBadge from "./fit-badge"
 import { DiscoveryProduct } from "../../data/types"
 import { diameterLabel } from "../../data/diameter-label"
+import { showOutOfStock } from "../../data/show-out-of-stock"
 import { formatCentsUsd } from "@lib/util/money"
 
 const FINISH_SWATCH: Record<string, string> = {
@@ -77,6 +78,16 @@ const DiscoveryProductCard = ({
           fit={fit}
           tier={product.fitTier}
         />
+        {showOutOfStock(product.inStock) && (
+          <div className="absolute bottom-2.5 right-2.5">
+            <Chip
+              size="sm"
+              className="bg-[var(--ink-soft)] text-white hover:bg-[var(--ink-soft)]"
+            >
+              OUT OF STOCK
+            </Chip>
+          </div>
+        )}
       </div>
 
       <div className="p-3 flex flex-col gap-1">

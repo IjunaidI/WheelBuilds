@@ -19,6 +19,7 @@ import { shouldUploadArchive } from "./utils/archive-policy"
 import { stockOnlyPartsToApply } from "./pipeline/stock-select"
 import { applyStockLevels } from "./pipeline/apply-stock"
 import { ensureDefaultSalesChannel } from "./pipeline/bootstrap"
+import { reconcileAfterStockApply } from "./pipeline/stock-reconcile"
 import {
   IN_PROGRESS_STATUSES,
   BLOCKING_STATUSES,
@@ -563,6 +564,16 @@ class VendorSyncService extends MedusaService({
       const salesChannelId = await ensureDefaultSalesChannel(container)
       const stockResult = await applyStockLevels(container, this, runId, vendorCode, parts, salesChannelId, this.logger_)
       this.logger_.info(`[vendor-sync] [${runId}] stock-only: ${stockResult.updatedCount} updated, ${stockResult.errors.length} errors over ${parts.length} parts`)
+      // WB-100: the Meili plugin has no subscriber for inventory-level events
+      // (only product.* + meilisearch.sync), so this stock-only apply is
+      // otherwise invisible to the index until the daily belt-and-braces
+      // cron. Gated on updatedCount (not parts.length) inside
+      // reconcileAfterStockApply so the common idempotent tick — a new feed
+      // file with unchanged quantities — does not trigger a full re-index.
+      const reconciled = await reconcileAfterStockApply(stockResult, container)
+      if (reconciled) {
+        this.logger_.info(`[vendor-sync] [${runId}] stock-only: requested Meili reconcile (${stockResult.updatedCount} parts changed)`)
+      }
       await (this as any).updateVendorFeedRuns({ id: runId, status: "completed", finished_at: new Date() })
       return { runId }
     } catch (err: any) {

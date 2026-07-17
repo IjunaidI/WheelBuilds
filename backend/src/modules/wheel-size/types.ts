@@ -48,8 +48,32 @@ export type RawRim = {
 }
 export type RawWheelEntry = { is_stock: boolean; front?: RawRim | null; rear?: RawRim | null }
 export type RawTechnical = { bolt_pattern?: string; pcd?: number; stud_holes?: number; centre_bore?: number | string }
-export type RawByModelEntry = { technical?: RawTechnical; centre_bore?: number | string; wheels?: RawWheelEntry[] }
+// trim_levels (WB-113): the marketing sub-model list (e.g. ["L","LE","XLE"] on
+// a Corolla), ALONGSIDE the existing engine "modification"/trim ("1.8i") this
+// entry already carries. Many-to-one with an entry (one engine entry can list
+// several sub-models) AND the same sub-model can appear on multiple entries
+// (e.g. a truck's "LT" spanning a gas AND a diesel engine entry) — see
+// `sub-models.ts` for the two pure fns that reconcile both directions.
+export type RawByModelEntry = {
+  technical?: RawTechnical
+  centre_bore?: number | string
+  wheels?: RawWheelEntry[]
+  trim_levels?: string[]
+}
 export type RawByModel = { data?: RawByModelEntry[] }
+
+// /modifications entry shape (the engine/trim catalog behind `client.ts`'s
+// `modifications()` — distinct from the by_model response above). Not
+// exhaustive: the live v2 payload also carries `generation`, `body`, `engine`,
+// etc. that no current caller reads; only the fields callers actually consume
+// plus this task's `trim_levels` addition are declared.
+export type RawModificationEntry = {
+  slug?: string
+  name?: string
+  trim?: string
+  trim_levels?: string[]
+}
+export type RawModifications = { data?: RawModificationEntry[] }
 
 export type ReverseFitmentVehicle = {
   year: string

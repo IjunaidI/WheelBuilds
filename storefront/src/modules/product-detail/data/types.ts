@@ -26,6 +26,8 @@ export type OffsetVariant = {
   priceCents?: number
   /** Medusa variant id for this exact size × offset. Drives the cart line item. */
   variantId: string
+  /** Real vendor part number for this exact variant (WB-098) — Medusa's actual `sku` column, set by vendor-sync (`sku: r.partNumber`). `undefined` when the variant carries none; never the internal `variantId` used as a stand-in. */
+  sku?: string
   /** Per-offset stock state — checked before add-to-cart so an out-of-stock ET hiding under an in-stock size cell can't be purchased. */
   availability: "in_stock" | "low_stock" | "out_of_stock"
   /** Center bore (mm) for this exact variant; null when the vendor omits it. */
@@ -34,6 +36,8 @@ export type OffsetVariant = {
   loadRatingLb: number | null
   /** Real on-hand quantity for this exact variant (WB-090 P2/P18) — drives the purchase panel's qty stepper cap/default and the "Only N left" copy, instead of the panel being inventory-blind. */
   quantity: number
+  /** True when this variant's `vendor_inv_order_type` metadata is `"SO"` (WB-098 Task 4) — a vendor special-order item, carrying a materially longer lead time than the standard ship window. Read via `isSpecialOrder()` in `order-signal.ts`. */
+  isSpecialOrder?: boolean
 }
 
 /** A specific Diameter × Width combination available for this product. */

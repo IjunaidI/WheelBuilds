@@ -42,6 +42,20 @@ export type DiscoveryProduct = {
   /** "NEW" tag in the product card. */
   isNew?: boolean
   /**
+   * Availability signal (WB-100). Mirrors `isNew`'s placement AND its
+   * optionality: `hitToProduct` (the Meili adapter, the only DiscoveryProduct
+   * constructor this task touches) always sets a concrete `true`/`false` —
+   * `true` only when the indexed doc's `in_stock` field is exactly `true`;
+   * missing/undefined (a doc from before the WB-100 re-index backfill, or
+   * the non-wheel stub) maps to `false`, the safe under-claim default. Left
+   * optional (not required) so the OTHER DiscoveryProduct constructors that
+   * predate WB-100 and build straight from the Store API — `toFeatured`
+   * (home/data/get-featured.ts) and `mapToDetail`/`toRelatedProduct`
+   * (product-detail/data/get-product.ts), none of which this task's brief
+   * scopes in — keep compiling without a manufactured/placeholder value.
+   */
+  inStock?: boolean
+  /**
    * Fit mode only (WB-077 D1): the product's best per-variant fit tier vs the
    * active vehicle — "fits" (genuinely fits, sorted first) or "check" (bolt
    * pattern + bore clear but at least one size window misses, so it's kept
@@ -80,6 +94,14 @@ export type DiscoveryFilters = {
   finishes: Finish[]
   priceMinCents?: number
   priceMaxCents?: number
+  /**
+   * Availability toggle (WB-100). An OPTIONAL SCALAR — same shape family as
+   * `priceMinCents`/`priceMaxCents` (undefined = no constraint), NOT an
+   * array like `brands`/`diameters`/`boltPatterns`/`finishes`: a boolean
+   * toggle has no per-value distribution, so `FacetCounts` is deliberately
+   * left untouched.
+   */
+  inStockOnly?: boolean
 }
 
 export const EMPTY_FILTERS: DiscoveryFilters = {
@@ -180,6 +202,15 @@ export function parseQueryFromSearchParams(
     const n = Number(Array.isArray(v) ? v[0] : v)
     return Number.isFinite(n) ? n : undefined
   }
+  // Boolean scalar reader (WB-100): `?in_stock=1` → true, anything else
+  // (absent, "0", or any other value) → undefined (no constraint) — mirrors
+  // `num`'s "absent/invalid collapses to no constraint" shape.
+  const bool = (k: string): true | undefined => {
+    const v = sp[k]
+    if (!v) return undefined
+    const s = Array.isArray(v) ? v[0] : v
+    return s === "1" ? true : undefined
+  }
 
   const sortRaw = (Array.isArray(sp.sort) ? sp.sort[0] : sp.sort) ?? "relevance"
   const sort: SortOption = [
@@ -221,6 +252,7 @@ export function parseQueryFromSearchParams(
       finishes: arr("finishes") as DiscoveryQuery["filters"]["finishes"],
       priceMinCents: num("priceMin"),
       priceMaxCents: num("priceMax"),
+      inStockOnly: bool("in_stock"),
     },
     sort,
     page: Math.max(1, num("page") ?? 1),

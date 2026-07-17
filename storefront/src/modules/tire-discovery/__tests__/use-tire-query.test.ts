@@ -37,4 +37,11 @@ describe("hasActiveQueryOrFilter — tires (WB-087 D3)", () => {
   it("treats a whitespace-only q as inactive", () => {
     expect(hasActiveQueryOrFilter(emptyFilters, "   ")).toBe(false)
   })
+
+  // WB-100 Task 3 — tire twin: inStockOnly counts as an active filter.
+  it("is true when inStockOnly is set even with no q", () => {
+    expect(
+      hasActiveQueryOrFilter({ ...emptyFilters, inStockOnly: true }, undefined)
+    ).toBe(true)
+  })
 })

@@ -22,6 +22,28 @@ describe("buildTireSizeOptions", () => {
       variantId: "var_1", priceCents: 46200, availability: "in_stock", quantity: 8,
     })
   })
+
+  it("threads the variant's real sku (WB-098 Task 3) — undefined, never fabricated, when absent", () => {
+    const [withSku] = buildTireSizeOptions([{ ...variant(), sku: "TIRE-305-45-R22" }] as any)
+    expect(withSku.sku).toBe("TIRE-305-45-R22")
+    const [noSku] = buildTireSizeOptions([variant()] as any) // no `sku` key
+    expect(noSku.sku).toBeUndefined()
+  })
+
+  it('flags isSpecialOrder from vendor_inv_order_type (WB-098 Task 4) — true only for "SO"', () => {
+    const so = variant()
+    ;(so.metadata as any).vendor_inv_order_type = "SO"
+    const [soOpt] = buildTireSizeOptions([so] as any)
+    expect(soOpt.isSpecialOrder).toBe(true)
+
+    const stocked = variant()
+    ;(stocked.metadata as any).vendor_inv_order_type = "ST"
+    const [stockedOpt] = buildTireSizeOptions([stocked] as any)
+    expect(stockedOpt.isSpecialOrder).toBe(false)
+
+    const [noKeyOpt] = buildTireSizeOptions([variant()] as any) // no vendor_inv_order_type at all
+    expect(noKeyOpt.isSpecialOrder).toBe(false)
+  })
   it("marks out_of_stock at qty 0 and low_stock at/under the threshold", () => {
     expect(buildTireSizeOptions([variant({ qty: 0 })] as any)[0].availability).toBe("out_of_stock")
     expect(buildTireSizeOptions([variant({ qty: 2 })] as any)[0].availability).toBe("low_stock")

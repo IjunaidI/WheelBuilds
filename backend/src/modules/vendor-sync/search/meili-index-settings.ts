@@ -11,6 +11,12 @@ export const MEILI_PRODUCT_FIELDS = [
   "metadata",
   "variants.sku", "variants.metadata",
   "variants.prices.amount", "variants.prices.currency_code",
+  // WB-100 spike (CONFIRMED via `medusa exec` probe + this transformer):
+  // query.graph resolves these off the InventoryItem module's computed
+  // (MikroORM @Formula, lazy) properties, aggregated across all stock
+  // locations for that inventory item. Real numbers, not undefined.
+  "variants.inventory_items.inventory.stocked_quantity",
+  "variants.inventory_items.inventory.reserved_quantity",
 ] as const
 
 /**

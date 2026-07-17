@@ -13,7 +13,7 @@ const baseProduct: ProductLike = {
   brand: "American Force",
   thumbnail: "https://cdn.example.com/wheel.jpg",
   description: "Forged monoblock wheel.",
-  leaf: { availability: "in_stock", priceCents: 36999, variantId: "variant_01" },
+  leaf: { availability: "in_stock", priceCents: 36999, sku: "AF-004-18X8-ET40" },
 }
 
 const url = "https://example.com/us/products/004-death-metal"
@@ -98,17 +98,17 @@ describe("productJsonLd", () => {
     expect(ld.offers).toBeUndefined()
   })
 
-  it("includes sku from the rendered leaf's variantId when present", () => {
+  it("includes sku from the rendered leaf's REAL vendor sku when present (WB-098 — was the internal Medusa variant id)", () => {
     const ld = productJsonLd(baseProduct, url) as any
-    expect(ld.sku).toBe("variant_01")
+    expect(ld.sku).toBe("AF-004-18X8-ET40")
   })
 
-  it("omits sku when the rendered leaf carries no variantId", () => {
-    const noVariantId: ProductLike = {
+  it("omits sku when the rendered leaf carries no sku — never falls back to a variant id", () => {
+    const noSku: ProductLike = {
       ...baseProduct,
       leaf: { availability: "in_stock", priceCents: 36999 },
     }
-    const ld = productJsonLd(noVariantId, url) as any
+    const ld = productJsonLd(noSku, url) as any
     expect(ld.sku).toBeUndefined()
   })
 

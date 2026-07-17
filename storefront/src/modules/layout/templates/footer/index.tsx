@@ -4,6 +4,9 @@ import Logo from "@modules/common/components/logo"
 import Label from "@modules/common/components/label"
 import { getHomeCatalog } from "@modules/home/data/get-home-catalog"
 import { styleTiles } from "@modules/home/components/shop-by-style/style-map"
+import { styleSlug } from "@modules/home/components/shop-by-style/style-slug"
+import { listBrandCollections } from "@lib/data/collections"
+import { buildBrandHandleMap, type BrandHandleMap } from "@modules/brands/data/brand-tiles"
 import { footerBrandLinks } from "./footer-links"
 import type { FacetCounts } from "@modules/discovery/data/types"
 
@@ -24,12 +27,25 @@ const FOOTER_STYLE_LABELS: Record<string, string> = {
 // link resolves to real results. Style tiles reuse the same curated mapping
 // as the homepage's Shop-by-Style section; brand links are the top-5 by
 // product count.
-function buildFooterColumns(facets: FacetCounts): FooterColumn[] {
+//
+// WB-099 Task 5: style items link at their real `/styles/<slug>` page
+// (styleTiles itself still builds the interim `/store?...` href — same
+// override pattern as the `/styles` index page, see style-slug.ts's doc
+// comment on why the slug is only ever computed there); brand links resolve
+// through `handleMap` (`brandHref`) to `/brands/<handle>`, falling back to
+// the interim filter link for any brand with no matching collection.
+function buildFooterColumns(
+  facets: FacetCounts,
+  handleMap: BrandHandleMap
+): FooterColumn[] {
   const styles = styleTiles(facets)
   const styleItems = Object.keys(FOOTER_STYLE_LABELS)
     .map((label) => styles.find((t) => t.label === label))
     .filter((t): t is NonNullable<typeof t> => Boolean(t))
-    .map((t) => ({ label: FOOTER_STYLE_LABELS[t.label], href: t.href }))
+    .map((t) => ({
+      label: FOOTER_STYLE_LABELS[t.label],
+      href: `/styles/${styleSlug(t.label)}`,
+    }))
 
   return [
     {
@@ -43,8 +59,8 @@ function buildFooterColumns(facets: FacetCounts): FooterColumn[] {
     {
       h: "Brands",
       items: [
-        ...footerBrandLinks(facets.brands),
-        { label: "All Brands", href: "/store" },
+        ...footerBrandLinks(facets.brands, handleMap),
+        { label: "All Brands", href: "/brands" },
       ],
     },
     // WB-081: every footer link now points at a real route — the Help/Company
@@ -76,9 +92,13 @@ const SOCIALS: { name: "instagram" | "youtube" | "tiktok" | "facebook"; label: s
 ]
 
 export default async function Footer() {
-  const { facets } = await getHomeCatalog()
+  const [{ facets }, collections] = await Promise.all([
+    getHomeCatalog(),
+    listBrandCollections(),
+  ])
   const brandCount = Object.keys(facets.brands).length
-  const footerColumns = buildFooterColumns(facets)
+  const handleMap = buildBrandHandleMap(collections)
+  const footerColumns = buildFooterColumns(facets, handleMap)
 
   return (
     <footer

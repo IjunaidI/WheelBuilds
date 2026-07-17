@@ -278,6 +278,13 @@ const medusaConfig = {
                 'tire_sizes', 'fit_specs', 'rim_diameters', 'section_widths',
                 'aspect_ratios', 'load_indexes', 'speed_ratings', 'tire_type',
                 'price_min', 'price_max', 'created_at', 'product_type',
+                // WB-100: availability signal. Docs already carry this field
+                // (Task 1's transformer widening); it must be BOTH displayed
+                // (so a search hit actually returns `in_stock` for the
+                // storefront badge) and filterable (so an "In stock only"
+                // toggle can filter on it) — a field only in one array is
+                // silently unusable for the other purpose.
+                'in_stock',
               ],
               filterableAttributes: [
                 'brand', 'finishes', 'diameters', 'widths', 'bolt_patterns',
@@ -285,6 +292,8 @@ const medusaConfig = {
                 'tire_sizes', 'rim_diameters', 'section_widths',
                 'aspect_ratios', 'load_indexes', 'speed_ratings', 'tire_type',
                 'price_min', 'price_max', 'product_type',
+                // WB-100: see the matching comment in displayedAttributes above.
+                'in_stock',
               ],
               sortableAttributes: ['price_min', 'created_at', 'title'],
               pagination: { maxTotalHits: 10000 },
@@ -307,10 +316,14 @@ const medusaConfig = {
             // discovery filter, so it is excluded from wheel + tire discovery.
             // Forced constant (not metadata.product_type) so an image-less WHEEL
             // can't slip back in as a product_type:"wheel" stub.
+            // WB-100: in_stock:false so a displayed/filtered attribute never
+            // references a missing field on this stub (it matches no
+            // discovery filter anyway, but keep the doc shape total).
             transformer: (product) =>
               buildSearchDocument(product) ?? {
                 id: product.id,
                 product_type: 'non-wheel',
+                in_stock: false,
               },
           }
         }

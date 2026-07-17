@@ -450,3 +450,49 @@ describe("groupVariantsIntoSizes — per-variant shipping weight (WB-090 P8/L6)"
     expect(sizes[0].weightLb).toBe(28)
   })
 })
+
+describe("groupVariantsIntoSizes — sku threading (WB-098 Task 3)", () => {
+  it("threads each variant's real sku onto its own offset variant", () => {
+    const withSku = { ...variant("v_a", 20, 9, 18, "5x114.3", 10, 300), sku: "AF-004-20X9-ET18" }
+    const sizes = groupVariantsIntoSizes([withSku], 28)
+    expect(sizes[0].offsetVariants?.[0].sku).toBe("AF-004-20X9-ET18")
+  })
+
+  it("leaves sku undefined (never a fabricated value) when the variant carries none", () => {
+    const noSku = variant("v_a", 20, 9, 18, "5x114.3", 10, 300) // no `sku` key
+    const sizes = groupVariantsIntoSizes([noSku], 28)
+    expect(sizes[0].offsetVariants?.[0].sku).toBeUndefined()
+  })
+
+  it("keeps sibling offsets' skus independent — never collapsed to one value", () => {
+    const a = { ...variant("v_a", 20, 9, 18, "5x114.3", 10, 300), sku: "SKU-A" }
+    const b = { ...variant("v_b", 20, 9, 35, "5x114.3", 10, 320), sku: "SKU-B" }
+    const sizes = groupVariantsIntoSizes([a, b], 28)
+    expect(sizes[0].offsetVariants?.map((o) => o.sku)).toEqual(["SKU-A", "SKU-B"])
+  })
+})
+
+describe("groupVariantsIntoSizes — special-order threading (WB-098 Task 4)", () => {
+  it('flags isSpecialOrder true when the variant metadata carries vendor_inv_order_type "SO"', () => {
+    const so = variant("v_a", 20, 9, 18, "5x114.3", 10, 300)
+    so.metadata.vendor_inv_order_type = "SO"
+    const sizes = groupVariantsIntoSizes([so], 28)
+    expect(sizes[0].offsetVariants?.[0].isSpecialOrder).toBe(true)
+  })
+
+  it('flags isSpecialOrder false for normal vendor codes ("ST") and when the key is absent', () => {
+    const stocked = variant("v_a", 20, 9, 18, "5x114.3", 10, 300)
+    stocked.metadata.vendor_inv_order_type = "ST"
+    const noKey = variant("v_b", 20, 9, 35, "5x114.3", 10, 300) // no vendor_inv_order_type at all
+    const sizes = groupVariantsIntoSizes([stocked, noKey], 28)
+    expect(sizes[0].offsetVariants?.map((o) => o.isSpecialOrder)).toEqual([false, false])
+  })
+
+  it("keeps sibling offsets' special-order flags independent — one SO leaf never flips a normal sibling", () => {
+    const so = variant("v_a", 20, 9, 18, "5x114.3", 10, 300)
+    so.metadata.vendor_inv_order_type = "SO"
+    const normal = variant("v_b", 20, 9, 35, "5x114.3", 10, 320)
+    const sizes = groupVariantsIntoSizes([so, normal], 28)
+    expect(sizes[0].offsetVariants?.map((o) => o.isSpecialOrder)).toEqual([true, false])
+  })
+})

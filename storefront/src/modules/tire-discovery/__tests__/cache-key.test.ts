@@ -20,6 +20,14 @@ describe("tireDiscoveryCacheKey", () => {
     expect(a).not.toBe(b)
   })
 
+  // WB-100 Task 3 — tire twin of the wheel cache-key test: without this,
+  // `?in_stock=1` would collapse to the same cache key as the bare query.
+  it("differs when inStockOnly differs", () => {
+    const a = tireDiscoveryCacheKey(base)
+    const b = tireDiscoveryCacheKey({ ...base, filters: { ...EMPTY_TIRE_FILTERS, inStockOnly: true } })
+    expect(a).not.toBe(b)
+  })
+
   describe("multi-axis vehicleOemTires (WB-068)", () => {
     const sameSizeHigherLoad: OemTire = { size: "305/45R22", loadIndex: 120, speedRating: "S" }
     const sameSizeLowerLoad: OemTire = { size: "305/45R22", loadIndex: 118, speedRating: "S" }

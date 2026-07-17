@@ -8,6 +8,7 @@ import Label from "@modules/common/components/label"
 import Chip from "@modules/common/components/chip"
 import Icon from "@modules/common/components/icon"
 import LocalizedClientLink from "@modules/common/components/localized-client-link"
+import CopySku from "@modules/common/components/copy-sku"
 import { Button } from "@/components/ui/button"
 import { Separator } from "@/components/ui/separator"
 import { addToCart } from "@lib/data/cart"
@@ -18,9 +19,16 @@ import { tireFitVerdict, TireFitSpec } from "@lib/fitment/tire-fits-vehicle"
 import { insufficientStockMessage } from "@lib/util/error-message"
 import { formatCentsUsd } from "@lib/util/money"
 import { TireProductDetail, TireSizeOption } from "../../../data/types"
-import { DEFAULT_TIRE_QTY, LOW_STOCK_THRESHOLD, TRUST_STRIP } from "../../../data/pdp-config"
+import {
+  DEFAULT_TIRE_QTY,
+  LOW_STOCK_THRESHOLD,
+  SPECIAL_ORDER_LEAD_TIME,
+  TRUST_STRIP,
+} from "../../../data/pdp-config"
 import { clampQty, stepperCap } from "../../../data/qty-bounds"
 import { canPurchasePrice } from "../../../data/price-truth"
+import { setPriceLine } from "../../../data/set-price"
+import { leadTimeLine } from "../../../data/order-signal"
 
 type TirePurchasePanelProps = {
   product: TireProductDetail
@@ -97,6 +105,22 @@ const TirePurchasePanel = ({
   // Pre-multiplied line total; null propagates "Price unavailable" into both
   // buy buttons instead of a fabricated $0.00 line.
   const lineTotalCents = unitPriceCents !== null ? unitPriceCents * quantity : null
+  // "$X × N = $Y per set" sub-line under the PER TIRE price (WB-098 Task 2)
+  // — mirrors the wheel panel exactly, same unitPriceCents/quantity as
+  // lineTotalCents above.
+  const setPrice = setPriceLine(unitPriceCents, quantity)
+  // Lead-time / special-order line at the CTA (WB-098 Task 4) — the SELECTED
+  // size's own availability + SO flag, out of the hover-only tooltip
+  // (size-picker.tsx's TooltipContent) so it's visible on touch too. No
+  // selectedSize yet -> nothing to promise.
+  const isSpecialOrder = selectedSize?.isSpecialOrder ?? false
+  const leadTime = selectedSize
+    ? leadTimeLine({ availability: selectedSize.availability, isSpecialOrder })
+    : null
+  // Only the ACTIONABLE special-order case (a real lead time on a size the
+  // shopper can still add to cart) gets the amber warning treatment below —
+  // mirrors the wheel panel (see its comment for the fix-wave reasoning).
+  const isActionableSpecialOrder = leadTime === SPECIAL_ORDER_LEAD_TIME
 
   const handleAddToCart = async () => {
     if (!selectedSize) return
@@ -204,6 +228,14 @@ const TirePurchasePanel = ({
         )}
       </div>
 
+      {/* Set-total sub-line (WB-098 Task 2) — mirrors the wheel panel;
+          hidden for a qty-1 selection or an unpriced size. */}
+      {setPrice.show && (
+        <div className="mt-1.5">
+          <Label tone="muted">{setPrice.text}</Label>
+        </div>
+      )}
+
       {product.description && (
         <p
           style={{
@@ -302,6 +334,36 @@ const TirePurchasePanel = ({
         </Button>
       </div>
 
+      {/* Lead-time / special-order line (WB-098 Task 4) — mirrors the wheel
+          panel exactly (see its comment for the amber-token reasoning and the
+          fix-wave's isActionableSpecialOrder distinction). */}
+      {leadTime && (
+        <p
+          style={
+            isActionableSpecialOrder
+              ? {
+                  fontSize: 12,
+                  fontWeight: 600,
+                  color: "#8A6508",
+                  background: "rgba(184,134,11,0.08)",
+                  border: "1px solid rgba(184,134,11,0.35)",
+                  borderRadius: "var(--radius)",
+                  padding: "6px 10px",
+                  marginTop: 10,
+                  display: "inline-block",
+                }
+              : {
+                  fontSize: 12,
+                  fontWeight: 600,
+                  color: "var(--ink-soft)",
+                  marginTop: 10,
+                }
+          }
+        >
+          {leadTime}
+        </p>
+      )}
+
       {/* Only-N-left copy (WB-090 P2/P18) — mirrors the wheel panel. */}
       {typeof available === "number" &&
         available > 0 &&
@@ -328,6 +390,12 @@ const TirePurchasePanel = ({
         {lineTotalCents !== null ? `Buy now · ${formatUsd(lineTotalCents)}` : "Price unavailable"}
         <Icon name="arrow-right" size={16} color="white" />
       </Button>
+
+      {/* Copy-to-clipboard SKU row (WB-098 Task 3) — the SELECTED size's real
+          vendor part number (Medusa's actual `sku` column), not the internal
+          variant id. Hidden entirely when the resolved size carries no sku
+          rather than rendering "SKU: undefined". */}
+      {selectedSize?.sku && <CopySku sku={selectedSize.sku} />}
 
       {/* Trust strip — reused verbatim from the wheel purchase panel,
           including the WB-091 P6 linked "Fitment guarantee" cell. */}

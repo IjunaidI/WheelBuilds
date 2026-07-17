@@ -27,6 +27,53 @@ export const FREE_SHIP_THRESHOLD_USD = intEnv(process.env.NEXT_PUBLIC_PDP_FREE_S
 export const SHIP_LEAD_TIME = process.env.NEXT_PUBLIC_PDP_SHIP_LEAD_TIME ?? "ships 2–3 days"
 
 /**
+ * CTA-area lead-time copy when the selected variant/size is vendor
+ * special-order (WB-098 Task 4 — `vendor_inv_order_type === "SO"`). Rendered
+ * instead of `SHIP_LEAD_TIME` because a special-order item takes a
+ * materially longer, vendor-driven lead time regardless of on-hand
+ * quantity — see `order-signal.ts`'s `leadTimeLine`.
+ */
+export const SPECIAL_ORDER_LEAD_TIME =
+  process.env.NEXT_PUBLIC_PDP_SPECIAL_ORDER_LEAD_TIME ??
+  "Special order — extended lead time"
+
+/**
+ * CTA-area copy when the selected variant/size is BOTH vendor special-order
+ * AND out of stock (WB-098 Task 4 fix-wave — Important review finding).
+ * Special-order stock in this vendor feed is essentially always `qty: 0`
+ * (special-order stock is never counted on-hand), so this combination is the
+ * COMMON real-world SO case, not an edge case — see `order-signal.ts`'s
+ * `leadTimeLine`. In that state `canPurchasePrice` disables Add to cart, so
+ * `SPECIAL_ORDER_LEAD_TIME`'s "extended lead time" wording would falsely
+ * promise a self-serve order the shopper has no button to act on. This copy
+ * stays honest (still names it as special-order, so the shopper understands
+ * WHY it's out of stock) without implying orderability through a disabled
+ * control.
+ */
+export const SPECIAL_ORDER_UNAVAILABLE =
+  process.env.NEXT_PUBLIC_PDP_SPECIAL_ORDER_UNAVAILABLE ??
+  "Special order — contact us to order"
+
+/**
+ * Trailing noun on the set-total row under the per-unit price (WB-098 Task
+ * 2), e.g. "$369.99 × 4 = $1,479.96 per set". Wheels and tires both sell in
+ * sets of 4 today so one shared const covers both panels; split into
+ * per-panel consts if the wording ever needs to diverge (e.g. "per set of 4
+ * tires").
+ */
+export const SET_PRICE_SUFFIX = process.env.NEXT_PUBLIC_PDP_SET_PRICE_SUFFIX ?? "per set"
+
+/**
+ * Static legend explaining the tire hero's "Load index 118S" stat (WB-098
+ * Task 4) — generic copy, NOT derived from the selected size's actual
+ * numbers (the "118"/"S" here are illustrative, matching the stat's own
+ * example values, not a live readout).
+ */
+export const TIRE_LOAD_SPEED_LEGEND =
+  process.env.NEXT_PUBLIC_PDP_TIRE_LOAD_SPEED_LEGEND ??
+  "118 = load index (max load), S = speed rating (max speed)"
+
+/**
  * Trust-strip cells in the purchase panel. `href` is optional — only the
  * "Fitment guarantee" cell links out today (to the real fitment-returns
  * section on /returns); the other cells render as plain text.

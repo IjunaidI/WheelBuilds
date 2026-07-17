@@ -51,7 +51,7 @@ const NEW_MS = NEW_DAYS * 24 * 60 * 60 * 1000
  * skipping one dimension (used for disjunctive facet counting) and always
  * scoping to wheels + any vehicle constraint.
  */
-function buildFilters(
+export function buildFilters(
   f: DiscoveryFilters,
   q: DiscoveryQuery,
   skip?: keyof DiscoveryFilters
@@ -68,6 +68,11 @@ function buildFilters(
     clauses.push(`finishes IN [${f.finishes.map(lit).join(", ")}]`)
   if (f.priceMinCents != null) clauses.push(`price_min >= ${f.priceMinCents}`)
   if (f.priceMaxCents != null) clauses.push(`price_min <= ${f.priceMaxCents}`)
+  // WB-100: in_stock is a global narrowing (like price), never gated by
+  // `skip` — an "in stock only" toggle must narrow BOTH the hits query and
+  // every per-dimension facet query, so facet counts reflect only in-stock
+  // products when the toggle is on.
+  if (f.inStockOnly) clauses.push(`in_stock = true`)
 
   if (q.vehicleConstraint?.length) clauses.push(...q.vehicleConstraint)
 
@@ -104,6 +109,9 @@ export type Hit = {
   price_min: number
   price_max: number
   created_at: string | null
+  /** Availability signal (WB-100). Absent on pre-backfill docs and the
+   *  non-wheel stub — hitToProduct treats that as "not known in stock". */
+  in_stock?: boolean
 }
 
 export function hitToProduct(h: Hit): DiscoveryProduct {
@@ -127,6 +135,9 @@ export function hitToProduct(h: Hit): DiscoveryProduct {
     boltPattern: isRealBoltPattern(rawBoltPattern) ? (rawBoltPattern as string) : "",
     boltPatternsCanonical: h.bolt_patterns_canonical ?? [],
     isNew: Number.isFinite(createdMs) ? Date.now() - createdMs < NEW_MS : false,
+    // WB-100: missing/undefined → false (safe default; see the Hit.in_stock
+    // doc comment above).
+    inStock: h.in_stock ?? false,
   }
 }
 

@@ -13,7 +13,7 @@
  */
 
 import { useCallback, useMemo } from "react"
-import { useParams, usePathname, useSearchParams } from "next/navigation"
+import { usePathname, useSearchParams } from "next/navigation"
 import { useRouter } from "@bprogress/next/app" // bprogress router → filter/sort/pagination changes show the top progress bar
 import {
   DiscoveryFilters,
@@ -23,7 +23,13 @@ import {
 } from "./types"
 import { parseQueryFromSearchParams } from "./types"
 
-type ScalarFilterKey = "priceMinCents" | "priceMaxCents"
+// WB-100: `inStockOnly` joins the scalar family (not the array family) —
+// it's an optional boolean, same shape as priceMinCents/priceMaxCents, with
+// no per-value distribution to toggle. `ScalarValue` widens to admit it
+// through the SAME `setScalarFilter`/`replaceScalars` path the price commit
+// already uses, rather than inventing a parallel boolean-only mechanism.
+type ScalarFilterKey = "priceMinCents" | "priceMaxCents" | "inStockOnly"
+type ScalarValue = number | boolean | undefined
 type ArrayFilterKey = Exclude<keyof DiscoveryFilters, ScalarFilterKey>
 
 // URL keys for array filters. Kept identical to the parser in get-products.ts
@@ -37,6 +43,18 @@ const ARRAY_PARAM: Record<ArrayFilterKey, string> = {
 const SCALAR_PARAM: Record<ScalarFilterKey, string> = {
   priceMinCents: "priceMin",
   priceMaxCents: "priceMax",
+  inStockOnly: "in_stock",
+}
+
+// Encodes a scalar value to its URL string, or `undefined` to delete the
+// param. Numbers pass through as-is (price); booleans write "1" for true
+// (matching parseQueryFromSearchParams's `?in_stock=1` reader) and delete
+// for false — there is no "in_stock=0" written, mirroring how price clears
+// to "no param" rather than writing a sentinel.
+const scalarParamValue = (value: ScalarValue): string | undefined => {
+  if (value == null) return undefined
+  if (typeof value === "boolean") return value ? "1" : undefined
+  return Number.isFinite(value) ? String(value) : undefined
 }
 
 const searchParamsToRecord = (
@@ -60,7 +78,6 @@ export const useDiscoveryQuery = () => {
   const router = useRouter()
   const pathname = usePathname()
   const searchParams = useSearchParams()
-  const { countryCode } = useParams() as { countryCode: string }
 
   const query: DiscoveryQuery = useMemo(
     () => parseQueryFromSearchParams(searchParamsToRecord(searchParams)),
@@ -111,13 +128,12 @@ export const useDiscoveryQuery = () => {
   )
 
   const setScalarFilter = useCallback(
-    (key: ScalarFilterKey, value: number | undefined) => {
+    (key: ScalarFilterKey, value: ScalarValue) => {
       push((sp) => {
         const param = SCALAR_PARAM[key]
         sp.delete(param)
-        if (value != null && Number.isFinite(value)) {
-          sp.set(param, String(value))
-        }
+        const v = scalarParamValue(value)
+        if (v != null) sp.set(param, v)
       })
     },
     [push]
@@ -132,15 +148,14 @@ export const useDiscoveryQuery = () => {
   // scalar edit, not a new history entry — same reasoning `push` already
   // documents for `setPage`'s `keepPage`, just via replace instead.
   const replaceScalars = useCallback(
-    (patch: Partial<Record<ScalarFilterKey, number | undefined>>) => {
+    (patch: Partial<Record<ScalarFilterKey, ScalarValue>>) => {
       const next = new URLSearchParams(searchParams.toString())
       for (const key of Object.keys(patch) as ScalarFilterKey[]) {
         const param = SCALAR_PARAM[key]
         const value = patch[key]
         next.delete(param)
-        if (value != null && Number.isFinite(value)) {
-          next.set(param, String(value))
-        }
+        const v = scalarParamValue(value)
+        if (v != null) next.set(param, v)
       }
       next.delete("page")
       const qs = next.toString()
@@ -182,9 +197,17 @@ export const useDiscoveryQuery = () => {
     [push]
   )
 
+  // WB-099 Task 1: `clearAll` used to hardcode `/${countryCode}/store` — fine
+  // while `/store` was the only page mounting the discovery rail, but a
+  // future pinned-filter page (e.g. `/brands/fuel`) would navigate AWAY to
+  // the unscoped `/store`, dropping the brand pin. Clearing filters must stay
+  // on whatever page mounted the rail so a server-side pin (brand/style)
+  // re-applies instead of vanishing. `clearAllTarget` is the pure decision;
+  // `pathname` (from `usePathname()`, used by `push()` above) never includes
+  // the query string, so this preserves `/store` byte-for-byte too.
   const clearAll = useCallback(() => {
-    router.push(`/${countryCode}/store`, { scroll: false })
-  }, [router, countryCode])
+    router.push(clearAllTarget(pathname), { scroll: false })
+  }, [router, pathname])
 
   return {
     query,
@@ -211,6 +234,7 @@ const hasAnyFilter = (f: DiscoveryFilters): boolean => {
   if (f.finishes.length) return true
   if (f.priceMinCents != null) return true
   if (f.priceMaxCents != null) return true
+  if (f.inStockOnly) return true
   return false
 }
 
@@ -226,5 +250,19 @@ export const hasActiveQueryOrFilter = (
   f: DiscoveryFilters,
   q: string | undefined
 ): boolean => hasAnyFilter(f) || !!(q && q.trim())
+
+/**
+ * WB-099 Task 1: pure decision for where `clearAll` navigates to. Before
+ * this, `clearAll` hardcoded `/${countryCode}/store` — correct while `/store`
+ * was the only page that mounted the discovery rail, but wrong for a future
+ * pinned-filter page like `/brands/fuel`, where it would navigate away to the
+ * unscoped `/store` and drop the brand pin. `usePathname()` (Next.js) never
+ * includes the query string, so "the current base path" IS the pathname —
+ * this is the identity function, extracted so the decision has a name and a
+ * test that doesn't require mocking `next/navigation`.
+ */
+export function clearAllTarget(pathname: string): string {
+  return pathname
+}
 
 export { EMPTY_FILTERS }

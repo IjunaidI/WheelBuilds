@@ -302,6 +302,89 @@ describe("buildSearchDocument — discontinued variants (WB-089 L4)", () => {
     expect(doc.price_max).toBe(20000)
   })
 
+  it("emits in_stock:true for a wheel with at least one in-stock, non-discontinued variant (WB-100)", () => {
+    const doc: any = buildSearchDocument({
+      ...product,
+      variants: [
+        {
+          sku: "out",
+          prices: [{ amount: 100, currency_code: "usd" }],
+          metadata: { wheel_diameter_in: 20, bolt_pattern_raw: "5X5.0" },
+          inventory_items: [{ inventory: { stocked_quantity: 0, reserved_quantity: 0 } }],
+        },
+        {
+          sku: "in",
+          prices: [{ amount: 100, currency_code: "usd" }],
+          metadata: { wheel_diameter_in: 20, bolt_pattern_raw: "5X5.0" },
+          inventory_items: [{ inventory: { stocked_quantity: 5, reserved_quantity: 2 } }],
+        },
+      ],
+    } as any)
+    expect(doc.in_stock).toBe(true)
+  })
+
+  it("emits in_stock:false for a wheel where every variant is out of stock (WB-100)", () => {
+    const doc: any = buildSearchDocument({
+      ...product,
+      variants: [
+        {
+          sku: "out1",
+          prices: [{ amount: 100, currency_code: "usd" }],
+          metadata: { wheel_diameter_in: 20, bolt_pattern_raw: "5X5.0" },
+          inventory_items: [{ inventory: { stocked_quantity: 0, reserved_quantity: 0 } }],
+        },
+        {
+          sku: "out2",
+          prices: [{ amount: 100, currency_code: "usd" }],
+          metadata: { wheel_diameter_in: 18, bolt_pattern_raw: "5X5.0" },
+          inventory_items: [{ inventory: { stocked_quantity: 3, reserved_quantity: 3 } }],
+        },
+      ],
+    } as any)
+    expect(doc.in_stock).toBe(false)
+  })
+
+  it("emits in_stock:false for a wheel whose only in-stock variant is discontinued (WB-100)", () => {
+    const doc: any = buildSearchDocument({
+      ...product,
+      variants: [
+        {
+          sku: "live-but-out",
+          prices: [{ amount: 100, currency_code: "usd" }],
+          metadata: { wheel_diameter_in: 20, bolt_pattern_raw: "5X5.0" },
+          inventory_items: [{ inventory: { stocked_quantity: 0, reserved_quantity: 0 } }],
+        },
+        {
+          sku: "dead-but-in-stock",
+          prices: [{ amount: 100, currency_code: "usd" }],
+          metadata: { wheel_diameter_in: 18, bolt_pattern_raw: "5X5.0", discontinued: true },
+          inventory_items: [{ inventory: { stocked_quantity: 10, reserved_quantity: 0 } }],
+        },
+      ],
+    } as any)
+    expect(doc.in_stock).toBe(false)
+  })
+
+  it("emits in_stock:true for a tire with an available variant (WB-100)", () => {
+    const tire = {
+      id: "prod_t5",
+      handle: "falken-wildpeak-at4w-5",
+      title: "Falken WDPEAK AT4W",
+      thumbnail: "https://cdn.example.com/t5.jpg",
+      metadata: { product_type: "tire", brand: "Falken" },
+      variants: [
+        {
+          sku: "s1",
+          prices: [{ amount: 200, currency_code: "usd" }],
+          metadata: { canonical_size: "305/45R22" },
+          inventory_items: [{ inventory: { stocked_quantity: 2, reserved_quantity: 0 } }],
+        },
+      ],
+    }
+    const doc: any = buildSearchDocument(tire as any)
+    expect(doc.in_stock).toBe(true)
+  })
+
   it("returns null when every TIRE variant is discontinued", () => {
     const tire = {
       id: "prod_t4",

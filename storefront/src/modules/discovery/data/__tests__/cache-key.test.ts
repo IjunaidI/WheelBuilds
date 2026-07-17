@@ -24,6 +24,15 @@ describe("discoveryCacheKey", () => {
     expect(discoveryCacheKey(base)).not.toBe(discoveryCacheKey(a))
   })
 
+  // WB-100 Task 3 — without this, `?in_stock=1` and the bare query would
+  // collapse to the SAME unstable_cache key, so toggling the filter within
+  // the 60s cache window would silently serve the OTHER query's cached
+  // result instead of actually narrowing.
+  it("differs when inStockOnly differs", () => {
+    const a: DiscoveryQuery = { ...base, filters: { ...EMPTY_FILTERS, inStockOnly: true } }
+    expect(discoveryCacheKey(base)).not.toBe(discoveryCacheKey(a))
+  })
+
   it("differs when the free-text query differs", () => {
     expect(discoveryCacheKey(base)).not.toBe(discoveryCacheKey({ ...base, q: "matte" }))
   })

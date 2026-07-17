@@ -29,6 +29,8 @@ export function tireDiscoveryCacheKey(query: TireDiscoveryQuery): string {
     loadIndexes: norm(f.loadIndexes),
     priceMin: f.priceMinCents ?? null,
     priceMax: f.priceMaxCents ?? null,
+    // WB-100: must be part of the key — mirrors the wheel cache-key twin.
+    inStockOnly: f.inStockOnly ?? false,
     sort: query.sort,
     page: query.page,
     q: query.q ?? "",

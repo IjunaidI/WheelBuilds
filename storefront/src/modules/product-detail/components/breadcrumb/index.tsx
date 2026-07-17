@@ -4,16 +4,24 @@ import Icon from "@modules/common/components/icon"
 type BreadcrumbProps = {
   brand: string
   name: string
+  /**
+   * Resolved `/brands/<handle>` href for the brand crumb (WB-099 Task 5),
+   * computed by the caller via `brandHref` — the component stays a plain
+   * presentational piece and doesn't know about the collection join.
+   * Falls back to the interim `/store?brands=<brand>` filter link when
+   * omitted (defensive; callers should always pass it now).
+   */
+  brandHref?: string
 }
 
 /**
  * Plain breadcrumb above the hero. Mono uppercase, ink-soft. Last segment
  * (the product name) is rendered without a link and in ink.
  */
-const Breadcrumb = ({ brand, name }: BreadcrumbProps) => {
+const Breadcrumb = ({ brand, name, brandHref }: BreadcrumbProps) => {
   const segments: { label: string; href?: string }[] = [
     { label: "Wheels", href: "/store" },
-    { label: brand, href: `/store?brands=${encodeURIComponent(brand)}` },
+    { label: brand, href: brandHref ?? `/store?brands=${encodeURIComponent(brand)}` },
     { label: name },
   ]
 

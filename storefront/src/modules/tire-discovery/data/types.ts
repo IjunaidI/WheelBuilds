@@ -34,6 +34,13 @@ export type TireDiscoveryProduct = {
    *  on pre-re-sync docs (WB-068 degrades those to "passes"). */
   fitSpecs: TireFitSpec[]
   isNew?: boolean
+  /**
+   * Availability signal (WB-100). Mirrors the wheel
+   * `DiscoveryProduct.inStock` twin: `true` only when the indexed doc's
+   * `in_stock` field is exactly `true`; missing/undefined (pre-backfill
+   * docs) maps to `false` — the safe under-claim default.
+   */
+  inStock: boolean
 }
 
 export type SortOption = "relevance" | "price-asc" | "price-desc" | "newest" | "name-asc"
@@ -56,6 +63,12 @@ export type TireDiscoveryFilters = {
   loadIndexes: number[]
   priceMinCents?: number
   priceMaxCents?: number
+  /**
+   * Availability toggle (WB-100). Optional scalar — same family as
+   * `priceMinCents`/`priceMaxCents` — not an array like the facet filters
+   * above.
+   */
+  inStockOnly?: boolean
 }
 
 export const EMPTY_TIRE_FILTERS: TireDiscoveryFilters = {
@@ -184,6 +197,15 @@ export function parseTireQueryFromSearchParams(
     const n = Number(Array.isArray(v) ? v[0] : v)
     return Number.isFinite(n) ? n : undefined
   }
+  // Boolean scalar reader (WB-100), mirrors the wheel
+  // parseQueryFromSearchParams twin: `?in_stock=1` → true, anything else
+  // (absent, "0", or any other value) → undefined (no constraint).
+  const bool = (k: string): true | undefined => {
+    const v = sp[k]
+    if (!v) return undefined
+    const s = Array.isArray(v) ? v[0] : v
+    return s === "1" ? true : undefined
+  }
 
   const sortRaw = (Array.isArray(sp.sort) ? sp.sort[0] : sp.sort) ?? "relevance"
   const sort: SortOption = (
@@ -210,6 +232,7 @@ export function parseTireQueryFromSearchParams(
       loadIndexes: nums("loadIndexes"),
       priceMinCents: num("priceMin"),
       priceMaxCents: num("priceMax"),
+      inStockOnly: bool("in_stock"),
     },
     sort,
     page: Math.max(1, num("page") ?? 1),

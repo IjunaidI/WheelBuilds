@@ -1,5 +1,10 @@
 import { Suspense } from "react"
 import { canonicalUrl } from "@lib/util/canonical"
+import { listBrandCollections } from "@lib/data/collections"
+import {
+  buildBrandHandleMap,
+  brandHref as resolveBrandHref,
+} from "@modules/brands/data/brand-tiles"
 import { DiscoveryProduct } from "@modules/discovery/data/types"
 import { ProductDetail } from "../data/types"
 import Breadcrumb from "../components/breadcrumb"
@@ -21,13 +26,26 @@ type ProductDetailTemplateProps = {
  * product + related. The Hero is the only interactive part (variant picks
  * are client state); everything else is server-rendered.
  */
-const ProductDetailTemplate = ({
+const ProductDetailTemplate = async ({
   product,
   related,
 }: ProductDetailTemplateProps) => {
   // Same absolute, `us`-pinned URL builder as Task 3's `alternates.canonical`
   // (generateMetadata in the page — untouched here; JSON-LD is not metadata).
   const productUrl = canonicalUrl(`/products/${product.handle}`)
+
+  // WB-099 Task 5: resolve the brand crumb's real `/brands/<handle>` page.
+  // `ProductDetail` doesn't carry the brand's collection handle (only its
+  // title), so join against `listBrandCollections()` the same exact-title
+  // way `/brands` and the footer/home sections do, rather than threading a
+  // new field through the whole PDP data layer for one link. Falls back to
+  // the interim `/store?brands=<title>` filter link when the brand has no
+  // matching collection (never a broken `/brands/undefined`).
+  const collections = await listBrandCollections()
+  const brandLinkHref = resolveBrandHref(
+    product.brand,
+    buildBrandHandleMap(collections)
+  )
 
   // The exact leaf variant the Hero renders by default (WB-095 Task 5 fix
   // wave, Important 1) — same function the Hero itself now seeds its
@@ -63,7 +81,7 @@ const ProductDetailTemplate = ({
             ? {
                 availability: defaultLeaf.availability,
                 priceCents: headlinePriceCents(defaultLeaf.priceCents),
-                variantId: defaultLeaf.variantId,
+                sku: defaultLeaf.sku,
               }
             : null,
         }}
@@ -73,13 +91,13 @@ const ProductDetailTemplate = ({
           { name: "Wheels", url: canonicalUrl("/store") },
           {
             name: product.brand,
-            url: canonicalUrl(`/store?brands=${encodeURIComponent(product.brand)}`),
+            url: canonicalUrl(brandLinkHref),
           },
           { name: product.name },
         ]}
       />
       <div className="mb-6 small:mb-8">
-        <Breadcrumb brand={product.brand} name={product.name} />
+        <Breadcrumb brand={product.brand} name={product.name} brandHref={brandLinkHref} />
       </div>
       <Suspense fallback={<div className="min-h-[600px]" />}>
         <Hero product={product} />

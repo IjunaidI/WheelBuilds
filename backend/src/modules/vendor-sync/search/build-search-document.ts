@@ -2,12 +2,21 @@ import { canonicalBoltPatterns } from "./bolt-pattern-canonical"
 import { normalizeFinish } from "./normalize-finish"
 import { hasImage } from "./has-image"
 import { isRealBoltPattern } from "./placeholder-bolt-pattern"
+import { computeInStock } from "./compute-in-stock"
 
 /** Minimal shape we read off a Medusa product in the Meilisearch transformer. */
 type IndexableVariant = {
   sku?: string
   prices?: { amount: number; currency_code: string }[]
   metadata?: Record<string, unknown> | null
+  // WB-100: widened onto MEILI_PRODUCT_FIELDS — confirmed reachable via
+  // query.graph (empirical spike). Feeds computeInStock.
+  inventory_items?: Array<{
+    inventory?: {
+      stocked_quantity?: number | null
+      reserved_quantity?: number | null
+    } | null
+  }>
 }
 type IndexableProduct = {
   id: string
@@ -137,6 +146,9 @@ function buildWheelDocument(
     // calculated_amount (major units) and ×100 itself, so the two surfaces agree.
     price_min: usdPrices.length ? Math.round(Math.min(...usdPrices) * 100) : 0,
     price_max: usdPrices.length ? Math.round(Math.max(...usdPrices) * 100) : 0,
+    // WB-100: grid availability signal. true iff some non-discontinued
+    // variant has stocked - reserved > 0 (see compute-in-stock.ts).
+    in_stock: computeInStock(variants),
   }
 }
 
@@ -224,6 +236,8 @@ function buildTireDocument(
     tire_type: classifyTireTypeFromMeta(meta, variants),
     price_min: usdPrices.length ? Math.round(Math.min(...usdPrices) * 100) : 0,
     price_max: usdPrices.length ? Math.round(Math.max(...usdPrices) * 100) : 0,
+    // WB-100: grid availability signal (see buildWheelDocument).
+    in_stock: computeInStock(variants),
   }
 }
 

@@ -134,6 +134,13 @@ const TireActiveChips = () => {
       onRemove: () => setScalarFilter("priceMaxCents", undefined),
     })
   }
+  if (filters.inStockOnly) {
+    chips.push({
+      key: "in-stock",
+      label: "In stock only",
+      onRemove: () => setScalarFilter("inStockOnly", undefined),
+    })
+  }
 
   return (
     <div className="flex flex-wrap items-center gap-2 mb-4">

@@ -1,6 +1,8 @@
 import { HttpTypes } from "@medusajs/types"
 import { OffsetVariant, SizeOption } from "./types"
 import { LOW_STOCK_THRESHOLD } from "./pdp-config"
+import { deriveBackspacing } from "./backspacing"
+import { isSpecialOrder } from "./order-signal"
 
 /** Coerce an unknown to a finite number, else 0. Shared by the PDP loader. */
 export const num = (v: unknown): number =>
@@ -132,6 +134,18 @@ export function sizeKey(s: {
  * product whose variant metadata never carried wheel_diameter_in /
  * wheel_width_in) are dropped entirely rather than collapsing into a fake
  * "0×0" SizeOption cell (WB-090 P19).
+ *
+ * Each offset variant's own `sku` (WB-098 Task 3) is threaded through
+ * unchanged — a plain top-level variant field (not metadata), the vendor
+ * part number vendor-sync writes via `sku: r.partNumber`. `undefined` when
+ * absent; there is no product-level fallback (unlike weight) because a sku
+ * is either real or it isn't.
+ *
+ * `isSpecialOrder` (WB-098 Task 4) is read from the SAME metadata blob as
+ * `center_bore_mm`/`load_rating_lb` above (`m.vendor_inv_order_type`) via
+ * `isSpecialOrder()` in `order-signal.ts` — per-variant, never rolled up to
+ * the size level, since sibling offsets can carry different vendor order
+ * types.
  */
 export function groupVariantsIntoSizes(
   variants: HttpTypes.StoreProductVariant[],
@@ -160,13 +174,15 @@ export function groupVariantsIntoSizes(
       variantWeightGrams > 0 ? gramsToLb(variantWeightGrams) : productWeightLb
     const offset: OffsetVariant = {
       value: offsetMm,
-      backspaceIn: "",
+      backspaceIn: deriveBackspacing(width, offsetMm),
       priceCents: priceCents > 0 ? priceCents : undefined,
       variantId: v.id,
+      sku: typeof v.sku === "string" && v.sku ? v.sku : undefined,
       availability: avail,
       centerBoreMm: numOrNull(m.center_bore_mm),
       loadRatingLb: numOrNull(m.load_rating_lb),
       quantity: qty,
+      isSpecialOrder: isSpecialOrder(m.vendor_inv_order_type),
     }
     const existing = byKey.get(key)
     if (existing) {

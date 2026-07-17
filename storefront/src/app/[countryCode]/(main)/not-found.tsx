@@ -8,6 +8,13 @@ import SearchCta from "@modules/search/components/search-cta"
 export const metadata: Metadata = {
   title: "404",
   description: "This page doesn't exist",
+  // The shared `(main)/loading.tsx` Suspense boundary flushes a 200 shell
+  // before a streamed `notFound()` resolves, so a bogus `/products/*` or
+  // `/brands/*` URL returns HTTP 200 with 404 content (a soft-404 — an App
+  // Router streaming limitation, not fixable without dropping the group
+  // skeleton). `robots: noindex` neutralizes the real harm — keeping those
+  // soft-404 URLs out of Google's index regardless of the 200 status.
+  robots: { index: false },
 }
 
 /**

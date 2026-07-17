@@ -2,12 +2,12 @@ import { Metadata } from "next"
 import { notFound } from "next/navigation"
 
 import { canonicalUrl } from "@lib/util/canonical"
-import type { Finish } from "@modules/common/components/wheel"
 import DiscoveryTemplate from "@modules/discovery/templates"
 import {
   getDiscoveryProducts,
   parseQueryFromSearchParams,
 } from "@modules/discovery/data/get-products"
+import { applyStylePreset } from "@modules/home/components/shop-by-style/apply-style-preset"
 import { styleFromSlug } from "@modules/home/components/shop-by-style/style-slug"
 import StylesHero from "@modules/styles/components/hero"
 
@@ -31,13 +31,14 @@ type Props = {
  * a shopper can't unpin or add a second brand), a style is a PRESET: the
  * full rail stays (no `hideBrand`-equivalent here), because a style is a
  * curated shortcut into the SAME catalog, not a separate identity — a
- * shopper can freely use every other facet dimension to narrow further.
- * `def.param`'s OWN facet section also stays visible/interactive; per the
- * brief this pin is re-applied unconditionally on every render (mirroring
- * the brand page's unconditional `filters.brands` override), so toggling
- * that SAME dimension in the rail doesn't change these results — a known,
- * accepted rough edge of the current stopgap (`STYLE_DEFS` is explicitly a
- * curated approximation until a real style facet exists; see `style-map.ts`).
+ * shopper can freely use every other facet dimension to narrow further,
+ * INCLUDING `def.param`'s own facet section (fix wave, WB-099 Task 4). The
+ * preset is applied via `applyStylePreset` (`shop-by-style/apply-style-preset.ts`)
+ * as a DEFAULT that fills `def.param`'s dimension only when the parsed URL
+ * left it empty — not an unconditional override — so a shopper who toggles a
+ * checkbox in that SAME dimension (e.g. unchecking "18" on `/styles/street`)
+ * genuinely narrows the results instead of the pin silently reasserting the
+ * full preset on every render.
  */
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { slug } = await params
@@ -67,21 +68,13 @@ export default async function StylePage({ params, searchParams }: Props) {
   const sp = await searchParams
   const query = parseQueryFromSearchParams(sp)
 
-  // The preset pin. STYLE_DEFS values are always strings; DiscoveryFilters
-  // wants `diameters` as number[] (Meili's `diameters` facet is numeric) —
-  // brands/finishes pass the strings straight through. Getting this
-  // coercion wrong (e.g. a string "18" where a number 18 is expected) would
-  // silently fail to match any Meili document and the pin would no-op
-  // instead of filtering — see DiscoveryFilters (discovery/data/types.ts)
-  // and how parseQueryFromSearchParams itself builds `filters.diameters`
-  // (`.map(Number)`) for the same reason.
-  if (def.param === "diameters") {
-    query.filters.diameters = def.values.map(Number)
-  } else if (def.param === "finishes") {
-    query.filters.finishes = def.values as Finish[]
-  } else {
-    query.filters.brands = def.values
-  }
+  // The preset default (fill-if-empty, not an override — see the module doc
+  // comment above and `applyStylePreset`'s own doc comment). STYLE_DEFS
+  // values are always strings; DiscoveryFilters wants `diameters` as
+  // number[] (Meili's `diameters` facet is numeric) — brands/finishes pass
+  // the strings straight through. That type coercion still happens inside
+  // `applyStylePreset`; only the apply-condition changed here.
+  query.filters = applyStylePreset(query.filters, def)
 
   const result = await getDiscoveryProducts(query)
   const inFitMode = !!query.vehicleConstraint?.length

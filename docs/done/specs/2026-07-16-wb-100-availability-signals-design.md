@@ -1,6 +1,6 @@
 # WB-100 · Availability signals in discovery — design
 
-> G12 Wave A (discovery & merchandising), chunk 3 of 3. Finding **WB-100** ([spec §WB-100](2026-07-13-ux-completeness-fixes-design.md)).
+> G12 Wave A (discovery & merchandising), chunk 3 of 3. Finding **WB-100** ([spec §WB-100](../../future/specs/2026-07-13-ux-completeness-fixes-design.md)).
 > Scouted against current `main` (`8035b6c`) 2026-07-16 — evidence inline. **Backend + storefront. The only Wave-A chunk needing a Meili re-index to go live.** Depends on WB-089 (done — the reconcile machinery this reuses).
 
 ## Problem

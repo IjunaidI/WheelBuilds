@@ -1,6 +1,6 @@
 # WB-098 · PDP merchandising completeness — design
 
-> G12 Wave A (discovery & merchandising), chunk 1 of 3. Finding **WB-098** ([spec §WB-098](2026-07-13-ux-completeness-fixes-design.md)).
+> G12 Wave A (discovery & merchandising), chunk 1 of 3. Finding **WB-098** ([spec §WB-098](../../future/specs/2026-07-13-ux-completeness-fixes-design.md)).
 > Scouted against current `main` (`8035b6c`) 2026-07-16 — evidence inline. **Storefront only, no backend work.**
 
 ## Problem

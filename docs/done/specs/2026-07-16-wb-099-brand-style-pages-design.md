@@ -1,6 +1,6 @@
 # WB-099 · Brand & style landing pages — design
 
-> G12 Wave A (discovery & merchandising), chunk 2 of 3. Finding **WB-099** ([spec §WB-099](2026-07-13-ux-completeness-fixes-design.md)).
+> G12 Wave A (discovery & merchandising), chunk 2 of 3. Finding **WB-099** ([spec §WB-099](../../future/specs/2026-07-13-ux-completeness-fixes-design.md)).
 > Scouted against current `main` (`8035b6c`) 2026-07-16 — evidence inline. **Storefront only.** Depends on WB-086 (done — the `/collections` retirement + brand-collection lookup), supersedes WB-085's interim repoint.
 
 ## Problem

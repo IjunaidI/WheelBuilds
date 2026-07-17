@@ -4,7 +4,7 @@ import { meili, PRODUCTS_INDEX } from "@lib/meilisearch"
 import { listBrandCollections } from "@lib/data/collections"
 import { getHomeCatalog } from "@modules/home/data/get-home-catalog"
 import { buildBrandTiles } from "@modules/brands/data/brand-tiles"
-import { STYLE_DEFS } from "@modules/home/components/shop-by-style/style-map"
+import { styleTiles } from "@modules/home/components/shop-by-style/style-map"
 import { styleSlug } from "@modules/home/components/shop-by-style/style-slug"
 
 /**
@@ -33,17 +33,13 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     { url: at(""), changeFrequency: "daily", priority: 1 },
     { url: at("/store"), changeFrequency: "daily", priority: 0.9 },
     { url: at("/tires"), changeFrequency: "daily", priority: 0.9 },
-    // WB-099 Task 5: /brands + /styles landing pages (Tasks 3-4). The
-    // /styles/<slug> entries come straight from the curated STYLE_DEFS array
-    // (no network dependency, unlike per-brand-handle below) so they're safe
-    // to include even in the fallback-base-url branch right below.
+    // WB-099 Task 5: the /brands + /styles INDEX landing pages (Tasks 3-4)
+    // always exist. The per-brand-handle AND per-style-slug entries are
+    // catalog-gated below (both need the live wheel facet counts) so the
+    // sitemap only ever advertises landing pages the indexes actually link —
+    // no empty-grid, thin-content 200s (see the brand/style loops below).
     { url: at("/brands"), changeFrequency: "weekly", priority: 0.8 },
     { url: at("/styles"), changeFrequency: "weekly", priority: 0.8 },
-    ...STYLE_DEFS.map((def) => ({
-      url: at(`/styles/${styleSlug(def.label)}`),
-      changeFrequency: "weekly" as const,
-      priority: 0.6,
-    })),
     { url: at("/contact"), changeFrequency: "monthly", priority: 0.3 },
     { url: at("/returns"), changeFrequency: "monthly", priority: 0.3 },
     { url: at("/shipping"), changeFrequency: "monthly", priority: 0.3 },
@@ -118,6 +114,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   // grid (getDiscoveryProducts is hard-scoped to wheels) — indexing those
   // would be thin-content soft-404s. Same fail-open shape as the scan above.
   const brandRoutes: MetadataRoute.Sitemap = []
+  const styleRoutes: MetadataRoute.Sitemap = []
   try {
     const [{ facets }, collections] = await Promise.all([
       getHomeCatalog(),
@@ -130,12 +127,22 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
         priority: 0.6,
       })
     }
+    // Per-style-slug entries, gated on the SAME wheel facet counts the /styles
+    // index uses (`styleTiles` drops zero-count presets) so the sitemap can't
+    // advertise a style page that renders an empty grid — parity with brands.
+    for (const tile of styleTiles(facets)) {
+      styleRoutes.push({
+        url: at(`/styles/${styleSlug(tile.label)}`),
+        changeFrequency: "weekly",
+        priority: 0.6,
+      })
+    }
   } catch (e) {
     console.error(
-      "[sitemap] brand catalog unavailable — emitting /brands index only:",
+      "[sitemap] brand/style catalog unavailable — emitting index pages only:",
       e
     )
   }
 
-  return [...statics, ...products, ...brandRoutes]
+  return [...statics, ...products, ...brandRoutes, ...styleRoutes]
 }

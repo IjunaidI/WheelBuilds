@@ -8,7 +8,9 @@ const isValidParam = (v: unknown): v is string => typeof v === "string" && v.len
 export async function GET(req: MedusaRequest, res: MedusaResponse): Promise<void> {
   const { make, model, year, region } = req.query as Record<string, string>
   const svc = resolveOptional<WheelSizeService>(req.scope, WHEEL_SIZE_MODULE)
-  if (!svc) { res.json({ modifications: [] }); return }
+  // WB-113: `listModifications` now returns the sub-model (`trim_levels`) union,
+  // not engine/trim modification slugs — the response key is named to match.
+  if (!svc) { res.json({ subModels: [] }); return }
   if (!isValidParam(make) || !isValidParam(model) || !isValidParam(year)) {
     res.status(400).json({ error: "make, model, and year are required" })
     return
@@ -19,7 +21,7 @@ export async function GET(req: MedusaRequest, res: MedusaResponse): Promise<void
   const regionParam = isValidParam(region) ? region : "usdm"
 
   try {
-    res.json({ modifications: await svc.listModifications(make, model, year, regionParam) })
+    res.json({ subModels: await svc.listModifications(make, model, year, regionParam) })
   } catch (e) {
     if (e instanceof QuotaOutageError) {
       res.status(503).json({ type: "service_unavailable", message: "Vehicle catalog temporarily unavailable" })

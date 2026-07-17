@@ -5,7 +5,10 @@ import { resolveOptional } from "../../../../lib/resolve-optional"
 
 export async function GET(req: MedusaRequest, res: MedusaResponse): Promise<void> {
   const svc = resolveOptional<WheelSizeService>(req.scope, WHEEL_SIZE_MODULE)
-  const { make, model, modification, year, region } = req.query as Record<string, string>
+  // WB-113: this route now reads `sub_model` (the trim_levels union), not the
+  // legacy `modification` engine-slug param. The service's `modificationSlug`
+  // alias stays in place for other callers — this route uses `subModel` only.
+  const { make, model, sub_model: subModel, year, region } = req.query as Record<string, string>
 
   if (!svc) { res.status(503).json({ error: "fitment unavailable" }); return }
   if (!make || !model) {
@@ -14,7 +17,7 @@ export async function GET(req: MedusaRequest, res: MedusaResponse): Promise<void
   }
 
   try {
-    const fitment = await svc.getFitment({ make, model, modificationSlug: modification, year, region })
+    const fitment = await svc.getFitment({ make, model, subModel, year, region })
     res.json({ fitment })
   } catch (err) {
     if (err instanceof QuotaOutageError) {

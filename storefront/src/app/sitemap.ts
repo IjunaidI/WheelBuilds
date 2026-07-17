@@ -2,6 +2,8 @@ import { MetadataRoute } from "next"
 import { getBaseURL, isFallbackBaseUrl } from "@lib/util/env"
 import { meili, PRODUCTS_INDEX } from "@lib/meilisearch"
 import { listBrandCollections } from "@lib/data/collections"
+import { getHomeCatalog } from "@modules/home/data/get-home-catalog"
+import { buildBrandTiles } from "@modules/brands/data/brand-tiles"
 import { STYLE_DEFS } from "@modules/home/components/shop-by-style/style-map"
 import { styleSlug } from "@modules/home/components/shop-by-style/style-slug"
 
@@ -106,23 +108,31 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     console.error("[sitemap] Meilisearch unavailable — emitting static URLs only:", e)
   }
 
-  // WB-099 Task 5: one entry per real brand collection handle. Same
-  // fail-open shape as the Meilisearch scan above — a Store API hiccup
-  // drops only the per-brand entries, never the whole sitemap.
+  // WB-099 Task 5: one entry per WHEEL brand landing page. `buildBrandTiles`
+  // joins the live wheel-facet count map (getHomeCatalog — product_type =
+  // "wheel") with the collection handles, dropping any brand with no wheel
+  // count — the SAME source the /brands INDEX renders from, so the sitemap
+  // can never advertise a brand page the index doesn't link. This matters:
+  // listBrandCollections() is unfiltered (includes ~11 tire-only brands like
+  // avix/fuel-tires), and a tire-only /brands/<handle> renders an EMPTY wheel
+  // grid (getDiscoveryProducts is hard-scoped to wheels) — indexing those
+  // would be thin-content soft-404s. Same fail-open shape as the scan above.
   const brandRoutes: MetadataRoute.Sitemap = []
   try {
-    const collections = await listBrandCollections()
-    for (const { handle } of collections) {
-      if (!handle) continue
+    const [{ facets }, collections] = await Promise.all([
+      getHomeCatalog(),
+      listBrandCollections(),
+    ])
+    for (const tile of buildBrandTiles(facets.brands, collections)) {
       brandRoutes.push({
-        url: at(`/brands/${handle}`),
+        url: at(tile.href), // tile.href is already `/brands/<handle>`
         changeFrequency: "weekly",
         priority: 0.6,
       })
     }
   } catch (e) {
     console.error(
-      "[sitemap] listBrandCollections unavailable — emitting /brands index only:",
+      "[sitemap] brand catalog unavailable — emitting /brands index only:",
       e
     )
   }

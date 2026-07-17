@@ -28,6 +28,31 @@ describe("buildTireFilters", () => {
     expect(c).toContain("price_min >= 5000")
     expect(c).toContain("price_min <= 40000")
   })
+
+  // WB-100 Task 3 — in_stock mirrors price: a global narrowing that is
+  // NEVER skipped (the `skip` arg only ever excludes one array facet), so
+  // it applies identically to the hits query and every per-dimension facet
+  // query.
+  it("adds `in_stock = true` when inStockOnly is true", () => {
+    const c = buildTireFilters({ ...EMPTY_TIRE_FILTERS, inStockOnly: true })
+    expect(c).toContain("in_stock = true")
+  })
+
+  it("omits in_stock when inStockOnly is undefined/false", () => {
+    expect(buildTireFilters(EMPTY_TIRE_FILTERS).some((x) => x.startsWith("in_stock"))).toBe(false)
+    expect(
+      buildTireFilters({ ...EMPTY_TIRE_FILTERS, inStockOnly: false }).some((x) => x.startsWith("in_stock"))
+    ).toBe(false)
+  })
+
+  it("still applies in_stock when a facet dimension is skipped", () => {
+    const c = buildTireFilters(
+      { ...EMPTY_TIRE_FILTERS, inStockOnly: true, brands: ["Falken"] },
+      "brands"
+    )
+    expect(c).toContain("in_stock = true")
+    expect(c.some((x) => x.startsWith("brand IN"))).toBe(false)
+  })
 })
 
 describe("hitToTireProduct", () => {
@@ -49,5 +74,28 @@ describe("hitToTireProduct", () => {
     expect(p.rimDiameters).toEqual([])
     expect(p.thumbnail).toBeNull()
     expect(p.tireType).toBe("other")
+  })
+
+  // WB-100 Task 3 — tire twin of the wheel hitToProduct in_stock mapping.
+  // Missing/undefined defaults to false (out of stock) — the safe default
+  // before a full re-index backfills every doc.
+  it("maps in_stock: true to inStock: true", () => {
+    expect(
+      hitToTireProduct({ id: "t3", handle: "h", title: "t", brand: "B", price_min: 0, in_stock: true } as any)
+        .inStock
+    ).toBe(true)
+  })
+
+  it("maps in_stock: false to inStock: false", () => {
+    expect(
+      hitToTireProduct({ id: "t4", handle: "h", title: "t", brand: "B", price_min: 0, in_stock: false } as any)
+        .inStock
+    ).toBe(false)
+  })
+
+  it("maps a missing in_stock field to inStock: false (safe default)", () => {
+    expect(
+      hitToTireProduct({ id: "t5", handle: "h", title: "t", brand: "B", price_min: 0 } as any).inStock
+    ).toBe(false)
   })
 })

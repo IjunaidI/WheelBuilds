@@ -85,6 +85,25 @@ describe("hasActiveQueryOrFilter (WB-087 D3)", () => {
       )
     ).toBe(false)
   })
+
+  // WB-100 Task 3 — inStockOnly must count as an active filter, same as
+  // priceMinCents/priceMaxCents (the same optional-scalar family).
+  it("is true when inStockOnly is set even with no q", () => {
+    expect(
+      hasActiveQueryOrFilter(
+        {
+          brands: [],
+          diameters: [],
+          boltPatterns: [],
+          finishes: [],
+          priceMinCents: null,
+          priceMaxCents: null,
+          inStockOnly: true,
+        } as any,
+        undefined
+      )
+    ).toBe(true)
+  })
 })
 
 // WB-099 Task 1 — `clearAll` used to hardcode `/${countryCode}/store`, so on

@@ -17,6 +17,10 @@ export function discoveryCacheKey(query: DiscoveryQuery): string {
     finishes: norm(f.finishes),
     priceMin: f.priceMinCents ?? null,
     priceMax: f.priceMaxCents ?? null,
+    // WB-100: must be part of the key — an availability toggle changes the
+    // Meili filter clause, so it must not collapse onto the same cache
+    // entry as the unfiltered query.
+    inStockOnly: f.inStockOnly ?? false,
     sort: query.sort,
     page: query.page,
     q: query.q ?? "",

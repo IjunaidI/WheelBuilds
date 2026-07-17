@@ -63,3 +63,23 @@ describe("hitToProduct — bolt pattern gated through isRealBoltPattern (WB-074 
     expect(product.boltPatternsCanonical).toEqual(["5x114.3"])
   })
 })
+
+// WB-100 Task 3 — hit.in_stock maps to product.inStock. Missing/undefined
+// (a doc from before the re-index backfill, or the non-wheel stub) treats
+// the product as OUT of stock — the safe default: better to under-claim
+// stock than over-claim it to a shopper.
+describe("hitToProduct — in_stock → inStock (WB-100 Task 3)", () => {
+  it("maps in_stock: true to inStock: true", () => {
+    expect(hitToProduct(makeHit({ in_stock: true })).inStock).toBe(true)
+  })
+
+  it("maps in_stock: false to inStock: false", () => {
+    expect(hitToProduct(makeHit({ in_stock: false })).inStock).toBe(false)
+  })
+
+  it("maps a missing in_stock field to inStock: false (safe default)", () => {
+    const hit = makeHit()
+    delete (hit as Partial<Hit>).in_stock
+    expect(hitToProduct(hit).inStock).toBe(false)
+  })
+})

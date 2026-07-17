@@ -45,6 +45,10 @@ export function buildTireFilters(
   if (skip !== "loadIndexes" && f.loadIndexes.length) clauses.push(`load_indexes IN [${f.loadIndexes.map(lit).join(", ")}]`)
   if (f.priceMinCents != null) clauses.push(`price_min >= ${f.priceMinCents}`)
   if (f.priceMaxCents != null) clauses.push(`price_min <= ${f.priceMaxCents}`)
+  // WB-100: in_stock is a global narrowing (like price), never gated by
+  // `skip` — mirrors the wheel `buildFilters` twin, so "in stock only"
+  // narrows both the hits query and every per-dimension facet query.
+  if (f.inStockOnly) clauses.push(`in_stock = true`)
   if (vehicleTireSizes?.length) clauses.push(`tire_sizes IN [${vehicleTireSizes.map(lit).join(", ")}]`)
   return clauses
 }
@@ -66,6 +70,9 @@ export type TireHit = {
   fit_specs?: string[]
   speed_ratings?: string[]; load_indexes?: number[]
   price_min: number; price_max: number; created_at: string | null
+  /** Availability signal (WB-100). Absent on pre-backfill docs — hitToTireProduct
+   *  treats that as "not known in stock". */
+  in_stock?: boolean
 }
 
 /** Parses the Meili `fit_specs` field ("size|load|speed" per variant) into
@@ -93,6 +100,9 @@ export function hitToTireProduct(h: TireHit): TireDiscoveryProduct {
     sizes: Array.isArray(h.tire_sizes) ? h.tire_sizes : [],
     fitSpecs: parseFitSpecs(h.fit_specs),
     isNew: Number.isFinite(createdMs) ? Date.now() - createdMs < NEW_MS : false,
+    // WB-100: missing/undefined → false (safe default; see the TireHit.in_stock
+    // doc comment above).
+    inStock: h.in_stock ?? false,
   }
 }
 

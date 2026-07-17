@@ -32,4 +32,15 @@ describe("parseTireQueryFromSearchParams", () => {
   it("reads free-text q", () => {
     expect(parseTireQueryFromSearchParams({ q: "wildpeak" }).q).toBe("wildpeak")
   })
+
+  // WB-100 Task 3 — tire twin of the wheel parse-in-stock.test.ts.
+  it("reads in_stock=1 as inStockOnly: true", () => {
+    expect(parseTireQueryFromSearchParams({ in_stock: "1" }).filters.inStockOnly).toBe(true)
+  })
+  it("omits inStockOnly when in_stock is absent", () => {
+    expect(parseTireQueryFromSearchParams({}).filters.inStockOnly).toBeUndefined()
+  })
+  it("treats in_stock=0 as not set (falsy)", () => {
+    expect(parseTireQueryFromSearchParams({ in_stock: "0" }).filters.inStockOnly).toBeUndefined()
+  })
 })

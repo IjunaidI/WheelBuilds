@@ -25,7 +25,12 @@ import {
 } from "./data/types"
 import { parseTireQueryFromSearchParams } from "./data/types"
 
-type ScalarFilterKey = "priceMinCents" | "priceMaxCents"
+// WB-100: tire twin of the wheel use-discovery-query.ts — `inStockOnly`
+// joins the scalar family (optional boolean, same shape as
+// priceMinCents/priceMaxCents), routed through the SAME
+// `setScalarFilter`/`replaceScalars` path rather than a new mechanism.
+type ScalarFilterKey = "priceMinCents" | "priceMaxCents" | "inStockOnly"
+type ScalarValue = number | boolean | undefined
 type ArrayFilterKey = Exclude<keyof TireDiscoveryFilters, ScalarFilterKey>
 
 // URL keys for array filters. Kept identical to the parser in
@@ -42,6 +47,17 @@ const ARRAY_PARAM: Record<ArrayFilterKey, string> = {
 const SCALAR_PARAM: Record<ScalarFilterKey, string> = {
   priceMinCents: "priceMin",
   priceMaxCents: "priceMax",
+  inStockOnly: "in_stock",
+}
+
+// Mirrors the wheel use-discovery-query.ts `scalarParamValue`: numbers pass
+// through as-is; booleans write "1" for true (matching
+// parseTireQueryFromSearchParams's `?in_stock=1` reader) and delete for
+// false/undefined.
+const scalarParamValue = (value: ScalarValue): string | undefined => {
+  if (value == null) return undefined
+  if (typeof value === "boolean") return value ? "1" : undefined
+  return Number.isFinite(value) ? String(value) : undefined
 }
 
 const searchParamsToRecord = (
@@ -115,13 +131,12 @@ export const useTireQuery = () => {
   )
 
   const setScalarFilter = useCallback(
-    (key: ScalarFilterKey, value: number | undefined) => {
+    (key: ScalarFilterKey, value: ScalarValue) => {
       push((sp) => {
         const param = SCALAR_PARAM[key]
         sp.delete(param)
-        if (value != null && Number.isFinite(value)) {
-          sp.set(param, String(value))
-        }
+        const v = scalarParamValue(value)
+        if (v != null) sp.set(param, v)
       })
     },
     [push]
@@ -135,15 +150,14 @@ export const useTireQuery = () => {
   // `push`) because a price commit is a transient scalar edit, not a new
   // history entry.
   const replaceScalars = useCallback(
-    (patch: Partial<Record<ScalarFilterKey, number | undefined>>) => {
+    (patch: Partial<Record<ScalarFilterKey, ScalarValue>>) => {
       const next = new URLSearchParams(searchParams.toString())
       for (const key of Object.keys(patch) as ScalarFilterKey[]) {
         const param = SCALAR_PARAM[key]
         const value = patch[key]
         next.delete(param)
-        if (value != null && Number.isFinite(value)) {
-          next.set(param, String(value))
-        }
+        const v = scalarParamValue(value)
+        if (v != null) next.set(param, v)
       }
       next.delete("page")
       const qs = next.toString()
@@ -227,6 +241,7 @@ const hasAnyFilter = (f: TireDiscoveryFilters): boolean => {
   if (f.loadIndexes.length) return true
   if (f.priceMinCents != null) return true
   if (f.priceMaxCents != null) return true
+  if (f.inStockOnly) return true
   return false
 }
 

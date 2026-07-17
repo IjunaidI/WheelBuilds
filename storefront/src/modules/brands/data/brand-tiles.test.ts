@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest"
-import { buildBrandTiles } from "./brand-tiles"
+import { buildBrandTiles, buildBrandHandleMap, brandHref } from "./brand-tiles"
 
 describe("buildBrandTiles", () => {
   it("joins the count map with matching collection handles", () => {
@@ -78,5 +78,35 @@ describe("buildBrandTiles", () => {
 
   it("returns an empty array for empty inputs", () => {
     expect(buildBrandTiles({}, [])).toEqual([])
+  })
+})
+
+describe("brandHref (WB-099 Task 5)", () => {
+  it("resolves to /brands/<handle> when the title has a matching collection", () => {
+    const handleMap = buildBrandHandleMap([{ title: "FUEL", handle: "fuel" }])
+    expect(brandHref("FUEL", handleMap)).toBe("/brands/fuel")
+  })
+
+  it("falls back to /store?brands=<title> when the title has no matching collection", () => {
+    const handleMap = buildBrandHandleMap([{ title: "FUEL", handle: "fuel" }])
+    expect(brandHref("NO-COLLECTION-BRAND", handleMap)).toBe(
+      "/store?brands=NO-COLLECTION-BRAND"
+    )
+  })
+
+  it("URL-encodes the fallback for a title with special characters", () => {
+    const handleMap = buildBrandHandleMap([])
+    expect(brandHref("Black Rhino Hard Alloys", handleMap)).toBe(
+      "/store?brands=Black%20Rhino%20Hard%20Alloys"
+    )
+  })
+
+  it("joins exactly on title, matching buildBrandTiles' join semantics", () => {
+    const handleMap = buildBrandHandleMap([
+      { title: "BLACKLINE FORGED", handle: "blackline-forged" },
+    ])
+    expect(brandHref("Blackline Forged", handleMap)).toBe(
+      "/store?brands=Blackline%20Forged"
+    )
   })
 })

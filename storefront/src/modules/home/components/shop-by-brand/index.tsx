@@ -2,9 +2,15 @@ import SectionHeader from "@modules/common/components/section-header"
 import MicroLink from "@modules/common/components/micro-link"
 import BrandTile from "@modules/common/components/brand-tile"
 import { getHomeCatalog } from "@modules/home/data/get-home-catalog"
+import { listBrandCollections } from "@lib/data/collections"
+import { buildBrandHandleMap, brandHref } from "@modules/brands/data/brand-tiles"
 
 const ShopByBrand = async () => {
-  const { facets } = await getHomeCatalog()
+  const [{ facets }, collections] = await Promise.all([
+    getHomeCatalog(),
+    listBrandCollections(),
+  ])
+  const handleMap = buildBrandHandleMap(collections)
   const brands = Object.entries(facets.brands).sort((a, b) => b[1] - a[1])
   if (brands.length === 0) return null
 
@@ -16,7 +22,7 @@ const ShopByBrand = async () => {
       <SectionHeader
         eyebrow={`${brands.length} BRANDS · ALL AUTHORIZED`}
         title="Trusted Brands"
-        action={<MicroLink href="/store">View all brands</MicroLink>}
+        action={<MicroLink href="/brands">View all brands</MicroLink>}
       />
       <div className="grid grid-cols-2 xsmall:grid-cols-3 small:grid-cols-4 gap-3 small:gap-4">
         {brands.map(([name, count]) => (
@@ -24,7 +30,7 @@ const ShopByBrand = async () => {
             key={name}
             name={name}
             count={count}
-            href={`/store?brands=${encodeURIComponent(name)}`}
+            href={brandHref(name, handleMap)}
           />
         ))}
       </div>

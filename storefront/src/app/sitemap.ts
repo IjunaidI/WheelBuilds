@@ -1,6 +1,9 @@
 import { MetadataRoute } from "next"
 import { getBaseURL, isFallbackBaseUrl } from "@lib/util/env"
 import { meili, PRODUCTS_INDEX } from "@lib/meilisearch"
+import { listBrandCollections } from "@lib/data/collections"
+import { STYLE_DEFS } from "@modules/home/components/shop-by-style/style-map"
+import { styleSlug } from "@modules/home/components/shop-by-style/style-slug"
 
 /**
  * WB-082: sitemap for the ~2,700-product catalog. Product handles come from
@@ -28,6 +31,17 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     { url: at(""), changeFrequency: "daily", priority: 1 },
     { url: at("/store"), changeFrequency: "daily", priority: 0.9 },
     { url: at("/tires"), changeFrequency: "daily", priority: 0.9 },
+    // WB-099 Task 5: /brands + /styles landing pages (Tasks 3-4). The
+    // /styles/<slug> entries come straight from the curated STYLE_DEFS array
+    // (no network dependency, unlike per-brand-handle below) so they're safe
+    // to include even in the fallback-base-url branch right below.
+    { url: at("/brands"), changeFrequency: "weekly", priority: 0.8 },
+    { url: at("/styles"), changeFrequency: "weekly", priority: 0.8 },
+    ...STYLE_DEFS.map((def) => ({
+      url: at(`/styles/${styleSlug(def.label)}`),
+      changeFrequency: "weekly" as const,
+      priority: 0.6,
+    })),
     { url: at("/contact"), changeFrequency: "monthly", priority: 0.3 },
     { url: at("/returns"), changeFrequency: "monthly", priority: 0.3 },
     { url: at("/shipping"), changeFrequency: "monthly", priority: 0.3 },
@@ -92,5 +106,26 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     console.error("[sitemap] Meilisearch unavailable — emitting static URLs only:", e)
   }
 
-  return [...statics, ...products]
+  // WB-099 Task 5: one entry per real brand collection handle. Same
+  // fail-open shape as the Meilisearch scan above — a Store API hiccup
+  // drops only the per-brand entries, never the whole sitemap.
+  const brandRoutes: MetadataRoute.Sitemap = []
+  try {
+    const collections = await listBrandCollections()
+    for (const { handle } of collections) {
+      if (!handle) continue
+      brandRoutes.push({
+        url: at(`/brands/${handle}`),
+        changeFrequency: "weekly",
+        priority: 0.6,
+      })
+    }
+  } catch (e) {
+    console.error(
+      "[sitemap] listBrandCollections unavailable — emitting /brands index only:",
+      e
+    )
+  }
+
+  return [...statics, ...products, ...brandRoutes]
 }

@@ -2,9 +2,8 @@
 export const NAV_ITEMS: { label: string; href: string }[] = [
   { label: "Wheels", href: "/store" },
   { label: "Tires", href: "/tires" },
-  // Interim: /collections + /categories 404 today. WB-099 adds dedicated
-  // /brands + /styles landing pages; until then these open discovery.
-  { label: "Brands", href: "/store" },
-  { label: "Style", href: "/store" },
+  // WB-099: dedicated /brands + /styles landing pages (Tasks 3-4).
+  { label: "Brands", href: "/brands" },
+  { label: "Style", href: "/styles" },
   { label: "Support", href: "/contact" },
 ]

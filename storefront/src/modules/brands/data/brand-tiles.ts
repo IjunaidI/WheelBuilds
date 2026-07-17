@@ -69,3 +69,30 @@ export function buildBrandTiles(
     return a.name < b.name ? -1 : a.name > b.name ? 1 : 0
   })
 }
+
+/** title -> handle lookup, built once per request from `listBrandCollections()`. */
+export type BrandHandleMap = Map<string, string>
+
+/**
+ * Build the title -> handle lookup `brandHref` (below) joins against. Same
+ * exact-title join key as `buildBrandTiles`, just keyed for O(1) per-title
+ * lookups instead of producing the full `/brands` tile grid.
+ */
+export function buildBrandHandleMap(
+  collections: BrandCollectionRef[]
+): BrandHandleMap {
+  return new Map(collections.map((c) => [c.title, c.handle]))
+}
+
+/**
+ * Resolve a single brand title to its `/brands/<handle>` page (WB-099
+ * Task 5) — shared by the footer, home ShopByBrand, and the wheel PDP
+ * breadcrumb, everywhere that needs one brand link rather than the full
+ * `/brands` grid. Falls back to the interim `/store?brands=<title>` filter
+ * link when `handleMap` has no entry for `title`, so a brand with no
+ * matching collection never emits a broken `/brands/undefined`.
+ */
+export function brandHref(title: string, handleMap: BrandHandleMap): string {
+  const handle = handleMap.get(title)
+  return handle ? `/brands/${handle}` : `/store?brands=${encodeURIComponent(title)}`
+}

@@ -14,6 +14,16 @@
 export type TrimLevelsCarrier = { trim_levels?: string[] | null }
 
 /**
+ * The synthetic "no sub-model narrowing" sentinel (Task 2 review Minor):
+ * every wheel-size vehicle is expected to expose this as the catch-all
+ * dropdown option when its `trim_levels` union is empty. Shared with
+ * service.ts (fitment resolution) and, going forward, the store route
+ * (Task 3) + storefront (Task 4) — extracted here instead of a bare literal
+ * repeated at each call site.
+ */
+export const BASE_SUBMODEL = "Base"
+
+/**
  * Deduped, first-seen-order union of `trim_levels` across every entry for a
  * make/model/year. An entry with no `trim_levels` key, or a null/empty array,
  * contributes nothing (skipped, not an error) — a make/model/year with zero
@@ -53,7 +63,7 @@ export function filterEntriesBySubModel<T extends TrimLevelsCarrier>(
   entries: T[],
   subModel: string | undefined
 ): T[] {
-  if (subModel === "Base" || subModel === undefined || subModel === "") {
+  if (subModel === BASE_SUBMODEL || subModel === undefined || subModel === "") {
     return entries
   }
   return entries.filter((entry) => (entry?.trim_levels ?? []).includes(subModel))

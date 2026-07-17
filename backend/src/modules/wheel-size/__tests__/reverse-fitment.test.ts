@@ -5,6 +5,13 @@ import { extractVehicleIdentity, matchedPattern, buildReverseFitment } from "../
 // `data` entry per array element, all sharing make/model/years) so callers
 // can construct multi-trim "union" rows (WB-077) to exercise WB-104 T1's
 // trim-honesty rule in `extractVehicleIdentity`.
+//
+// WB-113: each `t` becomes that entry's single-element `trim_levels` (or an
+// empty array when `t` is undefined — "this entry has no sub-model tag"),
+// mirroring `extractVehicleIdentity`'s switch from the engine `.trim` field
+// to the marketing sub-model `trim_levels` array. The param is still named
+// `trim` / passed as plain strings here purely to keep this fixture helper's
+// call sites (and their honesty-rule intent) unchanged.
 const rawOf = (
   make: string | null,
   model: string | null,
@@ -17,7 +24,8 @@ const rawOf = (
     data: trims.map((t) => ({
       make: make ? { name: make } : undefined,
       model: model ? { name: model } : undefined,
-      trim: t, start_year: start, end_year: end,
+      trim_levels: t !== undefined ? [t] : [],
+      start_year: start, end_year: end,
     })),
   }
 }
@@ -65,6 +73,39 @@ describe("extractVehicleIdentity", () => {
       // trim as its own distinct value, so this must claim NO trim.
       expect(extractVehicleIdentity(rawOf("Honda", "Accord", ["Sport", undefined], 2018, 2022))).toEqual({
         make: "Honda", model: "Accord", trim: undefined, yearLabel: "2018–2022", trimNarrowed: false,
+      })
+    })
+  })
+
+  // WB-113: entries can carry MULTIPLE trim_levels each (one engine entry
+  // lists several marketing sub-models) — rawOf's single-value-per-entry
+  // helper above can't build that shape, so these exercise it directly.
+  describe("sub-model union honesty (WB-113)", () => {
+    it("claims no trim when two entries' trim_levels overlap but don't collapse to one value", () => {
+      // Entry A ("LT","WT") + entry B ("LT","LTZ") share "LT", but their
+      // UNION is {LT,WT,LTZ} — 3 distinct sub-models, so this is NOT an
+      // honest single-sub-model claim even though every entry has data.
+      const raw = {
+        data: [
+          { make: { name: "Chevrolet" }, model: { name: "Silverado 1500" }, trim_levels: ["LT", "WT"], start_year: 2023, end_year: 2023 },
+          { make: { name: "Chevrolet" }, model: { name: "Silverado 1500" }, trim_levels: ["LT", "LTZ"], start_year: 2023, end_year: 2023 },
+        ],
+      }
+      expect(extractVehicleIdentity(raw)).toEqual({
+        make: "Chevrolet", model: "Silverado 1500", trim: undefined, yearLabel: "2023", trimNarrowed: false,
+      })
+    })
+
+    it("keeps the trim when a single entry lists it alongside other sub-models it does NOT claim alone", () => {
+      // A single-entry row whose trim_levels has more than one value is
+      // still a genuine union (this ONE engine entry legitimately covers
+      // both) — not narrowed to one sub-model, so no trim is claimed here
+      // either (2 distinct values), same rule as the multi-entry case.
+      const raw = {
+        data: [{ make: { name: "Toyota" }, model: { name: "Corolla" }, trim_levels: ["L", "LE"], start_year: 2019, end_year: 2019 }],
+      }
+      expect(extractVehicleIdentity(raw)).toEqual({
+        make: "Toyota", model: "Corolla", trim: undefined, yearLabel: "2019", trimNarrowed: true,
       })
     })
   })

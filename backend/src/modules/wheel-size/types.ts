@@ -16,19 +16,21 @@ export type VehicleFitment = {
     modificationSlug: string
     region: string
     /**
-     * True when a modificationSlug was supplied AND the trim-narrowed query
-     * returned data directly. False when a modificationSlug was supplied but
-     * `resolveByModel` discarded it and retried broad (all trims) because the
-     * trim-narrowed query returned no data (WB-104 T3) — the storefront's trim
-     * dropdown is the GLOBAL modifications catalog, so a non-US trim slug against
-     * a `usdm` fitment query is a common cause. That fallback is logged (visible
-     * in ops logs via `resolveByModel`'s `logger.warn`) and surfaced here on the
-     * live-resolve response. Undefined when no trim was supplied at all, OR
-     * when this value is being read back off a warm cache-hit (`toFitment`)
-     * rather than a live resolve/refresh — WB-104 T3: this flag is
-     * first-fetch/refresh-only, it is not persisted on the cache row, so a
-     * later cache-hit read cannot reconstruct it. The `logger.warn` above is
-     * the authoritative signal that a silent trim-fallback occurred.
+     * True when a sub-model (or the legacy modificationSlug alias) was
+     * requested AND it matched at least one `by_model` entry's `trim_levels`
+     * directly. False when one was requested but matched NOTHING, so the
+     * service fell back to ALL entries for this vehicle instead of resolving
+     * nothing (WB-113; this replaces WB-104 T3's old modification-narrowing
+     * fallback, same operator-visibility rule) — always logged via
+     * `logger.warn` (`service.ts`'s `fitmentForSubModel`), never silent.
+     * Undefined when no sub-model was supplied at all, or it was "Base"
+     * (`filterEntriesBySubModel`'s own no-narrow case).
+     *
+     * WB-113: unlike the old modification-narrowing fallback, this IS
+     * reconstructable on a warm cache-hit — the fitment cache stores the raw
+     * (unfiltered) `by_model` body, so `fitmentForSubModel` re-derives
+     * `trimNarrowed` by re-running the same filter at read time, not just on
+     * a fresh fetch.
      */
     trimNarrowed?: boolean
   }

@@ -13,6 +13,7 @@ import { useGarage } from "@lib/garage/use-garage"
 import { resolveFitmentForVehicle } from "@lib/data/fitment-resolve"
 import { getFitmentContext } from "@lib/stores/fitment-context"
 import { slugifyYmm } from "@lib/garage/vehicle-data"
+import { normalizeStoredSubModel } from "@lib/garage/sub-model"
 import { FitmentTarget } from "./destination-url"
 
 type FindByVehicleProps = {
@@ -43,6 +44,13 @@ const FindByVehicle = ({ onClose }: FindByVehicleProps) => {
   // live-catalog vehicles and fixes the seed case — otherwise re-sending the
   // stored display name would just resolve to nothing again, defeating the
   // recovery this button exists for.
+  //
+  // WB-113: `active.modificationSlug` now holds the sub-model string
+  // ("LE", "Base") — but a vehicle saved BEFORE this feature shipped stored
+  // an engine-modification hash slug there instead. normalizeStoredSubModel
+  // collapses that old shape (and any absent value) to "Base" so a stale
+  // vehicle re-checks broad instead of erroring or silently resolving
+  // nothing.
   const recheckFit = async () => {
     if (!active || rechecking) return
     setRechecking(true)
@@ -50,7 +58,7 @@ const FindByVehicle = ({ onClose }: FindByVehicleProps) => {
       const result = await resolveFitmentForVehicle(
         slugifyYmm(active.make),
         slugifyYmm(active.model),
-        active.modificationSlug ?? "",
+        normalizeStoredSubModel(active.modificationSlug),
         String(active.year),
         "usdm"
       )

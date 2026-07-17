@@ -12,6 +12,7 @@ import { useGarage } from "@lib/garage/use-garage"
 import { fitmentDestinationUrl, FitmentTarget } from "./destination-url"
 import { getFitmentContext } from "@lib/stores/fitment-context"
 import { resolveFitmentForVehicle } from "@lib/data/fitment-resolve"
+import { normalizeStoredSubModel } from "@lib/garage/sub-model"
 import { Vehicle, NewVehicle } from "@lib/garage/types"
 
 type GaragePaneProps = {
@@ -67,10 +68,14 @@ const GaragePane = ({ onClose, onAddNew }: GaragePaneProps) => {
         // Only the fetch itself lives inside resolveFitmentForVehicle's try/catch —
         // the update()/toast calls below run OUTSIDE it, so an unrelated throw from
         // them is never misreported as a fitment-fetch failure (WB-073 G8 review).
+        // WB-113: v.modificationSlug now holds the sub-model string; a
+        // vehicle saved before this feature stored an engine-modification
+        // slug there instead — normalizeStoredSubModel treats that (and any
+        // absent value) as "Base" rather than erroring or resolving nothing.
         const result = await resolveFitmentForVehicle(
           v.make,
           v.model,
-          v.modificationSlug ?? "",
+          normalizeStoredSubModel(v.modificationSlug),
           String(v.year),
           "usdm"
         )

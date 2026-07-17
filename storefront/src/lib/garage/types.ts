@@ -10,6 +10,9 @@ export type VehicleFitment = {
   diameterWindow: FitWindow; widthWindow: FitWindow; offsetWindow: FitWindow
   oemTireSizes: string[]
   oemTires: OemTire[]
+  // WB-113: holds the picked marketing SUB-MODEL string ("LE", "Base"),
+  // not a wheel-size engine-modification hash slug — field name unrenamed,
+  // mirrors the backend's own VehicleFitment.source.modificationSlug key.
   source: { modificationSlug: string; region: string }
 }
 export type Vehicle = {
@@ -18,6 +21,11 @@ export type Vehicle = {
   make: string
   model: string
   trim?: string
+  // WB-113: the picked marketing sub-model string ("LE", "XLE", "Base"),
+  // sent back as `sub_model` on re-resolve. Field name unrenamed (mirrors
+  // VehicleFitment.source.modificationSlug above) — a vehicle saved BEFORE
+  // this feature shipped holds an old engine-modification slug here
+  // instead; see lib/garage/sub-model.ts's normalizeStoredSubModel.
   modificationSlug?: string
   canonicalBoltPatterns?: string[]
   hubBoreMm?: number

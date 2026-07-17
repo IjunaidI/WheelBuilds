@@ -6,8 +6,14 @@ import { unwrapFitment } from "./fitment-unwrap"
 export const getMakes = () => sdk.client.fetch<{ makes: any }>("/store/vehicle-catalog/makes")
 export const getModels = (make: string) => sdk.client.fetch<{ models: any }>(`/store/vehicle-catalog/models?make=${make}`)
 export const getYears = (make: string, model: string) => sdk.client.fetch<{ years: any }>(`/store/vehicle-catalog/years?make=${make}&model=${model}`)
-export const getModifications = (make: string, model: string, year: string) =>
-  sdk.client.fetch<{ modifications: any }>(`/store/vehicle-catalog/modifications?make=${make}&model=${model}&year=${year}`)
+// WB-113: the sub-model union (L/LE/LE Eco/…) — the store route kept its
+// PATH (`/vehicle-catalog/modifications`, minimizing churn — Task 3) but
+// its response key changed from the engine `modifications: {slug,name}[]`
+// to `subModels: string[]`. Renamed from `getModifications` for clarity;
+// value === label now (no slug/name split — see `to-options.ts`'s twin
+// `toSubModelOptions`).
+export const getSubModels = (make: string, model: string, year: string) =>
+  sdk.client.fetch<{ subModels: string[] }>(`/store/vehicle-catalog/modifications?make=${make}&model=${model}&year=${year}`)
 
 /**
  * Reverse fitment for the PDP "confirmed models" list: cached vehicles that fit
@@ -88,13 +94,15 @@ export async function getFitmentByTireProduct(
   }
 }
 
-export async function getFitmentByVehicle(make: string, model: string, modification: string, year: string, region = "usdm"): Promise<VehicleFitment | { error: "unavailable" }> {
+export async function getFitmentByVehicle(make: string, model: string, subModel: string, year: string, region = "usdm"): Promise<VehicleFitment | { error: "unavailable" }> {
   try {
-    // wheel-size /search/by_model/ REQUIRES year (or generation); modification only
+    // wheel-size /search/by_model/ REQUIRES year (or generation); sub_model only
     // narrows the trim. Omitting year => 400 => fitment never resolves => no filtering.
+    // WB-113: `sub_model` replaces the old `modification` (engine-slug) param —
+    // send the literal string "Base" for "no sub-model selected", never "".
     const yearParam = year ? `&year=${encodeURIComponent(year)}` : ""
     const body = await sdk.client.fetch<unknown>(
-      `/store/fitment/by-vehicle?make=${make}&model=${model}&modification=${encodeURIComponent(modification)}${yearParam}&region=${region}`)
+      `/store/fitment/by-vehicle?make=${make}&model=${model}&sub_model=${encodeURIComponent(subModel)}${yearParam}&region=${region}`)
     const fitment = unwrapFitment(body)
     // null means a malformed/unrecognized response shape; treat as unavailable —
     // the YMM pane only distinguishes fitment vs. error.

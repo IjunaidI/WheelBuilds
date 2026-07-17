@@ -22,12 +22,12 @@ export type FitmentResolution =
 export async function resolveFitmentForVehicle(
   make: string,
   model: string,
-  modificationSlug: string,
+  subModel: string,
   year: string,
   region = "usdm"
 ): Promise<FitmentResolution> {
   try {
-    const fitment = await getFitmentByVehicle(make, model, modificationSlug, year, region)
+    const fitment = await getFitmentByVehicle(make, model, subModel, year, region)
     if (fitment && "error" in fitment) return { kind: "unavailable" }
     return { kind: "ok", fitment }
   } catch {

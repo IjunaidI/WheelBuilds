@@ -1225,3 +1225,22 @@
 - fix: reflect the server-filled dimension value in the rail's checked state (or the URL) so the UI matches the applied filter; same root cause as the existing accepted "can't clear the pinned dimension to empty" edge.
 - verify: opening `/styles/<slug>` shows the preset's pinned dimension pre-checked in the rail, matching the filtered grid.
 - refs: — (surfaced during G12 Wave A review of WB-099); cosmetic, accepted edge
+
+### WB-113 · Sub-model vehicle selector — replace the engine-trim axis   [DONE]
+- status: done
+- area: backend/wheel-size + storefront/search (YMM fitment)
+- evidence: the vehicle picker's 4th axis showed wheel-size.com engine "modifications" (1.8 VVT-i) as an optional "Trim"; shoppers identify their car by marketing sub-model (L, LE, LE Eco)
+- problem: engine displacement is not how shoppers know their car, and the axis was optional — a user request 2026-07-17.
+- fix: replace the engine axis with the mandatory sub-model from wheel-size's `trim_levels` (live-probed: on both `/modifications` and `by_model`); resolve fitment by filtering the broad `by_model` entries by `trim_levels` membership (RAW-cached, one fetch/vehicle); `Base` fallback for vehicles with no trim data; fully replace the engine name.
+- done: 2026-07-17 — SDD on branch `feat/wb-113-submodel-selector` (5 tasks + per-task reviews [2× opus] + opus whole-feature review + live smoke; tips 1=`f58552b`, 2=`81aa542`, 3=`85cc88e`, 4=`c7d7e11`). Backend: pure `subModelsForModelYear`/`filterEntriesBySubModel`, `resolveByModel(subModel)` filters a broad `by_model` fetch (RAW cache, key drops the sub-model slot, quota decreases), `listModifications`→sub-model union, routes serve `{ subModels: string[] }` + accept `sub_model`, reverse-fitment reads `trim_levels` (WB-104 honesty preserved). Storefront: mandatory sub-model `<select>` + `Base` fallback + `normalizeStoredSubModel` (old localStorage engine slug → Base, self-heals). Live-verified: Corolla 2019 → `L/LE/LE Eco/SE/XLE/XSE`, `sub_model=LE`→5x100. Gate: backend wheel-size jest 137 + full jest 602/12-skip + medusa build 0; storefront vitest 859/121 + tsc 2-baseline + next build 0.
+- **⚠️ DEPLOY IN LOCKSTEP (backend + storefront are separate Railway services): the `/store/vehicle-catalog/modifications` response changed `[{slug,name}]`→`{ subModels: string[] }` and the by-vehicle route param `modification`→`sub_model` — a version skew breaks the dropdown/fitment. No DB migration; stale engine-mod-keyed `wheel_size_fitment` rows re-resolve on demand + via the warm cron; existing localStorage vehicles' old engine slug collapses to `Base` (broad fallback) and self-heals on re-pick.**
+- refs: [done/specs/2026-07-17-wb-113-submodel-selector-design.md](../done/specs/2026-07-17-wb-113-submodel-selector-design.md) · [done/plans/2026-07-17-wb-113-submodel-selector.md](../done/plans/2026-07-17-wb-113-submodel-selector.md)
+
+### WB-114 · Tire OEM sizes not narrowed by the selected sub-model   [LOW]
+- status: todo
+- area: backend/wheel-size (fitment)
+- evidence: `fitmentForSubModel` (`service.ts`) narrows wheel bolt/bore/windows by the picked sub-model (WB-113) but passes the FULL unfiltered `by_model` body to `extractOemTireSizes`/`extractOemTires`, so a vehicle's OEM tire sizes are the union across ALL sub-models (live-confirmed: Corolla LE and XSE return the same `oemTireSizes`, though LE Eco is stock 195/65R15 vs XSE 205/55R16).
+- problem: a new asymmetry from WB-113 — wheels narrow by sub-model, tire OEM sizes don't. It's a permissive superset (never hides a fitting tire, never mis-sells a wheel), but not sub-model-accurate.
+- fix: pass the sub-model-filtered subset (`{ data: entries }`) rather than `body` to the two OEM-tire extractors, with a test; keep the cache's derived columns as the sub-model-agnostic Base snapshot for reverse-fitment + the warm cron.
+- verify: `sub_model=LE` returns LE's OEM tire sizes, not the union across trims.
+- refs: — (surfaced during the WB-113 whole-feature review); permissive superset, not urgent

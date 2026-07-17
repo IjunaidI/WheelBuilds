@@ -1,5 +1,6 @@
 import { ReverseFitmentVehicle, Window } from "./types"
 import { boreClears } from "./bore-clearance"
+import { subModelsForModelYear } from "./sub-models"
 
 type FitmentRow = {
   raw?: any
@@ -41,24 +42,29 @@ export function sizeInWindow(sizes: ProductSize[], row: FitmentRow): boolean {
 
 /**
  * Pull a display-ready vehicle identity out of a cached wheel-size `by_model`
- * body: make.name, model.name, trim, and a year label from start_year/end_year
- * — all read off `raw.data[0]` except `trim`. Returns null when make or model
- * is missing.
+ * body: make.name, model.name, a sub-model trim label, and a year label from
+ * start_year/end_year — all read off `raw.data[0]` except the trim label.
+ * Returns null when make or model is missing.
  *
  * WB-104 T1: WB-077 made a cached row's `raw.data` cover EVERY trim the
  * vehicle query matched (a "union" row) when there's more than one, so
- * `raw.data[0].trim` is an arbitrary pick that would otherwise be displayed
- * as if it were the only trim this fitment applies to. Trim-honesty rule: a
- * multi-entry row only keeps a trim label when EVERY entry agrees on it — a
- * missing/empty trim on any entry counts as its OWN distinct value, so a
- * mixed known/unknown-trim union (e.g. one entry "Sport", another with no
- * trim) is NOT collapsed down to the one named trim; it claims no trim at
- * all, same as a genuine union of >1 distinct named trims. (A naive
- * `.filter(Boolean)` before deduping would silently drop the empty entries
- * and let a mixed union masquerade as narrowed — that's the bug this fixes.)
- * `trimNarrowed` (`raw.data.length === 1`) tells callers whether the row was
- * ever narrowed to one specific trim, independent of whether that trim
- * happened to be nameable.
+ * picking an arbitrary entry's trim would display it as if it were the only
+ * trim this fitment applies to.
+ *
+ * WB-113: the trim label now surfaces the marketing **sub-model**
+ * (`trim_levels`) instead of the engine "modification" name (the old
+ * `.trim` field) — the sub-model is the axis the vehicle selector narrows
+ * by going forward. WB-104's honesty rule carries over unchanged in spirit:
+ * a multi-entry row only keeps a sub-model label when EVERY entry both
+ * carries `trim_levels` data AND the union of all of them (subModelsForModelYear)
+ * collapses to exactly one distinct value. An entry with no `trim_levels` at
+ * all counts against the claim (same as the old code's "missing trim is its
+ * own distinct value") — a mixed known/unknown-sub-model union (e.g. one
+ * entry tags "Sport", another has no trim_levels) is NOT collapsed down to
+ * the one named sub-model; it claims none at all, same as a genuine union of
+ * >1 distinct sub-models. `trimNarrowed` (`raw.data.length === 1`) tells
+ * callers whether the row was ever narrowed to one specific entry,
+ * independent of whether that entry's sub-model happened to be nameable.
  */
 export function extractVehicleIdentity(
   raw: any
@@ -68,12 +74,14 @@ export function extractVehicleIdentity(
   const make = d?.make?.name
   const model = d?.model?.name
   if (typeof make !== "string" || !make || typeof model !== "string" || !model) return null
-  // Missing/empty trims are distinct values here (NOT filtered out) so a
-  // mixed known/unknown-trim row is caught by distinct.size > 1 below.
-  const trimVals = data.map((e) => (e?.trim ?? "").trim())
-  const distinct = new Set(trimVals)
   const trimNarrowed = data.length === 1
-  const trim: string | undefined = distinct.size === 1 && trimVals[0] ? trimVals[0] : undefined
+  // Every entry must carry non-empty trim_levels (a missing one is NOT
+  // ignored — it blocks the claim, same as the old "missing trim counts as
+  // its own distinct value" rule) AND the union across all of them must
+  // collapse to exactly one distinct sub-model.
+  const allHaveSubModels = data.length > 0 && data.every((e) => Array.isArray(e?.trim_levels) && e.trim_levels.length > 0)
+  const subModels = subModelsForModelYear(data)
+  const trim: string | undefined = allHaveSubModels && subModels.length === 1 ? subModels[0] : undefined
   const start = typeof d?.start_year === "number" ? d.start_year : null
   const end = typeof d?.end_year === "number" ? d.end_year : null
   const yearLabel =

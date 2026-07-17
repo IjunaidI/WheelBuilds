@@ -54,13 +54,13 @@ describe("WheelSizeService.getFitment", () => {
   })
 
   it("classifies 200 + empty data as not_found and caches the sentinel", async () => {
-    // Two empty results: the primary (usdm + trim "m") AND the same-region no-trim
-    // retry that the fallback now performs when a trim slug yields nothing.
+    // WB-113: a single empty fetch — there is no more modification-narrowed
+    // primary + same-region no-trim retry (the API is always queried broad now).
     const empty = { status: 200, empty: false, body: { data: [] } }
-    const { svc, store } = makeService([empty, empty])
+    const { svc, store } = makeService([empty])
     const f = await svc.getFitment({ make: "honda", model: "accord", modificationSlug: "m", region: "usdm" })
     expect(f.status).toBe("not_found")
-    expect(store.fitment.get("honda|accord||m|usdm|v2").status).toBe("not_found")
+    expect(store.fitment.get("honda|accord|||usdm|v2").status).toBe("not_found")
   })
 
   it("returns the cached row on the second call without hitting the client", async () => {
@@ -151,46 +151,35 @@ describe("WheelSizeService.getFitment region fallback", () => {
     expect(f2.canonicalBoltPatterns).toContain("5x120")
   })
 
-  it("retries the requested region WITHOUT the trim before crossing markets (US car, non-US trim slug)", async () => {
+  // WB-113: the old modification-narrowed-primary-fetch + same-region no-trim
+  // retry is gone — the API is always queried broad, and sub-model narrowing
+  // happens locally afterward (fitmentForSubModel). A sub-model that doesn't
+  // match any entry in the resolved region's data falls back to ALL of that
+  // region's entries instead of crossing markets.
+  it("falls back to ALL entries locally when the sub-model matches nothing in the resolved region, without crossing regions", async () => {
     const { svc, calls } = makeRegionService({})
-    // usdm + a (non-US) trim → empty; usdm without the trim → real 5x112; other
-    // regions exist but must NOT be reached because the same-region retry succeeds.
     svc.client_.byModel = async (p: any) => {
       calls.push(p)
-      if (p.region === "usdm" && p.modification) return emptyWithRegions({ eudm: 3 })
-      if (p.region === "usdm") return record(5, 112)
-      return record(4, 100) // eudm/etc — would be wrong for a US car
+      if (p.region === "usdm") return record(5, 112) // real data, no trim_levels at all
+      return record(4, 100) // would be wrong for a US car — must not be reached
     }
-    const f = await svc.getFitment({ make: "audi", model: "a3", year: "2022", modificationSlug: "eu-trim", region: "usdm" })
+    const f = await svc.getFitment({ make: "audi", model: "a3", year: "2022", subModel: "eu-trim", region: "usdm" })
     expect(f.canonicalBoltPatterns).toContain("5x112")
     expect(f.source.region).toBe("usdm") // stayed on US data, did not jump to eudm
-    expect(calls.map((c) => `${c.region}${c.modification ? "+mod" : ""}`)).toEqual(["usdm+mod", "usdm"])
+    expect(calls).toHaveLength(1) // resolved from the single usdm fetch — no region crossing
   })
 
-  it("does not forward the (region-specific) modification slug to fallback probes", async () => {
+  it("never forwards a modification query param to the API — sub-model narrowing happens locally, not upstream", async () => {
     const { svc, calls } = makeRegionService({
       usdm: emptyWithRegions({ eudm: 1 }),
       eudm: record(5, 112),
     })
-    await svc.getFitment({ make: "m", model: "n", year: "2022", modificationSlug: "usdm-trim", region: "usdm" })
-    const eudmCall = calls.find((c) => c.region === "eudm")
-    expect(eudmCall.modification).toBeUndefined()
+    await svc.getFitment({ make: "m", model: "n", year: "2022", subModel: "usdm-trim", region: "usdm" })
+    expect(calls.every((c) => c.modification === undefined)).toBe(true)
   })
 })
 
 describe("WheelSizeService.resolveByModel quota exhaustion mid-lookup (WB-072 B4)", () => {
-  it("throws QuotaOutageError (not a cached not_found) when quota runs out on the same-region trim-retry", async () => {
-    // Primary (usdm + trim) comes back empty, so the trim-retry fires; the quota
-    // check for THAT retry is the one exhausted (ceiling: 1 — primary's own check
-    // already consumed the only unit).
-    const empty = { status: 200, empty: false, body: { data: [] } }
-    const { svc, store } = makeService([empty], { ceiling: 1 })
-    await expect(
-      svc.getFitment({ make: "honda", model: "accord", modificationSlug: "m", region: "usdm" })
-    ).rejects.toThrow(/outage/i)
-    expect(store.fitment.size).toBe(0) // no persisted not_found sentinel — this was an outage, not a no-match
-  })
-
   it("throws QuotaOutageError (not a cached not_found) when quota runs out during the region-probe loop", async () => {
     const { svc, calls, store } = makeRegionService(
       { usdm: emptyWithRegions({ eudm: 3 }) },
@@ -225,43 +214,89 @@ describe("WheelSizeService.resolveByModel quota exhaustion mid-lookup (WB-072 B4
   })
 })
 
-describe("WheelSizeService.getFitment trim-narrowed visibility (WB-104 T3)", () => {
-  it("logs a warn naming the discarded slug and sets source.trimNarrowed=false when the broad retry finds data", async () => {
+describe("WheelSizeService.getFitment sub-model narrowing visibility (WB-113)", () => {
+  it("sets source.trimNarrowed=true when the requested sub-model matches at least one entry directly", async () => {
+    const { svc } = makeRegionService({
+      usdm: { status: 200, empty: false, body: { data: [{ technical: { stud_holes: 5, pcd: 114.3, centre_bore: 64.1 }, wheels: [], trim_levels: ["LE"] }] } },
+    })
+    const f = await svc.getFitment({ make: "toyota", model: "corolla", year: "2019", subModel: "LE", region: "usdm" })
+    expect(f.canonicalBoltPatterns).toContain("5x114.3")
+    expect(f.source.trimNarrowed).toBe(true)
+  })
+
+  it("logs a warn naming the unmatched sub-model and sets source.trimNarrowed=false when it falls back to all entries", async () => {
     const warnings: string[] = []
-    const { svc, calls } = makeRegionService({})
+    const { svc } = makeRegionService({
+      usdm: { status: 200, empty: false, body: { data: [{ technical: { stud_holes: 5, pcd: 114.3, centre_bore: 64.1 }, wheels: [], trim_levels: ["LE"] }] } },
+    })
     svc.logger_ = { warn: (m: string) => warnings.push(m), error() {} }
-    svc.client_.byModel = async (p: any) => {
-      calls.push(p)
-      if (p.region === "usdm" && p.modification) return emptyWithRegions({})
-      if (p.region === "usdm") return record(5, 112)
-      return record(4, 100) // would be wrong for a US car — must not be reached
-    }
-    const f = await svc.getFitment({ make: "audi", model: "a3", year: "2022", modificationSlug: "eu-trim", region: "usdm" })
-    expect(f.canonicalBoltPatterns).toContain("5x112")
-    expect(f.source.region).toBe("usdm")
+    const f = await svc.getFitment({ make: "toyota", model: "corolla", year: "2019", subModel: "Platinum", region: "usdm" })
+    expect(f.canonicalBoltPatterns).toContain("5x114.3") // fell back to all entries, not resolved to nothing
     expect(f.source.trimNarrowed).toBe(false)
     expect(warnings).toHaveLength(1)
-    expect(warnings[0]).toMatch(/eu-trim/)
-    expect(warnings[0]).toMatch(/retrying broad/i)
+    expect(warnings[0]).toMatch(/Platinum/)
   })
 
-  it("sets source.trimNarrowed=true (and logs nothing) when the trim-narrowed primary query succeeds directly", async () => {
-    const warnings: string[] = []
-    const { svc } = makeRegionService({ usdm: record(5, 114.3) })
-    svc.logger_ = { warn: (m: string) => warnings.push(m), error() {} }
-    const f = await svc.getFitment({ make: "honda", model: "civic", year: "2022", modificationSlug: "us-trim", region: "usdm" })
-    expect(f.source.trimNarrowed).toBe(true)
-    expect(warnings).toHaveLength(0)
-  })
-
-  it("leaves source.trimNarrowed undefined when no modificationSlug was supplied at all", async () => {
+  it("leaves source.trimNarrowed undefined when no sub-model was supplied at all", async () => {
     const { svc } = makeRegionService({ usdm: record(5, 114.3) })
     const f = await svc.getFitment({ make: "honda", model: "civic", year: "2022", region: "usdm" })
     expect(f.source.trimNarrowed).toBeUndefined()
   })
+
+  it("leaves source.trimNarrowed undefined for the Base sub-model — same as absent", async () => {
+    const { svc } = makeRegionService({ usdm: record(5, 114.3) })
+    const f = await svc.getFitment({ make: "honda", model: "civic", year: "2022", subModel: "Base", region: "usdm" })
+    expect(f.source.trimNarrowed).toBeUndefined()
+  })
 })
 
-describe("WheelSizeService.listModifications (WB-104 T3: region-scoped catalog)", () => {
+describe("WheelSizeService.getFitment sub-model union across entries (WB-113)", () => {
+  it("a sub-model spanning 2 entries unions their bolt patterns, and bore-disagreement across the filtered subset still nulls the bore", async () => {
+    const body = {
+      data: [
+        { technical: { stud_holes: 5, pcd: 100, centre_bore: 60.1 }, wheels: [], trim_levels: ["LT", "WT"] },
+        { technical: { stud_holes: 6, pcd: 139.7, centre_bore: 66.1 }, wheels: [], trim_levels: ["LT", "LTZ"] },
+      ],
+    }
+    const { svc } = makeService([{ status: 200, empty: false, body }])
+    const f = await svc.getFitment({ make: "chevrolet", model: "silverado-1500", year: "2023", subModel: "LT", region: "usdm" })
+    expect(f.canonicalBoltPatterns.slice().sort()).toEqual(["5x100", "6x139.7"]) // both entries reached normalizeByModel
+    expect(f.hubBoreMm).toBeNull() // 60.1 vs 66.1 disagree beyond 0.05mm
+  })
+
+  it("narrows to only the entries carrying the sub-model; Base/absent still resolves ALL entries (today's behavior, unchanged)", async () => {
+    const body = {
+      data: [
+        { technical: { stud_holes: 5, pcd: 100, centre_bore: 60 }, wheels: [], trim_levels: ["LT"] },
+        { technical: { stud_holes: 6, pcd: 139.7, centre_bore: 60 }, wheels: [], trim_levels: ["Denali"] },
+      ],
+    }
+    const { svc: narrowSvc } = makeService([{ status: 200, empty: false, body }])
+    const narrowed = await narrowSvc.getFitment({ make: "chevrolet", model: "silverado-1500", year: "2023", subModel: "LT", region: "usdm" })
+    expect(narrowed.canonicalBoltPatterns).toEqual(["5x100"])
+
+    const { svc: baseSvc } = makeService([{ status: 200, empty: false, body }])
+    const base = await baseSvc.getFitment({ make: "chevrolet", model: "silverado-1500", year: "2023", region: "usdm" })
+    expect(base.canonicalBoltPatterns.slice().sort()).toEqual(["5x100", "6x139.7"])
+  })
+
+  it("shares ONE cached fetch across different sub-models of the same vehicle — the raw row backs every sub-model", async () => {
+    const body = {
+      data: [
+        { technical: { stud_holes: 5, pcd: 100, centre_bore: 60 }, wheels: [], trim_levels: ["LT"] },
+        { technical: { stud_holes: 6, pcd: 139.7, centre_bore: 60 }, wheels: [], trim_levels: ["Denali"] },
+      ],
+    }
+    const { svc, store } = makeService([{ status: 200, empty: false, body }]) // ONE result — a 2nd client call would throw
+    const lt = await svc.getFitment({ make: "chevrolet", model: "silverado-1500", year: "2023", subModel: "LT", region: "usdm" })
+    const denali = await svc.getFitment({ make: "chevrolet", model: "silverado-1500", year: "2023", subModel: "Denali", region: "usdm" })
+    expect(lt.canonicalBoltPatterns).toEqual(["5x100"])
+    expect(denali.canonicalBoltPatterns).toEqual(["6x139.7"])
+    expect(store.fitment.size).toBe(1) // one row, no second network fetch
+  })
+})
+
+describe("WheelSizeService.listModifications (WB-113: returns the sub-model union)", () => {
   function makeModsService(fetcherResults: any[]) {
     let i = 0
     const store: any = { rows: new Map<string, any>() }
@@ -279,26 +314,34 @@ describe("WheelSizeService.listModifications (WB-104 T3: region-scoped catalog)"
     return { svc, store, calls }
   }
 
-  it("keys the cache by make|model|year|region and forwards region=usdm by default", async () => {
-    const { svc, store, calls } = makeModsService([{ status: 200, body: [{ slug: "m1" }] }])
-    const out = await svc.listModifications("honda", "accord", "2021")
-    expect(out).toEqual([{ slug: "m1" }])
-    expect(store.rows.has("modifications|honda|accord|2021|usdm")).toBe(true)
-    expect(calls[0]).toEqual({ make: "honda", model: "accord", year: "2021", region: "usdm" })
+  it("returns the deduped trim_levels union (not the raw engine catalog) and keys the cache by make|model|year|region", async () => {
+    const { svc, store, calls } = makeModsService([
+      { status: 200, body: { data: [{ slug: "m1", trim_levels: ["LE Eco"] }, { slug: "m2", trim_levels: ["L", "LE", "XLE"] }] } },
+    ])
+    const out = await svc.listModifications("toyota", "corolla", "2019")
+    expect(out).toEqual(["LE Eco", "L", "LE", "XLE"])
+    expect(store.rows.has("modifications|toyota|corolla|2019|usdm")).toBe(true)
+    expect(calls[0]).toEqual({ make: "toyota", model: "corolla", year: "2019", region: "usdm" })
   })
 
-  it("scopes distinct regions to distinct cache rows instead of colliding on the old 3-part key", async () => {
+  it("scopes distinct regions to distinct cache rows and distinct unions instead of colliding on the old 3-part key", async () => {
     const { svc, store, calls } = makeModsService([
-      { status: 200, body: [{ slug: "us-1" }] },
-      { status: 200, body: [{ slug: "eu-1" }] },
+      { status: 200, body: { data: [{ slug: "us-1", trim_levels: ["SE"] }] } },
+      { status: 200, body: { data: [{ slug: "eu-1", trim_levels: ["Sport"] }] } },
     ])
     const usdm = await svc.listModifications("audi", "a3", "2022", "usdm")
     const eudm = await svc.listModifications("audi", "a3", "2022", "eudm")
-    expect(usdm).toEqual([{ slug: "us-1" }])
-    expect(eudm).toEqual([{ slug: "eu-1" }])
+    expect(usdm).toEqual(["SE"])
+    expect(eudm).toEqual(["Sport"])
     expect(store.rows.has("modifications|audi|a3|2022|usdm")).toBe(true)
     expect(store.rows.has("modifications|audi|a3|2022|eudm")).toBe(true)
     expect(calls.map((c) => c.region)).toEqual(["usdm", "eudm"])
+  })
+
+  it("returns [] when no entry carries trim_levels", async () => {
+    const { svc } = makeModsService([{ status: 200, body: { data: [{ slug: "m1" }] } }])
+    const out = await svc.listModifications("bugatti", "chiron", "2018")
+    expect(out).toEqual([])
   })
 })
 
@@ -328,7 +371,7 @@ describe("WheelSizeService.getFitment hub bore scaling (WB-007)", () => {
     ])
     const f = await svc.getFitment({ make: "honda", model: "accord", modificationSlug: "m", region: "usdm" })
     expect(f.hubBoreMm).toBe(67.1)
-    expect(store.fitment.get("honda|accord||m|usdm|v2").hub_bore_mm_x100).toBe(6710)
+    expect(store.fitment.get("honda|accord|||usdm|v2").hub_bore_mm_x100).toBe(6710)
     const again = await svc.getFitment({ make: "honda", model: "accord", modificationSlug: "m", region: "usdm" })
     expect(again.hubBoreMm).toBe(67.1) // served from cache, exact
   })
@@ -337,20 +380,32 @@ describe("WheelSizeService.getFitment hub bore scaling (WB-007)", () => {
 describe("WheelSizeService.getFitment TTL / stale-while-revalidate (WB-008)", () => {
   it("serves a fresh cached row without calling the client", async () => {
     const { svc } = makeService([]) // client throws if called (no results)
-    const fresh = { cache_key: "honda|accord||m|usdm", status: "ok", canonical_bolt_patterns: ["5x114.3"], hub_bore_mm_x100: 6410, region: "usdm", fetched_at: new Date(), diameter_window: null, width_window: null, offset_window: null, raw: {} }
+    // WB-113: the cache-hit path now re-derives the fitment from `raw` at read
+    // time (fitmentForSubModel), so `raw` must carry real data — the
+    // precomputed canonical_bolt_patterns/etc. columns are no longer trusted
+    // directly on a cache hit. subModel "Base" exercises the no-narrow path.
+    const fresh = {
+      cache_key: "honda|accord|||usdm|v2", status: "ok", region: "usdm", fetched_at: new Date(),
+      raw: { data: [{ technical: { stud_holes: 5, pcd: 114.3, centre_bore: 64.1 }, wheels: [] }] },
+      canonical_bolt_patterns: ["5x114.3"], hub_bore_mm_x100: 6410, diameter_window: null, width_window: null, offset_window: null,
+    }
     ;(svc as any).listWheelSizeFitments = async () => [fresh]
-    const f = await svc.getFitment({ make: "honda", model: "accord", modificationSlug: "m", region: "usdm" })
+    const f = await svc.getFitment({ make: "honda", model: "accord", subModel: "Base", region: "usdm" })
     expect(f.canonicalBoltPatterns).toEqual(["5x114.3"])
   })
 
   it("serves a STALE cached row immediately AND fires a background refresh", async () => {
     const old = new Date(Date.now() - 200 * 86_400_000)
-    const stale = { cache_key: "honda|accord||m|usdm", status: "ok", canonical_bolt_patterns: ["5x114.3"], hub_bore_mm_x100: 6410, region: "usdm", fetched_at: old, diameter_window: null, width_window: null, offset_window: null, raw: {} }
+    const stale = {
+      cache_key: "honda|accord|||usdm|v2", status: "ok", region: "usdm", fetched_at: old,
+      raw: { data: [{ technical: { stud_holes: 5, pcd: 114.3, centre_bore: 64.1 }, wheels: [] }] },
+      canonical_bolt_patterns: ["5x114.3"], hub_bore_mm_x100: 6410, diameter_window: null, width_window: null, offset_window: null,
+    }
     const { svc } = makeService([{ status: 200, empty: false, body: { data: [{ technical: { stud_holes: 5, pcd: 120, centre_bore: 72.6 }, wheels: [] } ] } }], { ttlDays: 90 })
     ;(svc as any).listWheelSizeFitments = async () => [stale]
     let refreshed = false
     ;(svc as any).refreshFitment = async () => { refreshed = true }
-    const f = await svc.getFitment({ make: "honda", model: "accord", modificationSlug: "m", region: "usdm" })
+    const f = await svc.getFitment({ make: "honda", model: "accord", subModel: "Base", region: "usdm" })
     expect(f.canonicalBoltPatterns).toEqual(["5x114.3"]) // stale value served immediately
     await new Promise((r) => setTimeout(r, 0)) // let the fire-and-forget run
     expect(refreshed).toBe(true)
@@ -478,7 +533,7 @@ describe("WheelSizeService.refreshFitment atomic upsert (WB-072 B8)", () => {
       diameter_window, width_window, offset_window, status, fetched_at,
     ] = calls[0].binds
     expect(id).toMatch(/^wsf_[0-9A-Z]{26}$/) // wsf_ + ULID, mirrors wsq_ convention
-    expect(cache_key).toBe("honda|accord||m|usdm|v2")
+    expect(cache_key).toBe("honda|accord|||usdm|v2") // WB-113: sub-model dropped from the key
     expect(region).toBe("usdm")
     expect(JSON.parse(raw)).toEqual(wheelBody) // arrays/objects must be pre-stringified for ::jsonb
     expect(JSON.parse(canonical_bolt_patterns)).toEqual(["5x114.3"])

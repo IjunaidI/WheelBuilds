@@ -6,13 +6,14 @@ import WheelSizeFitment from "./models/wheel-size-fitment"
 import WheelSizeQuota from "./models/wheel-size-quota"
 import { WheelSizeClient } from "./client"
 import { normalizeByModel } from "./normalize"
-import { VehicleFitment, ReverseFitmentVehicle, ReverseTireFitmentVehicle, Window } from "./types"
+import { VehicleFitment, ReverseFitmentVehicle, ReverseTireFitmentVehicle, RawModificationEntry } from "./types"
 import { buildReverseFitment, ProductSize } from "./reverse-fitment"
 import { buildReverseTireFitment, TireFitSpec } from "./reverse-tire-fitment"
 import { isStale } from "./staleness"
 import { extractOemTireSizes } from "./oem-tire-sizes"
 import { extractOemTires } from "./oem-tires"
 import { buildFitmentCacheKey } from "./cache-key"
+import { filterEntriesBySubModel, subModelsForModelYear, BASE_SUBMODEL } from "./sub-models"
 
 export class QuotaOutageError extends Error {
   constructor() { super("wheel-size quota outage") ; this.name = "QuotaOutageError" }
@@ -64,9 +65,21 @@ class WheelSizeService extends MedusaService({ WheelSizeCatalog, WheelSizeFitmen
     return count <= this.ceiling_
   }
 
-  async getFitment(p: { make: string; model: string; modificationSlug?: string; year?: string; region?: string }): Promise<VehicleFitment> {
+  /**
+   * WB-113: `modificationSlug` is kept as a back-compat alias for callers not
+   * yet migrated to `subModel` (the by-vehicle store route + the
+   * backfill-garage-bore script — Task 2 is service-only, those are Task 3's
+   * / out of scope). `subModel` wins when both are supplied. Neither is part
+   * of the cache key below — see cache-key.ts / `fitmentForSubModel`.
+   */
+  async getFitment(p: { make: string; model: string; modificationSlug?: string; subModel?: string; year?: string; region?: string }): Promise<VehicleFitment> {
     const region = p.region ?? this.options_.defaultRegion ?? "usdm"
-    const cache_key = buildFitmentCacheKey({ ...p, region })
+    const subModel = p.subModel ?? p.modificationSlug
+    // WB-113: the sub-model is deliberately NOT part of the cache key — one
+    // raw by_model row per make/model/year/region now serves every sub-model
+    // of that vehicle. filterEntriesBySubModel + normalizeByModel run at READ
+    // time (fitmentForSubModel) over whichever sub-model THIS call asked for.
+    const cache_key = buildFitmentCacheKey({ make: p.make, model: p.model, year: p.year, region })
 
     const cached = await this.listWheelSizeFitments({ cache_key })
     if (cached[0]) {
@@ -77,64 +90,82 @@ class WheelSizeService extends MedusaService({ WheelSizeCatalog, WheelSizeFitmen
           this.logger_.warn(`[wheel-size] background refresh failed for ${cache_key}: ${e?.message ?? e}`)
         )
       }
-      return this.toFitment(c, region, p.modificationSlug)
+      return this.fitmentForSubModel(c.raw, subModel, c.region ?? region)
     }
 
     return this.refreshFitment({ ...p, region })
   }
 
   /**
-   * Map a cache row to the VehicleFitment read contract.
+   * WB-113: turn a broad (unfiltered) by_model body into a VehicleFitment for
+   * ONE requested sub-model. `filterEntriesBySubModel` narrows `body.data` to
+   * the entries whose `trim_levels` include it ("Base"/undefined/"" → ALL
+   * entries, its own no-narrow case); `normalizeByModel` then runs over that
+   * subset UNCHANGED — it already unions bolt patterns across N entries and
+   * does bore-agree-or-null, so a sub-model spanning 2 engine entries (e.g. a
+   * truck's "LT" under gas+diesel) correctly unions both.
    *
-   * WB-104 T3: `source.trimNarrowed` is deliberately omitted here (left
-   * `undefined`) — it is populated ONLY on a live resolve/refresh (a cold
-   * cache miss, or the SWR background refresh in `getFitment`), never on this
-   * warm cache-HIT read path, because `WheelSizeFitment` has no
-   * `trim_narrowed` column to reconstruct it from. That's a deliberate
-   * scope cut, not an oversight — the field has no consumer yet, so a
-   * migration to persist it is a tracked follow-up rather than done here.
-   * The AUTHORITATIVE operator signal for a silent trim-fallback is the
-   * `logger.warn` in `resolveByModel`, which fires exactly when the fallback
-   * happens (on the live path that discovers it) regardless of whether any
-   * caller ever reads `trimNarrowed` back off a later cached response.
+   * A real, non-Base sub-model that matches NOTHING (defensive: shouldn't
+   * happen if the dropdown was built off the same union this filters
+   * against, but that union is a separately lazy-cached `/modifications`
+   * fetch that can drift from a warmed `by_model` row) falls back to ALL
+   * entries rather than resolving nothing — logged via `logger.warn` so the
+   * fallback is never silent (mirrors WB-104 T3's operator-visibility rule
+   * for the old modification-narrowing fallback this replaces).
+   *
+   * Shared by the fresh-fetch path (`resolveByModel`, right after a network
+   * call) AND the warm cache-hit read path (`getFitment`, using the cached
+   * `raw` column) — caching the RAW body at make/model/year/region (the
+   * sub-model dropped from the cache key, see cache-key.ts) means both call
+   * sites can re-derive ANY sub-model's result from the SAME stored data,
+   * with no second network fetch for a different sub-model of an
+   * already-cached vehicle.
    */
-  private toFitment(c: any, region: string, modificationSlug?: string): VehicleFitment {
-    return {
-      status: c.status as VehicleFitment["status"],
-      canonicalBoltPatterns: (c.canonical_bolt_patterns as unknown as string[]) ?? [],
-      hubBoreMm: c.hub_bore_mm_x100 == null ? null : (c.hub_bore_mm_x100 as number) / 100,
-      diameterWindow: (c.diameter_window as unknown as Window) ?? null,
-      widthWindow: (c.width_window as unknown as Window) ?? null,
-      offsetWindow: (c.offset_window as unknown as Window) ?? null,
-      oemTireSizes: extractOemTireSizes(c.raw),
-      oemTires: extractOemTires(c.raw),
-      // trimNarrowed intentionally absent — see the method comment above.
-      source: { modificationSlug: modificationSlug ?? "", region: c.region ?? region },
+  private fitmentForSubModel(body: any, subModel: string | undefined, region: string): VehicleFitment {
+    const allEntries = Array.isArray(body?.data) ? body.data : []
+    const isNarrowRequest = subModel !== undefined && subModel !== "" && subModel !== BASE_SUBMODEL
+    let entries = filterEntriesBySubModel(allEntries, subModel)
+    let trimNarrowed: boolean | undefined = isNarrowRequest ? true : undefined
+    if (isNarrowRequest && entries.length === 0 && allEntries.length > 0) {
+      this.logger_.warn(
+        `[wheel-size] sub-model "${subModel}" matched no entries for this vehicle; falling back to all entries`
+      )
+      entries = allEntries
+      trimNarrowed = false
     }
+    const fitment = normalizeByModel({ data: entries }, { modificationSlug: subModel ?? "", region, trimNarrowed })
+    return { ...fitment, oemTireSizes: extractOemTireSizes(body), oemTires: extractOemTires(body) }
   }
 
   /**
-   * Fetch live + upsert the cache row by cache_key. Returns the fresh fitment.
+   * Fetch live + upsert the cache row by cache_key. Returns the fresh fitment
+   * for the REQUESTED sub-model (or "Base"/all-entries when none/absent).
    *
-   * WB-104 T3: `trimNarrowed` below is a first-fetch/refresh-only signal — it
-   * rides on THIS call's return value only and is never written to the cache
-   * row (no `trim_narrowed` column on `WheelSizeFitment`), so a subsequent
-   * warm cache-hit through `toFitment` cannot reconstruct it. See the
-   * `toFitment` comment for the honest read-side contract.
+   * WB-113: the persisted row is sub-model-AGNOSTIC — `raw` is the full
+   * broad body, and its precomputed derived columns (`canonical_bolt_patterns`
+   * etc.) are always the Base/all-entries snapshot, NEVER narrowed to
+   * whichever sub-model happened to trigger this fetch, because the cache
+   * key dropped the sub-model slot (see cache-key.ts) — the row is now
+   * shared across every sub-model of this make/model/year/region.
+   * `reverseFitment`/`reverseTireFitment` + the warm cron read these columns
+   * directly with no sub-model awareness, so they must stay the full
+   * superset. Only this method's RETURN VALUE reflects the caller's specific
+   * sub-model, via `fitmentForSubModel`.
    */
-  async refreshFitment(p: { make: string; model: string; modificationSlug?: string; year?: string; region: string }): Promise<VehicleFitment> {
-    const cache_key = buildFitmentCacheKey(p)
-    const { body, regionUsed, trimNarrowed } = await this.resolveByModel(p)
-    const fitment = normalizeByModel(body, { modificationSlug: p.modificationSlug ?? "", region: regionUsed, trimNarrowed })
+  async refreshFitment(p: { make: string; model: string; modificationSlug?: string; subModel?: string; year?: string; region: string }): Promise<VehicleFitment> {
+    const subModel = p.subModel ?? p.modificationSlug
+    const cache_key = buildFitmentCacheKey({ make: p.make, model: p.model, year: p.year, region: p.region })
+    const { body, regionUsed, fitment } = await this.resolveByModel({ make: p.make, model: p.model, year: p.year, region: p.region, subModel })
+    const baseFitment = normalizeByModel(body, { modificationSlug: "", region: regionUsed })
     const row = {
       cache_key, region: regionUsed, raw: body,
-      canonical_bolt_patterns: fitment.canonicalBoltPatterns as unknown as Record<string, unknown>,
-      hub_bore_mm_x100: fitment.hubBoreMm == null ? null : Math.round(fitment.hubBoreMm * 100),
-      diameter_window: fitment.diameterWindow, width_window: fitment.widthWindow, offset_window: fitment.offsetWindow,
-      status: fitment.status, fetched_at: new Date(),
+      canonical_bolt_patterns: baseFitment.canonicalBoltPatterns as unknown as Record<string, unknown>,
+      hub_bore_mm_x100: baseFitment.hubBoreMm == null ? null : Math.round(baseFitment.hubBoreMm * 100),
+      diameter_window: baseFitment.diameterWindow, width_window: baseFitment.widthWindow, offset_window: baseFitment.offsetWindow,
+      status: baseFitment.status, fetched_at: new Date(),
     }
     await this.upsertFitmentRow(row)
-    return { ...fitment, oemTireSizes: extractOemTireSizes(body), oemTires: extractOemTires(body) }
+    return fitment
   }
 
   /**
@@ -229,73 +260,57 @@ class WheelSizeService extends MedusaService({ WheelSizeCatalog, WheelSizeFitmen
   // `meta.regions` map still reports which regions DO have records (and how many).
   // So: try the requested region first; if it is empty, probe the other regions it
   // reports — most-populated first — until one returns a record with a usable bolt
-  // pattern (the thing we actually filter wheels by). Returns the chosen raw body
-  // and the region it came from.
+  // pattern (the thing we actually filter wheels by). Returns the chosen raw body,
+  // the region it came from, and the sub-model-filtered fitment for the caller's
+  // requested sub-model (via `fitmentForSubModel`).
   //
   // Classification (spec §10): any non-2xx on the requested region => outage (folded
   // into the storefront's "fitment unavailable" 503). A non-2xx on a *fallback*
   // probe is non-fatal — we skip that region and keep trying.
-  private async resolveByModel(p: { make: string; model: string; modificationSlug?: string; year?: string; region: string }): Promise<{ body: any; regionUsed: string; trimNarrowed?: boolean }> {
+  //
+  // WB-113: always fetches BROAD (no `modification` query param at all, regardless
+  // of `p.subModel`) — the sub-model axis narrows LOCALLY, post-fetch, via
+  // `fitmentForSubModel`, not via an upstream query param. This replaces the old
+  // modification-narrowed-primary-fetch + same-region no-trim retry entirely: since
+  // no narrowing param is ever sent, there is nothing to discard and retry — a
+  // sub-model that fails to match is instead handled by `fitmentForSubModel`'s own
+  // local fallback-to-all-entries. One broad fetch per (make,model,year,region) now
+  // serves every sub-model of that vehicle (see `getFitment`'s cache-hit path,
+  // which reuses this same raw body without a second network call).
+  private async resolveByModel(p: { make: string; model: string; subModel?: string; year?: string; region: string }): Promise<{ body: any; regionUsed: string; fitment: VehicleFitment }> {
     if (!(await this.incrementAndCheckQuota())) throw new QuotaOutageError()
-    const primary = await this.client_.byModel({ make: p.make, model: p.model, modification: p.modificationSlug, year: p.year, region: p.region })
+    const primary = await this.client_.byModel({ make: p.make, model: p.model, year: p.year, region: p.region })
     if (primary.status >= 300) throw new QuotaOutageError()
-    if (this.hasData(primary.body)) return { body: primary.body, regionUsed: p.region, trimNarrowed: p.modificationSlug ? true : undefined }
-
-    // Empty in the requested region. If a trim slug was sent, the trim — not the
-    // region — may be why: the storefront's trim dropdown is the GLOBAL wheel-size
-    // catalog, so a US car can carry a non-US trim slug that yields no usdm match.
-    // Retry the SAME region without the trim before crossing markets, so a US car
-    // stays on US data. emptyBody then carries the broader make+model+year
-    // meta.regions, a better fallback hint than the trim-narrowed one.
-    //
-    // WB-104 T3: this retry used to be silent — no log at all, and the broader
-    // (all-trims) result gets cached under the trim-narrowed cache_key with no
-    // signal that the trim was discarded. The fallback is no longer silent in
-    // the sense that matters operationally: it is now ALWAYS logged here
-    // (`logger.warn`, visible in ops logs) the moment it happens, and
-    // `trimDiscarded` additionally surfaces on THIS live-resolve response's
-    // `source.trimNarrowed` for every return path below. That surfaced value
-    // is first-fetch/refresh-only, though — it is not persisted, so a later
-    // warm cache-hit read (`toFitment`) can't reconstruct it; the logger.warn
-    // above remains the authoritative record of the fallback having occurred.
-    let emptyBody = primary.body
-    let trimDiscarded = false
-    if (p.modificationSlug) {
-      trimDiscarded = true
-      this.logger_.warn(
-        `[wheel-size] modification "${p.modificationSlug}" returned no data for ${p.make} ${p.model} in region ${p.region}; retrying broad (all trims)`
-      )
-      if (!(await this.incrementAndCheckQuota())) throw new QuotaOutageError()
-      const broad = await this.client_.byModel({ make: p.make, model: p.model, year: p.year, region: p.region })
-      if (broad.status < 300 && this.hasData(broad.body)) return { body: broad.body, regionUsed: p.region, trimNarrowed: false }
-      if (broad.status < 300) emptyBody = broad.body
+    if (this.hasData(primary.body)) {
+      return { body: primary.body, regionUsed: p.region, fitment: this.fitmentForSubModel(primary.body, p.subModel, p.region) }
     }
 
     let firstWithData: { body: any; regionUsed: string } | null = null
-    for (const region of this.otherRegionsWithData(emptyBody, p.region)) {
+    for (const region of this.otherRegionsWithData(primary.body, p.region)) {
       if (!(await this.incrementAndCheckQuota())) {
         // Out of daily quota mid-lookup. If an earlier (already-paid-for) probe in
         // this same loop already found usable data (firstWithData), surface that —
         // discarding it here would turn an already-found result into a needless
         // outage. Only throw when nothing has been found yet.
-        if (firstWithData) return { ...firstWithData, trimNarrowed: trimDiscarded ? false : undefined }
+        if (firstWithData) {
+          return { ...firstWithData, fitment: this.fitmentForSubModel(firstWithData.body, p.subModel, firstWithData.regionUsed) }
+        }
         throw new QuotaOutageError()
       }
       let res: any
       try {
-        // Drop the modification slug — it is region-specific (a usdm trim slug won't
-        // resolve in an eudm/jdm catalog), so query the broadest make+model+year.
         res = await this.client_.byModel({ make: p.make, model: p.model, year: p.year, region })
       } catch { continue }
       if (res.status >= 300 || !this.hasData(res.body)) continue
       if (!firstWithData) firstWithData = { body: res.body, regionUsed: region }
-      if (this.hasBoltPattern(res.body)) return { body: res.body, regionUsed: region, trimNarrowed: trimDiscarded ? false : undefined } // filterable — done
+      if (this.hasBoltPattern(res.body)) {
+        return { body: res.body, regionUsed: region, fitment: this.fitmentForSubModel(res.body, p.subModel, region) } // filterable — done
+      }
     }
     // Prefer any region that returned data (even without a bolt pattern); else the
     // empty primary body, which normalizes to not_found.
-    return firstWithData
-      ? { ...firstWithData, trimNarrowed: trimDiscarded ? false : undefined }
-      : { body: primary.body, regionUsed: p.region, trimNarrowed: trimDiscarded ? false : undefined }
+    const chosen = firstWithData ?? { body: primary.body, regionUsed: p.region }
+    return { ...chosen, fitment: this.fitmentForSubModel(chosen.body, p.subModel, chosen.regionUsed) }
   }
 
   private hasData(body: any): boolean {
@@ -349,8 +364,17 @@ class WheelSizeService extends MedusaService({ WheelSizeCatalog, WheelSizeFitmen
   // then silently fail to resolve. Cache key gains a 4th slot; old 3-part rows
   // simply orphan and self-heal on next read (same non-breaking pattern as the
   // fitment cache key's WB-077 "v2" bump).
-  listModifications(make: string, model: string, year: string, region: string = "usdm") {
-    return this.catalog("modifications", `${make}|${model}|${year}|${region}`, () => this.client_.modifications(make, model, year, region))
+  //
+  // WB-113: returns the sub-model (`trim_levels`) UNION for the dropdown — a plain
+  // `string[]` — instead of the raw engine-modification catalog entries. Still the
+  // same cheap/lazy-cached `/modifications` fetch (unchanged); only what's derived
+  // from the cached/fetched payload changes. The underlying catalog cache still
+  // stores the raw payload verbatim (`catalog()` is unchanged), so other callers of
+  // that cache row are unaffected.
+  async listModifications(make: string, model: string, year: string, region: string = "usdm"): Promise<string[]> {
+    const payload = await this.catalog("modifications", `${make}|${model}|${year}|${region}`, () => this.client_.modifications(make, model, year, region))
+    const entries: RawModificationEntry[] = Array.isArray(payload?.data) ? payload.data : []
+    return subModelsForModelYear(entries)
   }
 }
 export default WheelSizeService

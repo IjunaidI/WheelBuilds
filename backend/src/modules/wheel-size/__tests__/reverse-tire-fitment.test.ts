@@ -6,6 +6,11 @@ import { buildReverseTireFitment } from "../reverse-tire-fitment"
 // `trim` accepts a single value (single-entry `data`) or an array (one `data`
 // entry per element, all sharing make/model/years/tires) to build multi-trim
 // "union" rows (WB-077) for the WB-104 T1 trim-honesty golden test below.
+//
+// WB-113: `extractVehicleIdentity` (shared with buildReverseFitment) now reads
+// the marketing sub-model `trim_levels` array instead of the engine `.trim`
+// field, so each `t` becomes that entry's single-element `trim_levels` (or an
+// empty array when `t` is undefined — no sub-model tag on that entry).
 const rawOf = (
   make: string | null,
   model: string | null,
@@ -19,7 +24,7 @@ const rawOf = (
     data: trims.map((t) => ({
       make: make ? { name: make } : undefined,
       model: model ? { name: model } : undefined,
-      trim: t, start_year: start, end_year: end,
+      trim_levels: t !== undefined ? [t] : [], start_year: start, end_year: end,
       wheels: tires.map((tire) => ({
         is_stock: true,
         front: { tire: tire.size, load_index: tire.loadIndex ?? null, speed_index: tire.speedRating ?? null },

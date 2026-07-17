@@ -12,14 +12,17 @@ import { Button } from "@/components/ui/button"
 import { useGarage } from "@lib/garage/use-garage"
 import { fitmentDestinationUrl, FitmentTarget } from "./destination-url"
 import { toOptions, Option } from "./to-options"
+import { toSubModelOptions } from "./sub-model-options"
+import { canSubmitYmm } from "./can-submit"
 import { getFitmentContext } from "@lib/stores/fitment-context"
 import {
   getMakes,
   getModels,
   getYears,
-  getModifications,
+  getSubModels,
 } from "@lib/data/fitment"
 import { resolveFitmentForVehicle } from "@lib/data/fitment-resolve"
+import { BASE_SUB_MODEL } from "@lib/garage/sub-model"
 import {
   MAKES,
   MODELS_BY_MAKE,
@@ -49,13 +52,15 @@ const YmmPane = ({ onClose }: YmmPaneProps) => {
   const [make, setMake] = useState("")
   const [model, setModel] = useState("")
   const [year, setYear] = useState("")
-  // modification value is the slug; we also stash its human label for the saved vehicle.
-  const [modificationSlug, setModificationSlug] = useState("")
+  // WB-113: the marketing sub-model (L / LE / LE Eco / …) replaces the old
+  // engine-modification axis. Value === label — no separate slug/label
+  // split (see sub-model-options.ts). MANDATORY: joins canSubmitYmm below.
+  const [subModel, setSubModel] = useState("")
 
   const [makeOptions, setMakeOptions] = useState<Option[]>([])
   const [modelOptions, setModelOptions] = useState<Option[]>([])
   const [yearOptions, setYearOptions] = useState<Option[]>([])
-  const [modificationOptions, setModificationOptions] = useState<Option[]>([])
+  const [subModelOptions, setSubModelOptions] = useState<Option[]>([])
 
   // Which fields are currently backed by the static seed (vs the live
   // wheel-size catalog) — the seed's option VALUE is a display name
@@ -165,22 +170,29 @@ const YmmPane = ({ onClose }: YmmPaneProps) => {
     }
   }, [make, model])
 
-  // Make + model + year → modifications (value = slug, label = trim name)
+  // Make + model + year → sub-models (WB-113: value === label === the
+  // marketing sub-model string, e.g. "LE" — replaces the old engine
+  // slug/name pair). A live union that comes back empty, or a fetch failure
+  // with no offline seed for this model either, both collapse to the
+  // mandatory Base fallback (toSubModelOptions) instead of leaving the
+  // required select with nothing to pick.
   useEffect(() => {
     if (!make || !model || !year) {
-      setModificationOptions([])
+      setSubModelOptions([])
       return
     }
     let cancelled = false
     setLoadingMods(true)
-    getModifications(make, model, year)
+    getSubModels(make, model, year)
       .then((r) => {
         if (cancelled) return
-        const opts = toOptions(r?.modifications)
-        setModificationOptions(opts.length ? opts : trimSeed(model))
+        setSubModelOptions(toSubModelOptions(r?.subModels))
       })
       .catch(() => {
-        if (!cancelled) setModificationOptions(trimSeed(model))
+        if (!cancelled) {
+          const seeded = trimSeed(model)
+          setSubModelOptions(seeded.length ? seeded : toSubModelOptions([]))
+        }
       })
       .finally(() => {
         if (!cancelled) setLoadingMods(false)
@@ -190,21 +202,24 @@ const YmmPane = ({ onClose }: YmmPaneProps) => {
     }
   }, [make, model, year])
 
-  const canSubmit = Boolean(year && make && model && !submitting)
+  const canSubmit = canSubmitYmm({ year, make, model, subModel, submitting })
 
   const submit = async (e: FormEvent) => {
     e.preventDefault()
     if (!canSubmit) return
     setSubmitting(true)
     try {
-      const trimLabel =
-        modificationOptions.find((o) => o.value === modificationSlug)?.label ?? ""
       const vehicle = add({
         year: Number(year),
         make,
         model,
-        trim: trimLabel || undefined,
-        modificationSlug,
+        // "Base" is the synthetic no-narrowing sentinel, not a real trim —
+        // keep it out of the human-readable label but still persist it in
+        // modificationSlug (field name unrenamed — mirrors the backend's own
+        // VehicleFitment.source.modificationSlug key, WB-113) since that's
+        // what a later "Re-check fit" re-sends.
+        trim: subModel !== BASE_SUB_MODEL ? subModel : undefined,
+        modificationSlug: subModel,
       })
       setActive(vehicle.id)
       // fire the (human-initiated) fitment lookup, then write it back.
@@ -214,7 +229,7 @@ const YmmPane = ({ onClose }: YmmPaneProps) => {
       // nothing (N4). A live-catalog value is already a real slug.
       const fitMake = makeIsSeed ? slugifyYmm(make) : make
       const fitModel = modelIsSeed ? slugifyYmm(model) : model
-      const result = await resolveFitmentForVehicle(fitMake, fitModel, modificationSlug, year, "usdm")
+      const result = await resolveFitmentForVehicle(fitMake, fitModel, subModel, year, "usdm")
 
       let boltPatterns: string[] = []
       let oemTireSizes: string[] = []
@@ -300,7 +315,7 @@ const YmmPane = ({ onClose }: YmmPaneProps) => {
               setMake(e.target.value)
               setModel("")
               setYear("")
-              setModificationSlug("")
+              setSubModel("")
             }}
             required
             disabled={loadingMakes}
@@ -322,7 +337,7 @@ const YmmPane = ({ onClose }: YmmPaneProps) => {
             onChange={(e) => {
               setModel(e.target.value)
               setYear("")
-              setModificationSlug("")
+              setSubModel("")
             }}
             required
             disabled={!make || loadingModels}
@@ -347,7 +362,7 @@ const YmmPane = ({ onClose }: YmmPaneProps) => {
             value={year}
             onChange={(e) => {
               setYear(e.target.value)
-              setModificationSlug("")
+              setSubModel("")
             }}
             required
             disabled={!model || loadingYears}
@@ -369,8 +384,9 @@ const YmmPane = ({ onClose }: YmmPaneProps) => {
         <Field label="Trim" htmlFor="ymm-trim">
           <Select
             id="ymm-trim"
-            value={modificationSlug}
-            onChange={(e) => setModificationSlug(e.target.value)}
+            value={subModel}
+            onChange={(e) => setSubModel(e.target.value)}
+            required
             disabled={!year || loadingMods}
           >
             <option value="">
@@ -378,9 +394,9 @@ const YmmPane = ({ onClose }: YmmPaneProps) => {
                 ? "Select year first"
                 : loadingMods
                 ? "Loading trims…"
-                : "Any trim"}
+                : "Select trim"}
             </option>
-            {modificationOptions.map((t) => (
+            {subModelOptions.map((t) => (
               <option key={t.value} value={t.value}>
                 {t.label}
               </option>

@@ -8,6 +8,17 @@
  * computed, so every key must change to orphan cached rows built under the old
  * logic and force them to re-warm. `parseCacheKey` (wheel-size-warm.ts) still
  * accepts legacy 5-slot keys, so this is an additive/non-breaking bump.
+ *
+ * WB-113: the fitment cache layer stores the RAW (unfiltered) `by_model`
+ * response in each row's `raw` column, so one row already covers EVERY
+ * sub-model of a make/model/year/region — service.ts's `fitmentForSubModel`
+ * filters + normalizes at READ time instead. The service therefore never
+ * feeds a sub-model into `modificationSlug` here anymore (that slot stays
+ * empty for every fitment-cache key going forward). This function's
+ * SIGNATURE is unchanged — it still accepts `modificationSlug` and still
+ * produces a stable key when given one — only the caller's usage pattern
+ * changed, so legacy engine-mod-keyed rows and `parseCacheKey` both keep
+ * working unmodified.
  */
 export function buildFitmentCacheKey(p: {
   make: string

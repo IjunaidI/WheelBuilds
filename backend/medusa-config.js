@@ -307,10 +307,14 @@ const medusaConfig = {
             // discovery filter, so it is excluded from wheel + tire discovery.
             // Forced constant (not metadata.product_type) so an image-less WHEEL
             // can't slip back in as a product_type:"wheel" stub.
+            // WB-100: in_stock:false so a displayed/filtered attribute never
+            // references a missing field on this stub (it matches no
+            // discovery filter anyway, but keep the doc shape total).
             transformer: (product) =>
               buildSearchDocument(product) ?? {
                 id: product.id,
                 product_type: 'non-wheel',
+                in_stock: false,
               },
           }
         }

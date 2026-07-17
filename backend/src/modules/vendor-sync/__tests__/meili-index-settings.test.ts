@@ -11,6 +11,17 @@ describe("MEILI_PRODUCT_FIELDS (WB-089 L1)", () => {
   })
 })
 
+describe("MEILI_PRODUCT_FIELDS (WB-100)", () => {
+  it("requests per-variant inventory stock/reserved so the transformer can compute in_stock", () => {
+    expect(MEILI_PRODUCT_FIELDS).toEqual(
+      expect.arrayContaining([
+        "variants.inventory_items.inventory.stocked_quantity",
+        "variants.inventory_items.inventory.reserved_quantity",
+      ])
+    )
+  })
+})
+
 describe("Meili search settings (WB-087)", () => {
   it("searches title/brand/style/skus/search_text", () => {
     expect(MEILI_SEARCHABLE_ATTRIBUTES).toEqual(

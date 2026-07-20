@@ -7,7 +7,8 @@ import VendorProductCurrent from "./models/vendor-product-current"
 import VendorImageCheck from "./models/vendor-image-check"
 import { resolveAdapter } from "./adapters/registry"
 import { fetchFeed } from "./pipeline/fetch"
-import { stageFeed } from "./pipeline/stage"
+import { stageFeed, StageImageCheckOptions } from "./pipeline/stage"
+import { createImageReachabilityChecker } from "./pipeline/image-reachability"
 import { computeGroupDiff, GroupDiffResult } from "./pipeline/diff"
 import { applyChanges } from "./pipeline/apply"
 import { resolveApplyContainer } from "./pipeline/resolve-apply-container"
@@ -52,6 +53,14 @@ export interface VendorSyncModuleOptions {
   allowSampleFeed?: boolean
   /** WB-017: explicit opt-in to durably upload the fetched feed archive to object storage (private bucket only). */
   durableArchive?: boolean
+  /** WB-115: image reachability gate at staging. `enabled` is a production kill switch (medusa-config.js defaults it true). */
+  imageCheck?: {
+    enabled?: boolean
+    maxDeadRatio?: number
+    ttlDays?: number
+    concurrency?: number
+    timeoutMs?: number
+  }
   vendors?: Record<
     string,
     { enabled?: boolean; feedPath?: string; sftp?: SftpConfig }
@@ -104,6 +113,30 @@ class VendorSyncService extends MedusaService({
   /** WB-011: apply concurrency knob (consumed by the apply loop). */
   getApplyConcurrency(): number {
     return this.options_.applyConcurrency ?? 8
+  }
+
+  /**
+   * WB-115: build the stageFeed image-check option, or undefined when the
+   * kill switch (`imageCheck.enabled`, default true) is off. Shared by both
+   * stageFeed call sites (executeRun + runStockOnly) so the checker's
+   * construction (and its module-options-driven ttl/concurrency/timeout
+   * knobs) lives in exactly one place. `fetch` mirrors the same
+   * `(url, init) => fetch(url, init) as any` default used by the wheel-size
+   * module's client (`src/modules/wheel-size/client.ts`) -- Node 22 ships a
+   * global `fetch`, no extra dependency needed.
+   */
+  private buildImageCheck(): StageImageCheckOptions | undefined {
+    const opts = this.options_.imageCheck
+    if (!opts?.enabled) return undefined
+    const checker = createImageReachabilityChecker({
+      service: this,
+      logger: this.logger_,
+      fetchImpl: (url, init) => fetch(url, init) as any,
+      ttlDays: opts.ttlDays,
+      concurrency: opts.concurrency,
+      timeoutMs: opts.timeoutMs,
+    })
+    return { checker, maxDeadRatio: opts.maxDeadRatio }
   }
 
   /**
@@ -340,7 +373,7 @@ class VendorSyncService extends MedusaService({
         `[vendor-sync] [${runId}] stage=staging vendor=${vendorCode}` +
           (devMaxRows ? ` devMaxRows=${devMaxRows}` : '')
       )
-      await stageFeed(adapter, descriptor, this, runId, this.logger_, devMaxRows)
+      await stageFeed(adapter, descriptor, this, runId, this.logger_, devMaxRows, this.buildImageCheck())
 
       // WB-011: honor a cancel requested during staging before diffing starts.
       if (await this.isCancelled(runId)) {
@@ -550,7 +583,7 @@ class VendorSyncService extends MedusaService({
         source_filename: descriptor.sourceFilename,
         ...(feed.kind === "file" && feed.modifyTime != null ? { source_modify_time: String(feed.modifyTime) } : {}),
       })
-      await stageFeed(adapter, descriptor, this, runId, this.logger_, this.options_.devMaxRows)
+      await stageFeed(adapter, descriptor, this, runId, this.logger_, this.options_.devMaxRows, this.buildImageCheck())
 
       // Which staged parts have a current row? Source from vendor_feed_staging
       // (ALL parts staged this run), not vendor_stock_staging (only qoh>0 rows) —

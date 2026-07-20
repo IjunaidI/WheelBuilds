@@ -46,6 +46,8 @@ import {
   VENDOR_SYNC_APPLY_MAX_ATTEMPTS,
   VENDOR_SYNC_DRY_RUN,
   VENDOR_ALLOW_SAMPLE_FEED,
+  VENDOR_SYNC_IMAGE_CHECK_ENABLED,
+  VENDOR_SYNC_IMAGE_DEAD_MAX_RATIO,
   WHEEL_SIZE_API_KEY,
   WHEEL_SIZE_BASE_URL,
   WHEEL_SIZE_REGION,
@@ -218,6 +220,14 @@ const medusaConfig = {
         dryRun: VENDOR_SYNC_DRY_RUN === 'true',
         allowSampleFeed: VENDOR_ALLOW_SAMPLE_FEED === 'true',
         devMaxRows,
+        // WB-115: image reachability gate at staging. `enabled` is a
+        // production kill switch that defaults to TRUE (opposite of every
+        // other boolean flag in this block) -- `!== 'false'` so it stays on
+        // unless explicitly disabled, matching the brief's "default true".
+        imageCheck: {
+          enabled: VENDOR_SYNC_IMAGE_CHECK_ENABLED !== 'false',
+          maxDeadRatio: parseFloat(VENDOR_SYNC_IMAGE_DEAD_MAX_RATIO ?? '0.40'),
+        },
         vendors: {
           'wheelpros-wheels': {
             enabled: VENDOR_WHEELPROS_WHEELS_ENABLED === 'true',

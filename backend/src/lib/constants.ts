@@ -146,6 +146,10 @@ export const VENDOR_SYNC_APPLY_CONCURRENCY = process.env.VENDOR_SYNC_APPLY_CONCU
 export const VENDOR_SYNC_APPLY_MAX_ATTEMPTS = process.env.VENDOR_SYNC_APPLY_MAX_ATTEMPTS
 export const VENDOR_SYNC_DRY_RUN = process.env.VENDOR_SYNC_DRY_RUN
 export const VENDOR_ALLOW_SAMPLE_FEED = process.env.VENDOR_ALLOW_SAMPLE_FEED
+/** WB-115: production kill switch for the image-reachability gate at staging. Default true. */
+export const VENDOR_SYNC_IMAGE_CHECK_ENABLED = process.env.VENDOR_SYNC_IMAGE_CHECK_ENABLED
+/** WB-115: circuit-breaker threshold (dead/checked ratio) above which a run aborts rather than trusting the checks. Default 0.40. */
+export const VENDOR_SYNC_IMAGE_DEAD_MAX_RATIO = process.env.VENDOR_SYNC_IMAGE_DEAD_MAX_RATIO
 
 export const VENDOR_WHEELPROS_WHEELS_ENABLED = process.env.VENDOR_WHEELPROS_WHEELS_ENABLED
 export const VENDOR_WHEELPROS_WHEEL_FEED_PATH = process.env.VENDOR_WHEELPROS_WHEEL_FEED_PATH

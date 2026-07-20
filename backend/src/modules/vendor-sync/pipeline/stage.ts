@@ -1,7 +1,14 @@
 import { VendorAdapter, VendorFeedDescriptor } from '../adapters/types'
 import { computeContentHash } from '../utils/hash'
+import { ImageReachabilityChecker } from './image-reachability'
 
 const BATCH_SIZE = 500
+
+// WB-115: default circuit-breaker threshold, applied when a caller passes an
+// `imageCheck` block without an explicit `maxDeadRatio` (e.g. module options
+// omit it). Mirrors the env default documented in medusa-config.js
+// (`VENDOR_SYNC_IMAGE_DEAD_MAX_RATIO`, default 0.40).
+const DEFAULT_MAX_DEAD_RATIO = 0.4
 
 interface StageResult {
   rowCount: number
@@ -16,6 +23,19 @@ interface Logger {
   info(message: string, ...args: any[]): void
   warn(message: string, ...args: any[]): void
   error(message: string, ...args: any[]): void
+}
+
+/**
+ * WB-115 Task 3 wiring. `checker` is the already-constructed
+ * ImageReachabilityChecker (Task 2); `stageFeed` never builds one itself, so
+ * a caller with `imageCheck.enabled === false` simply omits this argument
+ * entirely and staging behaves exactly as it did before this feature existed
+ * (the production kill switch). `maxDeadRatio` defaults to
+ * DEFAULT_MAX_DEAD_RATIO when omitted.
+ */
+export interface StageImageCheckOptions {
+  checker: ImageReachabilityChecker
+  maxDeadRatio?: number
 }
 
 /**
@@ -72,6 +92,28 @@ export function shouldTrustImageChecks(
  * consumed before staging stops. This is the dev/test truncation knob (wired
  * from medusa-config's `devMaxRows`) so local runs finish fast instead of
  * staging + diffing + applying the entire vendor feed.
+ *
+ * `imageCheck` (WB-115 Task 3) is optional. When omitted, staging is
+ * byte-identical to before this feature existed: `stageSkipReason` is called
+ * with no second argument, so it can never return "image-unreachable". When
+ * provided, rows are gated in BATCH_SIZE-sized groups: each group's unique
+ * non-empty image URLs are checked together (one `checker.check()` call),
+ * then each row's individual verdict is looked up back out of the returned
+ * Map before `stageSkipReason` decides admission. This preserves the
+ * existing streaming/bounded-memory shape — at most BATCH_SIZE rows are ever
+ * buffered awaiting a verdict.
+ *
+ * `checker.check()` errors (e.g. a real DB failure inside the checker's
+ * cache lookup/persist calls) are NOT caught here — they propagate and
+ * reject this function's promise, which the caller (service.ts) already
+ * treats as a run failure. This is deliberate: a missing/absent entry in
+ * `check()`'s returned Map is fail-open ("reachable"), but a thrown error is
+ * a different signal entirely (something is broken, not "this URL is
+ * fine") and must not be silently reinterpreted as "every pending row is
+ * unreachable" — that would drop rows at scale exactly like the bug this
+ * feature exists to prevent. See `shouldTrustImageChecks` above for the
+ * complementary guard against a checker that returns *successfully* but
+ * with implausibly many dead results.
  */
 export async function stageFeed(
   adapter: VendorAdapter,
@@ -79,22 +121,31 @@ export async function stageFeed(
   service: any,
   runId: string,
   logger: Logger,
-  maxRows?: number
+  maxRows?: number,
+  imageCheck?: StageImageCheckOptions
 ): Promise<StageResult> {
   let rowCount = 0
   let stagedCount = 0
   let skippedNoImageCount = 0
   let skippedInvalidPriceCount = 0
-  // WB-115: reachability checking + the circuit breaker are wired in Task 3.
-  // stageSkipReason is still called without an imageReachable argument here,
-  // so it never returns "image-unreachable" yet — these stay at their
-  // initial values and exist only so StageResult's shape is already correct.
-  const skippedImageUnreachableCount = 0
-  const imageChecksDistrusted = false
+  let skippedImageUnreachableCount = 0
+  let imageChecksDistrusted = false
   let truncated = false
+
+  // WB-115 circuit-breaker accumulators. Counted per ROW (not per unique
+  // URL) so the ratio reflects catalog impact — many rows can share one
+  // dead vendor thumbnail, and a breaker keyed on unique URLs would
+  // massively understate how much of the feed that single dead image
+  // actually affects.
+  let checkedCount = 0
+  let deadCount = 0
 
   let feedStagingBatch: any[] = []
   let stockStagingBatch: any[] = []
+  // Rows that passed the no-image gate and are awaiting an image-reachability
+  // verdict before final admission. Bounded at BATCH_SIZE, mirroring the
+  // insertion batches below, so memory stays bounded regardless of feed size.
+  let pendingBatch: Array<{ parsedRow: any; normalized: any }> = []
 
   async function flushFeedBatch() {
     if (feedStagingBatch.length > 0) {
@@ -110,33 +161,7 @@ export async function stageFeed(
     }
   }
 
-  for await (const parsedRow of adapter.parse(descriptor)) {
-    if (maxRows != null && maxRows > 0 && rowCount >= maxRows) {
-      truncated = true
-      break
-    }
-    rowCount++
-
-    let normalized
-    try {
-      normalized = adapter.normalize(parsedRow)
-    } catch (err: any) {
-      logger.warn(
-        `Skipping row ${parsedRow.partNumber}: normalization failed: ${err.message}`
-      )
-      continue
-    }
-
-    const skip = stageSkipReason(normalized)
-    if (skip === "no-image") {
-      skippedNoImageCount++
-      continue
-    }
-    if (skip === "invalid-price") {
-      skippedInvalidPriceCount++
-      continue
-    }
-
+  function admitRow(parsedRow: any, normalized: any) {
     const contentHash = computeContentHash(normalized)
 
     feedStagingBatch.push({
@@ -164,17 +189,98 @@ export async function stageFeed(
     }
 
     stagedCount++
+  }
 
-    // Flush batches when they reach BATCH_SIZE
-    if (feedStagingBatch.length >= BATCH_SIZE) {
-      await flushFeedBatch()
+  // Resolve the pending batch's admission: check reachability once for the
+  // batch's unique URLs (if a checker is configured), then decide each row
+  // individually. `reachableByUrl` stays undefined when no checker was
+  // passed, so every lookup below is undefined -> stageSkipReason's fail-open
+  // path -> identical to calling stageSkipReason(normalized) with one arg.
+  async function processPendingBatch() {
+    if (pendingBatch.length === 0) return
+
+    let reachableByUrl: Map<string, boolean> | undefined
+    if (imageCheck) {
+      const urls = Array.from(
+        new Set(
+          pendingBatch
+            .map((item) => item.normalized.imageUrl as string | null)
+            .filter((url): url is string => !!url)
+        )
+      )
+      // Deliberately unguarded -- see the stageFeed docstring. A DB error
+      // thrown here must propagate and fail the run, not be swallowed into
+      // "treat everything as unreachable."
+      reachableByUrl = await imageCheck.checker.check(urls)
     }
-    if (stockStagingBatch.length >= BATCH_SIZE) {
-      await flushStockBatch()
+
+    for (const { parsedRow, normalized } of pendingBatch) {
+      let reachable: boolean | undefined
+      if (reachableByUrl) {
+        // A URL absent from the returned Map (checker didn't report on it)
+        // resolves to `undefined` here, which stageSkipReason treats as
+        // reachable -- fail open, never "unreachable by omission."
+        reachable = reachableByUrl.get(normalized.imageUrl as string)
+        checkedCount++
+        if (reachable === false) deadCount++
+      }
+
+      const skip = stageSkipReason(normalized, reachable)
+      if (skip === "image-unreachable") {
+        skippedImageUnreachableCount++
+        continue
+      }
+      if (skip === "invalid-price") {
+        skippedInvalidPriceCount++
+        continue
+      }
+
+      admitRow(parsedRow, normalized)
+
+      // Flush batches when they reach BATCH_SIZE
+      if (feedStagingBatch.length >= BATCH_SIZE) {
+        await flushFeedBatch()
+      }
+      if (stockStagingBatch.length >= BATCH_SIZE) {
+        await flushStockBatch()
+      }
+    }
+
+    pendingBatch = []
+  }
+
+  for await (const parsedRow of adapter.parse(descriptor)) {
+    if (maxRows != null && maxRows > 0 && rowCount >= maxRows) {
+      truncated = true
+      break
+    }
+    rowCount++
+
+    let normalized
+    try {
+      normalized = adapter.normalize(parsedRow)
+    } catch (err: any) {
+      logger.warn(
+        `Skipping row ${parsedRow.partNumber}: normalization failed: ${err.message}`
+      )
+      continue
+    }
+
+    // The no-image gate never depends on reachability, so it's applied here
+    // immediately rather than deferred into the pending/reachability batch.
+    if (!normalized.imageUrl) {
+      skippedNoImageCount++
+      continue
+    }
+
+    pendingBatch.push({ parsedRow, normalized })
+    if (pendingBatch.length >= BATCH_SIZE) {
+      await processPendingBatch()
     }
   }
 
   // Flush remaining
+  await processPendingBatch()
   await flushFeedBatch()
   await flushStockBatch()
 
@@ -186,9 +292,38 @@ export async function stageFeed(
     skipped_invalid_price_count: skippedInvalidPriceCount,
   })
 
+  // WB-115 circuit breaker. Rows were already filtered during the streaming
+  // pass above and cannot be retroactively un-filtered, so the only way to
+  // guarantee no partial delisting reaches the catalog is to abort the run
+  // before diff/apply ever runs -- a failed run leaves the previous
+  // (already-applied) catalog state fully intact. Both service.ts call
+  // sites already wrap their stageFeed call in a try/catch that marks the
+  // run "failed" and returns without proceeding to diff/apply, so throwing
+  // here is sufficient; no separate caller-side check is required.
+  if (imageCheck) {
+    const maxDeadRatio = imageCheck.maxDeadRatio ?? DEFAULT_MAX_DEAD_RATIO
+    if (!shouldTrustImageChecks(checkedCount, deadCount, maxDeadRatio)) {
+      imageChecksDistrusted = true
+      const ratio = checkedCount > 0 ? deadCount / checkedCount : 0
+      const message =
+        `[vendor-sync] [${runId}] image reachability circuit breaker tripped ` +
+        `for vendor=${adapter.vendorCode}: ${deadCount}/${checkedCount} checked ` +
+        `images were dead (ratio=${ratio.toFixed(3)}, max=${maxDeadRatio}). ` +
+        `Aborting run before diff/apply -- catalog left unchanged.`
+      logger.error(message)
+      throw new Error(message)
+    }
+  }
+
+  // WB-115: a single aggregate summary line rather than per-URL logging --
+  // Task 2's checker already warns on individual timeout/error probes, so
+  // stage.ts must not add a second per-row log source on top of that (a full
+  // CDN outage would otherwise emit thousands of lines per run).
   logger.info(
     `Staging complete: ${rowCount} rows parsed, ${stagedCount} staged, ` +
-      `${skippedNoImageCount} skipped (no image), ${skippedInvalidPriceCount} skipped (invalid price)` +
+      `${skippedNoImageCount} skipped (no image), ${skippedInvalidPriceCount} skipped (invalid price), ` +
+      `${skippedImageUnreachableCount} skipped (image unreachable)` +
+      (imageCheck ? ` [image checks: ${checkedCount} checked, ${deadCount} dead]` : '') +
       (truncated ? ` [TRUNCATED to maxRows=${maxRows} — dev mode]` : '')
   )
 

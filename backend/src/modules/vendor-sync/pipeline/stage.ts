@@ -8,6 +8,8 @@ interface StageResult {
   stagedCount: number
   skippedNoImageCount: number
   skippedInvalidPriceCount: number
+  skippedImageUnreachableCount: number
+  imageChecksDistrusted: boolean
 }
 
 interface Logger {
@@ -20,13 +22,46 @@ interface Logger {
  * Why a normalized row is dropped at staging, or null if it should be staged.
  * Image gate is WB-084; the non-positive/missing MSRP gate is WB-089 L3 (a $0
  * price becomes a $0 Medusa price + a "From $0.00" card addable at $0).
+ *
+ * WB-115 extends the image gate from "is there a URL" to "does the URL still
+ * resolve" — 664/2,852 indexed products (23%) pointed at a vendor thumbnail
+ * that 404s, and an empty-string check never catches that. `imageReachable`
+ * is optional and MUST fail open: `undefined` means "not checked" (Task 2's
+ * checker didn't run, timed out, or the circuit breaker distrusted its own
+ * results) and is treated as reachable so an unknown image never hides a
+ * product. Only an explicit `false` — set solely on a definitive 404/410 by
+ * Task 2 — removes a row. Order: an empty/missing URL is still "no-image"
+ * even if `imageReachable` is (nonsensically) `false`; only once a URL is
+ * present does the reachability check apply, ahead of the price check.
  */
 export function stageSkipReason(
-  normalized: { imageUrl?: string | null; msrpUsd: number }
-): "no-image" | "invalid-price" | null {
+  normalized: { imageUrl?: string | null; msrpUsd: number },
+  imageReachable?: boolean
+): "no-image" | "image-unreachable" | "invalid-price" | null {
   if (!normalized.imageUrl) return "no-image"
+  if (imageReachable === false) return "image-unreachable"
   if (!(normalized.msrpUsd > 0)) return "invalid-price"
   return null
+}
+
+/**
+ * WB-115 circuit breaker for the image reachability gate. If the checker
+ * itself is unreliable — a vendor CDN blip, a network outage on our end —
+ * a huge fraction of "dead" results would be false positives, and trusting
+ * them could delist the entire catalog. `false` means "distrust the checked
+ * results this run"; the caller (Task 3) must FAIL THE RUN rather than
+ * stage everything as reachable, because rows are filtered during a
+ * streaming pass and can't be retroactively un-filtered once skipped.
+ * `checked === 0` always returns true (nothing to distrust, and it avoids
+ * dividing by zero).
+ */
+export function shouldTrustImageChecks(
+  checked: number,
+  dead: number,
+  maxRatio: number
+): boolean {
+  if (checked > 0 && dead / checked > maxRatio) return false
+  return true
 }
 
 /**
@@ -50,6 +85,12 @@ export async function stageFeed(
   let stagedCount = 0
   let skippedNoImageCount = 0
   let skippedInvalidPriceCount = 0
+  // WB-115: reachability checking + the circuit breaker are wired in Task 3.
+  // stageSkipReason is still called without an imageReachable argument here,
+  // so it never returns "image-unreachable" yet — these stay at their
+  // initial values and exist only so StageResult's shape is already correct.
+  const skippedImageUnreachableCount = 0
+  const imageChecksDistrusted = false
   let truncated = false
 
   let feedStagingBatch: any[] = []
@@ -151,5 +192,12 @@ export async function stageFeed(
       (truncated ? ` [TRUNCATED to maxRows=${maxRows} — dev mode]` : '')
   )
 
-  return { rowCount, stagedCount, skippedNoImageCount, skippedInvalidPriceCount }
+  return {
+    rowCount,
+    stagedCount,
+    skippedNoImageCount,
+    skippedInvalidPriceCount,
+    skippedImageUnreachableCount,
+    imageChecksDistrusted,
+  }
 }

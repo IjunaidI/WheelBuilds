@@ -132,13 +132,20 @@ export async function stageFeed(
   let imageChecksDistrusted = false
   let truncated = false
 
-  // WB-115 circuit-breaker accumulators. Counted per ROW (not per unique
-  // URL) so the ratio reflects catalog impact — many rows can share one
-  // dead vendor thumbnail, and a breaker keyed on unique URLs would
-  // massively understate how much of the feed that single dead image
-  // actually affects.
+  // WB-115 circuit-breaker accumulators. The breaker is a self-distrust
+  // guard on the CHECKER, not a catalog-impact guard (that job belongs to
+  // service.ts's discontinuedCount/currentCount > 0.05 park-for-approval
+  // check). Its evidence unit is a probe, and a probe is per unique URL --
+  // counting the same checker verdict once per SKU that happens to share a
+  // thumbnail (wheels average ~17 variant rows per product) would let one
+  // dead placeholder swing the ratio by dozens of "rows" from a single
+  // result, which is noise, not evidence the checker is unreliable.
+  // `checkedUrls` dedupes across the ENTIRE run (not just within one
+  // BATCH_SIZE batch) since two products far apart in the feed can still
+  // share a CDN thumbnail.
   let checkedCount = 0
   let deadCount = 0
+  const checkedUrls = new Set<string>()
 
   let feedStagingBatch: any[] = []
   let stockStagingBatch: any[] = []
@@ -212,18 +219,29 @@ export async function stageFeed(
       // thrown here must propagate and fail the run, not be swallowed into
       // "treat everything as unreachable."
       reachableByUrl = await imageCheck.checker.check(urls)
+
+      // WB-115 circuit-breaker accounting -- one probe per unique URL,
+      // deduped across the whole run via `checkedUrls` (see its
+      // declaration above for why). A URL absent from the returned Map
+      // was never actually resolved by the checker, so it must not count
+      // as checked (and certainly not as dead) -- only URLs the checker
+      // actually reported on move the ratio.
+      for (const url of urls) {
+        if (checkedUrls.has(url) || !reachableByUrl.has(url)) continue
+        checkedUrls.add(url)
+        checkedCount++
+        if (reachableByUrl.get(url) === false) deadCount++
+      }
     }
 
     for (const { parsedRow, normalized } of pendingBatch) {
-      let reachable: boolean | undefined
-      if (reachableByUrl) {
-        // A URL absent from the returned Map (checker didn't report on it)
-        // resolves to `undefined` here, which stageSkipReason treats as
-        // reachable -- fail open, never "unreachable by omission."
-        reachable = reachableByUrl.get(normalized.imageUrl as string)
-        checkedCount++
-        if (reachable === false) deadCount++
-      }
+      // A URL absent from `reachableByUrl` (checker didn't report on it)
+      // resolves to `undefined` here, which stageSkipReason treats as
+      // reachable -- fail open, never "unreachable by omission." Admission
+      // stays per-ROW even though the breaker's counters above are
+      // deduped by URL: every SKU sharing a dead thumbnail must still be
+      // individually dropped from the catalog.
+      const reachable = reachableByUrl?.get(normalized.imageUrl as string)
 
       const skip = stageSkipReason(normalized, reachable)
       if (skip === "image-unreachable") {
@@ -301,7 +319,21 @@ export async function stageFeed(
   // run "failed" and returns without proceeding to diff/apply, so throwing
   // here is sufficient; no separate caller-side check is required.
   if (imageCheck) {
-    const maxDeadRatio = imageCheck.maxDeadRatio ?? DEFAULT_MAX_DEAD_RATIO
+    let maxDeadRatio = imageCheck.maxDeadRatio ?? DEFAULT_MAX_DEAD_RATIO
+    // WB-115: `imageCheck.maxDeadRatio` is normally `parseFloat(env var)`
+    // upstream (medusa-config.js). A malformed env value parses to NaN,
+    // which is neither null nor undefined -- `??` above would NOT catch it
+    // -- and `dead/checked > NaN` is always false, so an unguarded NaN
+    // would silently disable the breaker entirely rather than falling back
+    // to the documented default. Guard explicitly and warn so a typo is
+    // visible in logs instead of a quietly-neutered safety check.
+    if (!Number.isFinite(maxDeadRatio)) {
+      logger.warn(
+        `[vendor-sync] [${runId}] invalid maxDeadRatio (${imageCheck.maxDeadRatio}) ` +
+          `for vendor=${adapter.vendorCode} -- falling back to default ${DEFAULT_MAX_DEAD_RATIO}`
+      )
+      maxDeadRatio = DEFAULT_MAX_DEAD_RATIO
+    }
     if (!shouldTrustImageChecks(checkedCount, deadCount, maxDeadRatio)) {
       imageChecksDistrusted = true
       const ratio = checkedCount > 0 ? deadCount / checkedCount : 0

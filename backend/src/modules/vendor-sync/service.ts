@@ -52,6 +52,19 @@ interface Logger {
  * A NaN concurrency would break `mapWithConcurrency`'s batching and a NaN/0
  * timeoutMs would make every reachability probe expire almost instantly, so
  * this must never pass a non-finite number through unguarded.
+ *
+ * WB-115 premerge review round 2 (Minor 1): `0` (and negatives) are now
+ * rejected too, not just non-finite values. This function's own docstring
+ * named `timeoutMs: 0` as the hazard it exists to prevent, but the original
+ * `Number.isFinite` check let `0` straight through: a 0ms timeout makes
+ * every reachability probe expire instantly, every image gets classified
+ * "alive" by the fail-open contract (timeout != definitive 404/410), and the
+ * whole image-reachability gate silently no-ops -- while still emitting a
+ * `logger.warn` per URL from the checker's own timeout handling, so it reads
+ * as "working" in the logs. The same reasoning applies to `ttlDays: 0`
+ * (every check re-runs every time, defeating the cache) and
+ * `concurrency: 0` (no probes ever get scheduled). `value > 0` is required
+ * for all three options.
  */
 export function resolveImageCheckNumericOption(
   optionName: "ttlDays" | "concurrency" | "timeoutMs",
@@ -61,7 +74,7 @@ export function resolveImageCheckNumericOption(
   logger: Logger
 ): number {
   if (value === undefined) return fallback
-  if (!Number.isFinite(value)) {
+  if (!Number.isFinite(value) || value <= 0) {
     logger.warn(
       `[vendor-sync] invalid imageCheck.${optionName} (${value}) for vendor=${vendorCode} -- falling back to default ${fallback}`
     )

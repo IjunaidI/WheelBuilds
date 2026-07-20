@@ -1,13 +1,28 @@
 import * as path from "path"
 import * as os from "os"
-import { resolveFeed, isSampleFeedPath, SampleFeedNotAllowedError } from "../feed-source/resolve-feed"
+import * as fs from "fs"
+import {
+  resolveFeed,
+  isSampleFeedPath,
+  SampleFeedNotAllowedError,
+  findBundledSampleDir,
+} from "../feed-source/resolve-feed"
 
-// The bundled sample CSVs' real absolute location, computed the exact same
-// way the module under test computes it (feed-source/resolve-feed.ts is 5
-// directories below the repo root; this test file, in __tests__/, sits at
-// the same depth). Recomputing independently here (rather than importing an
-// internal constant) keeps the test honest about what "the real bundled
-// sample path" means on disk.
+// The bundled sample CSVs' real absolute location, computed independently of
+// the module under test (feed-source/resolve-feed.ts is 5 directories below
+// the repo root; this test file, in __tests__/, sits at the same depth).
+//
+// WB-115 premerge review round 2 (Minor 3): the module under test used to
+// hardcode this SAME `__dirname`+5-ups expression, which means a wrong depth
+// would have passed both this test and the module self-consistently without
+// either ever proving the path is real -- that is exactly the class of bug
+// Important 2 found (the module's fixed depth was correct for the src/
+// layout but silently wrong for the built `.medusa/server` layout). The
+// module itself no longer hardcodes a depth at all (see `findBundledSampleDir`,
+// which walks up dynamically); this fixed expression is kept here ONLY as an
+// independently-derived expected value, and the `fs.existsSync` assertions
+// immediately below prove it is not merely self-consistent but the real
+// on-disk file.
 const BUNDLED_WHEEL_SAMPLE = path.resolve(__dirname, "../../../../../wheelInvPriceData.csv")
 const BUNDLED_TIRE_SAMPLE = path.resolve(__dirname, "../../../../../tireInvPriceData.csv")
 
@@ -124,6 +139,15 @@ describe("resolveFeed WB-041 fail-loud guard", () => {
 })
 
 describe("isSampleFeedPath (WB-115 premerge Change 3 — resolved-absolute-path comparison)", () => {
+  // WB-115 premerge review round 2 (Minor 3): prove BUNDLED_WHEEL_SAMPLE /
+  // BUNDLED_TIRE_SAMPLE are real files on disk, not merely a path expression
+  // that happens to match the module under test's own (possibly also wrong)
+  // computation.
+  it("BUNDLED_WHEEL_SAMPLE and BUNDLED_TIRE_SAMPLE resolve to real files on disk", () => {
+    expect(fs.existsSync(BUNDLED_WHEEL_SAMPLE)).toBe(true)
+    expect(fs.existsSync(BUNDLED_TIRE_SAMPLE)).toBe(true)
+  })
+
   it("true for the bundled wheel sample's real absolute path", () => {
     expect(isSampleFeedPath(BUNDLED_WHEEL_SAMPLE)).toBe(true)
   })
@@ -140,5 +164,51 @@ describe("isSampleFeedPath (WB-115 premerge Change 3 — resolved-absolute-path 
 
   it("false for an unrelated path", () => {
     expect(isSampleFeedPath("/feeds/live.csv")).toBe(false)
+  })
+})
+
+describe("findBundledSampleDir (WB-115 premerge review round 2 — Important 2: works in BOTH layouts)", () => {
+  // The real repo root, derived independently (matches BUNDLED_WHEEL_SAMPLE's
+  // directory above).
+  const REPO_ROOT = path.resolve(__dirname, "../../../../../")
+
+  // `path.dirname` (the walk-up step) is pure string manipulation -- it does
+  // NOT require the intermediate directories to exist on disk. Only the
+  // terminal check (`fs.existsSync` for both sample filenames) touches the
+  // filesystem, and it only succeeds once the walk actually reaches
+  // REPO_ROOT. That lets this test exercise the BUILT (`.medusa/server`)
+  // layout's directory shape without needing a real `medusa build` output on
+  // disk -- see the report for the separate manual verification against an
+  // actual built tree.
+  it("finds the repo root from a src/-layout start dir (backend/src/modules/vendor-sync/feed-source)", () => {
+    const srcLayoutFeedSource = path.join(
+      REPO_ROOT, "backend", "src", "modules", "vendor-sync", "feed-source"
+    )
+    expect(findBundledSampleDir(srcLayoutFeedSource)).toBe(REPO_ROOT)
+  })
+
+  it("finds the repo root from the BUILT layout start dir (backend/.medusa/server/src/modules/vendor-sync/feed-source) -- this is the exact directory pnpm start resolves at runtime, and the fixed-depth walk this replaces landed inside backend/.medusa/ from here instead", () => {
+    const builtLayoutFeedSource = path.join(
+      REPO_ROOT, "backend", ".medusa", "server", "src", "modules", "vendor-sync", "feed-source"
+    )
+    expect(findBundledSampleDir(builtLayoutFeedSource)).toBe(REPO_ROOT)
+  })
+
+  it("is independent of process.cwd() -- both layouts resolve the same regardless of where the process was launched from", () => {
+    const originalCwd = process.cwd()
+    try {
+      process.chdir(os.tmpdir())
+      const builtLayoutFeedSource = path.join(
+        REPO_ROOT, "backend", ".medusa", "server", "src", "modules", "vendor-sync", "feed-source"
+      )
+      expect(findBundledSampleDir(builtLayoutFeedSource)).toBe(REPO_ROOT)
+    } finally {
+      process.chdir(originalCwd)
+    }
+  })
+
+  it("returns null (bounded by maxLevels) rather than climbing indefinitely when the start dir is nowhere near the sample CSVs", () => {
+    const nowhere = path.join(os.tmpdir(), "some", "totally", "unrelated", "nested", "path")
+    expect(findBundledSampleDir(nowhere, 2)).toBeNull()
   })
 })

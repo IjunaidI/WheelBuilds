@@ -48,6 +48,8 @@ import {
   VENDOR_ALLOW_SAMPLE_FEED,
   VENDOR_SYNC_IMAGE_CHECK_ENABLED,
   VENDOR_SYNC_IMAGE_DEAD_MAX_RATIO,
+  VENDOR_SYNC_IMAGE_DEAD_MAX_RATIO_WHEELS,
+  VENDOR_SYNC_IMAGE_DEAD_MAX_RATIO_TIRES,
   VENDOR_SYNC_IMAGE_TTL_DAYS,
   VENDOR_SYNC_IMAGE_CONCURRENCY,
   VENDOR_SYNC_IMAGE_TIMEOUT_MS,
@@ -66,6 +68,7 @@ import {
 } from 'modules/vendor-sync/search/meili-index-settings';
 import { resolveDevMaxRows } from 'lib/dev-max-rows';
 import { buildModuleStatusReport, formatModuleStatusReport } from 'lib/module-status';
+import { resolveVendorMaxDeadRatio } from 'lib/resolve-vendor-max-dead-ratio';
 
 loadEnv(process.env.NODE_ENV, process.cwd());
 
@@ -249,9 +252,22 @@ const medusaConfig = {
             sftp: wheelSftp,
             // WB-115 premerge: two live dry-runs against the real production
             // feeds (2026-07-20) measured 313/3,914 unique image URLs dead
-            // (8.0%). Keep the global default (0.40) -- 5x headroom above
-            // the measured baseline.
-            maxDeadRatio: 0.40,
+            // (8.0%). 0.40 is 5x headroom above the measured baseline.
+            //
+            // WB-115 premerge review round 2 (Important 1): this used to be
+            // hardcoded to 0.40, which made the documented emergency knob
+            // (VENDOR_SYNC_IMAGE_DEAD_MAX_RATIO) inert for both live vendors
+            // -- an operator setting it in Railway mid-incident saw no
+            // effect. Now resolves per-vendor env -> global env -> this
+            // hardcoded default. A malformed value (parseFloat -> NaN) is
+            // still caught by pipeline/stage.ts's existing
+            // Number.isFinite(maxDeadRatio) guard (falls back + warns),
+            // exactly as it already did for every other source of this value.
+            maxDeadRatio: resolveVendorMaxDeadRatio(
+              VENDOR_SYNC_IMAGE_DEAD_MAX_RATIO_WHEELS,
+              VENDOR_SYNC_IMAGE_DEAD_MAX_RATIO,
+              0.40
+            ),
           },
           'wheelpros-tires': {
             enabled: VENDOR_WHEELPROS_TIRES_ENABLED === 'true',
@@ -267,7 +283,15 @@ const medusaConfig = {
             // the measured 47.7% baseline while still tripping on a
             // catastrophic (~100%) CDN failure. Do NOT raise to 1.0 or
             // disable the breaker for tires.
-            maxDeadRatio: 0.70,
+            //
+            // WB-115 premerge review round 2 (Important 1): same per-vendor
+            // env -> global env -> hardcoded-default resolution as wheels
+            // above, via VENDOR_SYNC_IMAGE_DEAD_MAX_RATIO_TIRES.
+            maxDeadRatio: resolveVendorMaxDeadRatio(
+              VENDOR_SYNC_IMAGE_DEAD_MAX_RATIO_TIRES,
+              VENDOR_SYNC_IMAGE_DEAD_MAX_RATIO,
+              0.70
+            ),
           },
         },
       },

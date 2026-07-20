@@ -131,10 +131,42 @@ describe("resolveImageCheckNumericOption (WB-115 premerge Change 4)", () => {
     expect(logger.warn).toHaveBeenCalledTimes(2)
   })
 
-  it("0 is a valid finite value and passes through without warning (not treated as malformed)", () => {
+  // WB-115 premerge review round 2 (Minor 1): `0` is REJECTED, not passed
+  // through. This flips the pre-fix assertion below, which enshrined the
+  // exact hazard this function's own docstring warns about: a `0` timeout
+  // makes every probe expire instantly (all images fail-open to "alive"),
+  // a `0` ttlDays defeats the cache, and a `0` concurrency schedules no
+  // probes at all -- each silently no-ops the gate while still looking
+  // "valid" to a shallow finite-number check.
+  it("0 is rejected (not a valid finite value in this domain) -- falls back to the default AND warns", () => {
     const logger = makeLogger()
     const result = resolveImageCheckNumericOption("concurrency", 0, 24, "v", logger)
-    expect(result).toBe(0)
+    expect(result).toBe(24)
+    expect(logger.warn).toHaveBeenCalledWith(
+      expect.stringMatching(/invalid imageCheck\.concurrency/i)
+    )
+  })
+
+  it("0 is rejected for ttlDays and timeoutMs too, each falling back and warning independently", () => {
+    const logger = makeLogger()
+    expect(resolveImageCheckNumericOption("ttlDays", 0, 7, "v", logger)).toBe(7)
+    expect(resolveImageCheckNumericOption("timeoutMs", 0, 10000, "v", logger)).toBe(10000)
+    expect(logger.warn).toHaveBeenCalledTimes(2)
+  })
+
+  it("negative values are rejected (not just 0) -- falls back and warns", () => {
+    const logger = makeLogger()
+    const result = resolveImageCheckNumericOption("timeoutMs", -1, 10000, "v", logger)
+    expect(result).toBe(10000)
+    expect(logger.warn).toHaveBeenCalledWith(
+      expect.stringMatching(/invalid imageCheck\.timeoutMs/i)
+    )
+  })
+
+  it("a small positive value (e.g. 1) is still accepted -- the floor is > 0, not some arbitrary minimum", () => {
+    const logger = makeLogger()
+    const result = resolveImageCheckNumericOption("concurrency", 1, 24, "v", logger)
+    expect(result).toBe(1)
     expect(logger.warn).not.toHaveBeenCalled()
   })
 })

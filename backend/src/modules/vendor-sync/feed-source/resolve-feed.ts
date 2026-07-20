@@ -1,4 +1,5 @@
 import * as path from "path"
+import * as fs from "fs"
 import { FeedConfig, LastSeen, ResolvedFeed } from "./types"
 import { downloadNewestViaSftp } from "./sftp"
 
@@ -12,17 +13,65 @@ export const SAMPLE_FEED_FILENAMES = new Set([
 ])
 
 /**
- * Absolute filesystem paths of the bundled sample CSVs, computed the same
- * way each adapter computes its own `DEFAULT_CSV_PATH` (see
- * adapters/wheelpros-wheels/index.ts and adapters/wheelpros-tires/index.ts):
- * the files ship at the monorepo root, one level above `backend/`. This
- * file lives at `backend/src/modules/vendor-sync/feed-source/`, five
- * directories below the repo root.
+ * Locate the directory that actually contains BOTH bundled sample CSVs by
+ * walking up from `startDir` (this file's own on-disk location, `__dirname`
+ * -- fixed at compile time, independent of `process.cwd()`) until a
+ * directory contains both filenames, or the walk runs out of parents.
+ *
+ * WB-115 premerge review round 2 (Important 2): a fixed
+ * `path.resolve(__dirname, "../../../../../")` (5 levels) only reaches the
+ * repo root from the `src/` layout (`backend/src/modules/vendor-sync/
+ * feed-source/`). Under `pnpm start`, which runs the BUILT tree
+ * (`backend/.medusa/server/src/modules/vendor-sync/feed-source/` -- one
+ * directory level deeper, via the extra `.medusa/server/` prefix), that same
+ * 5-level walk lands inside `backend/.medusa/`, which never contains the
+ * sample CSVs. `isSampleFeedPath` would then silently always return false in
+ * that layout, and the `!opts.allowSample` guard below -- the safety check
+ * that stops a production run from ingesting the bundled 11-row sample
+ * against a catalog of thousands -- could never fire.
+ *
+ * Walking up dynamically (instead of hardcoding a depth) finds the real
+ * directory in EITHER layout, regardless of cwd, with no per-layout branch
+ * to keep in sync. Requiring BOTH sample filenames to be present together
+ * (not just one) keeps this from false-matching an unrelated ancestor
+ * directory that happens to contain a single same-named file.
+ *
+ * This does not reintroduce the basename-matching bug `isSampleFeedPath`
+ * itself fixed: the returned directory only seeds the exact absolute paths
+ * of the two bundled files, and classification below still compares a
+ * feedPath's own FULL resolved path against that fixed set -- a same-named
+ * file living anywhere else (os.tmpdir(), an SFTP download, an unrelated
+ * directory) still does not match. See resolve-feed.test.ts for both layouts.
  */
+export function findBundledSampleDir(startDir: string, maxLevels = 12): string | null {
+  const filenames = Array.from(SAMPLE_FEED_FILENAMES)
+  let dir = startDir
+  for (let i = 0; i < maxLevels; i++) {
+    if (filenames.every((name) => fs.existsSync(path.join(dir, name)))) {
+      return dir
+    }
+    const parent = path.dirname(dir)
+    if (parent === dir) return null // reached the filesystem root
+    dir = parent
+  }
+  return null
+}
+
+/**
+ * Absolute filesystem paths of the bundled sample CSVs. `null` when neither
+ * layout's walk finds them (e.g. a deploy artifact that strips the sample
+ * CSVs entirely) -- `isSampleFeedPath` then simply never matches, which is
+ * no worse than the pre-fix behavior in that scenario and cannot itself
+ * misclassify a real feed.
+ */
+const BUNDLED_SAMPLE_DIR = findBundledSampleDir(__dirname)
+
 const BUNDLED_SAMPLE_PATHS = new Set(
-  Array.from(SAMPLE_FEED_FILENAMES, (filename) =>
-    path.resolve(__dirname, "../../../../../", filename)
-  )
+  BUNDLED_SAMPLE_DIR
+    ? Array.from(SAMPLE_FEED_FILENAMES, (filename) =>
+        path.resolve(BUNDLED_SAMPLE_DIR, filename)
+      )
+    : []
 )
 
 /**

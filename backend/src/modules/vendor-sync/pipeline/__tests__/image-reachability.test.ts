@@ -144,9 +144,13 @@ describe("createImageReachabilityChecker", () => {
       expect(result.get("https://vendor.example/429.jpg")).toBe(true)
     })
 
-    it("timeout (fetchImpl never resolves) -> reachable=true (fail-open)", async () => {
+    it("timeout (fetchImpl never resolves) -> reachable=true (fail-open) and actually aborts the signal", async () => {
       const service = makeFakeService()
-      const fetchImpl = jest.fn(() => new Promise(() => {})) // hangs forever
+      let capturedSignal: AbortSignal | undefined
+      const fetchImpl = jest.fn((_url: string, init: { signal: AbortSignal }) => {
+        capturedSignal = init.signal
+        return new Promise(() => {}) // hangs forever -- never itself resolves/rejects
+      })
       const checker = createImageReachabilityChecker({
         service,
         logger: makeLogger(),
@@ -155,6 +159,10 @@ describe("createImageReachabilityChecker", () => {
       })
       const result = await checker.check(["https://vendor.example/hangs.jpg"])
       expect(result.get("https://vendor.example/hangs.jpg")).toBe(true)
+      // Guards against an implementation that merely wins the timeout race
+      // without actually aborting the in-flight request (a leaked socket).
+      expect(capturedSignal).toBeDefined()
+      expect(capturedSignal?.aborted).toBe(true)
     })
 
     it("fetchImpl throws (DNS failure / connection refused) -> reachable=true (fail-open)", async () => {
@@ -169,6 +177,26 @@ describe("createImageReachabilityChecker", () => {
       })
       const result = await checker.check(["https://vendor.example/dns-fail.jpg"])
       expect(result.get("https://vendor.example/dns-fail.jpg")).toBe(true)
+    })
+
+    it("fetchImpl throws SYNCHRONOUSLY (not a rejected promise) -> reachable=true and check() does not reject", async () => {
+      const service = makeFakeService()
+      // Deliberately not `async` -- this throws before any Promise is ever
+      // constructed, unlike the rejected-promise case above. Per the
+      // fail-open contract this must resolve, not reject, `check()`.
+      const fetchImpl = jest.fn(() => {
+        throw new Error("synchronous boom")
+      }) as unknown as jest.Mock
+      const checker = createImageReachabilityChecker({
+        service,
+        logger: makeLogger(),
+        fetchImpl: fetchImpl as any,
+      })
+      const url = "https://vendor.example/sync-throw.jpg"
+      // If the synchronous throw escaped as a promise rejection, this
+      // `await` would throw and fail the test.
+      const result = await checker.check([url])
+      expect(result.get(url)).toBe(true)
     })
 
     it("issues a HEAD request", async () => {
@@ -254,6 +282,50 @@ describe("createImageReachabilityChecker", () => {
       expect(fetchImpl).toHaveBeenCalledTimes(1)
       expect(result.get(url)).toBe(true)
     })
+
+    it("cached row with last_status=null (prior timeout/error) -> refetches, is never treated as a fresh success", async () => {
+      const url = "https://vendor.example/null-status.jpg"
+      const service = makeFakeService([
+        {
+          url,
+          last_status: null,
+          last_checked_at: new Date(), // as fresh as it gets by timestamp alone
+          consecutive_failures: 0,
+        },
+      ])
+      const fetchImpl = jest.fn(async () => ({ status: 200 }))
+      const checker = createImageReachabilityChecker({
+        service,
+        logger: makeLogger(),
+        fetchImpl,
+        ttlDays: 7,
+      })
+      const result = await checker.check([url])
+      expect(fetchImpl).toHaveBeenCalledTimes(1)
+      expect(result.get(url)).toBe(true)
+    })
+
+    it("cached row with an unparseable last_checked_at -> refetches rather than treating the row as fresh (Number.isNaN guard)", async () => {
+      const url = "https://vendor.example/bad-date.jpg"
+      const service = makeFakeService([
+        {
+          url,
+          last_status: 200,
+          last_checked_at: "not-a-real-date",
+          consecutive_failures: 0,
+        },
+      ])
+      const fetchImpl = jest.fn(async () => ({ status: 200 }))
+      const checker = createImageReachabilityChecker({
+        service,
+        logger: makeLogger(),
+        fetchImpl,
+        ttlDays: 7,
+      })
+      const result = await checker.check([url])
+      expect(fetchImpl).toHaveBeenCalledTimes(1)
+      expect(result.get(url)).toBe(true)
+    })
   })
 
   describe("concurrency", () => {
@@ -276,7 +348,9 @@ describe("createImageReachabilityChecker", () => {
         concurrency: 3,
       })
       await checker.check(urls)
-      expect(peak).toBeLessThanOrEqual(3)
+      // Exact equality (not just <=) so an under-parallel implementation
+      // (e.g. accidentally-serial, peak 1) also fails this test.
+      expect(peak).toBe(3)
       expect(fetchImpl).toHaveBeenCalledTimes(10)
     })
   })

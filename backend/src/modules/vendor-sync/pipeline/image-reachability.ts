@@ -92,6 +92,15 @@ function isFreshSuccess(row: VendorImageCheckRow, now: number, ttlMs: number): b
  * injected test double that simply never resolves still yields a timely
  * "alive" result instead of hanging the caller; `settled` ensures only
  * whichever of the timer/fetch settles first actually resolves the promise.
+ *
+ * The call into `fetchImpl` (and the `.then` chained onto it) is wrapped in
+ * `try/catch`: a real `fetch` never throws synchronously (an invalid URL
+ * yields a rejected promise, handled by the `.then` error branch below),
+ * but the fail-open contract is "ANY throw -> alive", and a synchronous
+ * throw -- or a non-promise return value, which makes `.then` itself throw
+ * -- from an injected/future `fetchImpl` must not escape as a rejection of
+ * this promise (a rejection here would propagate through
+ * `mapWithConcurrency` and reject `check()` entirely, defeating fail-open).
  */
 function probeUrl(
   url: string,
@@ -111,25 +120,37 @@ function probeUrl(
       resolve({ status: null, classification: "alive" })
     }, timeoutMs)
 
-    fetchImpl(url, { method: "HEAD", signal: controller.signal }).then(
-      (res) => {
-        if (settled) return
-        settled = true
-        clearTimeout(timer)
-        resolve({ status: res.status, classification: classifyImageResponse(res.status) })
-      },
-      (error) => {
-        if (settled) return
-        settled = true
-        clearTimeout(timer)
-        logger.warn(
-          `[vendor-sync] image reachability check errored for ${url}: ${
-            (error as any)?.message ?? error
-          }`
-        )
-        resolve({ status: null, classification: classifyImageResponse(error) })
-      }
-    )
+    try {
+      fetchImpl(url, { method: "HEAD", signal: controller.signal }).then(
+        (res) => {
+          if (settled) return
+          settled = true
+          clearTimeout(timer)
+          resolve({ status: res.status, classification: classifyImageResponse(res.status) })
+        },
+        (error) => {
+          if (settled) return
+          settled = true
+          clearTimeout(timer)
+          logger.warn(
+            `[vendor-sync] image reachability check errored for ${url}: ${
+              (error as any)?.message ?? error
+            }`
+          )
+          resolve({ status: null, classification: classifyImageResponse(error) })
+        }
+      )
+    } catch (error) {
+      if (settled) return
+      settled = true
+      clearTimeout(timer)
+      logger.warn(
+        `[vendor-sync] image reachability check threw synchronously for ${url}: ${
+          (error as any)?.message ?? error
+        }`
+      )
+      resolve({ status: null, classification: "alive" })
+    }
   })
 }
 

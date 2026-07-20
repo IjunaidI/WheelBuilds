@@ -4,6 +4,7 @@ import VendorFeedRun from "./models/vendor-feed-run"
 import VendorFeedStaging from "./models/vendor-feed-staging"
 import VendorStockStaging from "./models/vendor-stock-staging"
 import VendorProductCurrent from "./models/vendor-product-current"
+import VendorImageCheck from "./models/vendor-image-check"
 import { resolveAdapter } from "./adapters/registry"
 import { fetchFeed } from "./pipeline/fetch"
 import { stageFeed } from "./pipeline/stage"
@@ -62,6 +63,7 @@ class VendorSyncService extends MedusaService({
   VendorFeedStaging,
   VendorStockStaging,
   VendorProductCurrent,
+  VendorImageCheck,
 }) {
   private container_: any
   private logger_: Logger

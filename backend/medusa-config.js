@@ -46,6 +46,13 @@ import {
   VENDOR_SYNC_APPLY_MAX_ATTEMPTS,
   VENDOR_SYNC_DRY_RUN,
   VENDOR_ALLOW_SAMPLE_FEED,
+  VENDOR_SYNC_IMAGE_CHECK_ENABLED,
+  VENDOR_SYNC_IMAGE_DEAD_MAX_RATIO,
+  VENDOR_SYNC_IMAGE_DEAD_MAX_RATIO_WHEELS,
+  VENDOR_SYNC_IMAGE_DEAD_MAX_RATIO_TIRES,
+  VENDOR_SYNC_IMAGE_TTL_DAYS,
+  VENDOR_SYNC_IMAGE_CONCURRENCY,
+  VENDOR_SYNC_IMAGE_TIMEOUT_MS,
   WHEEL_SIZE_API_KEY,
   WHEEL_SIZE_BASE_URL,
   WHEEL_SIZE_REGION,
@@ -61,6 +68,7 @@ import {
 } from 'modules/vendor-sync/search/meili-index-settings';
 import { resolveDevMaxRows } from 'lib/dev-max-rows';
 import { buildModuleStatusReport, formatModuleStatusReport } from 'lib/module-status';
+import { resolveVendorMaxDeadRatio } from 'lib/resolve-vendor-max-dead-ratio';
 
 loadEnv(process.env.NODE_ENV, process.cwd());
 
@@ -218,16 +226,72 @@ const medusaConfig = {
         dryRun: VENDOR_SYNC_DRY_RUN === 'true',
         allowSampleFeed: VENDOR_ALLOW_SAMPLE_FEED === 'true',
         devMaxRows,
+        // WB-115: image reachability gate at staging. `enabled` is a
+        // production kill switch that defaults to TRUE (opposite of every
+        // other boolean flag in this block) -- `!== 'false'` so it stays on
+        // unless explicitly disabled, matching the brief's "default true".
+        imageCheck: {
+          enabled: VENDOR_SYNC_IMAGE_CHECK_ENABLED !== 'false',
+          maxDeadRatio: parseFloat(VENDOR_SYNC_IMAGE_DEAD_MAX_RATIO ?? '0.40'),
+          // WB-115 premerge Change 4: these were typed and threaded into the
+          // checker (pipeline/image-reachability.ts) from day one but never
+          // actually wired to an env var here -- they were permanently stuck
+          // at the checker's own defaults (7 days / 24 / 10000ms) with no
+          // way to override in production. A malformed value (e.g. a typo'd
+          // env var parsing to NaN) is guarded in service.ts's
+          // buildImageCheck (Number.isFinite + fallback + warn), mirroring
+          // maxDeadRatio's guard in pipeline/stage.ts.
+          ttlDays: parseInt(VENDOR_SYNC_IMAGE_TTL_DAYS ?? '7', 10),
+          concurrency: parseInt(VENDOR_SYNC_IMAGE_CONCURRENCY ?? '24', 10),
+          timeoutMs: parseInt(VENDOR_SYNC_IMAGE_TIMEOUT_MS ?? '10000', 10),
+        },
         vendors: {
           'wheelpros-wheels': {
             enabled: VENDOR_WHEELPROS_WHEELS_ENABLED === 'true',
             feedPath: VENDOR_WHEELPROS_WHEEL_FEED_PATH,
             sftp: wheelSftp,
+            // WB-115 premerge: two live dry-runs against the real production
+            // feeds (2026-07-20) measured 313/3,914 unique image URLs dead
+            // (8.0%). 0.40 is 5x headroom above the measured baseline.
+            //
+            // WB-115 premerge review round 2 (Important 1): this used to be
+            // hardcoded to 0.40, which made the documented emergency knob
+            // (VENDOR_SYNC_IMAGE_DEAD_MAX_RATIO) inert for both live vendors
+            // -- an operator setting it in Railway mid-incident saw no
+            // effect. Now resolves per-vendor env -> global env -> this
+            // hardcoded default. A malformed value (parseFloat -> NaN) is
+            // still caught by pipeline/stage.ts's existing
+            // Number.isFinite(maxDeadRatio) guard (falls back + warns),
+            // exactly as it already did for every other source of this value.
+            maxDeadRatio: resolveVendorMaxDeadRatio(
+              VENDOR_SYNC_IMAGE_DEAD_MAX_RATIO_WHEELS,
+              VENDOR_SYNC_IMAGE_DEAD_MAX_RATIO,
+              0.40
+            ),
           },
           'wheelpros-tires': {
             enabled: VENDOR_WHEELPROS_TIRES_ENABLED === 'true',
             feedPath: VENDOR_WHEELPROS_TIRE_FEED_PATH,
             sftp: tireSftp,
+            // WB-115 premerge: the same dry-run measured 103/216 unique tire
+            // image URLs dead (47.7%) -- WheelPros genuinely ships dead
+            // placeholder URLs for about half their tire lines; this is a
+            // TRUE baseline, not a checker malfunction. Business decision
+            // (client, explicit): no products without images are allowed,
+            // tires included, even though gating on this drops ~35% of the
+            // tire catalog (397/1,131 products). 0.70 leaves headroom above
+            // the measured 47.7% baseline while still tripping on a
+            // catastrophic (~100%) CDN failure. Do NOT raise to 1.0 or
+            // disable the breaker for tires.
+            //
+            // WB-115 premerge review round 2 (Important 1): same per-vendor
+            // env -> global env -> hardcoded-default resolution as wheels
+            // above, via VENDOR_SYNC_IMAGE_DEAD_MAX_RATIO_TIRES.
+            maxDeadRatio: resolveVendorMaxDeadRatio(
+              VENDOR_SYNC_IMAGE_DEAD_MAX_RATIO_TIRES,
+              VENDOR_SYNC_IMAGE_DEAD_MAX_RATIO,
+              0.70
+            ),
           },
         },
       },

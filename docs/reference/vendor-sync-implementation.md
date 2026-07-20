@@ -64,6 +64,32 @@ pnpm exec medusa exec ./src/scripts/vendor-sync-cleanup.ts                # rele
 pnpm exec medusa exec ./src/scripts/vendor-sync-backfill-inventory.ts     # repair vendor_product_current.inventory_item_id
 ```
 
+### Image reachability gate (WB-115)
+
+At staging, every distinct image URL is HEAD-probed (`createImageReachabilityChecker`) and a row whose
+image 404s/410s is dropped — fail-open: timeout, DNS failure, 5xx, 429, a sync throw, and any URL
+missing from the result map all count as reachable, so an unknown image never hides a product. A
+circuit breaker aborts the run (catalog left unchanged) when the dead/checked ratio over deduplicated
+URLs exceeds a per-vendor threshold — WheelPros' true dead-image baseline differs a lot by vendor
+(measured 2026-07-20: wheels 8.0%/313 of 3,914 unique URLs, tires 47.7%/103 of 216 — tires genuinely
+ship dead placeholder URLs for about half their lines), so wheels and tires each get their own default
+(0.40 / 0.70) rather than one global number.
+
+| Env var | Default | What it does |
+|---|---|---|
+| `VENDOR_SYNC_IMAGE_CHECK_ENABLED` | `true` | Kill switch — the only flag on this page that defaults ON; set to `false` to disable the gate entirely. |
+| `VENDOR_SYNC_IMAGE_DEAD_MAX_RATIO` | `0.40` | Global circuit-breaker threshold, used only when a vendor doesn't set its own override below. |
+| `VENDOR_SYNC_IMAGE_DEAD_MAX_RATIO_WHEELS` | `0.40` | Per-vendor override for wheels. Resolution order is per-vendor env → global env → this hardcoded default (`medusa-config.js`); this is the knob to raise mid-incident to unblock a tripped run without a redeploy. |
+| `VENDOR_SYNC_IMAGE_DEAD_MAX_RATIO_TIRES` | `0.70` | Same, for tires. Do not set either to `1.0` — that disables the breaker rather than merely raising it. |
+| `VENDOR_SYNC_IMAGE_TTL_DAYS` | `7` | Days a cached "alive" result is trusted before re-checking. A known-dead result is always re-checked next run regardless of TTL, so a product recovers automatically once the vendor publishes the image. Must be `> 0`. |
+| `VENDOR_SYNC_IMAGE_CONCURRENCY` | `24` | Max in-flight HEAD requests. Must be `> 0`. |
+| `VENDOR_SYNC_IMAGE_TIMEOUT_MS` | `10000` | Per-probe timeout (ms). Must be `> 0` — a `0`/negative timeout makes every probe expire instantly, which fails OPEN (every image reads "alive") and silently no-ops the whole gate. |
+
+`VENDOR_SYNC_IMAGE_TTL_DAYS`/`_CONCURRENCY`/`_TIMEOUT_MS` are guarded by
+`resolveImageCheckNumericOption` (`service.ts`): a malformed value (non-finite, or `<= 0`) falls back to
+the default above and logs a warning rather than being used as-is. All seven vars are documented (with
+the same defaults) in `backend/.env.template`.
+
 ---
 
 ## Architecture in one paragraph

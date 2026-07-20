@@ -146,6 +146,20 @@ export const VENDOR_SYNC_APPLY_CONCURRENCY = process.env.VENDOR_SYNC_APPLY_CONCU
 export const VENDOR_SYNC_APPLY_MAX_ATTEMPTS = process.env.VENDOR_SYNC_APPLY_MAX_ATTEMPTS
 export const VENDOR_SYNC_DRY_RUN = process.env.VENDOR_SYNC_DRY_RUN
 export const VENDOR_ALLOW_SAMPLE_FEED = process.env.VENDOR_ALLOW_SAMPLE_FEED
+/** WB-115: production kill switch for the image-reachability gate at staging. Default true. */
+export const VENDOR_SYNC_IMAGE_CHECK_ENABLED = process.env.VENDOR_SYNC_IMAGE_CHECK_ENABLED
+/** WB-115: circuit-breaker threshold (dead/checked ratio) above which a run aborts rather than trusting the checks. Global fallback used when a vendor doesn't set its own override below. Default 0.40. */
+export const VENDOR_SYNC_IMAGE_DEAD_MAX_RATIO = process.env.VENDOR_SYNC_IMAGE_DEAD_MAX_RATIO
+/** WB-115 premerge review round 2: per-vendor override for the wheels circuit-breaker threshold. Wins over VENDOR_SYNC_IMAGE_DEAD_MAX_RATIO. Default (neither env set) 0.40 -- see medusa-config.js. */
+export const VENDOR_SYNC_IMAGE_DEAD_MAX_RATIO_WHEELS = process.env.VENDOR_SYNC_IMAGE_DEAD_MAX_RATIO_WHEELS
+/** WB-115 premerge review round 2: per-vendor override for the tires circuit-breaker threshold. Wins over VENDOR_SYNC_IMAGE_DEAD_MAX_RATIO. Default (neither env set) 0.70 -- see medusa-config.js. */
+export const VENDOR_SYNC_IMAGE_DEAD_MAX_RATIO_TIRES = process.env.VENDOR_SYNC_IMAGE_DEAD_MAX_RATIO_TIRES
+/** WB-115 premerge: how long (days) a cached "alive" image-reachability result is trusted before re-checking. Default 7. */
+export const VENDOR_SYNC_IMAGE_TTL_DAYS = process.env.VENDOR_SYNC_IMAGE_TTL_DAYS
+/** WB-115 premerge: max in-flight HEAD requests for the image-reachability checker. Default 24. */
+export const VENDOR_SYNC_IMAGE_CONCURRENCY = process.env.VENDOR_SYNC_IMAGE_CONCURRENCY
+/** WB-115 premerge: per-request timeout (ms) for one image-reachability HEAD probe. Default 10000. */
+export const VENDOR_SYNC_IMAGE_TIMEOUT_MS = process.env.VENDOR_SYNC_IMAGE_TIMEOUT_MS
 
 export const VENDOR_WHEELPROS_WHEELS_ENABLED = process.env.VENDOR_WHEELPROS_WHEELS_ENABLED
 export const VENDOR_WHEELPROS_WHEEL_FEED_PATH = process.env.VENDOR_WHEELPROS_WHEEL_FEED_PATH

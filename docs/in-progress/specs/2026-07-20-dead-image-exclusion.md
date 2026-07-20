@@ -89,10 +89,13 @@ rate-limits us or goes down. Three non-negotiable guards:
    DNS failure, `5xx`, or `429` → treated as reachable, product kept. The
    catalog degrades toward *showing too much*, never toward empty.
 2. **Circuit breaker.** If more than `VENDOR_SYNC_IMAGE_DEAD_MAX_RATIO`
-   (default `0.40`) of a run's checked URLs come back dead, treat the whole
-   check as untrustworthy: stage everything as reachable, log an error, and
-   record it on the run. Today's real rate is 18% of unique URLs, so 40% leaves
-   headroom while still catching a systemic CDN failure.
+   (default `0.40`) of a run's checked URLs come back dead, the check is
+   untrustworthy — **fail the run** so nothing is applied. Rows are filtered
+   during a streaming pass and cannot be retroactively un-filtered, so aborting
+   is the only way to guarantee no partial delisting reaches the catalog; a
+   failed run leaves the previous state fully intact. Today's real rate is 18%
+   of unique URLs, so 40% leaves headroom while still catching a systemic CDN
+   failure.
 3. **Persistent cache with re-check.** New table `vendor_image_check`
    (`url` PK, `last_status`, `last_checked_at`, `consecutive_failures`).
    Known-good URLs re-check at most every 7 days; known-dead re-check every run

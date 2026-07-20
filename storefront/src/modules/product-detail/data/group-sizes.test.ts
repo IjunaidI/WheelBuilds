@@ -8,6 +8,7 @@ import {
   loadsForBore,
   resolveLeafVariant,
   isRealBoltPattern,
+  isDiscontinuedVariant,
   availabilityOf,
   boltPatternsForFinish,
   bestAvailabilityOffset,
@@ -494,5 +495,41 @@ describe("groupVariantsIntoSizes — special-order threading (WB-098 Task 4)", (
     const normal = variant("v_b", 20, 9, 35, "5x114.3", 10, 320)
     const sizes = groupVariantsIntoSizes([so, normal], 28)
     expect(sizes[0].offsetVariants?.map((o) => o.isSpecialOrder)).toEqual([true, false])
+  })
+})
+
+describe("isDiscontinuedVariant", () => {
+  it("is true only for a truthy metadata.discontinued flag", () => {
+    expect(isDiscontinuedVariant({ metadata: { discontinued: true } })).toBe(true)
+    expect(isDiscontinuedVariant({ metadata: { discontinued: false } })).toBe(false)
+    expect(isDiscontinuedVariant({ metadata: {} })).toBe(false)
+    expect(isDiscontinuedVariant({})).toBe(false)
+  })
+})
+
+describe("groupVariantsIntoSizes — discontinued exclusion (WB-115 final review Finding 2)", () => {
+  it("drops a discontinued variant's offset out of the size matrix entirely", () => {
+    const dead = variant("v_dead", 20, 9, 18, "5x114.3", 5, 300)
+    dead.metadata.discontinued = true
+    const alive = variant("v_alive", 20, 9, 35, "5x114.3", 5, 320)
+    const sizes = groupVariantsIntoSizes([dead, alive], 28)
+    expect(sizes).toHaveLength(1)
+    expect(sizes[0].offsetVariants).toHaveLength(1)
+    expect(sizes[0].offsetVariants?.[0].variantId).toBe("v_alive")
+  })
+
+  it("drops a whole size when every one of its offsets is discontinued, leaving other sizes intact", () => {
+    const deadSize = variant("v_dead", 20, 9, 18, "5x114.3", 5, 300)
+    deadSize.metadata.discontinued = true
+    const aliveSize = variant("v_alive", 22, 10, 24, "5x114.3", 5, 320)
+    const sizes = groupVariantsIntoSizes([deadSize, aliveSize], 28)
+    expect(sizes).toHaveLength(1)
+    expect(sizes[0].diameter).toBe(22)
+  })
+
+  it("returns [] (not a crash) when every variant is discontinued", () => {
+    const dead = variant("v_dead", 20, 9, 18, "5x114.3", 5, 300)
+    dead.metadata.discontinued = true
+    expect(groupVariantsIntoSizes([dead], 28)).toEqual([])
   })
 })

@@ -1,7 +1,7 @@
 import { HttpTypes } from "@medusajs/types"
 import { Finish } from "@modules/common/components/wheel"
 import { normalizeFinish } from "@lib/fitment/normalize-finish"
-import { groupVariantsIntoSizes } from "./group-sizes"
+import { groupVariantsIntoSizes, isDiscontinuedVariant } from "./group-sizes"
 import { FinishOption } from "./types"
 
 const BLANK_FINISH = "—"
@@ -10,6 +10,16 @@ const BLANK_FINISH = "—"
  * Partition a product's variants by their RAW finish (matching the backend's
  * Finish variant axis), and build a per-finish size matrix + image. Blank
  * finishes collapse under the "—" sentinel. Sorted by raw label. (WB-059)
+ *
+ * Variants flagged `metadata.discontinued` (WB-115 final review Finding 2 —
+ * e.g. a dead vendor image URL dropped the row but the rest of its group
+ * survived) are excluded up front: a finish whose every variant died drops
+ * out of the returned list entirely (never a selectable-but-empty swatch),
+ * and a finish with some surviving variants keeps only those in its size
+ * matrix. If a product ends up with zero live variants this returns `[]`;
+ * the hero already renders its existing no-purchasable-options empty state
+ * for that shape (same as any variant-less product), so no separate
+ * not-found handling is needed here.
  *
  * NOTE (WB-090 P15): each finish gets its OWN `groupVariantsIntoSizes` call
  * below, so two finishes' SizeOption objects are never object-identical even
@@ -23,6 +33,7 @@ export function buildFinishOptions(
 ): FinishOption[] {
   const byFinish = new Map<string, HttpTypes.StoreProductVariant[]>()
   for (const v of variants) {
+    if (isDiscontinuedVariant(v)) continue
     const m = (v.metadata ?? {}) as Record<string, unknown>
     const raw = String(m.finish ?? "").trim() || BLANK_FINISH
     const list = byFinish.get(raw) ?? []

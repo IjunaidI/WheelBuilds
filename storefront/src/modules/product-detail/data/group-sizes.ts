@@ -53,6 +53,20 @@ export function isRealBoltPattern(raw: unknown): boolean {
 }
 
 /**
+ * True when a variant's metadata carries a truthy `discontinued` flag — set
+ * by vendor-sync (`backend/src/modules/vendor-sync/pipeline/apply.ts`) when
+ * a feed row drops out of a group that otherwise survives (e.g. a dead
+ * vendor image URL, WB-115) while the product itself stays published. Such a
+ * variant must never be offered as a live, selectable option even though the
+ * variant record is still on the product — Meilisearch already excludes it
+ * from Discovery; this keeps the PDP consistent with that.
+ */
+export function isDiscontinuedVariant(v: { metadata?: unknown }): boolean {
+  const m = (v.metadata ?? {}) as Record<string, unknown>
+  return !!m.discontinued
+}
+
+/**
  * Distinct wheel diameters across a product's variants, ascending (WB-088
  * D5). Feeds `DiscoveryProduct.diameters` for the featured/related card
  * mappers (get-featured.ts's `toFeatured`, get-product.ts's
@@ -153,6 +167,9 @@ export function groupVariantsIntoSizes(
 ): SizeOption[] {
   const byKey = new Map<string, SizeOption>()
   for (const v of variants) {
+    // WB-115 final review Finding 2: a discontinued variant (dead vendor
+    // image, group survives) must not appear in the purchasable size matrix.
+    if (isDiscontinuedVariant(v)) continue
     const m = (v.metadata ?? {}) as Record<string, unknown>
     const diameter = num(m.wheel_diameter_in)
     const width = num(m.wheel_width_in)

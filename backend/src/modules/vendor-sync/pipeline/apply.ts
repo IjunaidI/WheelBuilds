@@ -62,6 +62,11 @@ import {
 import VendorSyncService from "../service"
 import { indexVariantsBySku, partitionRecordsBySku } from "./adopt"
 import { suffixedHandle, isHandleConflictError } from "./handle-collision"
+import {
+  computeGroupImageFields,
+  computeSurvivingGroupRecords,
+  groupImageFieldsDiffer,
+} from "./group-image"
 
 interface Logger {
   info(message: string, ...args: any[]): void
@@ -546,12 +551,21 @@ async function applyChangedGroup(
 
   let variantCount = 0
 
+  // Finding 1 (WB-115 final review): every record that lands as a live
+  // variant this pass (changed in place, or added/re-listed below) feeds
+  // the end-of-function thumbnail/images recompute so a dead-image drop
+  // that only removes SOME of the group's rows doesn't leave the product
+  // serving a dead representative's image (mirrors the create path's
+  // pickGroupRepresentative + image-union rule via computeGroupImageFields).
+  const updatedRecords: NormalizedRecord[] = []
+
   // (a) changed_part_numbers - update existing variants
   if (group.changed_part_numbers.length > 0) {
     const changedRecords = await readStagingRecords(
       ctx,
       group.changed_part_numbers
     )
+    updatedRecords.push(...changedRecords)
     const variantUpdates = changedRecords.map((r) => {
       const currentRow = currentByPart.get(r.partNumber)
       if (!currentRow?.medusa_variant_id) {
@@ -658,6 +672,7 @@ async function applyChangedGroup(
       await refreshReListedVariants(ctx, productId, toAdopt)
 
       const toPersist = wheelAdds.filter((r) => !droppedSkus.has(r.partNumber))
+      updatedRecords.push(...toPersist)
       await persistAddedVariants(
         ctx,
         group.group_key,
@@ -731,6 +746,7 @@ async function applyChangedGroup(
       await refreshReListedVariants(ctx, productId, toAdopt)
 
       const toPersist = tireAdds.filter((r) => !droppedSkus.has(r.partNumber))
+      updatedRecords.push(...toPersist)
       await persistAddedVariants(ctx, group.group_key, toPersist, skuIndex, productId)
       variantCount += toPersist.length
     }
@@ -776,6 +792,55 @@ async function applyChangedGroup(
       applied_at: new Date(),
     })
     variantCount++
+  }
+
+  // Finding 1 (WB-115 final review): recompute thumbnail/images from the
+  // rows that actually survive this apply (current members minus this
+  // pass's removals, with changed/added rows' fresher data folded in) so a
+  // group that loses its representative finish to a dead-image drop stops
+  // serving that dead URL. The diff only ever produces a changed group when
+  // at least one staging row remains for it (a fully-emptied group is a
+  // discontinuedGroup instead — see diff.ts), so survivors should never be
+  // empty here; the guard is defensive only.
+  const survivingRecords = computeSurvivingGroupRecords(
+    currentRows,
+    updatedRecords,
+    group.removed_part_numbers
+  )
+  if (survivingRecords.length > 0) {
+    const { thumbnail, images } = computeGroupImageFields(survivingRecords)
+
+    // Regression fix (WB-115 thumbnail-recompute follow-up review, finding
+    // 2): only write when the recomputed fields actually differ from the
+    // product's current values. An unconditional write here fired on
+    // essentially every changed group and double-emitted product.updated
+    // (updateProductsWorkflow emits its own on top of the touchedProductIds
+    // emit below), churning updated_at for nothing — see groupImageFieldsDiffer.
+    const query = ctx.container.resolve(ContainerRegistrationKeys.QUERY)
+    const { data: currentProducts } = await query.graph({
+      entity: "product",
+      fields: ["id", "thumbnail", "images.url"],
+      filters: { id: [productId] },
+    })
+    const currentProduct = currentProducts?.[0] as
+      | { thumbnail?: string | null; images?: Array<{ url: string }> }
+      | undefined
+
+    if (
+      !currentProduct ||
+      groupImageFieldsDiffer(currentProduct, { thumbnail, images })
+    ) {
+      await updateProductsWorkflow(ctx.container).run({
+        input: {
+          selector: { id: productId },
+          update: { thumbnail, images },
+        },
+      })
+    }
+  } else {
+    ctx.logger.warn(
+      `[vendor-sync] [${ctx.runId}] changed group ${group.group_key} has no surviving rows; leaving thumbnail/images untouched`
+    )
   }
 
   // Finding 6: the changed path mutates variants/options only, which never

@@ -1,6 +1,7 @@
 import {
   computeGroupImageFields,
   computeSurvivingGroupRecords,
+  groupImageFieldsDiffer,
 } from "../group-image"
 import { WheelNormalizedRecord } from "../../adapters/types"
 
@@ -147,5 +148,102 @@ describe("computeSurvivingGroupRecords", () => {
       ["126GB-211223", "126SB-211224"]
     )
     expect(result).toEqual([])
+  })
+
+  // Regression (WB-115 thumbnail-recompute follow-up review, finding 1):
+  // reproduces the reviewer's exact scenario. Run N drops finish A (dead
+  // image); run N+1 is a routine price update on surviving finish B, which
+  // lands the group in changed_part_numbers again. A's current row is still
+  // tagged with the group and is NOT in THIS pass's removed_part_numbers
+  // (it was removed last run), so a naive "exclude only this pass's
+  // removals" rule lets it leak back into survivors -- and because it sorts
+  // lowest by part_number, pickGroupRepresentative re-picks its dead image.
+  // A row's own discontinued_at (set on the prior run) must exclude it
+  // regardless of which pass set it.
+  it("excludes a current row already discontinued in a PRIOR run even when this pass's removed_part_numbers is empty", () => {
+    const rows = [
+      {
+        part_number: "126GB-211223",
+        normalized: makeWheel({ partNumber: "126GB-211223" }),
+        discontinued_at: new Date("2026-07-01T00:00:00.000Z"),
+      },
+      {
+        part_number: "126SB-211224",
+        normalized: makeWheel({
+          partNumber: "126SB-211224",
+          finish: "SATIN BLACK",
+          imageUrl: "https://cdn.example.com/wheels/126sb-old.jpg",
+        }),
+        discontinued_at: null,
+      },
+    ]
+    // Run N+1: a routine price update on the surviving finish B.
+    const changedB = makeWheel({
+      partNumber: "126SB-211224",
+      finish: "SATIN BLACK",
+      imageUrl: "https://cdn.example.com/wheels/126sb-old.jpg",
+      msrpUsd: 340,
+    })
+
+    const result = computeSurvivingGroupRecords(rows, [changedB], [])
+
+    expect(result.map((r) => r.partNumber)).toEqual(["126SB-211224"])
+
+    // And the representative pick must not revert to A's dead image.
+    const { thumbnail } = computeGroupImageFields(result)
+    expect(thumbnail).toBe("https://cdn.example.com/wheels/126sb-old.jpg")
+  })
+})
+
+describe("groupImageFieldsDiffer", () => {
+  it("returns false when thumbnail and images match, regardless of images order", () => {
+    const current = {
+      thumbnail: "https://cdn.example.com/a.jpg",
+      images: [{ url: "https://cdn.example.com/b.jpg" }, { url: "https://cdn.example.com/a.jpg" }],
+    }
+    const computed = {
+      thumbnail: "https://cdn.example.com/a.jpg",
+      images: [{ url: "https://cdn.example.com/a.jpg" }, { url: "https://cdn.example.com/b.jpg" }],
+    }
+    expect(groupImageFieldsDiffer(current, computed)).toBe(false)
+  })
+
+  it("treats a null current thumbnail as equivalent to an undefined computed thumbnail", () => {
+    const current = { thumbnail: null, images: [] }
+    const computed = { thumbnail: undefined, images: [] }
+    expect(groupImageFieldsDiffer(current, computed)).toBe(false)
+  })
+
+  it("returns true when the thumbnail differs", () => {
+    const current = {
+      thumbnail: "https://cdn.example.com/dead.jpg",
+      images: [{ url: "https://cdn.example.com/dead.jpg" }],
+    }
+    const computed = {
+      thumbnail: "https://cdn.example.com/alive.jpg",
+      images: [{ url: "https://cdn.example.com/alive.jpg" }],
+    }
+    expect(groupImageFieldsDiffer(current, computed)).toBe(true)
+  })
+
+  it("returns true when the images set gained or lost a URL", () => {
+    const current = {
+      thumbnail: "https://cdn.example.com/a.jpg",
+      images: [{ url: "https://cdn.example.com/a.jpg" }],
+    }
+    const computed = {
+      thumbnail: "https://cdn.example.com/a.jpg",
+      images: [
+        { url: "https://cdn.example.com/a.jpg" },
+        { url: "https://cdn.example.com/b.jpg" },
+      ],
+    }
+    expect(groupImageFieldsDiffer(current, computed)).toBe(true)
+  })
+
+  it("treats a missing current.images as an empty set", () => {
+    const current = { thumbnail: undefined, images: undefined }
+    const computed = { thumbnail: undefined, images: [] }
+    expect(groupImageFieldsDiffer(current, computed)).toBe(false)
   })
 })

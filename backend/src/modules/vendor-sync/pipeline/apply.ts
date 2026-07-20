@@ -65,6 +65,7 @@ import { suffixedHandle, isHandleConflictError } from "./handle-collision"
 import {
   computeGroupImageFields,
   computeSurvivingGroupRecords,
+  groupImageFieldsDiffer,
 } from "./group-image"
 
 interface Logger {
@@ -808,12 +809,34 @@ async function applyChangedGroup(
   )
   if (survivingRecords.length > 0) {
     const { thumbnail, images } = computeGroupImageFields(survivingRecords)
-    await updateProductsWorkflow(ctx.container).run({
-      input: {
-        selector: { id: productId },
-        update: { thumbnail, images },
-      },
+
+    // Regression fix (WB-115 thumbnail-recompute follow-up review, finding
+    // 2): only write when the recomputed fields actually differ from the
+    // product's current values. An unconditional write here fired on
+    // essentially every changed group and double-emitted product.updated
+    // (updateProductsWorkflow emits its own on top of the touchedProductIds
+    // emit below), churning updated_at for nothing — see groupImageFieldsDiffer.
+    const query = ctx.container.resolve(ContainerRegistrationKeys.QUERY)
+    const { data: currentProducts } = await query.graph({
+      entity: "product",
+      fields: ["id", "thumbnail", "images.url"],
+      filters: { id: [productId] },
     })
+    const currentProduct = currentProducts?.[0] as
+      | { thumbnail?: string | null; images?: Array<{ url: string }> }
+      | undefined
+
+    if (
+      !currentProduct ||
+      groupImageFieldsDiffer(currentProduct, { thumbnail, images })
+    ) {
+      await updateProductsWorkflow(ctx.container).run({
+        input: {
+          selector: { id: productId },
+          update: { thumbnail, images },
+        },
+      })
+    }
   } else {
     ctx.logger.warn(
       `[vendor-sync] [${ctx.runId}] changed group ${group.group_key} has no surviving rows; leaving thumbnail/images untouched`

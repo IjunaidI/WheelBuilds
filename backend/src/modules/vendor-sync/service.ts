@@ -8,7 +8,12 @@ import VendorImageCheck from "./models/vendor-image-check"
 import { resolveAdapter } from "./adapters/registry"
 import { fetchFeed } from "./pipeline/fetch"
 import { stageFeed, StageImageCheckOptions } from "./pipeline/stage"
-import { createImageReachabilityChecker } from "./pipeline/image-reachability"
+import {
+  createImageReachabilityChecker,
+  DEFAULT_TTL_DAYS,
+  DEFAULT_CONCURRENCY,
+  DEFAULT_TIMEOUT_MS,
+} from "./pipeline/image-reachability"
 import { computeGroupDiff, GroupDiffResult } from "./pipeline/diff"
 import { applyChanges } from "./pipeline/apply"
 import { resolveApplyContainer } from "./pipeline/resolve-apply-container"
@@ -34,6 +39,35 @@ interface Logger {
   info(message: string, ...args: any[]): void
   warn(message: string, ...args: any[]): void
   error(message: string, ...args: any[]): void
+}
+
+/**
+ * WB-115 premerge Change 4: guard one `imageCheck` numeric option (ttlDays /
+ * concurrency / timeoutMs) against a malformed env value -- mirrors exactly
+ * how `maxDeadRatio` is guarded in pipeline/stage.ts (Number.isFinite check,
+ * fall back to the documented default, warn so a typo is visible in logs).
+ * `undefined` (the option simply wasn't set) is NOT a malformed value and
+ * silently falls back with no warning -- only an explicitly-set-but-invalid
+ * value (e.g. `parseInt("garbage", 10)` -> NaN from medusa-config.js) warns.
+ * A NaN concurrency would break `mapWithConcurrency`'s batching and a NaN/0
+ * timeoutMs would make every reachability probe expire almost instantly, so
+ * this must never pass a non-finite number through unguarded.
+ */
+export function resolveImageCheckNumericOption(
+  optionName: "ttlDays" | "concurrency" | "timeoutMs",
+  value: number | undefined,
+  fallback: number,
+  vendorCode: string,
+  logger: Logger
+): number {
+  if (value === undefined) return fallback
+  if (!Number.isFinite(value)) {
+    logger.warn(
+      `[vendor-sync] invalid imageCheck.${optionName} (${value}) for vendor=${vendorCode} -- falling back to default ${fallback}`
+    )
+    return fallback
+  }
+  return value
 }
 
 export interface VendorSyncModuleOptions {
@@ -63,7 +97,18 @@ export interface VendorSyncModuleOptions {
   }
   vendors?: Record<
     string,
-    { enabled?: boolean; feedPath?: string; sftp?: SftpConfig }
+    {
+      enabled?: boolean
+      feedPath?: string
+      sftp?: SftpConfig
+      /**
+       * WB-115 premerge: per-vendor override for the image-reachability
+       * circuit breaker (see `imageCheck.maxDeadRatio` above). Falls back to
+       * the global default when unset -- see medusa-config.js's `vendors`
+       * block for why wheels and tires need different thresholds.
+       */
+      maxDeadRatio?: number
+    }
   >
 }
 
@@ -124,19 +169,45 @@ class VendorSyncService extends MedusaService({
    * `(url, init) => fetch(url, init) as any` default used by the wheel-size
    * module's client (`src/modules/wheel-size/client.ts`) -- Node 22 ships a
    * global `fetch`, no extra dependency needed.
+   *
+   * WB-115 premerge: `maxDeadRatio` resolves per-vendor first
+   * (`vendors.<vendorCode>.maxDeadRatio` in medusa-config.js), falling back
+   * to the global `imageCheck.maxDeadRatio` default when the vendor doesn't
+   * set one. Live dry-runs measured wildly different true dead-image
+   * baselines per vendor (wheels ~8%, tires ~47.7% -- WheelPros genuinely
+   * ships dead placeholder URLs for about half their tire lines), so a
+   * single global threshold can't safely gate both without either trusting
+   * garbage for wheels or permanently tripping for tires.
+   *
+   * WB-115 premerge Change 4: `ttlDays`/`concurrency`/`timeoutMs` are each
+   * run through `resolveImageCheckNumericOption` so a malformed env value
+   * (VENDOR_SYNC_IMAGE_TTL_DAYS / _CONCURRENCY / _TIMEOUT_MS parsed via
+   * parseInt in medusa-config.js) falls back to the checker's own documented
+   * default instead of silently reaching `createImageReachabilityChecker` as
+   * NaN.
    */
-  private buildImageCheck(): StageImageCheckOptions | undefined {
+  private buildImageCheck(vendorCode: string): StageImageCheckOptions | undefined {
     const opts = this.options_.imageCheck
     if (!opts?.enabled) return undefined
+    const ttlDays = resolveImageCheckNumericOption(
+      "ttlDays", opts.ttlDays, DEFAULT_TTL_DAYS, vendorCode, this.logger_
+    )
+    const concurrency = resolveImageCheckNumericOption(
+      "concurrency", opts.concurrency, DEFAULT_CONCURRENCY, vendorCode, this.logger_
+    )
+    const timeoutMs = resolveImageCheckNumericOption(
+      "timeoutMs", opts.timeoutMs, DEFAULT_TIMEOUT_MS, vendorCode, this.logger_
+    )
     const checker = createImageReachabilityChecker({
       service: this,
       logger: this.logger_,
       fetchImpl: (url, init) => fetch(url, init) as any,
-      ttlDays: opts.ttlDays,
-      concurrency: opts.concurrency,
-      timeoutMs: opts.timeoutMs,
+      ttlDays,
+      concurrency,
+      timeoutMs,
     })
-    return { checker, maxDeadRatio: opts.maxDeadRatio }
+    const vendorMaxDeadRatio = (this.options_.vendors ?? {})[vendorCode]?.maxDeadRatio
+    return { checker, maxDeadRatio: vendorMaxDeadRatio ?? opts.maxDeadRatio }
   }
 
   /**
@@ -373,7 +444,7 @@ class VendorSyncService extends MedusaService({
         `[vendor-sync] [${runId}] stage=staging vendor=${vendorCode}` +
           (devMaxRows ? ` devMaxRows=${devMaxRows}` : '')
       )
-      await stageFeed(adapter, descriptor, this, runId, this.logger_, devMaxRows, this.buildImageCheck())
+      await stageFeed(adapter, descriptor, this, runId, this.logger_, devMaxRows, this.buildImageCheck(vendorCode))
 
       // WB-011: honor a cancel requested during staging before diffing starts.
       if (await this.isCancelled(runId)) {
@@ -583,7 +654,7 @@ class VendorSyncService extends MedusaService({
         source_filename: descriptor.sourceFilename,
         ...(feed.kind === "file" && feed.modifyTime != null ? { source_modify_time: String(feed.modifyTime) } : {}),
       })
-      await stageFeed(adapter, descriptor, this, runId, this.logger_, this.options_.devMaxRows, this.buildImageCheck())
+      await stageFeed(adapter, descriptor, this, runId, this.logger_, this.options_.devMaxRows, this.buildImageCheck(vendorCode))
 
       // Which staged parts have a current row? Source from vendor_feed_staging
       // (ALL parts staged this run), not vendor_stock_staging (only qoh>0 rows) —

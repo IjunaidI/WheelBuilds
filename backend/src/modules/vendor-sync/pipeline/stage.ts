@@ -10,6 +10,15 @@ const BATCH_SIZE = 500
 // (`VENDOR_SYNC_IMAGE_DEAD_MAX_RATIO`, default 0.40).
 const DEFAULT_MAX_DEAD_RATIO = 0.4
 
+// WB-115 premerge Change 2: minimum-sample floor for the circuit breaker.
+// An earlier tires run checked only 2 unique URLs, found 1 dead, and its
+// summary line read "50% dead" -- a number that looks like a catalog-wide
+// image crisis but was really just proof the feed had 11 rows in it. A tiny
+// sample makes the ratio statistically meaningless in either direction, so
+// the breaker must never trip below this floor no matter how bad the ratio
+// looks.
+const DEFAULT_MIN_SAMPLE = 50
+
 interface StageResult {
   rowCount: number
   stagedCount: number
@@ -74,13 +83,26 @@ export function stageSkipReason(
  * streaming pass and can't be retroactively un-filtered once skipped.
  * `checked === 0` always returns true (nothing to distrust, and it avoids
  * dividing by zero).
+ *
+ * WB-115 premerge Change 2: `minSample` (default `DEFAULT_MIN_SAMPLE` = 50)
+ * is a floor below which the breaker may NEVER trip, regardless of ratio —
+ * `checked < minSample` short-circuits to `true` before the ratio is even
+ * computed. A tiny `checked` count makes dead/checked statistically
+ * meaningless (2 checked, 1 dead reads as a "50% crisis" that's really just
+ * a symptom of an 11-row truncated feed). This function stays pure and
+ * synchronous — it only decides trust, it never logs. The caller
+ * (`stageFeed`) is responsible for warning when the floor suppresses a trip
+ * the ratio alone would have triggered; silence there would hide a real
+ * signal.
  */
 export function shouldTrustImageChecks(
   checked: number,
   dead: number,
-  maxRatio: number
+  maxRatio: number,
+  minSample: number = DEFAULT_MIN_SAMPLE
 ): boolean {
-  if (checked > 0 && dead / checked > maxRatio) return false
+  if (checked < minSample) return true
+  if (dead / checked > maxRatio) return false
   return true
 }
 
@@ -344,6 +366,25 @@ export async function stageFeed(
         `Aborting run before diff/apply -- catalog left unchanged.`
       logger.error(message)
       throw new Error(message)
+    } else if (
+      checkedCount < DEFAULT_MIN_SAMPLE &&
+      checkedCount > 0 &&
+      deadCount / checkedCount > maxDeadRatio
+    ) {
+      // WB-115 premerge Change 2: the min-sample floor inside
+      // shouldTrustImageChecks just silently kept trusting this run -- but
+      // silence is exactly the failure mode this feature exists to prevent.
+      // The ratio alone WOULD have tripped the breaker; it's only the small
+      // sample that's holding it back, so say so explicitly rather than
+      // letting a real (if statistically unproven) signal disappear into an
+      // ordinary info-level summary line.
+      const ratio = deadCount / checkedCount
+      logger.warn(
+        `[vendor-sync] [${runId}] image reachability ratio ${deadCount}/${checkedCount} ` +
+          `(ratio=${ratio.toFixed(3)}) exceeds max=${maxDeadRatio} for vendor=${adapter.vendorCode}, ` +
+          `but the sample is too small to trust (checked=${checkedCount} < minSample=${DEFAULT_MIN_SAMPLE}) ` +
+          `-- NOT tripping the breaker.`
+      )
     }
   }
 

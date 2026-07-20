@@ -1,8 +1,12 @@
 import { mapWithConcurrency } from "./concurrency"
 
-const DEFAULT_TTL_DAYS = 7
-const DEFAULT_CONCURRENCY = 24
-const DEFAULT_TIMEOUT_MS = 10_000
+// WB-115 premerge Change 4: exported so service.ts's buildImageCheck can
+// fall back to the exact same defaults when guarding a malformed env value
+// (VENDOR_SYNC_IMAGE_TTL_DAYS / _CONCURRENCY / _TIMEOUT_MS) rather than
+// duplicating these numbers and risking drift.
+export const DEFAULT_TTL_DAYS = 7
+export const DEFAULT_CONCURRENCY = 24
+export const DEFAULT_TIMEOUT_MS = 10_000
 const MS_PER_DAY = 24 * 60 * 60 * 1000
 
 interface Logger {

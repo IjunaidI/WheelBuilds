@@ -150,6 +150,12 @@ export const VENDOR_ALLOW_SAMPLE_FEED = process.env.VENDOR_ALLOW_SAMPLE_FEED
 export const VENDOR_SYNC_IMAGE_CHECK_ENABLED = process.env.VENDOR_SYNC_IMAGE_CHECK_ENABLED
 /** WB-115: circuit-breaker threshold (dead/checked ratio) above which a run aborts rather than trusting the checks. Default 0.40. */
 export const VENDOR_SYNC_IMAGE_DEAD_MAX_RATIO = process.env.VENDOR_SYNC_IMAGE_DEAD_MAX_RATIO
+/** WB-115 premerge: how long (days) a cached "alive" image-reachability result is trusted before re-checking. Default 7. */
+export const VENDOR_SYNC_IMAGE_TTL_DAYS = process.env.VENDOR_SYNC_IMAGE_TTL_DAYS
+/** WB-115 premerge: max in-flight HEAD requests for the image-reachability checker. Default 24. */
+export const VENDOR_SYNC_IMAGE_CONCURRENCY = process.env.VENDOR_SYNC_IMAGE_CONCURRENCY
+/** WB-115 premerge: per-request timeout (ms) for one image-reachability HEAD probe. Default 10000. */
+export const VENDOR_SYNC_IMAGE_TIMEOUT_MS = process.env.VENDOR_SYNC_IMAGE_TIMEOUT_MS
 
 export const VENDOR_WHEELPROS_WHEELS_ENABLED = process.env.VENDOR_WHEELPROS_WHEELS_ENABLED
 export const VENDOR_WHEELPROS_WHEEL_FEED_PATH = process.env.VENDOR_WHEELPROS_WHEEL_FEED_PATH

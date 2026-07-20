@@ -48,6 +48,9 @@ import {
   VENDOR_ALLOW_SAMPLE_FEED,
   VENDOR_SYNC_IMAGE_CHECK_ENABLED,
   VENDOR_SYNC_IMAGE_DEAD_MAX_RATIO,
+  VENDOR_SYNC_IMAGE_TTL_DAYS,
+  VENDOR_SYNC_IMAGE_CONCURRENCY,
+  VENDOR_SYNC_IMAGE_TIMEOUT_MS,
   WHEEL_SIZE_API_KEY,
   WHEEL_SIZE_BASE_URL,
   WHEEL_SIZE_REGION,
@@ -227,17 +230,44 @@ const medusaConfig = {
         imageCheck: {
           enabled: VENDOR_SYNC_IMAGE_CHECK_ENABLED !== 'false',
           maxDeadRatio: parseFloat(VENDOR_SYNC_IMAGE_DEAD_MAX_RATIO ?? '0.40'),
+          // WB-115 premerge Change 4: these were typed and threaded into the
+          // checker (pipeline/image-reachability.ts) from day one but never
+          // actually wired to an env var here -- they were permanently stuck
+          // at the checker's own defaults (7 days / 24 / 10000ms) with no
+          // way to override in production. A malformed value (e.g. a typo'd
+          // env var parsing to NaN) is guarded in service.ts's
+          // buildImageCheck (Number.isFinite + fallback + warn), mirroring
+          // maxDeadRatio's guard in pipeline/stage.ts.
+          ttlDays: parseInt(VENDOR_SYNC_IMAGE_TTL_DAYS ?? '7', 10),
+          concurrency: parseInt(VENDOR_SYNC_IMAGE_CONCURRENCY ?? '24', 10),
+          timeoutMs: parseInt(VENDOR_SYNC_IMAGE_TIMEOUT_MS ?? '10000', 10),
         },
         vendors: {
           'wheelpros-wheels': {
             enabled: VENDOR_WHEELPROS_WHEELS_ENABLED === 'true',
             feedPath: VENDOR_WHEELPROS_WHEEL_FEED_PATH,
             sftp: wheelSftp,
+            // WB-115 premerge: two live dry-runs against the real production
+            // feeds (2026-07-20) measured 313/3,914 unique image URLs dead
+            // (8.0%). Keep the global default (0.40) -- 5x headroom above
+            // the measured baseline.
+            maxDeadRatio: 0.40,
           },
           'wheelpros-tires': {
             enabled: VENDOR_WHEELPROS_TIRES_ENABLED === 'true',
             feedPath: VENDOR_WHEELPROS_TIRE_FEED_PATH,
             sftp: tireSftp,
+            // WB-115 premerge: the same dry-run measured 103/216 unique tire
+            // image URLs dead (47.7%) -- WheelPros genuinely ships dead
+            // placeholder URLs for about half their tire lines; this is a
+            // TRUE baseline, not a checker malfunction. Business decision
+            // (client, explicit): no products without images are allowed,
+            // tires included, even though gating on this drops ~35% of the
+            // tire catalog (397/1,131 products). 0.70 leaves headroom above
+            // the measured 47.7% baseline while still tripping on a
+            // catastrophic (~100%) CDN failure. Do NOT raise to 1.0 or
+            // disable the breaker for tires.
+            maxDeadRatio: 0.70,
           },
         },
       },

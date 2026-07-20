@@ -161,8 +161,11 @@ describe("stageFeed (WB-115 Task 3 — image reachability wiring)", () => {
   })
 
   it("a distrusted run raises rather than silently staging a gutted feed", async () => {
-    // 3 rows, all dead, maxDeadRatio 0.4 -> 3/3 = 1.0 > 0.4 -> distrust.
-    const rows = [makeNormalized("A"), makeNormalized("B"), makeNormalized("C")]
+    // 60 rows (each a distinct URL), all dead, maxDeadRatio 0.4 -> 60/60 =
+    // 1.0 > 0.4 -> distrust. Must clear the WB-115 premerge Change 2
+    // minimum-sample floor (50) or the breaker can never trip regardless of
+    // ratio -- see the dedicated below-the-floor test for that behavior.
+    const rows = Array.from({ length: 60 }, (_, i) => makeNormalized(`R${i}`))
     const adapter = makeAdapter(rows)
     const service = makeFakeService()
     const logger = makeLogger()
@@ -344,7 +347,9 @@ describe("stageFeed (WB-115 Task 3 — image reachability wiring)", () => {
   // parses (via parseFloat upstream in medusa-config.js) to NaN, and
   // `dead/checked > NaN` is always false -- silently disabling the breaker.
   it("falls back to the default max-dead-ratio and warns when maxDeadRatio is not finite", async () => {
-    const rows = [makeNormalized("A"), makeNormalized("B"), makeNormalized("C")]
+    // 60 rows to clear the WB-115 premerge Change 2 minimum-sample floor
+    // (50) -- see the note on the previous test.
+    const rows = Array.from({ length: 60 }, (_, i) => makeNormalized(`R${i}`))
     const adapter = makeAdapter(rows)
     const service = makeFakeService()
     const logger = makeLogger()
@@ -358,7 +363,41 @@ describe("stageFeed (WB-115 Task 3 — image reachability wiring)", () => {
     ).rejects.toThrow(/circuit breaker tripped/)
 
     // Trips at the fallback default (0.4), proving NaN did NOT silently
-    // disable the breaker (3/3 dead = 1.0 > 0.4).
+    // disable the breaker (60/60 dead = 1.0 > 0.4).
     expect(logger.warn).toHaveBeenCalledWith(expect.stringMatching(/invalid maxDeadRatio/i))
+  })
+
+  // WB-115 premerge Change 2: minimum-sample floor. A run this small (2
+  // unique URLs) must not abort even at a 100% dead ratio -- but it must not
+  // fail SILENTLY either, since a ratio this bad is still a real (if
+  // statistically unproven) signal worth a loud warning.
+  it("a tiny sample (below the 50-URL floor) with a terrible ratio does not trip the breaker, but warns explicitly", async () => {
+    const rows = [makeNormalized("A"), makeNormalized("B")]
+    const adapter = makeAdapter(rows)
+    const service = makeFakeService()
+    const logger = makeLogger()
+    const allUrls = rows.map((r) => r.imageUrl as string)
+    // Both of the 2 checked URLs are dead -- 100% ratio, which would trip
+    // any sane maxDeadRatio -- but only 2 URLs were checked, well below the
+    // 50-URL floor.
+    const checker = makeStubChecker(new Set(allUrls))
+    const imageCheck: StageImageCheckOptions = { checker, maxDeadRatio: 0.4 }
+
+    const result = await stageFeed(adapter, {} as any, service, "run_1", logger, undefined, imageCheck)
+
+    // The run must NOT abort: both rows are dropped individually (fail-open
+    // stays row-scoped), but the run completes rather than throwing.
+    expect(result.imageChecksDistrusted).toBe(false)
+    expect(result.skippedImageUnreachableCount).toBe(2)
+    expect(logger.error).not.toHaveBeenCalled()
+
+    // But the small-sample suppression must be logged loudly, not silently.
+    expect(logger.warn).toHaveBeenCalledWith(
+      expect.stringMatching(/too small to trust/i)
+    )
+    const warnMsg = logger.warn.mock.calls
+      .map((call: any[]) => call[0])
+      .find((msg: string) => /too small to trust/i.test(msg))
+    expect(warnMsg).toMatch(/2\/2/)
   })
 })

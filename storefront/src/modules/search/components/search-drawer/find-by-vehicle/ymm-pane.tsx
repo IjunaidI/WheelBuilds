@@ -381,7 +381,7 @@ const YmmPane = ({ onClose }: YmmPaneProps) => {
             ))}
           </Select>
         </Field>
-        <Field label="Trim" htmlFor="ymm-trim">
+        <Field label="Sub-model" htmlFor="ymm-trim">
           <Select
             id="ymm-trim"
             value={subModel}
@@ -393,8 +393,8 @@ const YmmPane = ({ onClose }: YmmPaneProps) => {
               {!year
                 ? "Select year first"
                 : loadingMods
-                ? "Loading trims…"
-                : "Select trim"}
+                ? "Loading sub-models…"
+                : "Select sub-model"}
             </option>
             {subModelOptions.map((t) => (
               <option key={t.value} value={t.value}>

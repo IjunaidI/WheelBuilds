@@ -30,6 +30,41 @@ describe("buildFinishOptions", () => {
   })
 })
 
+// WB-115 final review Finding 2 — a variant flagged metadata.discontinued
+// (e.g. a dead vendor image dropped its feed row but the group survived)
+// must never appear as a selectable finish/size, even though the variant
+// record itself is still on the product.
+describe("buildFinishOptions — discontinued exclusion (WB-115 final review Finding 2)", () => {
+  it("drops a finish entirely when its only variant is discontinued, keeping a surviving finish selectable", () => {
+    const dead = variant("Matte Black", "b.jpg", 20)
+    ;(dead.metadata as any).discontinued = true
+    const alive = variant("Gloss Silver", "s.jpg", 22)
+
+    const out = buildFinishOptions([dead, alive], 30)
+
+    expect(out.map((f) => f.raw)).toEqual(["Gloss Silver"])
+  })
+
+  it("keeps a finish selectable but drops only its discontinued variant from the size matrix", () => {
+    const dead = variant("Matte Black", "b.jpg", 20)
+    ;(dead.metadata as any).discontinued = true
+    const alive = variant("Matte Black", "b.jpg", 22)
+
+    const out = buildFinishOptions([dead, alive], 30)
+
+    expect(out).toHaveLength(1)
+    expect(out[0].sizeOptions).toHaveLength(1)
+    expect(out[0].sizeOptions[0].diameter).toBe(22)
+  })
+
+  it("returns [] (not a crash) when every variant on the product is discontinued", () => {
+    const dead = variant("Matte Black", "b.jpg", 20)
+    ;(dead.metadata as any).discontinued = true
+
+    expect(buildFinishOptions([dead], 30)).toEqual([])
+  })
+})
+
 // WB-074 D6 — card mappers (related products, home Featured) need the
 // normalized finish UNION without the full per-finish size-matrix cost of
 // buildFinishOptions, and must OMIT (not default to "black") when no variant

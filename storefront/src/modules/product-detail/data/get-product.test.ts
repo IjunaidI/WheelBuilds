@@ -100,3 +100,52 @@ describe("getProductDetail — WB-084 image gate", () => {
     await expect(getProductDetail("p2", "us")).resolves.toMatchObject({ id: "p2" })
   })
 })
+
+describe("getProductDetail — discontinued variant exclusion (WB-115 final review Finding 2)", () => {
+  it("excludes a discontinued finish from finishOptions and its size from sizeOptions, keeping the surviving finish/size selectable", async () => {
+    const dead = variant({
+      finish: "Matte Black",
+      discontinued: true,
+      wheel_diameter_in: 20,
+      wheel_width_in: 9,
+      offset_mm: 18,
+      bolt_pattern_raw: "5x114.3",
+      image_url: "https://cdn.example.com/dead.jpg",
+    })
+    const alive = variant({
+      finish: "Gloss Silver",
+      wheel_diameter_in: 22,
+      wheel_width_in: 10,
+      offset_mm: 24,
+      bolt_pattern_raw: "5x114.3",
+      image_url: "https://cdn.example.com/alive.jpg",
+    })
+    ;(getProductByHandle as any).mockResolvedValueOnce(
+      product([dead, alive], { thumbnail: "https://cdn.example.com/thumb.jpg" })
+    )
+
+    const detail = (await getProductDetail("p1", "us")) as any
+
+    expect(detail.finishOptions.map((f: any) => f.raw)).toEqual(["Gloss Silver"])
+    expect(detail.sizeOptions.map((s: any) => s.diameter)).toEqual([22])
+  })
+
+  it("does not crash and degrades to empty finish/size options when every variant is discontinued", async () => {
+    const dead = variant({
+      finish: "Matte Black",
+      discontinued: true,
+      wheel_diameter_in: 20,
+      wheel_width_in: 9,
+      offset_mm: 18,
+      bolt_pattern_raw: "5x114.3",
+    })
+    ;(getProductByHandle as any).mockResolvedValueOnce(
+      product([dead], { thumbnail: "https://cdn.example.com/thumb.jpg" })
+    )
+
+    const detail = (await getProductDetail("p1", "us")) as any
+
+    expect(detail.finishOptions).toEqual([])
+    expect(detail.sizeOptions).toEqual([])
+  })
+})

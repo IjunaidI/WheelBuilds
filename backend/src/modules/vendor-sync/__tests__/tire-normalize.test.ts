@@ -89,8 +89,15 @@ describe('parseTireSize', () => {
     expect(parseTireSize('255/35ZR19 FK453 (96Y) XL BLK 2553519').sizeToken).toBe('255/35ZR19')
   })
 
-  it('exposes the matched size token (LT inch)', () => {
-    expect(parseTireSize('WDPEAK AT4W LT37X12.50R18 128R E').sizeToken).toBe('LT37X12.50R18')
+  it('exposes the CANONICAL size token (LT inch — service designation stripped)', () => {
+    // The inch branch rebuilds sizeToken from its parts so that every spelling
+    // of one physical size lands on one facet value: "LT37X12.50R18",
+    // "37X12.50R18LT" and "LT37X12.50-18" all canonicalize to "37X12.50R18".
+    // The designation is not lost — it moves to tirePrefix, which is what
+    // classifyTireType reads for the light-truck facet.
+    const r = parseTireSize('WDPEAK AT4W LT37X12.50R18 128R E')
+    expect(r.sizeToken).toBe('37X12.50R18')
+    expect(r.tirePrefix).toBe('LT')
   })
 
   it('exposes the matched size token (bias, excludes ply)', () => {

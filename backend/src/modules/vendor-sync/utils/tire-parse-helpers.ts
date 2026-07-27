@@ -73,17 +73,33 @@ export function parseTireSize(description: string): TireSizeResult {
     return { ...NULL_RESULT }
   }
 
-  const desc = description.trim()
+  // The feed occasionally uses the UNICODE multiplication sign in an inch size
+  // ("TRAIL GRAP 37×12.50R18LT"). Fold it to a plain X up front so every
+  // pattern below sees one spelling instead of each needing [xX×].
+  const desc = description.trim().replace(/×/g, "X")
 
   // --- Pattern 1: Metric format ---
-  // Matches: 235/55ZR17, 305/45R22, 255/35ZR19
+  // Matches: 235/55ZR17, 305/45R22, 255/35ZR19, LT325/60T18
   // May appear after a prefix like "WDPEAK AT4W "
   // Optional prefix: (P|LT|ST)?
+  //
+  // T joins the construction class for sizes like "LT325/60T18": strictly the
+  // T is an embedded speed symbol rather than a construction code, but every
+  // other field (width/aspect/rim) parses correctly and recording
+  // constructionType "T" is far better than discarding the whole size.
+  // The trailing group covers "225/60R18XL" (load-range marker) and
+  // "375/45R24LT" (service designation after the rim, the metric twin of what
+  // Pattern 2 handles) -- both previously failed the \b after the rim digits.
+  // The leading "-" alternative covers "MOTIVO 365-245/45R20", where the model
+  // name is hyphenated straight onto the size.
   const metricMatch = desc.match(
-    /(?:^|[\s])(P|LT|ST)?(\d{2,3})\/(\d{2,3})(Z?)(R|B|D)(\d{2})\b/
+    /(?:^|[\s-])(P|LT|ST)?(\d{2,3})\/(\d{2,3})(Z?)(R|B|D|T)(\d{2})(XL|LT|P|ST)?\b/
   )
   if (metricMatch) {
-    const tirePrefix = metricMatch[1] || null
+    // XL is a load range, not a service type -- it must not become tirePrefix
+    // (classifyTireType reads that, and "XL" is neither P nor LT).
+    const trailing = metricMatch[7] && metricMatch[7] !== "XL" ? metricMatch[7] : null
+    const tirePrefix = metricMatch[1] || trailing
     const tireWidthMm = parseInt(metricMatch[2], 10)
     const aspectRatio = parseInt(metricMatch[3], 10)
     // Z is a speed rating modifier, construction type is R/B/D
@@ -91,8 +107,14 @@ export function parseTireSize(description: string): TireSizeResult {
     const rimDiameterIn = parseInt(metricMatch[6], 10)
 
     // Find load/speed/ply in the text after the size match
-    const afterSize = desc.slice(desc.indexOf(metricMatch[0]) + metricMatch[0].length)
+    const afterSize = desc.slice(metricMatch.index! + metricMatch[0].length)
     const { loadIndex, speedRating, plyRating } = parseLoadSpeedPly(afterSize)
+
+    // Rebuilt rather than echoed so the match's leading boundary ("-") and any
+    // trailing XL/LT marker stay out of the token. Byte-identical to the old
+    // `metricMatch[0].trim()` for every form that already parsed: a LEADING
+    // prefix is still kept ("LT265/70R17"), unlike the inch branch below.
+    const sizeToken = `${metricMatch[1] ?? ""}${tireWidthMm}/${aspectRatio}${metricMatch[4]}${constructionType}${rimDiameterIn}`
 
     return {
       tireWidthMm,
@@ -103,15 +125,17 @@ export function parseTireSize(description: string): TireSizeResult {
       speedRating,
       plyRating,
       tirePrefix,
-      sizeToken: metricMatch[0].trim(),
+      sizeToken,
     }
   }
 
   // --- Pattern 1b: Dash-metric radial (size written with a dash instead of R) ---
   // Matches: 285/45-22, 285/45-22 114H  (WWW/AA-RR). The slash distinguishes it
   // from bias sizes (12.4-24, no slash). Canonicalized to radial "R".
+  // The optional Z covers "MS932 XP+ 265/35Z-22 102W" -- the same speed
+  // modifier Pattern 1 already tolerates, just on the dash spelling.
   const dashMetricMatch = desc.match(
-    /(?:^|[\s])(P|LT|ST)?(\d{2,3})\/(\d{2,3})-(\d{2})\b/
+    /(?:^|[\s])(P|LT|ST)?(\d{2,3})\/(\d{2,3})Z?-(\d{2})\b/
   )
   if (dashMetricMatch) {
     const tirePrefix = dashMetricMatch[1] || null
@@ -152,23 +176,35 @@ export function parseTireSize(description: string): TireSizeResult {
   // already-indexed leading-form row byte-identical. The designation is not lost
   // either way: it is captured into tirePrefix, which is what classifyTireType
   // reads for the light-truck/passenger facet.
+  // The separator class also accepts "-": WheelPros writes the SAME flotation
+  // size both ways ("35X12.50R20" and "LT35X12.50-20"), and the dash spelling
+  // alone accounted for 190 of the 215 unparsed staged rows in the 2026-07-27
+  // tires dry-run. Canonicalized to radial "R", mirroring Pattern 1b's
+  // dash-metric precedent, so both spellings collapse to ONE facet value.
   const ltMatch = desc.match(
-    /(?:^|[\s])(LT|P|ST)?(\d+\.?\d*)[xX](\d+\.?\d*)(R|B|D)(\d{2})(LT|P|ST)?\b/
+    /(?:^|[\s])(LT|P|ST)?(\d+\.?\d*)[xX](\d+\.?\d*)(R|B|D|T|-)(\d{2})(LT|P|ST)?\b/
   )
   if (ltMatch) {
     const trailingPrefix = ltMatch[6] || null
     const tirePrefix = ltMatch[1] || trailingPrefix
+    const separator = ltMatch[4]
     // In inch format, the first number is overall diameter, not width in mm
-    const constructionType = ltMatch[4]
+    const constructionType = separator === "-" ? "R" : separator
     const rimDiameterIn = parseInt(ltMatch[5], 10)
 
     const afterSize = desc.slice(ltMatch.index! + ltMatch[0].length)
     const { loadIndex, speedRating, plyRating } = parseLoadSpeedPly(afterSize)
 
-    const matched = ltMatch[0].trim()
-    const sizeToken = trailingPrefix
-      ? matched.slice(0, matched.length - trailingPrefix.length)
-      : matched
+    // sizeToken is rebuilt from the parts rather than echoed from the match,
+    // so every spelling of one physical size lands on ONE canonical value:
+    // the service designation is dropped (it survives in tirePrefix, which is
+    // what classifyTireType reads) and the separator is normalized to R.
+    // "LT35X12.50-20", "35X12.50R20LT" and "LT35X12.50R20" all become
+    // "35X12.50R20". This DOES restate previously-indexed leading-prefix rows
+    // -- deliberately: it is a one-time canonicalization that must land in the
+    // same apply as the WB-115 dead-image cleanup, because doing it later
+    // would rewrite the Size variant axis on rows that had already shipped.
+    const sizeToken = `${ltMatch[2]}X${ltMatch[3]}${constructionType}${ltMatch[5]}`
 
     return {
       tireWidthMm: null,
@@ -180,6 +216,48 @@ export function parseTireSize(description: string): TireSizeResult {
       plyRating,
       tirePrefix,
       sizeToken,
+    }
+  }
+
+  // --- Pattern 2b: slash-inch (drag / rock-crawler) format ---
+  // Matches: 29.0/10.5R18, 18.5/39R17LT, 17/49-20LT, 19.5/54-20LT
+  // Overall diameter / section width / rim, all in INCHES -- so it must never
+  // be read as metric (a 29mm-wide tire), which is why it returns null
+  // tireWidthMm/aspectRatio like Pattern 2 rather than filling them in.
+  //
+  // Ordering is load-bearing: this sits BELOW Patterns 1 and 1b so a genuine
+  // metric size is always claimed by them first. The guard below is the
+  // tiebreak for what reaches here: a real metric width is a 3-digit integer
+  // (185-355), whereas these inch heights are 2 digits or carry a decimal.
+  const slashInchMatch = desc.match(
+    /(?:^|[\s])(LT|P|ST)?(\d+\.?\d*)\/(\d+\.?\d*)(R|B|D|-)(\d{2})(LT|P|ST)?\b/
+  )
+  if (slashInchMatch) {
+    const height = slashInchMatch[2]
+    const isInch = height.includes(".") || height.replace(/\D/g, "").length <= 2
+    if (isInch) {
+      const trailingPrefix = slashInchMatch[6] || null
+      const tirePrefix = slashInchMatch[1] || trailingPrefix
+      const separator = slashInchMatch[4]
+      const constructionType = separator === "-" ? "R" : separator
+      const rimDiameterIn = parseInt(slashInchMatch[5], 10)
+
+      const afterSize = desc.slice(
+        slashInchMatch.index! + slashInchMatch[0].length
+      )
+      const { loadIndex, speedRating, plyRating } = parseLoadSpeedPly(afterSize)
+
+      return {
+        tireWidthMm: null,
+        aspectRatio: null,
+        constructionType,
+        rimDiameterIn,
+        loadIndex,
+        speedRating,
+        plyRating,
+        tirePrefix,
+        sizeToken: `${height}/${slashInchMatch[3]}${constructionType}${slashInchMatch[5]}`,
+      }
     }
   }
 

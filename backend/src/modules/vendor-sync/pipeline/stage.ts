@@ -1,8 +1,19 @@
 import { VendorAdapter, VendorFeedDescriptor } from '../adapters/types'
 import { computeContentHash } from '../utils/hash'
 import { ImageReachabilityChecker } from './image-reachability'
+import { summarizeNormalizationError } from './normalization-error'
 
 const BATCH_SIZE = 500
+
+// Per-row normalization warnings emitted before falling back to the
+// end-of-run aggregate. A production wheels run rejects ~65 rows out of
+// ~40k, every run, for the same handful of reasons (empty BoltPattern on
+// display units and accessories, unparseable Size). Printing each one --
+// previously as the raw ZodError, i.e. ~13 lines of JSON apiece -- buried
+// the summary line under hundreds of lines of noise without telling an
+// operator anything the aggregate doesn't. A few concrete examples are
+// still worth having for debugging, hence a cap rather than silence.
+const MAX_NORMALIZATION_WARNINGS = 5
 
 // WB-115: default circuit-breaker threshold, applied when a caller passes an
 // `imageCheck` block without an explicit `maxDeadRatio` (e.g. module options
@@ -25,6 +36,12 @@ interface StageResult {
   skippedNoImageCount: number
   skippedInvalidPriceCount: number
   skippedImageUnreachableCount: number
+  // Rows the adapter refused to normalize. Previously counted nowhere at all,
+  // which left the "Staging complete" line failing to balance: a real run read
+  // 40,475 parsed / 31,432 staged / 6,705 no-image / 0 price / 2,273
+  // unreachable, and the missing 65 rows were invisible unless you did the
+  // subtraction by hand.
+  skippedNormalizationCount: number
   imageChecksDistrusted: boolean
 }
 
@@ -151,8 +168,18 @@ export async function stageFeed(
   let skippedNoImageCount = 0
   let skippedInvalidPriceCount = 0
   let skippedImageUnreachableCount = 0
+  let skippedNormalizationCount = 0
   let imageChecksDistrusted = false
   let truncated = false
+
+  // reason -> { count, firstPartNumber }. Keyed by the SUMMARIZED reason
+  // (see normalization-error.ts) precisely because that string is stable
+  // across rows failing the same way, which is what makes the aggregate
+  // meaningful.
+  const normalizationFailures = new Map<
+    string,
+    { count: number; firstPartNumber: string }
+  >()
 
   // WB-115 circuit-breaker accumulators. The breaker is a self-distrust
   // guard on the CHECKER, not a catalog-impact guard (that job belongs to
@@ -300,9 +327,22 @@ export async function stageFeed(
     try {
       normalized = adapter.normalize(parsedRow)
     } catch (err: any) {
-      logger.warn(
-        `Skipping row ${parsedRow.partNumber}: normalization failed: ${err.message}`
-      )
+      skippedNormalizationCount++
+      const reason = summarizeNormalizationError(err)
+      const seen = normalizationFailures.get(reason)
+      if (seen) {
+        seen.count++
+      } else {
+        normalizationFailures.set(reason, {
+          count: 1,
+          firstPartNumber: parsedRow.partNumber,
+        })
+      }
+      if (skippedNormalizationCount <= MAX_NORMALIZATION_WARNINGS) {
+        logger.warn(
+          `Skipping row ${parsedRow.partNumber}: normalization failed: ${reason}`
+        )
+      }
       continue
     }
 
@@ -392,10 +432,35 @@ export async function stageFeed(
   // Task 2's checker already warns on individual timeout/error probes, so
   // stage.ts must not add a second per-row log source on top of that (a full
   // CDN outage would otherwise emit thousands of lines per run).
+  // One aggregated line per distinct failure reason, replacing the former
+  // one-warning-per-row firehose. Sorted by count so the dominant reason is
+  // first, with a sample part number to make any single case reproducible.
+  if (normalizationFailures.size > 0) {
+    const byFrequency = [...normalizationFailures.entries()].sort(
+      (a, b) => b[1].count - a[1].count
+    )
+    const suppressed = Math.max(
+      0,
+      skippedNormalizationCount - MAX_NORMALIZATION_WARNINGS
+    )
+    logger.warn(
+      `Normalization skipped ${skippedNormalizationCount} of ${rowCount} rows ` +
+        `across ${normalizationFailures.size} distinct reason(s)` +
+        (suppressed > 0
+          ? ` (${suppressed} per-row warning(s) suppressed after the first ${MAX_NORMALIZATION_WARNINGS})`
+          : '') +
+        `: ` +
+        byFrequency
+          .map(([reason, { count, firstPartNumber }]) => `${count}x ${reason} (e.g. ${firstPartNumber})`)
+          .join(' | ')
+    )
+  }
+
   logger.info(
     `Staging complete: ${rowCount} rows parsed, ${stagedCount} staged, ` +
       `${skippedNoImageCount} skipped (no image), ${skippedInvalidPriceCount} skipped (invalid price), ` +
-      `${skippedImageUnreachableCount} skipped (image unreachable)` +
+      `${skippedImageUnreachableCount} skipped (image unreachable), ` +
+      `${skippedNormalizationCount} skipped (normalization)` +
       (imageCheck ? ` [image checks: ${checkedCount} checked, ${deadCount} dead]` : '') +
       (truncated ? ` [TRUNCATED to maxRows=${maxRows} — dev mode]` : '')
   )
@@ -406,6 +471,7 @@ export async function stageFeed(
     skippedNoImageCount,
     skippedInvalidPriceCount,
     skippedImageUnreachableCount,
+    skippedNormalizationCount,
     imageChecksDistrusted,
   }
 }

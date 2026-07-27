@@ -136,6 +136,7 @@ describe("stageFeed (WB-115 Task 3 — image reachability wiring)", () => {
       skippedNoImageCount: 1,
       skippedInvalidPriceCount: 1,
       skippedImageUnreachableCount: 0,
+      skippedNormalizationCount: 0,
       imageChecksDistrusted: false,
     })
     expect(service.feedStagingRows.map((r) => r.part_number).sort()).toEqual(["A", "D"])
@@ -399,5 +400,142 @@ describe("stageFeed (WB-115 Task 3 — image reachability wiring)", () => {
       .map((call: any[]) => call[0])
       .find((msg: string) => /too small to trust/i.test(msg))
     expect(warnMsg).toMatch(/2\/2/)
+  })
+})
+
+describe("stageFeed normalization-failure accounting", () => {
+  /** Adapter that yields `total` rows, of which the ones whose part number is
+   *  in `failing` throw the supplied error out of normalize(). */
+  function makeFailingAdapter(
+    rows: WheelNormalizedRecord[],
+    failing: Map<string, Error>
+  ): VendorAdapter {
+    const byPartNumber = new Map(rows.map((r) => [r.partNumber, r]))
+    return {
+      vendorCode: "test-vendor",
+      async fetch() {
+        throw new Error("not used")
+      },
+      async *parse(): AsyncIterable<ParsedRow> {
+        for (const row of rows) {
+          yield { partNumber: row.partNumber, raw: {}, warehouseColumns: [] }
+        }
+      },
+      normalize(row: ParsedRow) {
+        const failure = failing.get(row.partNumber)
+        if (failure) throw failure
+        return byPartNumber.get(row.partNumber)!
+      },
+      async submitPurchaseOrder(): Promise<never> {
+        throw new Error("not used")
+      },
+    }
+  }
+
+  function boltPatternZodError(): Error {
+    const err: any = new Error("[\n  {\n    \"code\": \"too_small\"\n  }\n]")
+    err.issues = [
+      { code: "too_small", message: "BoltPattern is required", path: ["BoltPattern"] },
+    ]
+    return err
+  }
+
+  it("counts skipped rows so the summary line balances", async () => {
+    const rows = Array.from({ length: 10 }, (_, i) => makeNormalized(`P${i}`))
+    const failing = new Map<string, Error>([
+      ["P1", boltPatternZodError()],
+      ["P2", boltPatternZodError()],
+      ["P3", new Error('Invalid size format: "18"')],
+    ])
+    const adapter = makeFailingAdapter(rows, failing)
+    const service = makeFakeService()
+    const logger = makeLogger()
+
+    const result = await stageFeed(adapter, {} as any, service, "run_1", logger)
+
+    expect(result.rowCount).toBe(10)
+    expect(result.stagedCount).toBe(7)
+    expect(result.skippedNormalizationCount).toBe(3)
+
+    // The whole point: parsed must equal staged + every skip bucket.
+    expect(
+      result.stagedCount +
+        result.skippedNoImageCount +
+        result.skippedInvalidPriceCount +
+        result.skippedImageUnreachableCount +
+        result.skippedNormalizationCount
+    ).toBe(result.rowCount)
+
+    const summary = logger.info.mock.calls
+      .map((c: any[]) => c[0])
+      .find((m: string) => /Staging complete/.test(m))
+    expect(summary).toMatch(/3 skipped \(normalization\)/)
+  })
+
+  it("caps per-row warnings and aggregates the rest by reason", async () => {
+    // 30 rows failing the SAME way -- the production shape (56x
+    // "BoltPattern is required" in one run).
+    const rows = Array.from({ length: 40 }, (_, i) => makeNormalized(`P${i}`))
+    const failing = new Map<string, Error>()
+    for (let i = 0; i < 30; i++) failing.set(`P${i}`, boltPatternZodError())
+    const adapter = makeFailingAdapter(rows, failing)
+    const service = makeFakeService()
+    const logger = makeLogger()
+
+    const result = await stageFeed(adapter, {} as any, service, "run_1", logger)
+    expect(result.skippedNormalizationCount).toBe(30)
+
+    const perRow = logger.warn.mock.calls
+      .map((c: any[]) => c[0])
+      .filter((m: string) => /^Skipping row /.test(m))
+    expect(perRow).toHaveLength(5)
+    // The raw ZodError JSON must never reach the log again.
+    for (const msg of perRow) {
+      expect(msg).not.toContain("\n")
+      expect(msg).toContain("BoltPattern: BoltPattern is required")
+    }
+
+    const aggregate = logger.warn.mock.calls
+      .map((c: any[]) => c[0])
+      .find((m: string) => /^Normalization skipped/.test(m))
+    expect(aggregate).toContain("30 of 40 rows")
+    expect(aggregate).toContain("1 distinct reason(s)")
+    expect(aggregate).toContain("25 per-row warning(s) suppressed")
+    expect(aggregate).toContain("30x BoltPattern: BoltPattern is required")
+  })
+
+  it("orders distinct reasons by frequency", async () => {
+    const rows = Array.from({ length: 20 }, (_, i) => makeNormalized(`P${i}`))
+    const failing = new Map<string, Error>()
+    for (let i = 0; i < 3; i++) failing.set(`P${i}`, new Error('Invalid size format: "18"'))
+    for (let i = 3; i < 12; i++) failing.set(`P${i}`, boltPatternZodError())
+    const adapter = makeFailingAdapter(rows, failing)
+    const logger = makeLogger()
+
+    await stageFeed(adapter, {} as any, makeFakeService(), "run_1", logger)
+
+    const aggregate = logger.warn.mock.calls
+      .map((c: any[]) => c[0])
+      .find((m: string) => /^Normalization skipped/.test(m))
+    expect(aggregate).toContain("2 distinct reason(s)")
+    // 9x BoltPattern must precede 3x Invalid size format.
+    expect(aggregate.indexOf("9x BoltPattern")).toBeLessThan(
+      aggregate.indexOf('3x Invalid size format')
+    )
+  })
+
+  it("logs no aggregate line at all when every row normalizes", async () => {
+    const rows = Array.from({ length: 5 }, (_, i) => makeNormalized(`P${i}`))
+    const adapter = makeFailingAdapter(rows, new Map())
+    const logger = makeLogger()
+
+    const result = await stageFeed(adapter, {} as any, makeFakeService(), "run_1", logger)
+
+    expect(result.skippedNormalizationCount).toBe(0)
+    expect(
+      logger.warn.mock.calls
+        .map((c: any[]) => c[0])
+        .filter((m: string) => /^Normalization skipped/.test(m))
+    ).toHaveLength(0)
   })
 })

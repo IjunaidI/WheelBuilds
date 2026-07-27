@@ -39,7 +39,12 @@ function parseLoadSpeedPly(suffix: string): {
   // Pattern: 2-3 digits followed by a single letter (speed rating),
   // then optionally whitespace and a single uppercase letter (ply/load range).
   // The \b before digits ensures we don't match mid-word numeric substrings.
-  const match = trimmed.match(/(?:^|\s)(\d{2,3})([A-Z])\b(?:\s+([A-Z])\b)?/)
+  //
+  // The optional "/" between the digits and the speed letter covers the feed's
+  // "123/Q" / "124/Q" / "121/Q" spelling of a service description. Without it
+  // both loadIndex and speedRating silently came back null on rows whose size
+  // parsed perfectly well.
+  const match = trimmed.match(/(?:^|\s)(\d{2,3})\/?([A-Z])\b(?:\s+([A-Z])\b)?/)
   if (!match) {
     return { loadIndex: null, speedRating: null, plyRating: null }
   }
@@ -130,19 +135,40 @@ export function parseTireSize(description: string): TireSizeResult {
     }
   }
 
-  // --- Pattern 2: LT/inch format ---
-  // Matches: LT37X12.50R18, P265X70R17, 33X12.50R15
+  // --- Pattern 2: LT/inch (flotation) format ---
+  // Matches: LT37X12.50R18, P265X70R17, 33X12.50R15, and the TRAILING-service
+  // spelling WheelPros actually ships for flotation lines: 33x12.50R20LT.
+  //
+  // The trailing group is why this pattern needed widening. The old regex ended
+  // at `(\d{2})\b`, and with "LT" glued straight onto the rim digits there is no
+  // word boundary after "20" -- so every "33x12.50R20LT" row fell through all
+  // three patterns to the all-null result. That is not a cosmetic log warning:
+  // a null sizeToken makes tireSizeLabel() fall back to the raw part number as
+  // the variant axis, and the tire indexes with no canonical_size, no
+  // rim/width/aspect facets and no fit_specs entry -- i.e. unfindable by size.
+  //
+  // sizeToken deliberately EXCLUDES a trailing service designation (-> "33x12.50R20")
+  // but preserves a leading one (-> "LT37X12.50R18"), which keeps every
+  // already-indexed leading-form row byte-identical. The designation is not lost
+  // either way: it is captured into tirePrefix, which is what classifyTireType
+  // reads for the light-truck/passenger facet.
   const ltMatch = desc.match(
-    /(?:^|[\s])(LT|P|ST)?(\d+\.?\d*)[xX](\d+\.?\d*)(R|B|D)(\d{2})\b/
+    /(?:^|[\s])(LT|P|ST)?(\d+\.?\d*)[xX](\d+\.?\d*)(R|B|D)(\d{2})(LT|P|ST)?\b/
   )
   if (ltMatch) {
-    const tirePrefix = ltMatch[1] || null
+    const trailingPrefix = ltMatch[6] || null
+    const tirePrefix = ltMatch[1] || trailingPrefix
     // In inch format, the first number is overall diameter, not width in mm
     const constructionType = ltMatch[4]
     const rimDiameterIn = parseInt(ltMatch[5], 10)
 
-    const afterSize = desc.slice(desc.indexOf(ltMatch[0]) + ltMatch[0].length)
+    const afterSize = desc.slice(ltMatch.index! + ltMatch[0].length)
     const { loadIndex, speedRating, plyRating } = parseLoadSpeedPly(afterSize)
+
+    const matched = ltMatch[0].trim()
+    const sizeToken = trailingPrefix
+      ? matched.slice(0, matched.length - trailingPrefix.length)
+      : matched
 
     return {
       tireWidthMm: null,
@@ -153,16 +179,24 @@ export function parseTireSize(description: string): TireSizeResult {
       speedRating,
       plyRating,
       tirePrefix,
-      sizeToken: ltMatch[0].trim(),
+      sizeToken,
     }
   }
 
   // --- Pattern 3: Bias/agricultural format ---
-  // Matches: 12.4-24 8PR, 11.2-26 8PR
-  const biasMatch = desc.match(/(\d+\.?\d*)-(\d{2})\s+(\d+PR)\b/)
+  // Matches: 12.4-24 8PR, 11.2-26 8PR, and the X-separated spelling of the same
+  // thing (8.3X20 6PR). Implement/ag tires carry no R/B/D construction letter,
+  // so Pattern 2 can never anchor on them and the dash-only form left rows like
+  // "8.3X20 6PR BKT TR 171 TT" unparsed. The separator is captured rather than
+  // hardcoded so sizeToken echoes the feed's own spelling.
+  //
+  // Ordering note: this stays BELOW Pattern 2, and the mandatory `\s+\d+PR` tail
+  // keeps it from poaching radial sizes -- a flotation row like "33X12.50R20LT"
+  // has already returned above, and carries no "<n>PR" token to match here anyway.
+  const biasMatch = desc.match(/(\d+\.?\d*)([-xX])(\d{2})\s+(\d+PR)\b/)
   if (biasMatch) {
-    const rimDiameterIn = parseInt(biasMatch[2], 10)
-    const plyRating = biasMatch[3]
+    const rimDiameterIn = parseInt(biasMatch[3], 10)
+    const plyRating = biasMatch[4]
 
     return {
       tireWidthMm: null,
@@ -173,7 +207,7 @@ export function parseTireSize(description: string): TireSizeResult {
       speedRating: null,
       plyRating,
       tirePrefix: null,
-      sizeToken: `${biasMatch[1]}-${biasMatch[2]}`,
+      sizeToken: `${biasMatch[1]}${biasMatch[2]}${biasMatch[3]}`,
     }
   }
 

@@ -47,7 +47,7 @@ const YmmPane = ({ onClose }: YmmPaneProps) => {
   const router = useRouter()
   const { countryCode } = useParams() as { countryCode: string }
   const pathname = usePathname()
-  const { add, setActive, update } = useGarage()
+  const { add, setActive, update, remove } = useGarage()
 
   const [make, setMake] = useState("")
   const [model, setModel] = useState("")
@@ -251,11 +251,37 @@ const YmmPane = ({ onClose }: YmmPaneProps) => {
           // on OEM tire sizes, wheels on bolt patterns. Only toast (and only about
           // the RIGHT thing) when the relevant data is missing — otherwise the tire
           // flow would wrongly show a "no wheel specs" message.
-          const hasFit =
-            target === "tires"
-              ? (fitment.oemTireSizes?.length ?? 0) > 0
-              : fitment.status === "ok" && fitment.canonicalBoltPatterns.length > 0
+          const wheelFit =
+            fitment.status === "ok" && fitment.canonicalBoltPatterns.length > 0
+          const tireFit = (fitment.oemTireSizes?.length ?? 0) > 0
+          const hasFit = target === "tires" ? tireFit : wheelFit
+
+          // Nothing usable for EITHER surface = we simply don't have this
+          // vehicle. Keeping it saved+active was the confusing part: the
+          // toast said "we found nothing", the catalog stayed unfiltered, and
+          // yet the nav pill lit up "Vehicle · 2019 Ford Escape" as though a
+          // fit were applied. Roll the vehicle back out of the cache so the
+          // UI matches the toast, and stay in the drawer (no navigation — the
+          // destination would be the unfiltered catalog we're already on) so
+          // the shopper can try another car.
+          //
+          // Deliberately NOT the same as the unavailable/failed branch below,
+          // which keeps the vehicle so "RE-CHECK FIT" can retry: this is a
+          // successful lookup that authoritatively returned no data, so a
+          // retry would return the same nothing forever.
+          if (!wheelFit && !tireFit) {
+            remove(vehicle.id)
+            toast("No fitment data for this vehicle yet", {
+              description:
+                "We couldn't find wheel or tire specs for it, so we haven't set it as your vehicle.",
+            })
+            return
+          }
+
           if (!hasFit) {
+            // Usable for the OTHER surface only — keep it saved (it genuinely
+            // fits something) but still say plainly that THIS catalog isn't
+            // narrowed.
             toast(
               target === "tires"
                 ? "No tire fitment for this vehicle yet"

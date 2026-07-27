@@ -34,7 +34,21 @@ export default function TireFitmentSync() {
 
     if (!desired.fit) {
       const hasFitParam = TIRE_FIT_PARAM_KEYS.some((k) => sp.has(k))
-      if (shouldStripFit({ isLoaded, hasActive: false, hasFitParam, isExplicitOptOut })) {
+      // Mirrors the wheel twin: `undefined` oemTires = the wheel-size lookup
+      // for this vehicle is still in flight (mid-YMM-submit), so stripping now
+      // only to re-add a moment later fires two conflicting router.replace
+      // calls and can strand the navigation. `[]` = resolved with nothing,
+      // which IS an orphaned param worth stripping.
+      const fitmentPending = !!active && active.oemTires === undefined
+      if (
+        shouldStripFit({
+          isLoaded,
+          hasActive: false,
+          hasFitParam,
+          isExplicitOptOut,
+          fitmentPending,
+        })
+      ) {
         const next = new URLSearchParams(Array.from(sp.entries()))
         for (const k of TIRE_FIT_PARAM_KEYS) next.delete(k)
         next.delete("page") // reset pagination on filter change (mirrors useTireQuery)

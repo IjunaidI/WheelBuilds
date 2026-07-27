@@ -32,6 +32,27 @@ export type ShouldStripFitArgs = {
    *  path already refuses to write over it, and the URL only ever carries
    *  bare `fit=0` in that state — no `fitb/fitd/fitw/fito`). */
   isExplicitOptOut: boolean
+  /**
+   * An active vehicle exists but its wheel-size lookup has not come back yet
+   * (`canonicalBoltPatterns` still `undefined` — never written, as opposed to
+   * `[]` which means "resolved, genuinely nothing").
+   *
+   * This is a THIRD state that `hasActive: false` used to swallow, and it is
+   * the one that made "Find My Fit" intermittently do nothing until a manual
+   * refresh. The YMM flow is add() → setActive() → await the lookup →
+   * update(). During that await the vehicle is active with no patterns, so
+   * FitmentSync would strip the fit params it was about to re-add a moment
+   * later — two conflicting `router.replace` calls back to back. The App
+   * Router can drop the pair (the same concurrent-navigation hazard ymm-pane
+   * documents at its `router.push` guard), leaving the progress bar spinning
+   * and the URL — and therefore the grid — unchanged.
+   *
+   * A pending lookup is not an orphaned param: wait for it.
+   *
+   * Optional so existing callers keep compiling; absent means "not pending",
+   * i.e. the exact pre-existing behavior.
+   */
+  fitmentPending?: boolean
 }
 
 /**
@@ -46,9 +67,11 @@ export function shouldStripFit({
   hasActive,
   hasFitParam,
   isExplicitOptOut,
+  fitmentPending = false,
 }: ShouldStripFitArgs): boolean {
   if (isExplicitOptOut) return false
   if (!isLoaded) return false
+  if (fitmentPending) return false
   if (hasActive) return false
   return hasFitParam
 }

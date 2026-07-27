@@ -57,3 +57,55 @@ describe("shouldStripFit", () => {
     ).toBe(false)
   })
 })
+
+describe("shouldStripFit — fitmentPending (the 'Find My Fit does nothing' guard)", () => {
+  it("does NOT strip while an active vehicle's fitment lookup is still in flight", () => {
+    // The YMM submit window: add() -> setActive() -> await lookup -> update().
+    // Stripping here fires a router.replace that the post-update replace
+    // immediately contradicts; the pair can strand the navigation entirely.
+    expect(
+      shouldStripFit({
+        isLoaded: true,
+        hasActive: false,
+        hasFitParam: true,
+        isExplicitOptOut: false,
+        fitmentPending: true,
+      })
+    ).toBe(false)
+  })
+
+  it("DOES strip once the lookup has landed and genuinely found nothing", () => {
+    expect(
+      shouldStripFit({
+        isLoaded: true,
+        hasActive: false,
+        hasFitParam: true,
+        isExplicitOptOut: false,
+        fitmentPending: false,
+      })
+    ).toBe(true)
+  })
+
+  it("omitting fitmentPending preserves the pre-existing behavior exactly", () => {
+    expect(
+      shouldStripFit({
+        isLoaded: true,
+        hasActive: false,
+        hasFitParam: true,
+        isExplicitOptOut: false,
+      })
+    ).toBe(true)
+  })
+
+  it("a pending lookup still never overrides an explicit opt-out", () => {
+    expect(
+      shouldStripFit({
+        isLoaded: true,
+        hasActive: false,
+        hasFitParam: true,
+        isExplicitOptOut: true,
+        fitmentPending: true,
+      })
+    ).toBe(false)
+  })
+})

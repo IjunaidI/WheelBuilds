@@ -33,7 +33,20 @@ export default function FitmentSync() {
     // "Fits: …" chip sets fit=0, handled above).
     if (!desiredFit) {
       const hasFitParam = FIT_PARAM_KEYS.some((k) => sp.has(k))
-      if (shouldStripFit({ isLoaded, hasActive: false, hasFitParam, isExplicitOptOut })) {
+      // `undefined` = the wheel-size lookup for this vehicle hasn't landed
+      // yet (mid-YMM-submit); `[]` = it landed and found nothing. Only the
+      // latter is an orphaned param worth stripping — see fitmentPending.
+      const fitmentPending =
+        !!active && active.canonicalBoltPatterns === undefined
+      if (
+        shouldStripFit({
+          isLoaded,
+          hasActive: false,
+          hasFitParam,
+          isExplicitOptOut,
+          fitmentPending,
+        })
+      ) {
         const next = new URLSearchParams(Array.from(sp.entries()))
         for (const k of FIT_PARAM_KEYS) next.delete(k)
         next.delete("page") // reset pagination on filter change (mirrors useDiscoveryQuery)

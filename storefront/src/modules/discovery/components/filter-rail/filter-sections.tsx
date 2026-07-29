@@ -108,6 +108,12 @@ const ChecklistSection = <T extends string | number>({
 
 type FilterSectionsProps = {
   facets: FacetCounts
+  /**
+   * Real catalog price range in whole dollars (WB-120 Q-15). `null`/absent
+   * keeps the previous static placeholders rather than showing a fabricated
+   * bound — a wrong hint would suggest products exist outside the range.
+   */
+  priceBounds?: { minUsd: number; maxUsd: number } | null
   /** Hides the clear-all button (used inside the mobile drawer which has its own footer). */
   hideClearAll?: boolean
   /**
@@ -133,6 +139,7 @@ type FilterSectionsProps = {
  */
 const FilterSections = ({
   facets,
+  priceBounds,
   hideClearAll,
   instanceId = "rail",
   hideBrand = false,
@@ -373,7 +380,7 @@ const FilterSections = ({
                   id={`filter-${instanceId}-price-min`}
                   type="number"
                   inputMode="numeric"
-                  placeholder="$0"
+                  placeholder={priceBounds ? `$${priceBounds.minUsd}` : "$0"}
                   value={minInput}
                   onChange={(e) => setMinInput(e.target.value)}
                   onBlur={commitPrice}
@@ -385,7 +392,7 @@ const FilterSections = ({
                   id={`filter-${instanceId}-price-max`}
                   type="number"
                   inputMode="numeric"
-                  placeholder="$2,500"
+                  placeholder={priceBounds ? `$${priceBounds.maxUsd.toLocaleString()}` : "$2,500"}
                   value={maxInput}
                   onChange={(e) => setMaxInput(e.target.value)}
                   onBlur={commitPrice}
@@ -393,10 +400,14 @@ const FilterSections = ({
                 />
               </Field>
             </div>
-            {/* TODO(integration): replace the two TextInputs with a
-                <Slider value={[min, max]}/> (shadcn primitive — install with
-                `npx shadcn@2.1.8 add slider`) once a real min/max range
-                comes from Meilisearch's price aggregation. */}
+            {/* WB-120 Q-15: the real min/max now comes from Meilisearch
+                `facetStats` and drives the placeholders above. The remaining
+                half of the old TODO — swapping these inputs for a
+                <Slider value={[min, max]}/> (shadcn, `npx shadcn@2.1.8 add
+                slider`) — is split out rather than bundled here, because it
+                needs a new Radix dependency and pnpm is not reliably on PATH
+                on Windows (see storefront/CLAUDE.md). Bounds are the
+                substance; the slider is presentation. */}
           </AccordionContent>
         </AccordionItem>
       </Accordion>

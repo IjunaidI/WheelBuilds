@@ -19,6 +19,7 @@
  */
 
 import { meili, PRODUCTS_INDEX } from "@lib/meilisearch"
+import { priceBoundsFromFacetStats } from "./price-bounds"
 import type { MultiSearchResult } from "meilisearch"
 import {
   DEFAULT_PAGE_SIZE,
@@ -347,6 +348,11 @@ export async function fetchDiscoveryProducts(
         // carries.
         hitsPerPage: pageSize,
         page: query.page,
+        // WB-120 Q-15: Meilisearch returns `facetStats` (min/max) for numeric
+        // filterable attributes, so asking for these two on the hits query
+        // yields the real catalog price range at no extra round trip. It
+        // reflects the CURRENT filters, which is what the rail should show.
+        facets: ["price_min", "price_max"],
       },
       ...FACET_FIELDS.map((field) => ({
         indexUid: PRODUCTS_INDEX,
@@ -378,6 +384,7 @@ export async function fetchDiscoveryProducts(
 
   return {
     products: hitsRes.hits.map(hitToProduct),
+    priceBounds: priceBoundsFromFacetStats((hitsRes as any).facetStats),
     // WB-088 D13: prefer the exhaustive `totalHits` (present because the
     // query above uses `hitsPerPage`/`page`) over `estimatedTotalHits`,
     // which older mocks/fixtures may still supply and which real Meili

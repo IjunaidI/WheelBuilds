@@ -13,6 +13,45 @@
 
 ---
 
+## Quick version — one line each
+
+> Send this section on its own if they just need to answer; everything below is the
+> detail for any item they want to dig into. **Items 1-3 are affecting live customers
+> right now.**
+
+1. **US sales tax** 🔴 — Every US order is currently charged a flat 10% under a rule
+   named *"Defaul Tax rate For Testing"*, so Chicago and Los Angeles pay the same:
+   which states do you collect sales tax in, and at what rate? → ________
+2. **Shipping prices** 🔴 — Express and Standard both cost **$10.00**, so a customer
+   paying for Express gets nothing extra for it: what should each cost, and how fast
+   is each? → ________
+3. **Free shipping** 🔴 — The site advertises *"Free shipping $199+"* but a **$333**
+   order was still charged shipping: is $199 the right threshold, and does it apply to
+   Express too? → ________
+4. **Support contact** 🟠 — The Contact page shows no email address and no phone
+   number, while six places on the site send customers there: what support email and
+   phone should we display? → ________
+5. **Fitment enquiries** 🟠 — Tyre pages promised a fitment answer *"within 24 hours"*
+   (we have removed that claim for now): is 24 hours the promise you want, and which
+   inbox should these go to? → ________
+6. **Email domain** 🟠 — No order confirmations or password resets can be sent until
+   the site has its own domain instead of the temporary Railway address: what is the
+   real domain, and can we get access to its DNS? → ________
+7. **Search** 🟡 — A tester said search "needs improving" but gave no example, and
+   guessing risks breaking what already works: can you give 2-3 searches where you
+   got the wrong products? → ________
+8. **Style categories** 🟡 — Street / Truck & Dually / Luxury / UTV / Off-Road / Drag
+   are approximations we invented from wheel size and brand, because the supplier
+   sends no style data: are they close enough to how you actually sell? → ________
+9. **Centre bore wording** 🟡 — 45 forged wheels carry a supplier placeholder that used
+   to display as "999 mm" and now reads **"Custom / bore-to-order"**: is that the
+   wording you would use with customers? → ________
+
+*Anything left blank simply stays as it is today — each item below spells out exactly
+what that means.*
+
+---
+
 ## 🔴 Priority 1 — live now, affecting real customers
 
 ### 1. US sales tax — which states, and at what rate?

@@ -4,6 +4,8 @@ import TrustStrip from "@modules/checkout/components/trust-strip"
 import Thumbnail from "@modules/products/components/thumbnail"
 import LocalizedClientLink from "@modules/common/components/localized-client-link"
 import Label from "@modules/common/components/label"
+import { cartTotalRows, type CartLikeTotals } from "@lib/util/cart-total-rows"
+import { lineItemAmounts } from "@lib/util/line-item-amounts"
 import { convertToLocale } from "@lib/util/money"
 import { HttpTypes } from "@medusajs/types"
 import { isAffirmEnabled } from "@modules/checkout/components/express-pay/config"
@@ -74,8 +76,10 @@ const LineItemRow = ({
   item: HttpTypes.StoreCartLineItem
   currency: string
 }) => {
-  const total = item.total ?? 0
-  const perEa = item.quantity ? total / item.quantity : 0
+  // WB-118 Q-01: the Store API cart response carries no `total` on a line
+  // item, so `item.total ?? 0` rendered "$0.00" here too. `lineItemAmounts`
+  // falls back to unit_price × quantity within the stored amounts.
+  const { total, unitPrice: perEa } = lineItemAmounts(item)
   const variantOptions = item.variant?.options
     ?.map((o) => o.value)
     .filter(Boolean)
@@ -141,34 +145,40 @@ const LineItemRow = ({
   )
 }
 
+/**
+ * WB-118 Q-02: rows come from `cartTotalRows`, the same helper `/cart` uses,
+ * so the two surfaces cannot disagree with each other or with the charged
+ * total. Do not reintroduce per-field reads here.
+ *
+ * The previous version rendered `subtotal + shipping_total + tax_total`, which
+ * double-counted shipping (Medusa's `subtotal` already contains
+ * `shipping_subtotal`, and `tax_total` already contains `shipping_tax_total`).
+ * Measured live 2026-07-29: displayed 343.00 + 11.00 + 34.30 = 388.30 against
+ * a charged total of 377.30.
+ *
+ * It also hard-coded "FREE" whenever shipping was 0 — which fired BEFORE a
+ * shipping method had been selected, promising something not yet determined.
+ * `cartTotalRows` omits the row until a method exists instead. If "FREE" is
+ * wanted once a method IS selected and costs nothing, add it there (with a
+ * test), not as a special case here.
+ */
 const Totals = ({ cart }: { cart: HttpTypes.StoreCart }) => {
-  const subtotal = cart.subtotal ?? 0
-  const shipping = cart.shipping_total ?? 0
-  const tax = cart.tax_total ?? 0
-  const discount = cart.discount_total ?? 0
-  const total = cart.total ?? 0
-  const currency = cart.currency_code
+  const { rows, total, currencyCode } = cartTotalRows(cart as CartLikeTotals)
 
   return (
     <div className="pt-2 pb-5" style={{ borderTop: "1px solid var(--hairline)" }}>
-      <Row label="Subtotal" value={convertToLocale({ amount: subtotal, currency_code: currency })} />
-      {discount > 0 && (
+      {rows.map((row) => (
         <Row
-          label="Discount"
-          value={`− ${convertToLocale({ amount: discount, currency_code: currency })}`}
-          accent
+          key={row.key}
+          testId={`checkout-${row.key}`}
+          label={row.label}
+          value={`${row.negative ? "− " : ""}${convertToLocale({
+            amount: row.amount,
+            currency_code: currencyCode,
+          })}`}
+          accent={row.negative}
         />
-      )}
-      <Row
-        label="Shipping"
-        value={
-          shipping === 0
-            ? "FREE"
-            : convertToLocale({ amount: shipping, currency_code: currency })
-        }
-        accent={shipping === 0}
-      />
-      <Row label="Tax" value={convertToLocale({ amount: tax, currency_code: currency })} />
+      ))}
       <div className="mt-3 pt-3" style={{ borderTop: "1px solid var(--ink)" }}>
         <div className="flex justify-between items-baseline">
           <span className="text-[13px] font-bold uppercase tracking-[0.04em] text-[var(--ink)]">
@@ -177,6 +187,7 @@ const Totals = ({ cart }: { cart: HttpTypes.StoreCart }) => {
           <span
             className="font-[var(--display)] text-[28px] text-[var(--ink)]"
             style={{ fontWeight: 900 }}
+            data-testid="checkout-total"
           >
             <span style={{ color: "var(--orange)" }}>$</span>
             {total.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
@@ -198,16 +209,19 @@ const Row = ({
   label,
   value,
   accent,
+  testId,
 }: {
   label: string
   value: string
   accent?: boolean
+  testId?: string
 }) => (
   <div className="flex justify-between items-baseline py-1.5">
     <span className="text-[13px] text-[var(--graphite)]">{label}</span>
     <span
       className="text-[14px] font-medium"
       style={{ color: accent ? "var(--orange-deep)" : "var(--ink)" }}
+      data-testid={testId}
     >
       {value}
     </span>

@@ -48,4 +48,33 @@ describe("lineItemAmounts", () => {
       unitPrice: 0,
     })
   })
+
+  // WB-118 Q-01. The live Store API response carries NO `total` on a cart line
+  // item -- its full key set is id/quantity/unit_price/tax_lines/adjustments/
+  // product/variant/..., with per-line totals simply not decorated. So
+  // `item.total ?? 0` rendered "$0.00" in the cart's TOTAL column while the
+  // unit price beside it was correct. Captured live 2026-07-29; see
+  // docs/in-progress/plans/wb-118-task1-findings.md.
+  //
+  // NOTE this is the mirror image of the original hypothesis, which assumed
+  // `unit_price` was the zero. It was not: unit_price was 333 and correct.
+  it("derives the total from unit_price x quantity when total is ABSENT", () => {
+    expect(lineItemAmounts({ quantity: 1, unit_price: 333 })).toEqual({
+      total: 333,
+      unitPrice: 333,
+    })
+  })
+
+  it("derives the total for a multi-quantity line", () => {
+    expect(lineItemAmounts({ quantity: 4, unit_price: 333 })).toEqual({
+      total: 1332,
+      unitPrice: 333,
+    })
+  })
+
+  it("does not divide by zero on a zero-quantity line", () => {
+    const out = lineItemAmounts({ quantity: 0, unit_price: 333 })
+    expect(out.total).toBe(0)
+    expect(Number.isFinite(out.unitPrice)).toBe(true)
+  })
 })

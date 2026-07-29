@@ -315,6 +315,11 @@ const medusaConfig = {
     // stubs. Uncomment to restore (and see the other GARAGE-DISABLED seams).
     // { resolve: './src/modules/customer-vehicle' },
     { resolve: './src/modules/newsletter' },
+    // WB-119: customer support / fitment-check submissions. Registered
+    // UNCONDITIONALLY like newsletter -- it has no env dependency, and a
+    // conditionally-registered module is exactly the "why isn't X working in
+    // production" trap called out in the root CLAUDE.md.
+    { resolve: './src/modules/support-request' },
   ],
   plugins: [
   ...(MEILISEARCH_HOST && MEILISEARCH_ADMIN_KEY ? [{

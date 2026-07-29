@@ -1,3 +1,4 @@
+import { centerBoreDisplay } from "../../data/center-bore"
 import { ProductDetail } from "../../data/types"
 
 export type SpecRow = { label: string; value: string }
@@ -15,7 +16,13 @@ export function buildSpecRows(specs: ProductDetail["specs"]): SpecRow[] {
   if (specs.weightLb > 0) rows.push({ label: "Per-wheel weight", value: `${specs.weightLb} lb` })
   if (specs.loadRatingLb > 0)
     rows.push({ label: "Load rating", value: `${specs.loadRatingLb.toLocaleString()} lb` })
-  if (specs.centerBoreMm > 0) rows.push({ label: "Center bore", value: `${specs.centerBoreMm} mm` })
+  // WB-121 Q-16: the `> 0` guard below caught 0/null but not WheelPros' 999
+  // bore-to-order sentinel, which rendered as a plausible "999 mm" on 45 live
+  // products. `centerBoreDisplay` keeps the omit-when-absent rule and adds
+  // honest copy for the sentinel. Display only — the value itself still feeds
+  // the fitment bore gate untouched.
+  const bore = centerBoreDisplay(specs.centerBoreMm)
+  if (bore.kind !== "hidden") rows.push({ label: "Center bore", value: bore.text })
   if (specs.hubBoreMm) rows.push({ label: "Hub bore", value: `${specs.hubBoreMm} mm` })
   if (specs.countryOfOrigin)
     rows.push({ label: "Country of origin", value: specs.countryOfOrigin })

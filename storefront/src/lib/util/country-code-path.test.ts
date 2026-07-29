@@ -58,3 +58,47 @@ describe("countryCodeRedirectPath", () => {
     expect(countryCodeRedirectPath("/de/store", "", "us")).toBe("/us/de/store")
   })
 })
+
+// WB-121 Q-17 — "/US/STORE" 404'd because only the country code was
+// canonicalised; the route segment kept its case and matched no route.
+describe("countryCodeRedirectPath — route-segment case (WB-121 Q-17)", () => {
+  it("lowercases the route segment alongside the country code", () => {
+    expect(countryCodeRedirectPath("/US/STORE", "", "us")).toBe("/us/store")
+  })
+
+  it("corrects a wrong-cased route even when the country code is fine", () => {
+    expect(countryCodeRedirectPath("/us/STORE", "", "us")).toBe("/us/store")
+    expect(countryCodeRedirectPath("/us/Tires", "", "us")).toBe("/us/tires")
+  })
+
+  it("returns null when both segments are already canonical (no redirect loop)", () => {
+    expect(countryCodeRedirectPath("/us/store", "", "us")).toBeNull()
+    expect(countryCodeRedirectPath("/us", "", "us")).toBeNull()
+  })
+
+  it("preserves the query string verbatim", () => {
+    expect(countryCodeRedirectPath("/US/STORE", "?brands=Fuel%201PC", "us")).toBe(
+      "/us/store?brands=Fuel%201PC"
+    )
+  })
+
+  it("⚠️ NEVER touches a case-sensitive id below the route segment", () => {
+    // The order ULID is the guest's ONLY route back to their order, via the
+    // link in the confirmation email. Lowercasing it would turn a cosmetic
+    // 404 into a lost order.
+    expect(
+      countryCodeRedirectPath("/US/order/confirmed/order_01KYPQK3ERBAQCC9VGCJE5Y2SS", "", "us")
+    ).toBe("/us/order/confirmed/order_01KYPQK3ERBAQCC9VGCJE5Y2SS")
+  })
+
+  it("leaves product handles and slugs untouched", () => {
+    expect(countryCodeRedirectPath("/US/PRODUCTS/Asanti-Forged-832", "", "us")).toBe(
+      "/us/products/Asanti-Forged-832"
+    )
+  })
+
+  it("leaves an unknown segment alone so it still 404s", () => {
+    // Silently rewriting an unknown path would mask real broken links.
+    expect(countryCodeRedirectPath("/US/NOT-A-ROUTE", "", "us")).toBe("/us/NOT-A-ROUTE")
+  })
+})

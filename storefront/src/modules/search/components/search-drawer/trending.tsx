@@ -8,6 +8,7 @@ import Label from "@modules/common/components/label"
 import LocalizedClientLink from "@modules/common/components/localized-client-link"
 import { Button } from "@/components/ui/button"
 import { formatCentsUsd } from "@lib/util/money"
+import { showOutOfStock } from "@modules/discovery/data/show-out-of-stock"
 import type { TrendingProduct } from "./trending-data"
 
 type TrendingProps = {
@@ -72,6 +73,19 @@ const Trending = ({ onClose, products }: TrendingProps) => {
               <Display size={14} as="div">
                 {p.name}
               </Display>
+              {/* WB-120 Q-03: reuses the grid card's exact `=== false` gate, so
+                  an UNKNOWN availability stays silent rather than mis-badging.
+                  toTrendingProducts already prefers in-stock products, but it
+                  deliberately does not hard-filter -- three badged tiles beat
+                  one tile -- so the badge is what keeps that honest. */}
+              {showOutOfStock(p.inStock) && (
+                <Label
+                  tone="muted"
+                  style={{ fontSize: 9, marginTop: 3, display: "block" }}
+                >
+                  OUT OF STOCK
+                </Label>
+              )}
             </div>
             <Display size={15} as="div">
               <span style={{ color: "var(--orange-deep)" }}>$</span>

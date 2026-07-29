@@ -48,7 +48,21 @@ export async function getStyleCounts(): Promise<Record<string, number>> {
       if (typeof total === "number") counts[def.label] = total
     })
     return counts
-  } catch {
+  } catch (err) {
+    // Degrade to `styleTiles`' summed fallback rather than blanking the
+    // section — but say so. This swallow was originally silent, and it hid a
+    // real bug all the way into production: `styleFilterClause` emitted
+    // `brands = …` where the index attribute is `brand`, Meilisearch rejected
+    // the whole ATOMIC multiSearch, and every style quietly reverted to the
+    // double-counted numbers this function exists to replace. Nothing in the
+    // logs said so. Same lesson as WB-119's subscribers: a swallow that says
+    // nothing is indistinguishable from success.
+    // eslint-disable-next-line no-console
+    console.error(
+      `[getStyleCounts] falling back to summed facet counts — style tiles will over-count: ${
+        (err as Error)?.message ?? err
+      }`
+    )
     return {}
   }
 }

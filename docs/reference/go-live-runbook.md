@@ -123,3 +123,51 @@ they are customer-facing promises.
 | §4.1 Meili re-sync | Tire fit filter over-claims; stale facets |
 | §5.2 dev-max-rows unset | Next sync silently truncates the catalog to 1,000 rows |
 | §6.1 secret rotation | Session/JWT forgery risk with a public template value |
+
+## WB-118 — shipping and tax configuration (added 2026-07-29)
+
+Both are **operational** steps: the code is written and guarded, it has simply
+never been run against production. Verified live on 2026-07-29 that neither is
+in effect.
+
+### 1. Free shipping over $199 (Q-05)
+
+A live **$333** cart was still charged $10 shipping while the site advertised
+"Free shipping on orders $199+" on the home page, PDP and checkout.
+
+```bash
+cd backend
+npx medusa exec ./src/scripts/update-shipping-prices.ts          # prints the target host, refuses to act
+npx medusa exec ./src/scripts/update-shipping-prices.ts -- --confirm-host=<host>
+```
+
+**VERIFY:** a $150 cart is charged shipping; a $250 cart is not.
+
+⚠️ If the threshold ever changes, change `FREE_SHIP_THRESHOLD_USD` in that
+script **and** `FREE_SHIPPING_THRESHOLD_USD` in
+`storefront/src/lib/util/shipping-threshold.ts` (lockstep twins), then re-run
+this against every environment.
+
+### 2. Per-state US tax (Q-06) — BLOCKED on the client
+
+**Today every US address is taxed a flat 10% under a rule literally named
+"Defaul Tax rate For Testing" (code `12223`).** Chicago and Los Angeles return
+identical tax. This is being charged to real customers.
+
+`create-us-tax-region.ts` only ever creates the COUNTRY-level US region; per-state
+province regions were always a manual admin step that was never done.
+
+**Blocked on:** the confirmed nexus state list + rates, and a decision on whether
+to keep per-state rates or move to a tax provider — see
+[client-input-needed.md §1](client-input-needed.md). The implementation is
+deliberately NOT built yet, because Stripe Tax would make a per-state script
+redundant.
+
+**VERIFY once configured:** two identical carts, one to Chicago IL and one to
+Los Angeles CA, must return DIFFERENT tax.
+
+### 3. Standard vs Express pricing — BLOCKED on the client
+
+Both methods currently quote **$10.00**, so "Express — ship in 24 hours" costs the
+same as "Standard — 2-3 days". Tracked as WB-123; blocked on real carrier rates
+(see [client-input-needed.md §2](client-input-needed.md)).

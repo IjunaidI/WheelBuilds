@@ -4,6 +4,8 @@ import SectionHeader from "@modules/common/components/section-header"
 import Label from "@modules/common/components/label"
 import Chip from "@modules/common/components/chip"
 import Icon from "@modules/common/components/icon"
+import LocalizedClientLink from "@modules/common/components/localized-client-link"
+import { fitmentCheckHref } from "@modules/support/fitment-check-link"
 import { Button } from "@/components/ui/button"
 import { Separator } from "@/components/ui/separator"
 import { useGarage } from "@lib/garage/use-garage"
@@ -220,6 +222,20 @@ const Fitment = ({ product }: FitmentProps) => {
           )
         })}
       </div>
+
+      {/* WB-119 Q-20: the wheel PDP had no route forward for a shopper whose
+          vehicle isn't in the confirmed list — the tyre PDP had this CTA and
+          this one did not. Same prefilled destination, same wording. */}
+      <p className="mt-6 text-[12px] text-[var(--ink-soft)] font-[var(--mono)] leading-relaxed">
+        Don&apos;t see your vehicle?{" "}
+        <LocalizedClientLink
+          href={fitmentCheckHref({ vehicle: active, productHandle: product.handle })}
+          className="text-[var(--orange-deep)] font-semibold no-underline hover:underline"
+        >
+          Submit your vehicle for a fitment check
+        </LocalizedClientLink>{" "}
+        — we&apos;ll get back to you by email.
+      </p>
     </section>
   )
 }

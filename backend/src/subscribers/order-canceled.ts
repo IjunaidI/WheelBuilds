@@ -70,8 +70,17 @@ export default async function orderCanceledHandler({
         preview: 'Your order has been canceled'
       }
     })
-  } catch (error) {
-    console.error('Error sending order cancellation notification:', error)
+  } catch (error: any) {
+    // WB-119 Q-19 — same blind spot as order-placed.ts: WB-094 made the
+    // Resend provider THROW rather than silently record success, and a
+    // console.error here threw that signal away, so a failed send was
+    // invisible in production logs. Swallowed (not rethrown) on purpose: a
+    // retry risks a duplicate send, which is worse than a missing message
+    // that is loud in the logs.
+    const logger = container.resolve(ContainerRegistrationKeys.LOGGER)
+    logger.error(
+      `Failed to send order cancellation email: ${error?.message ?? error}`
+    )
   }
 }
 

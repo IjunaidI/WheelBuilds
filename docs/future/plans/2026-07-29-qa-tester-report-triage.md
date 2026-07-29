@@ -47,10 +47,13 @@ By kind: **13 code**, **4 ops/config**, **1 data**, **1 content+code**.
 **Two headline corrections to the tester's report:**
 
 1. **The "empty filters" (Q-10 / Q-11) are not empty.** The facet data is complete —
-   all 46 canonical bolt patterns and all 500 tire sizes / 16 speed ratings / 80 load
+   all 46 canonical bolt patterns and the tire sizes / 16 speed ratings / 80 load
    indexes are in the page payload. Those accordion sections are **collapsed by
    default** and Radix unmounts collapsed content, so they read as empty until clicked.
-   Real defect, different fix.
+   Real defect, different fix. **Follow-on discovery (WB-120):** the tire size facet's
+   "500 values" turned out to be the `maxValuesPerFacet` ceiling, not the real total —
+   the catalog has **699** distinct sizes, so 199 were genuinely missing from the filter.
+   Ceiling raised to 2000.
 2. **The "In stock only" toggle works** on both `/store` and `/tires` (verified: 1447 →
    1138 wheels, 611 → 399 tires, zero OUT OF STOCK badges on the filtered pages). The
    tester's out-of-stock complaint (Q-03) is about the **search drawer's Trending
@@ -65,7 +68,7 @@ they are launch-blocking: a customer cannot be asked to enter a card next to num
 that don't add up.
 
 ### Q-01 · Cart shows $0 in the main price field
-- **Verified:** UNVERIFIED (needs a cart session — automated fetch is robots-blocked)
+- **Verified:** **CONFIRMED + ROOT-CAUSED** (live cart captured 2026-07-29; fixed in WB-118)
 - **Severity:** Critical (tester: none given) · **Kind:** code
 - **Tester:** *"CART PRICE SHOWING 0 IN MAIN FIELD, SHOWING CORRECT PRICE BELOW THO"*
 - **Evidence:** [`line-item-unit-price/index.tsx:26`](../../../storefront/src/modules/common/components/line-item-unit-price/index.tsx) reads
@@ -80,10 +83,17 @@ that don't add up.
   Something else is rendering `$0.00`.
 - **Why it matters:** the single most trust-destroying number on the site. It also
   looks like a free item, which invites a support ticket on every order.
-- **Fix direction:** **identify which field on screen is zero before writing anything.**
-  `CartTotals` defaults every field with `?? 0`, so a *missing* field renders `$0.00`
-  while its neighbours stay correct — a strong alternative candidate. Then pin it with a
-  test built on the real captured payload.
+- **ROOT CAUSE (from the live capture):** the zero is the line **TOTAL**
+  (`data-testid="product-price"`, rendered by `LineItemPrice`), **not** the unit price.
+  The Store API cart response carries **no `total` key on a line item at all** — its whole
+  key set is `id/quantity/unit_price/tax_lines/adjustments/product/variant/…`, i.e.
+  per-line totals are not decorated on that response, only cart-level ones are. So
+  `item.total ?? 0` rendered `$0.00` while `unit_price` (333) was perfectly correct — the
+  **mirror image** of the hypothesis above. The same bug was present a second time in
+  `checkout-summary`'s own `LineItemRow`.
+- **Fixed** in WB-118 (`c3c1db2`): `lineItemAmounts` derives each amount from the other,
+  staying entirely within stored amounts. Evidence:
+  [`wb-118-task1-findings.md`](../../in-progress/plans/wb-118-task1-findings.md).
 
 ### Q-02 · Checkout summary math does not add up
 - **Verified:** **CONFIRMED** — root-caused from the installed Medusa 2.13.6 source
@@ -250,12 +260,28 @@ that don't add up.
   fewer products reads as a broken catalog.
 
 ### Q-13 · Brand count differs between homepage and store filter
-- **Verified:** UNVERIFIED (needs the exact two surfaces side by side)
+- **Verified:** **NOT REPRODUCED** (re-measured 2026-07-29 during WB-120)
 - **Severity:** Low (tester: Low) · **Kind:** code
 - **Tester:** *"'American Racing Forged' = 25 on homepage but 27 in store filter."*
 - **Evidence:** Meilisearch says **25** for `product_type = "wheel"`. So the 27 is the
   outlier — likely an unscoped count that includes non-wheel or drafted docs.
-- **Fix direction:** one shared brand-count helper, scoped identically everywhere.
+- **Re-measurement (2026-07-29), all four agree on 25:**
+
+  | Surface | Count |
+  |---|---|
+  | Homepage `ShopByBrand` tile | **25** |
+  | `/brands` tile | **25** |
+  | `/store` filter rail | **25** |
+  | Meilisearch ground truth (`product_type = "wheel"`) | **25** |
+
+  All three surfaces read the **same** `facets.brands` from one
+  `getHomeCatalog()` react-cache hit, so they are structurally incapable of
+  disagreeing. The catalog shifted slightly between the tester's run and this
+  one (they recorded "1449 results", it is 1447 today), which is the likeliest
+  explanation for the 27.
+- **Resolution: no code written.** Inventing a fix for a defect that isn't
+  there is how a real one gets introduced. Re-open with a screenshot if it
+  recurs.
 
 ### Q-14 · Search bar quality
 - **Verified:** UNVERIFIED (subjective; no failing query given)

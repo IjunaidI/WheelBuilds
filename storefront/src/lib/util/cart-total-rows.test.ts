@@ -87,6 +87,42 @@ describe("cartTotalRows", () => {
     expect(sum(view)).toBeCloseTo(view.total, 2)
   })
 
+  it("falls back to discount_total when discount_subtotal is absent (orders)", () => {
+    // BaseOrder does not declare discount_subtotal, so the order-confirmation
+    // page would otherwise drop the row and over-state a discounted order.
+    const order = {
+      currency_code: "usd",
+      item_subtotal: 1000,
+      shipping_subtotal: 0,
+      tax_total: 0,
+      discount_total: 100,
+      total: 900,
+    }
+    const view = cartTotalRows(order as any)
+    expect(view.rows.find((r) => r.key === "discount")?.amount).toBe(100)
+    expect(sum(view)).toBeCloseTo(900, 2)
+    expect(view.rows.find((r) => r.key === "adjustments")).toBeUndefined()
+  })
+
+  it("ALWAYS reconciles: an unknown component becomes an explicit row", () => {
+    // e.g. a gift card (stubbed out in decorateCartTotals) or a future field.
+    // Rendering numbers that visibly fail to add up is the defect this file
+    // exists to prevent, so a residual is surfaced rather than ignored.
+    const cart = { ...base, item_subtotal: 1000, tax_total: 0, total: 940 }
+    const view = cartTotalRows(cart)
+    const adj = view.rows.find((r) => r.key === "adjustments")
+    expect(adj?.amount).toBeCloseTo(60, 2)
+    expect(adj?.negative).toBe(true)
+    expect(sum(view)).toBeCloseTo(940, 2)
+  })
+
+  it("does not add a reconciling row for sub-cent float noise", () => {
+    const cart = { ...base, item_subtotal: 1000, tax_total: 0, total: 1000.001 }
+    expect(
+      cartTotalRows(cart).rows.find((r) => r.key === "adjustments")
+    ).toBeUndefined()
+  })
+
   it("reproduces the exact live numbers from the Task 1 capture", () => {
     // Live 2026-07-29: items 333.00, shipping 10.00 (pre-tax), tax 34.30,
     // total 377.30. The page displayed 343.00 + 11.00 + 34.30 = 388.30.

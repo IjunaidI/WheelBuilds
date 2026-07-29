@@ -62,6 +62,8 @@ export type CartLikeTotals = {
   shipping_subtotal?: number | null
   tax_total?: number | null
   discount_subtotal?: number | null
+  /** Fallback for surfaces whose payload omits `discount_subtotal` (orders). */
+  discount_total?: number | null
   credit_line_total?: number | null
   total?: number | null
 }
@@ -69,12 +71,23 @@ export type CartLikeTotals = {
 const num = (v: unknown): number =>
   typeof v === "number" && Number.isFinite(v) ? v : 0
 
+/** Currency amounts are compared to the cent; anything smaller is float noise. */
+const EPSILON = 0.005
+
 export function cartTotalRows(cart: CartLikeTotals): CartTotalsView {
   const items = num(cart.item_subtotal)
   const shipping = num(cart.shipping_subtotal)
   const tax = num(cart.tax_total)
-  const discount = num(cart.discount_subtotal)
+  // `BaseOrder` (unlike `BaseCart`) does not declare `discount_subtotal`, so
+  // fall back to `discount_total` rather than dropping the row and silently
+  // over-stating a discounted order. The two differ by the discount's tax
+  // portion; any leftover lands in the reconciling row below.
+  const discount =
+    cart.discount_subtotal != null
+      ? num(cart.discount_subtotal)
+      : num(cart.discount_total)
   const credit = num(cart.credit_line_total)
+  const total = num(cart.total)
 
   const rows: CartTotalRow[] = [{ key: "items", label: "Items", amount: items }]
 
@@ -99,9 +112,36 @@ export function cartTotalRows(cart: CartLikeTotals): CartTotalsView {
     rows.push({ key: "credit", label: "Credit", amount: credit, negative: true })
   }
 
+  // Reconciling row. The rows above cover every component Medusa 2.13.6
+  // exposes, but this component is also fed `StoreOrder` (order-confirmation)
+  // and future versions may add totals we don't know about — gift cards are
+  // already stubbed out in `decorateCartTotals`. Rather than render a column
+  // of numbers that visibly fails to add up (the exact defect this file
+  // exists to fix), any residual is surfaced as its own labelled row so the
+  // arithmetic ALWAYS closes against the charged total.
+  const residual =
+    total - rows.reduce((acc, r) => acc + (r.negative ? -r.amount : r.amount), 0)
+
+  if (Math.abs(residual) > EPSILON) {
+    if (process.env.NODE_ENV !== "production") {
+      // eslint-disable-next-line no-console
+      console.warn(
+        `[cartTotalRows] ${residual.toFixed(2)} unaccounted for against a total of ` +
+          `${total.toFixed(2)}. A totals component is missing from the row set — ` +
+          `add it here rather than leaving it in "Adjustments".`
+      )
+    }
+    rows.push({
+      key: "adjustments",
+      label: "Adjustments",
+      amount: Math.abs(residual),
+      negative: residual < 0,
+    })
+  }
+
   return {
     rows,
-    total: num(cart.total),
+    total,
     currencyCode: cart.currency_code || "usd",
   }
 }

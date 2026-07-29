@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from "react"
 import Input from "@modules/common/components/input"
+import { normalizeUsState } from "@lib/util/us-states"
 import CountrySelect from "../country-select"
+import StateSelect from "../state-select"
 import { HttpTypes } from "@medusajs/types"
 
 const BillingAddress = ({ cart }: { cart: HttpTypes.StoreCart | null }) => {
@@ -16,7 +18,12 @@ const BillingAddress = ({ cart }: { cart: HttpTypes.StoreCart | null }) => {
       "billing_address.postal_code": cart?.billing_address?.postal_code || "",
       "billing_address.city": cart?.billing_address?.city || "",
       "billing_address.country_code": cart?.billing_address?.country_code || "",
-      "billing_address.province": cart?.billing_address?.province || "",
+      // WB-118 Q-07 — see shipping-address: normalise a legacy free-text
+      // province so "Illinois" preselects and "Chicago" clears.
+      "billing_address.province":
+        (cart?.billing_address?.country_code?.toLowerCase() === "us"
+          ? normalizeUsState(cart?.billing_address?.province || "")
+          : cart?.billing_address?.province) || "",
       "billing_address.phone": cart?.billing_address?.phone || "",
     })
   }, [cart?.billing_address])
@@ -105,15 +112,28 @@ const BillingAddress = ({ cart }: { cart: HttpTypes.StoreCart | null }) => {
           required
           data-testid="billing-country-select"
         />
-        <Input
-          label="State / Province"
-          name="billing_address.province"
-          autoComplete="address-level1"
-          value={formData["billing_address.province"]}
-          onChange={handleChange}
-          required
-          data-testid="billing-province-input"
-        />
+        {/* WB-118 Q-07 — see shipping-address for the rationale. Constrained
+            for US addresses only; every other country keeps free text. */}
+        {formData["billing_address.country_code"]?.toLowerCase() === "us" ? (
+          <StateSelect
+            name="billing_address.province"
+            autoComplete="address-level1"
+            value={formData["billing_address.province"]}
+            onChange={handleChange}
+            required
+            data-testid="billing-province-select"
+          />
+        ) : (
+          <Input
+            label="State / Province"
+            name="billing_address.province"
+            autoComplete="address-level1"
+            value={formData["billing_address.province"]}
+            onChange={handleChange}
+            required
+            data-testid="billing-province-input"
+          />
+        )}
         <Input
           label="Phone"
           name="billing_address.phone"

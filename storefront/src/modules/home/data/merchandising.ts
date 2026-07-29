@@ -1,4 +1,8 @@
 import type { IconName } from "@modules/common/components/icon"
+import {
+  FREE_SHIPPING_THRESHOLD_USD,
+  freeShippingLabel,
+} from "@lib/util/shipping-threshold"
 
 /**
  * Editable home merchandising copy. Change strings here — not in the section
@@ -7,7 +11,7 @@ import type { IconName } from "@modules/common/components/icon"
  * because they read the live facet count.
  */
 export const TRUST_STRIP_ITEMS: { icon: IconName; h: string; s: string }[] = [
-  { icon: "shipping", h: "Free shipping $199+", s: "Lower 48, ground" },
+  { icon: "shipping", h: freeShippingLabel(), s: "Lower 48, ground" },
   { icon: "shield", h: "Fitment guarantee", s: "Or your money back" },
   { icon: "badge", h: "Authorized dealer", s: "Premium brands" },
   { icon: "return", h: "30-day returns", s: "Unmounted wheels" },
@@ -22,6 +26,6 @@ export const HERO_COPY = {
   trustPoints: [
     { l: "Fitment guaranteed", s: "Or your money back" },
     { l: "Free returns", s: "30 days, unmounted" },
-    { l: "Free ship $199+", s: "2–3 day delivery" },
+    { l: `Free ship $${FREE_SHIPPING_THRESHOLD_USD}+`, s: "2–3 day delivery" },
   ],
 }

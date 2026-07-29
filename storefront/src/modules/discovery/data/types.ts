@@ -152,6 +152,12 @@ export type DiscoveryResult = {
    */
   ok?: boolean
   products: DiscoveryProduct[]
+  /**
+   * Real catalog price range in whole dollars (WB-120 Q-15), from
+   * Meilisearch `facetStats`. `null` when unavailable — the rail then keeps
+   * its static placeholders rather than showing a fabricated bound.
+   */
+  priceBounds?: { minUsd: number; maxUsd: number } | null
   totalCount: number
   pageSize: number
   facets: FacetCounts

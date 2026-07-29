@@ -1,9 +1,10 @@
 import Icon from "@modules/common/components/icon"
+import { freeShippingLabel } from "@lib/util/shipping-threshold"
 
 const POINTS: { i: "shipping" | "shield" | "return"; h: string; s: string }[] = [
   {
     i: "shipping",
-    h: "Free shipping on orders $199+ · 2–3 day delivery",
+    h: `${freeShippingLabel()} · 2–3 day delivery`,
     s: "From our Long Beach warehouse",
   },
   {

@@ -315,6 +315,11 @@ const medusaConfig = {
     // stubs. Uncomment to restore (and see the other GARAGE-DISABLED seams).
     // { resolve: './src/modules/customer-vehicle' },
     { resolve: './src/modules/newsletter' },
+    // WB-119: customer support / fitment-check submissions. Registered
+    // UNCONDITIONALLY like newsletter -- it has no env dependency, and a
+    // conditionally-registered module is exactly the "why isn't X working in
+    // production" trap called out in the root CLAUDE.md.
+    { resolve: './src/modules/support-request' },
   ],
   plugins: [
   ...(MEILISEARCH_HOST && MEILISEARCH_ADMIN_KEY ? [{
@@ -363,10 +368,20 @@ const medusaConfig = {
               pagination: { maxTotalHits: 10000 },
               // WB-088 D9: Meili's default maxValuesPerFacet is 100, so any
               // facet with more distinct values (brand, tire_sizes) silently
-              // truncates its counts/options past the 100th. Raised to 500 —
-              // an index-config change only (no content re-sync needed), it
-              // takes effect on the next backend boot.
-              faceting: { maxValuesPerFacet: 500 },
+              // truncates its counts/options past the Nth. An index-config
+              // change only (no content re-sync needed); takes effect on the
+              // next backend boot.
+              //
+              // WB-120: 500 was NOT enough and was silently truncating. The
+              // live catalog carries 699 distinct `tire_sizes` against a 500
+              // ceiling, so 199 sizes were absent from the /tires Size filter
+              // entirely — a shopper looking for one of them could never
+              // filter to it. Raised to 2000 for real headroom: the cost is
+              // per-query facet computation, and 699 → 2000 leaves room for
+              // the catalog to roughly triple before this bites again.
+              // ⚠️ If a facet ever approaches this, raise it — do not let a
+              // filter quietly stop offering values that exist.
+              faceting: { maxValuesPerFacet: 2000 },
             },
             primaryKey: 'id',
             // The plugin falls back to its DEFAULT transformer when ours returns a

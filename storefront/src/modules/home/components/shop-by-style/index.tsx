@@ -5,12 +5,12 @@ import { styleTiles } from "./style-map"
 import { styleSlug } from "./style-slug"
 
 const ShopByStyle = async () => {
-  const { facets } = await getHomeCatalog()
+  const { facets, styleCounts } = await getHomeCatalog()
   // WB-099 Task 5: styleTiles itself still builds the interim `/store?...`
   // href (see style-map.test.ts); repoint each tile to its real
   // `/styles/<slug>` page here, same override pattern as the `/styles`
   // index page (app/[countryCode]/(main)/styles/page.tsx).
-  const tiles = styleTiles(facets).map((t) => ({
+  const tiles = styleTiles(facets, styleCounts).map((t) => ({
     ...t,
     href: `/styles/${styleSlug(t.label)}`,
   }))

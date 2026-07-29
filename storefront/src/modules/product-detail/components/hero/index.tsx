@@ -11,6 +11,7 @@ import PurchasePanel from "./purchase-panel"
 import AutoFitmentCard from "./auto-fitment-card"
 import AdvancedFitmentPanel from "./advanced-fitment-panel"
 import SpecSelector from "./spec-selector"
+import { isSentinelBore } from "../../data/center-bore"
 import { useSearchParams } from "next/navigation"
 import { useGarage } from "@lib/garage/use-garage"
 import { buildFitView } from "../../data/fit-view"
@@ -288,6 +289,12 @@ const Hero = ({ product }: HeroProps) => {
             selected={selectedBore}
             onSelect={setSelectedBore}
             unit="mm"
+            // WB-121 Q-16: some products offer a real bore AND the 999
+            // bore-to-order sentinel (e.g. Asanti Forged 862 is [73.1, 999]),
+            // so the chip row must not present 999 as a measurement either.
+            formatValue={(v) =>
+              isSentinelBore(v) ? "Bore-to-order" : null
+            }
           />
         )}
         {availableLoads.length > 1 && (

@@ -36,13 +36,13 @@ export class OrderPage extends BasePage {
     this.orderDate = this.container.getByTestId("order-date")
     this.orderId = this.container.getByTestId("order-id")
     this.orderStatus = this.container.getByTestId("order-status")
-    this.cartSubtotal = this.container.getByTestId("cart-subtotal")
+    this.cartSubtotal = this.container.getByTestId("cart-items")
     this.cartDiscount = this.container.getByTestId("cart-discount")
     this.cartGiftCardAmount = this.container.getByTestId(
       "cart-gift-card-amount"
     )
     this.cartShipping = this.container.getByTestId("cart-shipping")
-    this.cartTaxes = this.container.getByTestId("cart-taxes")
+    this.cartTaxes = this.container.getByTestId("cart-tax")
     this.cartTotal = this.container.getByTestId("cart-total")
     this.orderPaymentStatus = this.container.getByTestId("order-payment-status")
     this.shippingAddressSummary = this.container.getByTestId(

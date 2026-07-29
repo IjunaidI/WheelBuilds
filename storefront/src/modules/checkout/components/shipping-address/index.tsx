@@ -4,8 +4,10 @@ import Checkbox from "@modules/common/components/checkbox"
 import Input from "@modules/common/components/input"
 import { mapKeys } from "lodash"
 import React, { useEffect, useMemo, useState } from "react"
+import { normalizeUsState } from "@lib/util/us-states"
 import AddressSelect from "../address-select"
 import CountrySelect from "../country-select"
+import StateSelect from "../state-select"
 
 const ShippingAddress = ({
   customer,
@@ -49,7 +51,16 @@ const ShippingAddress = ({
         "shipping_address.postal_code": address?.postal_code || "",
         "shipping_address.city": address?.city || "",
         "shipping_address.country_code": address?.country_code || "",
-        "shipping_address.province": address?.province || "",
+        // WB-118 Q-07: a saved address predating the picker may hold a full
+        // name ("Illinois") or junk ("Chicago"). A <select> renders an
+        // unknown value as blank and would then submit empty, so normalise:
+        // "Illinois" -> "IL" preselects correctly, while "Chicago" -> null ->
+        // "" forces the shopper to pick a real state instead of silently
+        // carrying junk into the tax lookup.
+        "shipping_address.province":
+          (address?.country_code?.toLowerCase() === "us"
+            ? normalizeUsState(address?.province || "")
+            : address?.province) || "",
         "shipping_address.phone": address?.phone || "",
       }))
 
@@ -171,15 +182,31 @@ const ShippingAddress = ({
           required
           data-testid="shipping-country-select"
         />
-        <Input
-          label="State / Province"
-          name="shipping_address.province"
-          autoComplete="address-level1"
-          value={formData["shipping_address.province"]}
-          onChange={handleChange}
-          required
-          data-testid="shipping-province-input"
-        />
+        {/* WB-118 Q-07: a free-text province let "Chicago" through into the
+            state field, which then drove the tax lookup and the shipping
+            label with no error anywhere. Constrained for US addresses only —
+            every other country keeps the free-text input, since they are not
+            US states. */}
+        {formData["shipping_address.country_code"]?.toLowerCase() === "us" ? (
+          <StateSelect
+            name="shipping_address.province"
+            autoComplete="address-level1"
+            value={formData["shipping_address.province"]}
+            onChange={handleChange}
+            required
+            data-testid="shipping-province-select"
+          />
+        ) : (
+          <Input
+            label="State / Province"
+            name="shipping_address.province"
+            autoComplete="address-level1"
+            value={formData["shipping_address.province"]}
+            onChange={handleChange}
+            required
+            data-testid="shipping-province-input"
+          />
+        )}
       </div>
       <div className="my-8">
         <Checkbox

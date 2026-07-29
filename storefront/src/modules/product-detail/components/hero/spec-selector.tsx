@@ -10,6 +10,13 @@ type SpecSelectorProps = {
   onSelect: (v: number) => void
   /** Suffix shown on each chip, e.g. "mm" or "lb". */
   unit?: string
+  /**
+   * Overrides a chip's text for specific values (WB-121 Q-16). Used for the
+   * centre-bore selector, where WheelPros' 999 sentinel means bore-to-order
+   * and must not be offered as a literal "999mm" measurement. Returning
+   * `null` falls back to `value + unit`.
+   */
+  formatValue?: (v: number) => string | null
 }
 
 /**
@@ -17,7 +24,14 @@ type SpecSelectorProps = {
  * progressive-disclosure Center Bore / Load Rating selectors — rendered by the
  * hero only when a (size, offset) genuinely branches on that axis (WB-051).
  */
-const SpecSelector = ({ label, values, selected, onSelect, unit }: SpecSelectorProps) => (
+const SpecSelector = ({
+  label,
+  values,
+  selected,
+  onSelect,
+  unit,
+  formatValue,
+}: SpecSelectorProps) => (
   <div>
     <Label tone="muted" style={{ display: "block", marginBottom: 8 }}>
       {label}
@@ -37,8 +51,7 @@ const SpecSelector = ({ label, values, selected, onSelect, unit }: SpecSelectorP
                 : "border-[var(--hairline)] bg-white text-[var(--ink)] hover:border-[var(--ink)]"
             )}
           >
-            {v}
-            {unit ?? ""}
+            {formatValue?.(v) ?? `${v}${unit ?? ""}`}
           </button>
         )
       })}

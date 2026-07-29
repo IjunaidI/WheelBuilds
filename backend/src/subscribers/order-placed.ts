@@ -46,8 +46,23 @@ export default async function orderPlacedHandler({
         preview: 'Thank you for your order!'
       }
     })
-  } catch (error) {
-    console.error('Error sending order confirmation notification:', error)
+  } catch (error: any) {
+    // WB-119 Q-19. This was `console.error`, which meant a failed order
+    // confirmation was effectively invisible: WB-094 deliberately made the
+    // Resend provider THROW rather than silently record success, and this
+    // catch threw that signal straight back away. In production "the customer
+    // never got their email" read identically to "sent fine" — which is
+    // exactly what the QA tester hit. Route it through the Medusa logger so it
+    // lands in production logs like every other backend error.
+    //
+    // Still swallowed rather than rethrown, deliberately: the order is already
+    // placed and paid. Failing the subscriber would have the event bus retry
+    // the whole handler and risk a duplicate send, which is worse for the
+    // customer than a missing email that is loud in the logs.
+    const logger = container.resolve(ContainerRegistrationKeys.LOGGER)
+    logger.error(
+      `Failed to send order confirmation for order ${data.id}: ${error?.message ?? error}`
+    )
   }
 }
 

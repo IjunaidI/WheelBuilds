@@ -1,3 +1,5 @@
+import { FREE_SHIPPING_THRESHOLD_USD } from "@lib/util/shipping-threshold"
+
 /**
  * PDP presentation config (WB-029). De-hardcodes values that were literals in
  * the PDP components. Each numeric reads an optional NEXT_PUBLIC_PDP_* env
@@ -20,8 +22,17 @@ export const DEFAULT_TIRE_QTY = intEnv(process.env.NEXT_PUBLIC_PDP_TIRE_DEFAULT_
 /** On-hand count at or below which a size shows "low stock". */
 export const LOW_STOCK_THRESHOLD = intEnv(process.env.NEXT_PUBLIC_PDP_LOW_STOCK_THRESHOLD, 4)
 
-/** Free-shipping order threshold shown in the trust strip (USD). */
-export const FREE_SHIP_THRESHOLD_USD = intEnv(process.env.NEXT_PUBLIC_PDP_FREE_SHIP_USD, 199)
+/**
+ * Free-shipping order threshold shown in the trust strip (USD).
+ *
+ * WB-118 Q-05: this used to own its own copy of the number. It is now a
+ * re-export of the shared `FREE_SHIPPING_THRESHOLD_USD`, which the checkout
+ * trust strip, home merchandising and the shipping policy page all read too —
+ * the figure stopped being PDP-specific once five surfaces advertised it. The
+ * legacy `NEXT_PUBLIC_PDP_FREE_SHIP_USD` override still works (see that
+ * module); this alias is kept so existing importers don't break.
+ */
+export const FREE_SHIP_THRESHOLD_USD = FREE_SHIPPING_THRESHOLD_USD
 
 /** Lead-time copy on in-stock sizes. */
 export const SHIP_LEAD_TIME = process.env.NEXT_PUBLIC_PDP_SHIP_LEAD_TIME ?? "ships 2–3 days"

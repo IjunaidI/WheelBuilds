@@ -6,6 +6,7 @@ import { useGarage } from "@lib/garage/use-garage"
 import { openSearch } from "@lib/stores/search-store"
 import Icon from "@modules/common/components/icon"
 import Label from "@modules/common/components/label"
+import FacetCount from "@modules/common/components/facet-count"
 import Field from "@modules/common/components/field"
 import TextInput from "@modules/common/components/text-input"
 import {
@@ -107,6 +108,12 @@ const ChecklistSection = <T extends string | number>({
 
 type FilterSectionsProps = {
   facets: FacetCounts
+  /**
+   * Real catalog price range in whole dollars (WB-120 Q-15). `null`/absent
+   * keeps the previous static placeholders rather than showing a fabricated
+   * bound — a wrong hint would suggest products exist outside the range.
+   */
+  priceBounds?: { minUsd: number; maxUsd: number } | null
   /** Hides the clear-all button (used inside the mobile drawer which has its own footer). */
   hideClearAll?: boolean
   /**
@@ -132,6 +139,7 @@ type FilterSectionsProps = {
  */
 const FilterSections = ({
   facets,
+  priceBounds,
   hideClearAll,
   instanceId = "rail",
   hideBrand = false,
@@ -276,13 +284,16 @@ const FilterSections = ({
 
       <Accordion
         type="multiple"
-        defaultValue={["brand", "diameter", "finish"]}
+        defaultValue={["brand", "diameter", "bolt-pattern", "finish"]}
         className="rounded-[var(--radius)] border border-[var(--hairline)] bg-white px-4"
       >
         {!hideBrand && (
           <>
             <AccordionItem value="brand">
-              <AccordionTrigger>Brand</AccordionTrigger>
+              <AccordionTrigger>
+                Brand
+                <FacetCount count={Object.keys(facets.brands ?? {}).length} />
+              </AccordionTrigger>
               <AccordionContent>
                 <ChecklistSection
                   facetMap={facets.brands}
@@ -300,7 +311,10 @@ const FilterSections = ({
         )}
 
         <AccordionItem value="diameter">
-          <AccordionTrigger>Diameter</AccordionTrigger>
+          <AccordionTrigger>
+                Diameter
+                <FacetCount count={Object.keys(facets.diameters ?? {}).length} />
+              </AccordionTrigger>
           <AccordionContent>
             <ChecklistSection
               facetMap={facets.diameters}
@@ -318,7 +332,10 @@ const FilterSections = ({
         <Separator />
 
         <AccordionItem value="bolt-pattern">
-          <AccordionTrigger>Bolt pattern</AccordionTrigger>
+          <AccordionTrigger>
+                Bolt pattern
+                <FacetCount count={Object.keys(facets.boltPatterns ?? {}).length} />
+              </AccordionTrigger>
           <AccordionContent>
             <ChecklistSection
               facetMap={facets.boltPatterns}
@@ -335,7 +352,10 @@ const FilterSections = ({
         <Separator />
 
         <AccordionItem value="finish">
-          <AccordionTrigger>Finish</AccordionTrigger>
+          <AccordionTrigger>
+                Finish
+                <FacetCount count={Object.keys(facets.finishes ?? {}).length} />
+              </AccordionTrigger>
           <AccordionContent>
             <ChecklistSection
               facetMap={facets.finishes}
@@ -360,7 +380,7 @@ const FilterSections = ({
                   id={`filter-${instanceId}-price-min`}
                   type="number"
                   inputMode="numeric"
-                  placeholder="$0"
+                  placeholder={priceBounds ? `$${priceBounds.minUsd}` : "$0"}
                   value={minInput}
                   onChange={(e) => setMinInput(e.target.value)}
                   onBlur={commitPrice}
@@ -372,7 +392,7 @@ const FilterSections = ({
                   id={`filter-${instanceId}-price-max`}
                   type="number"
                   inputMode="numeric"
-                  placeholder="$2,500"
+                  placeholder={priceBounds ? `$${priceBounds.maxUsd.toLocaleString()}` : "$2,500"}
                   value={maxInput}
                   onChange={(e) => setMaxInput(e.target.value)}
                   onBlur={commitPrice}
@@ -380,10 +400,14 @@ const FilterSections = ({
                 />
               </Field>
             </div>
-            {/* TODO(integration): replace the two TextInputs with a
-                <Slider value={[min, max]}/> (shadcn primitive — install with
-                `npx shadcn@2.1.8 add slider`) once a real min/max range
-                comes from Meilisearch's price aggregation. */}
+            {/* WB-120 Q-15: the real min/max now comes from Meilisearch
+                `facetStats` and drives the placeholders above. The remaining
+                half of the old TODO — swapping these inputs for a
+                <Slider value={[min, max]}/> (shadcn, `npx shadcn@2.1.8 add
+                slider`) — is split out rather than bundled here, because it
+                needs a new Radix dependency and pnpm is not reliably on PATH
+                on Windows (see storefront/CLAUDE.md). Bounds are the
+                substance; the slider is presentation. */}
           </AccordionContent>
         </AccordionItem>
       </Accordion>

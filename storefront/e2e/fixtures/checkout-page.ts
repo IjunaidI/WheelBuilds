@@ -222,13 +222,13 @@ export class CheckoutPage extends BasePage {
     this.giftCardRemoveButton = this.container.getByTestId(
       "remove-gift-card-button"
     )
-    this.cartSubtotal = this.container.getByTestId("cart-subtotal")
+    this.cartSubtotal = this.container.getByTestId("cart-items")
     this.cartDiscount = this.container.getByTestId("cart-discount")
     this.cartGiftCardAmount = this.container.getByTestId(
       "cart-gift-card-amount"
     )
     this.cartShipping = this.container.getByTestId("cart-shipping")
-    this.cartTaxes = this.container.getByTestId("cart-taxes")
+    this.cartTaxes = this.container.getByTestId("cart-tax")
     this.cartTotal = this.container.getByTestId("cart-total")
     this.itemsTable = this.container.getByTestId("items-table")
     this.itemRow = this.container.getByTestId("item-row")

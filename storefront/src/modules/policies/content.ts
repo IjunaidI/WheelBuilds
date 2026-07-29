@@ -1,3 +1,4 @@
+import { FREE_SHIPPING_THRESHOLD_USD } from "@lib/util/shipping-threshold"
 import type { PolicyContent } from "./templates/policy-page"
 
 /**
@@ -7,7 +8,9 @@ import type { PolicyContent } from "./templates/policy-page"
  * wheel-industry-standard draft written so these pages EXIST (Stripe live
  * mode + ad networks expect them). It states nothing known to be false, but
  * the merchant must review and own it before launch — go-live runbook §7.
- * The shipping thresholds ARE real (WB-071: free ≥ $199, else $10).
+ * The shipping THRESHOLD is real and now reads from one constant
+ * (`FREE_SHIPPING_THRESHOLD_USD`); the flat $10 is still hard-coded here
+ * pending the client's real carrier rates (WB-123).
  */
 
 export const SHIPPING_POLICY: PolicyContent = {
@@ -20,8 +23,8 @@ export const SHIPPING_POLICY: PolicyContent = {
     {
       heading: "Rates",
       bullets: [
-        "Orders of $199 or more ship FREE (standard ground).",
-        "Orders under $199 ship at a flat $10 (standard ground).",
+        `Orders of $${FREE_SHIPPING_THRESHOLD_USD} or more ship FREE (standard ground).`,
+        `Orders under $${FREE_SHIPPING_THRESHOLD_USD} ship at a flat $10 (standard ground).`,
         "Express shipping is available at checkout where supported.",
       ],
     },

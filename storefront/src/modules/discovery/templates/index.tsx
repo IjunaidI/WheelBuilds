@@ -68,12 +68,17 @@ const DiscoveryTemplate = ({
       <ActiveChips />
       <MobileFilterTrigger
         facets={result.facets}
+        priceBounds={result.priceBounds}
         totalCount={result.totalCount}
         isCapped={result.isCapped}
         hideBrand={hideBrand}
       />
       <div className="flex items-start gap-8">
-        <FilterRail facets={result.facets} hideBrand={hideBrand} />
+        <FilterRail
+          facets={result.facets}
+          priceBounds={result.priceBounds}
+          hideBrand={hideBrand}
+        />
         <div className="flex-1 min-w-0">
           {result.ok === false ? (
             <DiscoveryOutage />

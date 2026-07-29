@@ -44,4 +44,13 @@ describe("buildSpecRows", () => {
       "Warranty",
     ])
   })
+
+  // WB-121 Q-16 — 45 live products carry WheelPros' 999 bore-to-order
+  // sentinel, which the `> 0` guard let through as a plausible "999 mm".
+  it("renders the 999 sentinel as bore-to-order copy, not a number", () => {
+    const rows = buildSpecRows({ ...base, centerBoreMm: 999 })
+    const bore = rows.find((r) => r.label === "Center bore")
+    expect(bore?.value).toBe("Custom / bore-to-order")
+    expect(bore?.value).not.toContain("999")
+  })
 })

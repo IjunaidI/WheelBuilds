@@ -10,6 +10,7 @@ import { openSearch } from "@lib/stores/search-store"
 import { useSelectedTireFit } from "@lib/stores/selected-tire-fit"
 import { tireFitVerdict } from "@lib/fitment/tire-fits-vehicle"
 import { entryMatchesVehicle } from "@lib/fitment/vehicle-entry-match"
+import { fitmentCheckHref } from "@modules/support/fitment-check-link"
 import { TireFitmentEntry, TireProductDetail } from "../../data/types"
 
 type TireFitmentProps = {
@@ -178,15 +179,21 @@ const TireFitment = ({ product }: TireFitmentProps) => {
         })}
       </div>
 
+      {/* WB-119 Q-20: this used to link to a /contact page with no form on it,
+          under a promise of a reply "within 24 hours" — so the highest-intent
+          lead the site can capture went nowhere. The href now carries the
+          active vehicle and this product so the form arrives prefilled, and
+          the timeframe claim is dropped until the client confirms one
+          (docs/reference/client-input-needed.md item 5). */}
       <p className="mt-6 text-[12px] text-[var(--ink-soft)] font-[var(--mono)] leading-relaxed">
         Don&apos;t see your vehicle?{" "}
         <LocalizedClientLink
-          href="/contact"
+          href={fitmentCheckHref({ vehicle: active, productHandle: product.handle })}
           className="text-[var(--orange-deep)] font-semibold no-underline hover:underline"
         >
           Submit your vehicle for a fitment check
         </LocalizedClientLink>{" "}
-        — we usually confirm within 24 hours.
+        — we&apos;ll get back to you by email.
       </p>
     </section>
   )

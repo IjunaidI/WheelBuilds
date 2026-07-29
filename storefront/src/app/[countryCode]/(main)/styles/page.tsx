@@ -32,8 +32,8 @@ export const metadata: Metadata = {
  * is dropped by `styleTiles` itself, same as the homepage section.
  */
 export default async function StylesPage() {
-  const { facets } = await getHomeCatalog()
-  const tiles = styleTiles(facets).map((tile) => ({
+  const { facets, styleCounts } = await getHomeCatalog()
+  const tiles = styleTiles(facets, styleCounts).map((tile) => ({
     ...tile,
     href: `/styles/${styleSlug(tile.label)}`,
   }))

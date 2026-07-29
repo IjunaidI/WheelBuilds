@@ -18,6 +18,8 @@ import { mobileTriggerLabel, mobileDrawerCta } from "./mobile-trigger-copy"
 
 type MobileFilterTriggerProps = {
   facets: FacetCounts
+  /** Real catalog price range (WB-120 Q-15) — kept in step with the desktop rail. */
+  priceBounds?: { minUsd: number; maxUsd: number } | null
   totalCount: number
   /**
    * True when fit mode's candidate cap may have hidden additional matches
@@ -38,6 +40,7 @@ type MobileFilterTriggerProps = {
  */
 const MobileFilterTrigger = ({
   facets,
+  priceBounds,
   totalCount,
   isCapped = false,
   hideBrand = false,
@@ -109,6 +112,7 @@ const MobileFilterTrigger = ({
           <div className="flex-1 overflow-y-auto p-5">
             <FilterSections
               facets={facets}
+              priceBounds={priceBounds}
               hideClearAll
               instanceId="drawer"
               hideBrand={hideBrand}

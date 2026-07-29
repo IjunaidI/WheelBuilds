@@ -16,6 +16,7 @@ import { Separator } from "@/components/ui/separator"
 import Field from "@modules/common/components/field"
 import Icon from "@modules/common/components/icon"
 import Label from "@modules/common/components/label"
+import FacetCount from "@modules/common/components/facet-count"
 import TextInput from "@modules/common/components/text-input"
 
 import { useTireQuery } from "../../use-tire-query"
@@ -276,11 +277,14 @@ const FilterSections = ({
 
       <Accordion
         type="multiple"
-        defaultValue={["brand", "rim-diameter", "tire-type"]}
+        defaultValue={["brand", "rim-diameter", "size", "tire-type"]}
         className="rounded-[var(--radius)] border border-[var(--hairline)] bg-white px-4"
       >
         <AccordionItem value="brand">
-          <AccordionTrigger>Brand</AccordionTrigger>
+          <AccordionTrigger>
+                Brand
+                <FacetCount count={Object.keys(facets.brands ?? {}).length} />
+              </AccordionTrigger>
           <AccordionContent>
             <ChecklistSection
               facetMap={facets.brands}
@@ -296,7 +300,10 @@ const FilterSections = ({
         <Separator />
 
         <AccordionItem value="rim-diameter">
-          <AccordionTrigger>Rim diameter</AccordionTrigger>
+          <AccordionTrigger>
+                Rim diameter
+                <FacetCount count={Object.keys(facets.rimDiameters ?? {}).length} />
+              </AccordionTrigger>
           <AccordionContent>
             <ChecklistSection
               facetMap={facets.rimDiameters}
@@ -314,7 +321,10 @@ const FilterSections = ({
         <Separator />
 
         <AccordionItem value="size">
-          <AccordionTrigger>Size</AccordionTrigger>
+          <AccordionTrigger>
+                Size
+                <FacetCount count={Object.keys(facets.sizes ?? {}).length} />
+              </AccordionTrigger>
           <AccordionContent>
             <TextInput
               type="text"
@@ -344,7 +354,10 @@ const FilterSections = ({
         <Separator />
 
         <AccordionItem value="tire-type">
-          <AccordionTrigger>Tire type</AccordionTrigger>
+          <AccordionTrigger>
+                Tire type
+                <FacetCount count={Object.keys(facets.tireTypes ?? {}).length} />
+              </AccordionTrigger>
           <AccordionContent>
             <ChecklistSection
               facetMap={facets.tireTypes}
@@ -361,7 +374,10 @@ const FilterSections = ({
         <Separator />
 
         <AccordionItem value="speed-rating">
-          <AccordionTrigger>Speed rating</AccordionTrigger>
+          <AccordionTrigger>
+                Speed rating
+                <FacetCount count={Object.keys(facets.speedRatings ?? {}).length} />
+              </AccordionTrigger>
           <AccordionContent>
             <ChecklistSection
               facetMap={facets.speedRatings}
@@ -377,7 +393,10 @@ const FilterSections = ({
         <Separator />
 
         <AccordionItem value="load-rating">
-          <AccordionTrigger>Load rating</AccordionTrigger>
+          <AccordionTrigger>
+                Load rating
+                <FacetCount count={Object.keys(facets.loadIndexes ?? {}).length} />
+              </AccordionTrigger>
           <AccordionContent>
             <ChecklistSection
               facetMap={facets.loadIndexes}

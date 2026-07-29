@@ -6,6 +6,7 @@ import { useGarage } from "@lib/garage/use-garage"
 import { openSearch } from "@lib/stores/search-store"
 import Icon from "@modules/common/components/icon"
 import Label from "@modules/common/components/label"
+import FacetCount from "@modules/common/components/facet-count"
 import Field from "@modules/common/components/field"
 import TextInput from "@modules/common/components/text-input"
 import {
@@ -276,13 +277,16 @@ const FilterSections = ({
 
       <Accordion
         type="multiple"
-        defaultValue={["brand", "diameter", "finish"]}
+        defaultValue={["brand", "diameter", "bolt-pattern", "finish"]}
         className="rounded-[var(--radius)] border border-[var(--hairline)] bg-white px-4"
       >
         {!hideBrand && (
           <>
             <AccordionItem value="brand">
-              <AccordionTrigger>Brand</AccordionTrigger>
+              <AccordionTrigger>
+                Brand
+                <FacetCount count={Object.keys(facets.brands ?? {}).length} />
+              </AccordionTrigger>
               <AccordionContent>
                 <ChecklistSection
                   facetMap={facets.brands}
@@ -300,7 +304,10 @@ const FilterSections = ({
         )}
 
         <AccordionItem value="diameter">
-          <AccordionTrigger>Diameter</AccordionTrigger>
+          <AccordionTrigger>
+                Diameter
+                <FacetCount count={Object.keys(facets.diameters ?? {}).length} />
+              </AccordionTrigger>
           <AccordionContent>
             <ChecklistSection
               facetMap={facets.diameters}
@@ -318,7 +325,10 @@ const FilterSections = ({
         <Separator />
 
         <AccordionItem value="bolt-pattern">
-          <AccordionTrigger>Bolt pattern</AccordionTrigger>
+          <AccordionTrigger>
+                Bolt pattern
+                <FacetCount count={Object.keys(facets.boltPatterns ?? {}).length} />
+              </AccordionTrigger>
           <AccordionContent>
             <ChecklistSection
               facetMap={facets.boltPatterns}
@@ -335,7 +345,10 @@ const FilterSections = ({
         <Separator />
 
         <AccordionItem value="finish">
-          <AccordionTrigger>Finish</AccordionTrigger>
+          <AccordionTrigger>
+                Finish
+                <FacetCount count={Object.keys(facets.finishes ?? {}).length} />
+              </AccordionTrigger>
           <AccordionContent>
             <ChecklistSection
               facetMap={facets.finishes}

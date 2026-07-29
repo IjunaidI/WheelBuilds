@@ -51,6 +51,17 @@ const Payment = ({
 
   const useOptions: StripeCardElementOptions = useMemo(() => {
     return {
+      // WB-118 Q-08 — the QA pass asked for a postal code on the card form.
+      // Stripe's CardElement already defaults `hidePostalCode` to false, so
+      // AVS postal-code collection was most likely working; this makes the
+      // intent EXPLICIT rather than depending on a library default that a
+      // future @stripe/stripe-js release could flip. Postal-code (AVS) checks
+      // are a primary card-fraud control and some issuers decline without one,
+      // so this must never be silently turned off.
+      //
+      // Do not set this to `true` unless the billing postal code is being
+      // collected somewhere else and passed to the PaymentIntent.
+      hidePostalCode: false,
       style: {
         base: {
           fontFamily: "Inter, sans-serif",

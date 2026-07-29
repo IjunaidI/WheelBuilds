@@ -61,6 +61,19 @@ import { ContainerRegistrationKeys, Modules } from "@medusajs/framework/utils"
  *      (adds/updates the free-over-$199 USD price on Standard + Express)
  */
 
+/**
+ * ⚠️ LOCKSTEP TWIN: `FREE_SHIPPING_THRESHOLD_USD` in
+ * `storefront/src/lib/util/shipping-threshold.ts`, which drives the
+ * customer-facing "$199+" copy on the checkout trust strip, two home
+ * merchandising entries, the shipping policy page and the PDP.
+ *
+ * The two apps install separately (no workspace tool), so this cannot be a
+ * shared import. Change BOTH together, then re-run this script against every
+ * environment — otherwise the site advertises a threshold the cart does not
+ * apply, which is exactly what the 2026-07-28 QA pass found: a live $333 cart
+ * was still charged $10 shipping because this script had never been run
+ * against production (WB-118 Q-05).
+ */
 const FREE_SHIP_THRESHOLD_USD = 199
 const TARGET_OPTION_NAMES = ["Standard Shipping", "Express Shipping"]
 

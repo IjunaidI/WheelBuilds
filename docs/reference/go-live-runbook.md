@@ -171,3 +171,58 @@ Los Angeles CA, must return DIFFERENT tax.
 Both methods currently quote **$10.00**, so "Express — ship in 24 hours" costs the
 same as "Standard — 2-3 days". Tracked as WB-123; blocked on real carrier rates
 (see [client-input-needed.md §2](client-input-needed.md)).
+
+## WB-119 — support & lead capture (added 2026-07-29)
+
+### 1. Deploy order is NOT optional
+
+The storefront form posts to a route that must already exist:
+
+1. **Deploy the backend first.** `init-backend` applies
+   `Migration20260729113453`, creating `support_request`.
+2. **Then** set the storefront vars and rebuild.
+
+Shipping the storefront first makes every submission 404 — and because the
+form's whole purpose is that a lead is never lost, that is the one failure
+mode worth ordering around.
+
+### 2. Support channels
+
+```
+NEXT_PUBLIC_SUPPORT_EMAIL=
+NEXT_PUBLIC_SUPPORT_PHONE=
+```
+
+Each renders on `/contact` ONLY when set — a fabricated address silently
+swallows customer mail, so there is no default. Both are `NEXT_PUBLIC_*` and
+inlined at BUILD time: **setting them without rebuilding the storefront
+changes nothing.**
+
+Values are pending from the client — [client-input-needed.md item 4](client-input-needed.md).
+
+### 3. Reading submissions
+
+There is no admin UI yet. Until there is, read them from the database:
+
+```sql
+select created_at, source, name, email, phone, vehicle, product_handle, subject, message
+from support_request
+where deleted_at is null
+order by created_at desc
+limit 50;
+```
+
+`source` is `contact` or `fitment-check`. `notified_at` stays null until email
+delivery is switched on.
+
+**Follow-up:** an admin console route (mirroring the vendor-sync console,
+WB-006) is the proper home for this — worth doing before volume picks up,
+since nobody is notified of a new submission today.
+
+### 4. Email delivery is still impossible
+
+Order confirmations, password resets and everything else remain undeliverable
+until a real sending domain exists ([client-input-needed.md item 6](client-input-needed.md)).
+The code is ready and every send failure is now logged loudly; the config is
+not. When the domain lands: set `RESEND_API_KEY`, `RESEND_FROM_EMAIL` and
+`STOREFRONT_URL`, then place one test order and watch the logs.

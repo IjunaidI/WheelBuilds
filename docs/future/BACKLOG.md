@@ -1309,7 +1309,7 @@
 - refs: [design Wave 1](../in-progress/specs/2026-07-29-qa-remediation-design.md)
 
 ### WB-119 · Support & lead capture — contact page has no contact channel   [HIGH]
-- status: todo
+- status: done (code) 2026-07-29 on `feat/g13-qa-remediation`
 - area: storefront/policies + storefront/product-detail + backend (new `support-request` module)
 - evidence: live `/us/contact` fetched 2026-07-29 contains **0 form elements, 0 inputs, 0 `mailto:`, 0 `tel:`**. Six surfaces route there and dead-end: `(checkout)/layout.tsx:36`, `account/@dashboard/orders/page.tsx:67`, `profile-email/index.tsx:30`, `account-layout.tsx:33`, `order/components/help/index.tsx:12`, `product-detail/components/tire/fitment.tsx:184`.
 - problem: Q-04 no way to reach support, while the returns policy says "contact us BEFORE ordering" (`policies/content.ts:74`) and WB-098's out-of-stock CTA says "special order — contact us to order" — so every special-order sale has no channel to arrive through · Q-20 "Submit your vehicle for a fitment check" (`tire/fitment.tsx:187`) promises a 24h reply and links to that empty page · Q-19 order confirmation email never arrives.
@@ -1317,6 +1317,14 @@
 - verify: migration applies; a submission persists and survives a failing notifier; the static channel is absent when env is unset; the `order.placed` → subscriber → template → provider path passes with a stub and the template key matches an `EmailTemplates` enum entry.
 - deploy: **backend FIRST, then storefront** — the route must exist before the form ships or every submission 404s.
 - blocked-on (does not block starting): the real support email + phone. Resend delivery is explicitly out of scope until a sending domain exists.
+- **done (code) 2026-07-29.** Commits: shared email helpers `b969fcc`, module `d2f54e4`, route `226a075`, form+page `e08e2ea`, fitment CTAs `62f2741`, subscriber sweep `db4180b`.
+- **⚠️ correction to the spec, found by reading the source:** the contact page was NOT featureless. `contact/page.tsx` already read `NEXT_PUBLIC_SUPPORT_EMAIL` and rendered a `mailto:` when set (WB-081) — it is unset in production, so the page fell through to its prose fallback and *rendered* as empty. The email channel is a **config gap**; the form and the phone sibling were the real code gap.
+- **⚠️ Q-19 was bigger than one file.** WB-094 made the Resend provider throw instead of silently recording success, but EVERY subscriber above it wrapped `createNotifications` in `catch { console.error }` — throwing that signal away, so a failed send read identically to a successful one in production. Fixed across all five (`order-placed`, `order-canceled`, `shipment-created`, `auth-password-reset`, `invite-created`); the plan had named only the first. Deliberately still swallowed rather than rethrown — the order is placed and paid, so a retry risks a duplicate send.
+- design decision: **persist-then-notify.** The route stores the row before attempting any notification and the 201 does not depend on delivery, because email cannot be sent at all right now — a submission that only sent an email would be lost forever. `notified_at` is carried from the start so a future notifier can tell which stored requests still need one.
+- gate: backend jest **779 passing / 12 skipped**, tsc 0, `medusa build` 0; storefront vitest **916 / 126 files**, tsc **2-error baseline**, `next build` compiles.
+- **deploy: BACKEND FIRST**, then the storefront — the route must exist before the form ships or every submission 404s. See the runbook.
+- **still blocked on the client (does not block the code):** the support email + phone (renders nothing until set) and a sending domain for email delivery. Both in [client-input-needed.md](../reference/client-input-needed.md) items 4 and 6.
+- follow-up: no admin UI for reading submissions — SQL query documented in the runbook; an admin console route mirroring WB-006 is the proper home, worth doing before volume picks up since nobody is notified of a new submission today.
 - refs: [design Wave 2](../in-progress/specs/2026-07-29-qa-remediation-design.md)
 
 ### WB-120 · Discovery & availability truth — collapsed facets, over-claiming style counts   [HIGH]

@@ -2,17 +2,48 @@ import { Metadata } from "next"
 import Label from "@modules/common/components/label"
 import Display from "@modules/common/components/display"
 import LocalizedClientLink from "@modules/common/components/localized-client-link"
+import ContactForm from "@modules/support/components/contact-form"
+import { supportChannels } from "@modules/support/support-config"
 
 export const metadata: Metadata = {
   title: "Contact",
   description: "Get help with an order, fitment, returns, or anything else.",
 }
 
-// Client-visible support inbox. Optional — when unset we point at the
-// order-email reply path instead of fabricating an address (WB-081).
-const SUPPORT_EMAIL = process.env.NEXT_PUBLIC_SUPPORT_EMAIL
+type ContactPageProps = {
+  params: Promise<{ countryCode: string }>
+  searchParams: Promise<{
+    subject?: string
+    vehicle?: string
+    product?: string
+    source?: string
+  }>
+}
 
-export default function ContactPage() {
+/**
+ * WB-119 Q-04.
+ *
+ * Before this, the rendered page had no form, no email and no phone — three
+ * FAQ links and nothing else — while SIX surfaces sent customers here,
+ * including the returns policy ("contact us BEFORE ordering") and the
+ * out-of-stock CTA ("special order — contact us to order"). Every
+ * special-order enquiry had no way to arrive.
+ *
+ * The `mailto:` half already existed (WB-081) but renders only when
+ * `NEXT_PUBLIC_SUPPORT_EMAIL` is set, which it is not in production — so the
+ * page fell through to its prose fallback and read as empty. Both channels
+ * stay env-gated (a fabricated address is worse than none), but the FORM now
+ * works regardless, because submissions are stored server-side before any
+ * notification is attempted.
+ */
+export default async function ContactPage({
+  params,
+  searchParams,
+}: ContactPageProps) {
+  const { countryCode } = await params
+  const { subject, vehicle, product, source } = await searchParams
+  const channels = supportChannels()
+
   return (
     <div className="px-5 xsmall:px-8 small:px-20 py-14 small:py-20">
       <div style={{ maxWidth: 760 }}>
@@ -24,45 +55,58 @@ export default function ContactPage() {
         </Display>
 
         <div style={{ marginTop: 26 }}>
-          {SUPPORT_EMAIL ? (
-            <>
-              <p
-                style={{
-                  fontSize: 14,
-                  lineHeight: 1.75,
-                  color: "var(--graphite)",
-                  margin: "0 0 10px",
-                }}
-              >
-                Questions about an order, fitment for your vehicle, or a return?
-                Email us — a real person answers.
-              </p>
-              <a
-                href={`mailto:${SUPPORT_EMAIL}`}
-                style={{
-                  fontSize: 18,
-                  color: "var(--orange-deep)",
-                  textDecoration: "none",
-                  fontWeight: 600,
-                }}
-              >
-                {SUPPORT_EMAIL}
-              </a>
-            </>
-          ) : (
-            <p
-              style={{
-                fontSize: 14,
-                lineHeight: 1.75,
-                color: "var(--graphite)",
-                margin: 0,
-              }}
-            >
-              Questions about an order, fitment for your vehicle, or a return?
-              Reply to any order or account email from us and it lands in our
-              support inbox — a real person answers.
-            </p>
+          <p
+            style={{
+              fontSize: 14,
+              lineHeight: 1.75,
+              color: "var(--graphite)",
+              margin: "0 0 10px",
+            }}
+          >
+            Questions about an order, fitment for your vehicle, or a return?
+            Send us a message below — a real person answers.
+          </p>
+
+          {channels.hasAny && (
+            <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+              {channels.email && (
+                <a
+                  href={`mailto:${channels.email}`}
+                  style={{
+                    fontSize: 18,
+                    color: "var(--orange-deep)",
+                    textDecoration: "none",
+                    fontWeight: 600,
+                  }}
+                >
+                  {channels.email}
+                </a>
+              )}
+              {channels.phone && (
+                <a
+                  href={`tel:${channels.phone.replace(/[^\d+]/g, "")}`}
+                  style={{
+                    fontSize: 18,
+                    color: "var(--orange-deep)",
+                    textDecoration: "none",
+                    fontWeight: 600,
+                  }}
+                >
+                  {channels.phone}
+                </a>
+              )}
+            </div>
           )}
+        </div>
+
+        <div style={{ marginTop: 30 }}>
+          <ContactForm
+            defaultSubject={subject}
+            vehicle={vehicle}
+            productHandle={product}
+            source={source ?? "contact"}
+            countryCode={countryCode}
+          />
         </div>
 
         <div style={{ marginTop: 34 }}>

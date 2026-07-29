@@ -69,49 +69,65 @@ numbers that contradict each other.
 
 ## The exception to severity ordering
 
-Q-01 and Q-02 are the only issues in the batch marked `UNVERIFIED`. I know **where** the
-disagreement is; I do not yet know **which side is wrong**. So Wave 1 opens with a
+Q-01 and Q-02 were the two `UNVERIFIED` findings. **Q-02 is now root-caused from the
+Medusa 2.13.6 source** (see below) and needs no session. **Q-01 is not**, and the tidy
+hypothesis for it turned out to be provably wrong — so Wave 1 still opens with a
 reproduction task, not a fix task:
 
-> **Task 1 (no production code):** drive a real cart → checkout session against a local
-> backend. Add a wheel and a tire, set quantity above 1, enter a US address, reach the
-> payment step. Capture the raw `StoreCart` payload — every totals field and one full
-> line item — into a fixture. Only then write fixes.
+> **Task 1 (no production code):** drive a real cart to the checkout payment step. Add a
+> wheel and a tire, quantity above 1, US address, a shipping method selected (so shipping
+> is non-zero and Q-02's double-count is visible). Screenshot both `/cart` and
+> `/checkout`, note **which dollar field reads `$0.00`**, and capture the raw `StoreCart`
+> JSON as a fixture. Only then write fixes.
 
-Guessing at a money bug is how you ship a second one. The captured payload becomes the
-test fixture for everything else in this wave, which is the other reason it comes first.
+Guessing at a money bug is how you ship a second one — and this wave already caught itself
+about to do exactly that. The captured payload becomes the test fixture for the rest of
+the wave, which is the other reason it comes first.
+
+**No order is placed.** The session stops at the payment step; an abandoned cart is the
+only trace. If it runs against production rather than a local stack, that is the whole
+extent of the side effect.
 
 ## Q-01 · Cart shows $0 in the main price field
 
-**Leading hypothesis (strong, not yet proven).**
-[`line-item-amounts.ts:29`](../../../storefront/src/lib/util/line-item-amounts.ts)
+**Status: NOT root-caused. Do not fix on the obvious hypothesis — it is wrong.**
+
+The obvious reading of
+[`line-item-amounts.ts:29`](../../../storefront/src/lib/util/line-item-amounts.ts):
 
 ```ts
 const unitPrice = item.unit_price ?? (quantity > 0 ? total / quantity : 0)
 ```
 
-`??` is nullish-coalescing. A `unit_price` of **`0`** is neither `null` nor `undefined`,
-so the fallback never fires and `$0.00` renders — while `LineItemPrice`, which reads
-`item.total`, renders correctly right next to it. That is precisely the reported
-symptom: *"CART PRICE SHOWING 0 IN MAIN FIELD, SHOWING CORRECT PRICE BELOW THO"*.
+`??` is nullish-coalescing, so a `unit_price` of `0` never falls back and `$0.00`
+renders beside a correct line total. Tidy, and it matches the symptom exactly.
 
-Corroborating evidence: checkout's own `LineItemRow`
-([`checkout-summary/index.tsx`](../../../storefront/src/modules/checkout/templates/checkout-summary/index.tsx))
-computes `perEa = total / item.quantity` unconditionally — it never reads `unit_price` —
-and the tester did not report a $0 there.
+**The installed Medusa 2.13.6 source rules it out.** In
+`@medusajs/utils/dist/totals/line-item/index.js`, `getLineItemTotals` does:
 
-**Fix.** Treat a contradictory zero the same way as a missing value: when `unit_price`
-is falsy but `total` and `quantity` are both positive, derive the unit price. A stored
-unit price of `0` alongside a non-zero total is not a legitimate state — it is a
-response-shape artifact, and deriving is strictly safer than displaying a lie.
+```js
+const totalItemPrice = MathBN.mult(item.unit_price, item.quantity)
+// subtotal derives from totalItemPrice; total derives from subtotal
+totals.unit_price = item.unit_price          // passed through, never recomputed
+```
 
-The `lineItemAmounts` docstring's principle (stored amounts are the source of truth,
-live variant data may only decorate) is **preserved** — the derivation uses `item.total`,
-which is still a stored amount. Nothing starts reading live variant prices.
+A `unit_price` of `0` therefore drives `subtotal` **and** `total` to `0`. The tester was
+explicit that the price below was **correct**, so `unit_price` cannot simply be zero —
+and the one-line fix would have shipped a wrong answer to a Critical money bug.
 
-**Test.** Table-driven cases over `lineItemAmounts`, including the real payload shape
-captured in Task 1: `unit_price: 0` + `total: 980` + `quantity: 4` → `245`. Plus a
-genuine free line (`total: 0`, `quantity: 1` → `0`) so the fix cannot mask a real zero.
+**What Task 1 must determine: which rendered dollar field is actually zero.** Candidates:
+
+| Candidate | Why it could render `$0.00` |
+|---|---|
+| Cart line unit-price cell | the `??` path above — now doubted |
+| Cart-page totals rows | `CartTotals` defaults every field `?? 0`, so a **missing** field renders `$0.00` while other rows stay correct |
+| Nav cart dropdown subtotal | separate component, separate field |
+
+Identify the field on screen first, *then* read the raw payload for that field.
+
+**Test (shape known now, values after Task 1).** Table-driven cases over whichever helper
+proves responsible, including a genuine free line (`total: 0`, `quantity: 1` → `0`) so the
+fix cannot mask a legitimate zero.
 
 ## Q-02 · Checkout summary math does not add up
 
@@ -122,18 +138,52 @@ Two different components render totals, with different labels and different fiel
 | `/cart` | [`cart-totals`](../../../storefront/src/modules/common/components/cart-totals/index.tsx) | Subtotal *(excl. shipping and taxes)*, Discount, Shipping, Taxes, Gift card, Total |
 | `/checkout` | `Totals` inside [`checkout-summary`](../../../storefront/src/modules/checkout/templates/checkout-summary/index.tsx) | Subtotal, Discount, Shipping, Tax, TOTAL |
 
-Both render five independent server fields with nothing asserting they reconcile. Two
-candidate causes, to be discriminated by Task 1's captured payload:
+**Root cause: CONFIRMED from the vendor source. No cart session needed.**
 
-- **Medusa v2 totals semantics.** `shipping_total` includes shipping tax, and
-  `tax_total` also includes shipping tax — so a naive
-  `subtotal − discount + shipping + tax` double-counts it. Medusa exposes
-  `shipping_subtotal` / `item_total` / `item_subtotal` precisely to disambiguate.
-- **A stale or differently-scoped field** on one of the two surfaces.
+`@medusajs/utils/dist/totals/cart/index.js` (`decorateCartTotals`, 2.13.6) computes:
 
-**Fix.** Whichever it proves to be, the structural fix is the same: a single pure
-`cartTotalRows(cart)` helper that both surfaces consume, so `/cart` and `/checkout` can
-never again disagree with each other *or* with the charged amount.
+```js
+subtotal = Σ item.subtotal + Σ shippingMethod.subtotal   // lines 66, 87
+taxTotal = itemsTaxTotal + shippingTaxTotal              // line 106
+total    = (subtotal + taxTotal) − discountSubtotal − creditLinesTotal   // lines 111-112
+shipping_total = Σ shippingMethod.total                  // line 92 — tax included
+```
+
+So `cart.subtotal` **already contains the shipping subtotal** — line 87 adds every
+shipping method's subtotal into the same accumulator as the line items.
+
+Now read the rendered rows as arithmetic — `subtotal − discount_total + shipping_total +
+tax_total` — against the real formula. Three separate errors:
+
+1. **Shipping is counted twice.** Its subtotal is already inside `subtotal`, and its tax
+   is already inside `tax_total`; the Shipping row adds `shipping_total` (which is both)
+   on top. The displayed rows overstate by roughly the whole shipping amount.
+2. **Wrong discount field.** The rows subtract `discount_total` (= `discount_subtotal` +
+   `discount_tax_total`); the real formula subtracts `discount_subtotal` only.
+3. **`credit_line_total` is never displayed**, though it reduces the total.
+
+This also makes the `/cart` label **factually wrong**: "Subtotal (excl. shipping and
+taxes)" excludes taxes but *includes* shipping.
+
+It also explains why this surfaced now. With shipping at `$0` (free over $199) error 1
+vanishes; with a fee on every order — Q-05, which is live today — the rows visibly fail
+to add up. **Q-05 and Q-02 are the same bug wearing two hats.**
+
+**Fix.** One pure `cartTotalRows(cart)` helper, consumed by both surfaces, decomposing
+into rows that provably sum to `cart.total`:
+
+| Row | Field | |
+|---|---|---|
+| Items | `item_subtotal` | |
+| Shipping | `shipping_subtotal` | pre-tax; omit the row when there is no shipping method |
+| Discount | `−discount_subtotal` | only when non-zero |
+| Tax | `+tax_total` | |
+| Credit | `−credit_line_total` | only when non-zero |
+| **Total** | `cart.total` | |
+
+`item_subtotal + shipping_subtotal` reconstitutes `subtotal`, so the rows sum to
+`subtotal + tax_total − discount_subtotal − credit_line_total`, which is `total`
+by construction.
 
 **Test.** The helper asserts the invariant
 

@@ -72,26 +72,40 @@ that don't add up.
   `lineItemAmounts(item).unitPrice`; the "correct price below" is a different component
   reading a different field. A $0 unit price beside a correct line total means the two
   disagree about where price comes from.
+- **⚠️ The obvious hypothesis is WRONG.** `lineItemAmounts` uses `item.unit_price ?? …`,
+  and `??` won't fall back on a `0` — tidy, and it fits the symptom. But
+  `@medusajs/utils/.../totals/line-item/index.js` derives `subtotal` and `total` **from**
+  `unit_price × quantity` and passes `unit_price` through unchanged, so a zero
+  `unit_price` would zero the line total too — and the tester says the total was correct.
+  Something else is rendering `$0.00`.
 - **Why it matters:** the single most trust-destroying number on the site. It also
   looks like a free item, which invites a support ticket on every order.
-- **Fix direction:** find which of the two readers is wrong, make both read one source
-  (`lineItemAmounts`), and pin it with a test using a real cart payload shape.
+- **Fix direction:** **identify which field on screen is zero before writing anything.**
+  `CartTotals` defaults every field with `?? 0`, so a *missing* field renders `$0.00`
+  while its neighbours stay correct — a strong alternative candidate. Then pin it with a
+  test built on the real captured payload.
 
 ### Q-02 · Checkout summary math does not add up
-- **Verified:** UNVERIFIED (needs a checkout session)
+- **Verified:** **CONFIRMED** — root-caused from the installed Medusa 2.13.6 source
 - **Severity:** Critical (tester: none given) · **Kind:** code
 - **Tester:** *"math not adding up in summary (during checkout)"*
-- **Evidence:** [`cart-totals/index.tsx`](../../../storefront/src/modules/common/components/cart-totals/index.tsx) renders
-  `subtotal`, `discount_total`, `shipping_total`, `tax_total`, `total` as five
-  independent server fields. Nothing asserts `subtotal − discount + shipping + tax == total`,
-  so any one of them being stale or differently-scoped shows as broken arithmetic.
+- **Evidence:** `@medusajs/utils/dist/totals/cart/index.js` (`decorateCartTotals`):
+  `subtotal = Σ item.subtotal + Σ shippingMethod.subtotal` (lines 66 **and 87** — shipping
+  is inside `subtotal`); `taxTotal = itemsTaxTotal + shippingTaxTotal` (106);
+  `total = (subtotal + taxTotal) − discountSubtotal − creditLinesTotal` (111-112);
+  `shipping_total = Σ shippingMethod.total`, tax included (92).
+  Both [`cart-totals`](../../../storefront/src/modules/common/components/cart-totals/index.tsx)
+  and checkout's `Totals` render `subtotal − discount_total + shipping_total + tax_total`,
+  which **(a)** counts shipping twice — its subtotal is already in `subtotal` and its tax
+  already in `tax_total`; **(b)** subtracts `discount_total` where the real formula
+  subtracts `discount_subtotal`; **(c)** never shows `credit_line_total`.
+- **Corollary:** the `/cart` label "Subtotal (excl. shipping and taxes)" is factually
+  wrong — it excludes taxes but *includes* shipping.
 - **Why it matters:** same trust problem as Q-01, at the moment of payment. Also a
   chargeback risk if the charged total differs from the displayed total.
-- **Fix direction:** reproduce with a real cart, identify the disagreeing field, then
-  add a client-side invariant check that surfaces a discrepancy in development instead
-  of rendering nonsense.
-- **Depends on:** Q-05 and Q-06 — a wrong shipping or tax number is one way this
-  presents. Fix those first, then re-measure.
+- **Relationship to Q-05:** with shipping at $0 the double-count is invisible; the flat
+  fee on every order is what makes it visible. **Q-02 and Q-05 are one bug wearing two
+  hats** — which is why the tester reported both.
 
 ### Q-05 · Free-shipping-over-$199 rule is not in effect; flat fee on every order
 - **Verified:** CONFIRMED (by code + ops trail)

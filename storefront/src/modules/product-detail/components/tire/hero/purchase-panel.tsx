@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react"
 import { useParams, useRouter } from "next/navigation"
 import { toast } from "sonner"
+import { toggleWishlist, useIsWishlisted } from "@lib/wishlist"
 import Display from "@modules/common/components/display"
 import Label from "@modules/common/components/label"
 import Chip from "@modules/common/components/chip"
@@ -193,10 +194,24 @@ const TirePurchasePanel = ({
     }
   }
 
+  // WB-125: this used to fire a toast reading "Find it in your account
+  // later." while NO wishlist existed anywhere — no page, route, backend or
+  // account tab — so it was false for every shopper and additionally sent
+  // guests to a login wall for a page that did not exist. It now really saves,
+  // in the browser, with no account required and no claim of one.
+  const saved = useIsWishlisted(product.handle)
   const handleSave = () => {
-    // No wishlist backend yet. Keep the toast (same as the wheel panel).
-    toast(`Saved ${product.name}`, {
-      description: "Find it in your account later.",
+    const nowSaved = toggleWishlist({
+      handle: product.handle,
+      name: product.name,
+      brand: product.brand,
+      priceCents: product.priceCents ?? 0,
+      thumbnail: product.thumbnail ?? null,
+      kind: "tire",
+      savedAt: new Date().toISOString(),
+    })
+    toast(nowSaved ? `Saved ${product.name}` : `Removed ${product.name}`, {
+      description: nowSaved ? "View it on your wishlist." : undefined,
     })
   }
 
@@ -327,8 +342,15 @@ const TirePurchasePanel = ({
           variant="outline"
           size="icon"
           onClick={handleSave}
-          aria-label="Save to wishlist"
-          style={{ height: 56, width: 56 }}
+          aria-label={saved ? "Remove from wishlist" : "Save to wishlist"}
+          aria-pressed={saved}
+          // WB-125: reflect real saved state — the control used to look
+          // identical before and after a "save" that never happened.
+          style={
+            saved
+              ? { height: 56, width: 56, borderColor: "var(--orange)", color: "var(--orange-deep)" }
+              : { height: 56, width: 56 }
+          }
         >
           <Icon name="heart" size={18} />
         </Button>

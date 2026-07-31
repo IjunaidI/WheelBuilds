@@ -37,8 +37,19 @@ export default async function Nav() {
           <SearchTrigger />
         </div>
 
-        {/* Right: account + cart. Hide user icon on mobile (it's in the drawer). */}
+        {/* Right: wishlist + account + cart. Hide user icon on mobile (it's in
+            the drawer). */}
         <div className="flex items-center gap-4 small:gap-[18px] text-[var(--ink)]">
+          {/* WB-125: the wishlist has to be reachable, or "Saved" is still a
+              dead end — the defect being fixed was a save with nowhere to go. */}
+          <LocalizedClientLink
+            href="/wishlist"
+            aria-label="Wishlist"
+            className="hidden small:inline-flex"
+            style={{ color: "inherit" }}
+          >
+            <Icon name="heart" size={16} />
+          </LocalizedClientLink>
           <LocalizedClientLink
             href="/account"
             aria-label="Account"

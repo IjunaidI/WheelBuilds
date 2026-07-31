@@ -1,7 +1,8 @@
 "use client"
 
 import { FormEvent, useEffect, useRef, useState } from "react"
-import { useParams, useRouter } from "next/navigation"
+import { useParams, usePathname, useRouter } from "next/navigation"
+import { searchDestination } from "@modules/search/search-destination"
 import Icon from "@modules/common/components/icon"
 import Display from "@modules/common/components/display"
 import { Button } from "@/components/ui/button"
@@ -16,6 +17,7 @@ type HeaderProps = {
 
 const Header = ({ onClose }: HeaderProps) => {
   const router = useRouter()
+  const pathname = usePathname()
   const { countryCode } = useParams() as { countryCode: string }
   const inputRef = useRef<HTMLInputElement>(null)
   const [query, setQuery] = useState("")
@@ -43,12 +45,16 @@ const Header = ({ onClose }: HeaderProps) => {
     // drawer is mounted globally in the root layout with no Suspense
     // boundary around it, and `useSearchParams()` there would de-opt the
     // whole app shell to dynamic rendering.
-    const params = new URLSearchParams({ q: trimmed })
+    // WB-126: route to the surface the shopper is actually on. Every search
+    // used to go to `/store`, which is scoped to product_type = "wheel" — so
+    // searching from /tires bounced to wheels, and a tyre-only brand
+    // ("Falken": 65 tyres, 0 wheels) was unfindable.
+    const extra: Record<string, string> = {}
     if (typeof window !== "undefined") {
       const currentFit = new URLSearchParams(window.location.search).get("fit")
-      if (currentFit === "0") params.set("fit", "0")
+      if (currentFit === "0") extra.fit = "0"
     }
-    router.push(`/${countryCode}/store?${params.toString()}`)
+    router.push(searchDestination(countryCode, pathname, trimmed, extra))
   }
 
   return (

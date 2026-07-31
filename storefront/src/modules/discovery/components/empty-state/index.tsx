@@ -4,6 +4,7 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation"
 import Wheel from "@modules/common/components/wheel"
 import Display from "@modules/common/components/display"
 import Label from "@modules/common/components/label"
+import LocalizedClientLink from "@modules/common/components/localized-client-link"
 import { Button } from "@/components/ui/button"
 import { useGarage } from "@lib/garage/use-garage"
 import { useDiscoveryQuery } from "../../data/use-discovery-query"
@@ -15,7 +16,17 @@ import { useDiscoveryQuery } from "../../data/use-discovery-query"
  * filter copy, and the recovery action turns fitment OFF (fit=0) — bare /store
  * would just get the active vehicle's fit re-applied by FitmentSync.
  */
-const DiscoveryEmpty = () => {
+type DiscoveryEmptyProps = {
+  /**
+   * WB-126: how many TYRES match the same `?q`. When non-zero the no-results
+   * block offers a link across instead of dead-ending — the reported case was
+   * "Falken", a tyre-only brand with 65 products, searched from this
+   * wheel-scoped page.
+   */
+  otherTypeCount?: number
+}
+
+const DiscoveryEmpty = ({ otherTypeCount = 0 }: DiscoveryEmptyProps) => {
   const { clearAll, q } = useDiscoveryQuery()
   const { active } = useGarage()
   const router = useRouter()
@@ -80,9 +91,24 @@ const DiscoveryEmpty = () => {
           No results for &quot;{q}&quot;
         </Display>
         <p className="text-[14px] text-[var(--graphite)] max-w-[400px]">
-          Try a different search, or clear it to browse the full catalog.
+          {otherTypeCount > 0
+            ? "No wheels match that — but our tire catalog does."
+            : "Try a different search, or clear it to browse the full catalog."}
         </p>
-        <Button onClick={clearQuery} className="mt-2">
+        {otherTypeCount > 0 && (
+          <LocalizedClientLink
+            href={`/tires?q=${encodeURIComponent(q ?? "")}`}
+            className="text-[15px] font-semibold text-[var(--orange-deep)] no-underline hover:underline"
+          >
+            See {otherTypeCount} tire{otherTypeCount === 1 ? "" : "s"} matching
+            &quot;{q}&quot; →
+          </LocalizedClientLink>
+        )}
+        <Button
+          onClick={clearQuery}
+          variant={otherTypeCount > 0 ? "outline" : "default"}
+          className="mt-2"
+        >
           Clear search
         </Button>
       </div>

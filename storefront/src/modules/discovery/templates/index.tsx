@@ -23,6 +23,12 @@ type DiscoveryTemplateProps = {
    * or add a second one. Defaults to `false` so `/store` is unchanged.
    */
   hideBrand?: boolean
+  /**
+   * WB-126: how many TYRES match the same `?q`. Only non-zero on the
+   * zero-result path, where the empty state offers a link across. Resolved
+   * by the route (this template is sync).
+   */
+  otherTypeCount?: number
 }
 
 /**
@@ -54,6 +60,7 @@ const DiscoveryTemplate = ({
   fit = false,
   activeDiameters,
   hideBrand = false,
+  otherTypeCount = 0,
 }: DiscoveryTemplateProps) => {
   // result.totalCount already reflects only the candidates that were
   // fetched/checked (bounded by FIT_CANDIDATE_CAP in fit mode — see
@@ -83,7 +90,7 @@ const DiscoveryTemplate = ({
           {result.ok === false ? (
             <DiscoveryOutage />
           ) : result.products.length === 0 ? (
-            <DiscoveryEmpty />
+            <DiscoveryEmpty otherTypeCount={otherTypeCount} />
           ) : (
             <>
               <DiscoveryGrid products={result.products} fit={fit} activeDiameters={activeDiameters} />

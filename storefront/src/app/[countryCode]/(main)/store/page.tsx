@@ -3,6 +3,7 @@ import { redirect } from "next/navigation"
 
 import { canonicalUrl } from "@lib/util/canonical"
 import DiscoveryTemplate from "@modules/discovery/templates"
+import { countOtherType } from "@modules/search/cross-type-count"
 import {
   getDiscoveryProducts,
   parseQueryFromSearchParams,
@@ -62,12 +63,22 @@ export default async function StorePage({ searchParams, params }: StorePageProps
 
   const inFitMode = !!query.vehicleConstraint?.length
 
+  // WB-126: only on the zero-result path, ask whether the OTHER catalogue has
+  // matches, so the empty state can point across instead of dead-ending. The
+  // client's video was exactly this: "Falken" searched from the wheels page,
+  // where it honestly has 0 matches while 65 tyres exist.
+  const otherTypeCount =
+    result.ok !== false && result.products.length === 0 && query.q
+      ? await countOtherType(query.q, "wheel")
+      : 0
+
   return (
     <DiscoveryTemplate
       result={result}
       currentPage={query.page}
       fit={inFitMode}
       activeDiameters={query.filters.diameters}
+      otherTypeCount={otherTypeCount}
     />
   )
 }

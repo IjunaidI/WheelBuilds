@@ -1428,3 +1428,13 @@
 - fix: account-backed persistence with a guest→login merge, the shape the retired garage used (`lib/garage/merge.ts`, `routing-garage.ts`) before WB-076 mothballed it.
 - verify: a guest saves, logs in, and sees the item on another device.
 - refs: [plan](../in-progress/plans/2026-07-30-g14-client-video-fixes-plan.md)
+
+### WB-128 · A purchase never re-indexes the product — search shows stale stock   [HIGH]
+- status: done (code) 2026-07-31 on `main` (commit `e97675f`)
+- area: backend/subscribers
+- evidence: `@rokmohar/medusa-plugin-meilisearch@1.3.5` subscribes ONLY to `product.created` / `product.updated` / `product.deleted` / `product-category.*` and its own `meilisearch.sync` (read off the installed plugin's `subscribers/`). A purchase writes inventory levels through a different module and emits no product event. Scheduled reindex paths: daily `meilisearch-reconcile-tick` (`0 4 * * *`), the 3-hourly `vendor-sync-stock-tick` (which `reconcileAfterStockApply` gates on `updatedCount > 0` — i.e. only when the FEED changed, not when a customer bought something), and the 12-hourly full sync. **So the only backstop a purchase can rely on is the nightly reconcile: up to ~24h of stale "in stock".**
+- problem: raised by the client. WB-100 found and closed exactly this blind spot for the vendor stock pass; it was never closed for customer purchases.
+- **⚠️ LATENT, not active — do not over-claim it.** Sampled 40 in-stock-flagged products against live inventory 2026-07-30: **40/40 genuinely buyable, 0 drifted**, because there is no real order volume yet. It starts biting the day sales flow.
+- fix: a subscriber on `order.placed` / `order.canceled` / `order.return_received` emitting `product.updated` per distinct product (the plugin's own documented entry point — one product re-indexed per event, no coupling to plugin internals; nothing else here listens to that event). Cancellation and returns are included so a RESTOCK is reflected too. Never throws — that would have the event bus retry a completed purchase — and failures log through the Medusa logger naming the consequence.
+- verify: place a test order for the last unit of a variant, then confirm the product's `in_stock` flips in Meilisearch within seconds instead of at 04:00.
+- refs: [plan](../in-progress/plans/2026-07-30-g14-client-video-fixes-plan.md)

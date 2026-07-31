@@ -50,5 +50,11 @@ export default async function TiresPage({ searchParams, params }: TiresPageProps
     }
   }
 
-  return <TireDiscoveryTemplate result={result} currentPage={query.page} />
+  return (
+    <TireDiscoveryTemplate
+      result={result}
+      currentPage={query.page}
+      inStockOnly={!!query.filters.inStockOnly}
+    />
+  )
 }

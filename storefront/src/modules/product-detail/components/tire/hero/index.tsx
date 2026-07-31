@@ -1,11 +1,13 @@
 "use client"
 
 import { useEffect, useMemo, useRef, useState } from "react"
+import { useSearchParams } from "next/navigation"
 import { TireProductDetail, TireSizeOption } from "../../../data/types"
 import { sizesForRim, pickDefaultTireSize } from "../../../data/tire/tire-size-options"
 import { pickDefaultTireLeaf } from "../../../data/pick-default-leaf"
 import { headlinePriceCents } from "../../../data/price-truth"
 import { useGarage } from "@lib/garage/use-garage"
+import { filterNotice } from "../../../data/filter-notice"
 import { tireFitsVehicle } from "@lib/fitment/tire-fits-vehicle"
 import { setSelectedTireFit } from "@lib/stores/selected-tire-fit"
 import FitBanner from "@modules/product-detail/components/hero/fit-banner"
@@ -54,7 +56,33 @@ const TireHero = ({ product }: TireHeroProps) => {
 
   const [showAll, setShowAll] = useState(false)
   const filtered = canFilter && !showAll
-  const visibleSizeOptions = filtered ? fittingSizeOptions : product.sizeOptions
+
+  // WB-124: the discovery "In stock only" toggle carries its intent here via
+  // `?in_stock=1`. This matters most on tyres: the index's `in_stock` only
+  // means "SOME size is buyable", and measured live 2026-07-30
+  // `falken-sincera-sn250` had 2 buyable sizes out of 62. Since choosing a
+  // size IS the interaction on a tyre PDP, the filter was close to
+  // meaningless without this.
+  const stockParam = useSearchParams().get("in_stock") === "1"
+  const fitFilteredSizes = filtered ? fittingSizeOptions : product.sizeOptions
+  const inStockSizes = useMemo(
+    () => fitFilteredSizes.filter((o) => o.availability !== "out_of_stock"),
+    [fitFilteredSizes]
+  )
+  // Never filter to empty — a product can sell out between the last index
+  // sync and this render, and an unusable PDP is worse than an honest one.
+  const stockActive = stockParam && !showAll && inStockSizes.length > 0
+  const visibleSizeOptions = stockActive ? inStockSizes : fitFilteredSizes
+
+  // Stock is only "active" for banner purposes when it actually HID something.
+  const stockTrimmed = stockActive && inStockSizes.length < fitFilteredSizes.length
+  const notice = filterNotice({
+    fitActive: filtered,
+    stockActive: stockTrimmed,
+    vehicleLabel: active
+      ? [active.year, active.make, active.model].filter(Boolean).join(" ")
+      : null,
+  })
   const visibleRims = useMemo(
     () => Array.from(new Set(visibleSizeOptions.map((o) => o.rimDiameterIn))).sort((a, b) => a - b),
     [visibleSizeOptions]
@@ -183,13 +211,35 @@ const TireHero = ({ product }: TireHeroProps) => {
     <section className="grid grid-cols-1 small:grid-cols-2 gap-10 small:gap-16 items-start">
       <TireGallery product={product} />
       <div className="flex flex-col gap-8">
-        {canFilter && (
-          <FitBanner
-            filtered={filtered}
-            vehicleLabel={vehicleLabel}
-            onShowAll={() => setShowAll(true)}
-            onOnlyFit={() => setShowAll(false)}
-          />
+        {/* WB-124: when the in-stock filter is trimming, ONE banner names
+            whichever filters are active and its escape clears both — showing
+            FitBanner alongside would say overlapping things twice. With stock
+            off, FitBanner is untouched. */}
+        {stockTrimmed && notice ? (
+          <div
+            className="flex flex-wrap items-center justify-between gap-3 rounded-[var(--radius)] border px-4 py-3"
+            style={{ borderColor: "var(--hairline)", background: "var(--soft)" }}
+          >
+            <span className="text-[13px] font-semibold text-[var(--ink)]">
+              {notice.message}
+            </span>
+            <button
+              type="button"
+              onClick={() => setShowAll(true)}
+              className="text-[12px] font-semibold uppercase tracking-[0.04em] text-[var(--orange-deep)] underline underline-offset-2"
+            >
+              {notice.action}
+            </button>
+          </div>
+        ) : (
+          canFilter && (
+            <FitBanner
+              filtered={filtered}
+              vehicleLabel={vehicleLabel}
+              onShowAll={() => setShowAll(true)}
+              onOnlyFit={() => setShowAll(false)}
+            />
+          )
         )}
         <TirePurchasePanel
           product={product}

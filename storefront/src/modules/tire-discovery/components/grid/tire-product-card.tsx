@@ -16,13 +16,23 @@ export function rimRangeLabel(rims: number[]): string {
   return min === max ? `${min}"` : `${min}"–${max}"`
 }
 
-type TireProductCardProps = { product: TireDiscoveryProduct }
+type TireProductCardProps = {
+  product: TireDiscoveryProduct
+  /**
+   * WB-124: when the rail's "In stock only" toggle is on, link with
+   * `?in_stock=1` so the tyre PDP filters its SIZE list to buyable ones.
+   * Acute here — `falken-sincera-sn250` had 2 buyable sizes of 62 while still
+   * passing the grid filter, and choosing a size IS the interaction on a tyre
+   * PDP.
+   */
+  inStockOnly?: boolean
+}
 
-const TireProductCard = ({ product }: TireProductCardProps) => {
+const TireProductCard = ({ product, inStockOnly = false }: TireProductCardProps) => {
   const rim = rimRangeLabel(product.rimDiameters)
   return (
     <LocalizedClientLink
-      href={`/products/${product.handle}`}
+      href={`/products/${product.handle}${inStockOnly ? "?in_stock=1" : ""}`}
       className="product-card group block"
       aria-label={`${product.brand} ${product.name}`}
     >

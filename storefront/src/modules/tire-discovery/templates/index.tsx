@@ -14,6 +14,8 @@ import { totalPagesFor } from "@modules/discovery/data/clamp-page"
 type TireDiscoveryTemplateProps = {
   result: TireDiscoveryResult
   currentPage: number
+  /** WB-124: the rail's "In stock only" state, carried into each PDP link. */
+  inStockOnly?: boolean
 }
 
 /**
@@ -43,6 +45,7 @@ type TireDiscoveryTemplateProps = {
  * using this same `totalPagesFor`) before ever calling this component.
  */
 const TireDiscoveryTemplate = ({
+  inStockOnly = false,
   result,
   currentPage,
 }: TireDiscoveryTemplateProps) => {
@@ -68,7 +71,7 @@ const TireDiscoveryTemplate = ({
             <TireEmpty />
           ) : (
             <>
-              <TireGrid products={result.products} />
+              <TireGrid products={result.products} inStockOnly={inStockOnly} />
               <TirePagination
                 currentPage={currentPage}
                 totalPages={totalPages}

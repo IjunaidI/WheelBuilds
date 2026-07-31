@@ -23,6 +23,14 @@ type DiscoveryProductCardProps = {
   /** When true (discovery fit mode), link to the PDP with ?fit=1 so the PDP filters variants to the active vehicle. */
   fit?: boolean
   /**
+   * WB-124: when the rail's "In stock only" toggle is on, link with
+   * `?in_stock=1` so the PDP filters its sizes to buyable ones too. The
+   * index's `in_stock` only means "SOME variant is buyable" — a tyre with 2
+   * buyable sizes of 62 passes it — so without carrying the intent through,
+   * the shopper picks the size they came for and finds it unavailable.
+   */
+  inStockOnly?: boolean
+  /**
    * Diameters currently selected in the filter rail (WB-088 D5). When set,
    * `diameterLabel` narrows the chip to the matching diameter(s) instead of
    * the product's full range. Only threaded from the Discovery grid page
@@ -43,6 +51,7 @@ type DiscoveryProductCardProps = {
 const DiscoveryProductCard = ({
   product,
   fit = false,
+  inStockOnly = false,
   activeDiameters,
 }: DiscoveryProductCardProps) => {
   const dLabel = diameterLabel(product.diameters, activeDiameters)
@@ -50,7 +59,13 @@ const DiscoveryProductCard = ({
 
   return (
     <LocalizedClientLink
-      href={`/products/${product.handle}${fit ? "?fit=1" : ""}`}
+      href={`/products/${product.handle}${
+        fit || inStockOnly
+          ? `?${[fit ? "fit=1" : null, inStockOnly ? "in_stock=1" : null]
+              .filter(Boolean)
+              .join("&")}`
+          : ""
+      }`}
       className="product-card group block"
       aria-label={`${product.brand} ${product.name}`}
     >

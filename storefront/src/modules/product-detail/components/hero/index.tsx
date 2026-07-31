@@ -15,6 +15,8 @@ import { isSentinelBore } from "../../data/center-bore"
 import { useSearchParams } from "next/navigation"
 import { useGarage } from "@lib/garage/use-garage"
 import { buildFitView } from "../../data/fit-view"
+import { buildStockView } from "../../data/stock-view"
+import { filterNotice } from "../../data/filter-notice"
 import FitBanner from "./fit-banner"
 
 type HeroProps = {
@@ -40,6 +42,11 @@ const Hero = ({ product }: HeroProps) => {
   const searchParams = useSearchParams()
   const { active } = useGarage()
   const fitParam = searchParams.get("fit") === "1"
+  // WB-124: the discovery "In stock only" toggle carries its intent here, the
+  // same way `?fit=1` does. `in_stock` in the search index means "SOME variant
+  // is buyable", so a tyre with 2 buyable sizes of 62 passes that filter —
+  // this is what makes the promise true at the point the shopper picks a size.
+  const stockParam = searchParams.get("in_stock") === "1"
 
   // The non-fit-mode default chain (finish -> bolt pattern -> size -> offset),
   // shared with `productJsonLd` via `pickDefaultSelection` so the two
@@ -70,7 +77,26 @@ const Hero = ({ product }: HeroProps) => {
   const [showAll, setShowAll] = useState(false)
   const useFilter = fitActive && !showAll
 
-  const finishOptions = useFilter ? fitView!.finishOptions : product.finishOptions
+  // Fit first, then stock — so with both on the shopper sees only sizes that
+  // fit their vehicle AND can be bought. `buildStockView` returns its input
+  // untouched (didTrim false) when nothing is buyable, so a product that sold
+  // out since the last index sync still renders a selectable PDP instead of
+  // an empty one.
+  const fitFiltered = useFilter ? fitView!.finishOptions : product.finishOptions
+  const stockView = useMemo(
+    () => (stockParam && !showAll ? buildStockView(fitFiltered) : null),
+    [stockParam, showAll, fitFiltered]
+  )
+  const stockActive = !!stockView?.didTrim
+  const finishOptions = stockView ? stockView.finishOptions : fitFiltered
+
+  const notice = filterNotice({
+    fitActive: useFilter,
+    stockActive,
+    vehicleLabel: active
+      ? [active.year, active.make, active.model].filter(Boolean).join(" ")
+      : null,
+  })
   const [activeFinishRaw, setActiveFinishRaw] = useState<string>(
     initialSelection.finishRaw
   )
@@ -249,7 +275,32 @@ const Hero = ({ product }: HeroProps) => {
         onFinishChange={setActiveFinishRaw}
       />
       <div className="flex flex-col gap-8">
-        {fitActive && active && (
+        {/* WB-124: when the in-stock filter is trimming, ONE banner covers both
+            filters (its copy names whichever are active) and its escape clears
+            both — showing FitBanner alongside would say overlapping things
+            twice. With stock off, FitBanner is untouched and keeps its
+            "Show all" confirmation dialog. */}
+        {stockActive && notice && (
+          <div
+            className="flex flex-wrap items-center justify-between gap-3 rounded-[var(--radius)] border px-4 py-3"
+            style={{
+              borderColor: "var(--hairline)",
+              background: "var(--soft)",
+            }}
+          >
+            <span className="text-[13px] font-semibold text-[var(--ink)]">
+              {notice.message}
+            </span>
+            <button
+              type="button"
+              onClick={() => setShowAll(true)}
+              className="text-[12px] font-semibold uppercase tracking-[0.04em] text-[var(--orange-deep)] underline underline-offset-2"
+            >
+              {notice.action}
+            </button>
+          </div>
+        )}
+        {!stockActive && fitActive && active && (
           <FitBanner
             filtered={useFilter}
             aggressive={aggressive}

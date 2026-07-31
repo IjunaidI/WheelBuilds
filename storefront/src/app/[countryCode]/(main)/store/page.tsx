@@ -79,6 +79,7 @@ export default async function StorePage({ searchParams, params }: StorePageProps
       fit={inFitMode}
       activeDiameters={query.filters.diameters}
       otherTypeCount={otherTypeCount}
+      inStockOnly={!!query.filters.inStockOnly}
     />
   )
 }

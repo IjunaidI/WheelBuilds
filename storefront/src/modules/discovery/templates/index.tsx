@@ -29,6 +29,8 @@ type DiscoveryTemplateProps = {
    * by the route (this template is sync).
    */
   otherTypeCount?: number
+  /** WB-124: the rail's "In stock only" state, carried into each PDP link. */
+  inStockOnly?: boolean
 }
 
 /**
@@ -61,6 +63,7 @@ const DiscoveryTemplate = ({
   activeDiameters,
   hideBrand = false,
   otherTypeCount = 0,
+  inStockOnly = false,
 }: DiscoveryTemplateProps) => {
   // result.totalCount already reflects only the candidates that were
   // fetched/checked (bounded by FIT_CANDIDATE_CAP in fit mode — see
@@ -93,7 +96,12 @@ const DiscoveryTemplate = ({
             <DiscoveryEmpty otherTypeCount={otherTypeCount} />
           ) : (
             <>
-              <DiscoveryGrid products={result.products} fit={fit} activeDiameters={activeDiameters} />
+              <DiscoveryGrid
+                products={result.products}
+                fit={fit}
+                inStockOnly={inStockOnly}
+                activeDiameters={activeDiameters}
+              />
               <DiscoveryPagination
                 currentPage={currentPage}
                 totalPages={totalPages}

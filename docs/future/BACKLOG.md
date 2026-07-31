@@ -47,6 +47,8 @@
 - **G12 · Conversion & completeness features — 2026-07-13 UX audit** `[L]` — the missing-but-expected layer from the same audit: guest order lookup (WB-097), PDP merchandising — set framing/SKU/stock-ETA (WB-098), brand & style landing pages (WB-099), discovery availability signals (WB-100, depends WB-089), journey connectors (WB-101), staggered fitment (WB-102, XL — design first), post-purchase self-service (WB-103). **Wave A ("discovery & merchandising" sub-wave) ✅ DONE 2026-07-17 — WB-098/099/100** (branch `feat/g12-wave-a-discovery-merch`, chunk tips 098=`0a2b0b1`, 099=`f483cd3`, 100=`9185f52`; per-chunk opus/sonnet reviews + a cross-chunk opus review, no Critical/Important). Remaining G12: WB-097 (guest order lookup), WB-101 (journey connectors), WB-102 (staggered fitment, XL — design first), WB-103 (post-purchase self-service). Tracked follow-ups from the Wave A review: WB-110…WB-112. → WB-097, WB-101…WB-103
 - **G13 · QA remediation — 2026-07-28 tester report** `[L · multi-session]` — remediate the external tester's live-site QA pass ([triage + defect register](plans/2026-07-29-qa-tester-report-triage.md), 19 issues `Q-01`…`Q-20`; consolidated design: [specs/2026-07-29-qa-remediation-design.md](../in-progress/specs/2026-07-29-qa-remediation-design.md)). Client scope calls 2026-07-29: **`TO TEST` rows excluded** (never exercised → not defects); **Resend delivery out of scope** (no sending domain, still on a `railway.app` host) but its logic stays in scope. Four severity-ordered waves, each its own branch + review gate, executed one at a time: **WB-118** checkout & money integrity `[CRITICAL]` → **WB-119** support & lead capture `[HIGH]` → **WB-120** discovery & availability truth `[HIGH–MED]` → **WB-121** catalog data honesty & routing `[MED–LOW]`. **✅ ALL FOUR WAVES CODE-COMPLETE 2026-07-29** on `feat/g13-qa-remediation` (26 commits, unpushed): WB-118 `4e03ee9`, WB-119 `2ed0fc2`, WB-120 `3e5cc7e`, WB-121 `202e8a4`. Two items deferred with explicit unblock conditions: **WB-122** (search relevance — blocked on a repro) and **WB-123** (Express shipping differentiation — blocked on carrier rates); plus **WB-118 Task 8** (per-state tax script — held deliberately, since [client-input §1](../reference/client-input-needed.md) offers Stripe Tax as an alternative that would make it redundant). **Everything the client must answer is collected in [reference/client-input-needed.md](../reference/client-input-needed.md).** → WB-118…WB-123
 
+- **G14 · Client video reports** `[M]` — three reports from client videos against the live site 2026-07-30, each reproduced and root-caused before planning: **WB-124** "In stock only" over-promises because `in_stock` is a product-level OR across variants (a tyre with 2 of 62 sizes buyable still passes the filter) — fixed by carrying the intent into the PDP and filtering VARIANTS there, reusing WB-060's fitment machinery so it composes with `?fit=1` and needs no re-index; **WB-125** the wishlist is fiction (the button only toasts; no page, route or backend exists for anyone, not just guests) — a localStorage guest wishlist mirroring `SingleVehicleGarage`; **WB-126** search cannot reach tyres (every submit routes to the wheel-scoped `/store`, so Falken's 65 tyre products are unfindable). Follow-up **WB-127** (wishlist account sync). → WB-124…WB-127
+
 ---
 
 ## Blockers
@@ -1379,3 +1381,47 @@
 - verify: Standard and Express quote different amounts, and each matches its stated transit time.
 - unblocks-on: real prices + transit times per method. The client decision on 2026-07-29 was explicitly to defer this, not to fix it now.
 - refs: [triage Q-09](plans/2026-07-29-qa-tester-report-triage.md)
+
+## G14 · Client video reports (2026-07-30)
+
+> Three reports from client videos against the live site, each reproduced and root-caused
+> before planning. Plan: [in-progress/plans/2026-07-30-g14-client-video-fixes-plan.md](../in-progress/plans/2026-07-30-g14-client-video-fixes-plan.md).
+
+### WB-124 · "In stock only" shows products whose sizes are out of stock   [HIGH]
+- status: todo
+- area: storefront/product-detail + storefront/discovery
+- evidence: `computeInStock` sets `in_stock = true` iff at least ONE non-discontinued variant has stock, but the shopper reads the filter as "the size I want is available". Measured live 2026-07-30 on products sitting in the filtered grid: `falken-sincera-sn250` **2 of 62 sizes buyable (3%)**, `toyo-extensa-hp2` 10/62, `toyo-proxes-r888r` 8/55, `black-rhino-hard-alloys-utv-pkb` (wheel) 1/21. Worst on TYRES, where picking a size IS the interaction. The PDP already defaults to a purchasable variant, which is why it looks fine on landing and only fails when the shopper picks the size they came for.
+- problem: the grid filter over-promises; "In stock only" is close to meaningless on a 62-size tyre with 2 buyable.
+- fix (client design, 2026-07-30): do NOT change what `in_stock` means in the index — carry the shopper's intent into the PDP and filter VARIANTS there, exactly as WB-060 already does for fitment. Grid link gains `?in_stock=1` beside the existing `?fit=1`; the PDP trims finish/size/offset options to in-stock ones; a banner at the top says so with a "Show all" escape, mirroring `FitBanner`. Composes with `?fit=1` so a shopper with a vehicle gets "fits your car AND is in stock" — which the client asked for explicitly.
+- why this shape: **no re-index** (the PDP reads live per-variant stock from the Store API), it makes the grid honest retroactively, and it reuses proven machinery (`buildFitView`, `useFilter = fitActive && !showAll`, `FitBanner`) rather than a parallel path.
+- verify: a tyre with 2/62 buyable, reached from the in-stock grid, offers exactly 2 sizes and says so; "Show all" restores 62; with a vehicle set AND in-stock on, only sizes that both fit and are buyable are offered.
+- refs: [plan](../in-progress/plans/2026-07-30-g14-client-video-fixes-plan.md)
+
+### WB-125 · Wishlist is fiction — the button only fires a toast   [HIGH]
+- status: todo
+- area: storefront/product-detail + storefront (new `lib/wishlist/`)
+- evidence: `product-detail/components/hero/purchase-panel.tsx:202-207` and `tire/hero/purchase-panel.tsx:197` — `handleSave` does nothing but `toast("Saved …", { description: "Find it in your account later." })`. A search across BOTH apps finds no wishlist page, route, backend module or account tab.
+- problem: the client reported it as broken for guests; it is broader — **it works for nobody**. The toast is false for logged-in users too, and it additionally sends a guest to a login wall for a page that does not exist.
+- fix (client choice, 2026-07-30): a **guest wishlist in localStorage**, mirroring `SingleVehicleGarage` + the `lib/stores/` `useSyncExternalStore` pattern already established for exactly this problem. Both PDPs toggle real saved state with honest copy and NO claim about an account; a `/wishlist` page lists saved items reusing `DiscoveryProductCard`.
+- **honesty first:** even if the page slips, the false "find it in your account later" copy goes in the same task as the toggle — that is the actual defect.
+- limitation to state plainly, not hide: browser-local, so it does not follow the shopper across devices and is lost with site data. Account sync is WB-127, a deliberate follow-up.
+- verify: a guest saves with no login, sees it on `/wishlist`, and it survives a reload; the toast never mentions an account.
+- refs: [plan](../in-progress/plans/2026-07-30-g14-client-video-fixes-plan.md)
+
+### WB-126 · Search cannot reach tyres — "FALKEN" returns nothing though 65 exist   [HIGH]
+- status: todo
+- area: storefront/search + storefront/discovery
+- evidence: `search-drawer/header.tsx:51` and `recent-searches.tsx:39` hard-code `router.push(/${countryCode}/store?…)`, and `/store` is scoped to `product_type = "wheel"` (`discovery/data/get-products.ts:60`). Verified live: **Falken is a TYRE brand — 65 products, 0 wheels**; unscoped search returns 65, wheel-scoped returns 0. Tyre discovery ALREADY reads `?q` (`get-tire-products.ts:178`), so the capability exists and the UI simply never routes to it.
+- problem: one line, two symptoms — searching from `/tires` bounces you to wheels, and any tyre-only brand is unfindable. The client is right that the product exists and search cannot find it.
+- fix: a pure `searchDestination(pathname, query)` so a search from a tyre surface stays on `/tires`; plus a cross-type fallback on the zero-result path — *"No wheels match 'falken' — 65 tyres do →"* — which is what actually rescues the reported case, since they searched from the wheels page.
+- verify: "falken" from `/tires` returns 65; from `/store` returns 0 wheels AND offers the tyre link; a wheel brand still behaves exactly as before.
+- not this item: relevance/ranking tuning, which is WB-122 and still blocked on a repro. This is reachability.
+- refs: [plan](../in-progress/plans/2026-07-30-g14-client-video-fixes-plan.md)
+
+### WB-127 · Wishlist does not sync to the customer account   [LOW]
+- status: todo (deliberate follow-up to WB-125)
+- area: storefront + backend (would need a module + migration + merge-on-login)
+- problem: WB-125's wishlist is browser-local, so it does not follow a shopper across devices and is lost when site data is cleared.
+- fix: account-backed persistence with a guest→login merge, the shape the retired garage used (`lib/garage/merge.ts`, `routing-garage.ts`) before WB-076 mothballed it.
+- verify: a guest saves, logs in, and sees the item on another device.
+- refs: [plan](../in-progress/plans/2026-07-30-g14-client-video-fixes-plan.md)

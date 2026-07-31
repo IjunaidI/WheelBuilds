@@ -1388,7 +1388,8 @@
 > before planning. Plan: [in-progress/plans/2026-07-30-g14-client-video-fixes-plan.md](../in-progress/plans/2026-07-30-g14-client-video-fixes-plan.md).
 
 ### WB-124 · "In stock only" shows products whose sizes are out of stock   [HIGH]
-- status: todo
+- status: done (code) 2026-07-30 on `main`
+- done (code) 2026-07-30, commit `6e7b2f5`. `buildStockView` + `filterNotice` (both pure, 14 tests); `?in_stock=1` threaded page → template → grid → card on BOTH catalogues; composed AFTER the fit trim in both heroes so "fits your car AND is in stock" works. **Caught while wiring the tyre hero:** an unguarded banner swap would have silently dropped FitBanner's confirmation dialog in the fit-only case — now guarded on `stockTrimmed`. Never filters to empty (a product can sell out between index sync and render; an unusable PDP would be worse than the bug). No backend change, no reconcile.
 - area: storefront/product-detail + storefront/discovery
 - evidence: `computeInStock` sets `in_stock = true` iff at least ONE non-discontinued variant has stock, but the shopper reads the filter as "the size I want is available". Measured live 2026-07-30 on products sitting in the filtered grid: `falken-sincera-sn250` **2 of 62 sizes buyable (3%)**, `toyo-extensa-hp2` 10/62, `toyo-proxes-r888r` 8/55, `black-rhino-hard-alloys-utv-pkb` (wheel) 1/21. Worst on TYRES, where picking a size IS the interaction. The PDP already defaults to a purchasable variant, which is why it looks fine on landing and only fails when the shopper picks the size they came for.
 - problem: the grid filter over-promises; "In stock only" is close to meaningless on a 62-size tyre with 2 buyable.
@@ -1398,7 +1399,8 @@
 - refs: [plan](../in-progress/plans/2026-07-30-g14-client-video-fixes-plan.md)
 
 ### WB-125 · Wishlist is fiction — the button only fires a toast   [HIGH]
-- status: todo
+- status: done (code) 2026-07-30 on `main`
+- done (code) 2026-07-30, commit `0ef9afd`. `lib/wishlist/` (pure core + `useSyncExternalStore` store, 11 tests), both PDPs toggle real state with the heart reflecting it, `/wishlist` page (noindex) linked from the nav — without the link the save is still a dead end, which was the original defect. Prices labelled "when saved" rather than passed off as live. Limitation stated in the UI: browser-local. → WB-127.
 - area: storefront/product-detail + storefront (new `lib/wishlist/`)
 - evidence: `product-detail/components/hero/purchase-panel.tsx:202-207` and `tire/hero/purchase-panel.tsx:197` — `handleSave` does nothing but `toast("Saved …", { description: "Find it in your account later." })`. A search across BOTH apps finds no wishlist page, route, backend module or account tab.
 - problem: the client reported it as broken for guests; it is broader — **it works for nobody**. The toast is false for logged-in users too, and it additionally sends a guest to a login wall for a page that does not exist.
@@ -1409,7 +1411,8 @@
 - refs: [plan](../in-progress/plans/2026-07-30-g14-client-video-fixes-plan.md)
 
 ### WB-126 · Search cannot reach tyres — "FALKEN" returns nothing though 65 exist   [HIGH]
-- status: todo
+- status: done (code) 2026-07-30 on `main`
+- done (code) 2026-07-30, commit `24a51d5`. `searchDestination` (11 tests) routes a search made FROM a tyre surface to `/tires`, carrying the WB-088 D13 `fit=0` opt-out through; plus a cross-type hint on the ZERO-result path ("See 65 tires matching 'falken'"), which is what rescues the reported case since the video searched from the wheels page. Queried only when there are no results, and returns 0 on failure.
 - area: storefront/search + storefront/discovery
 - evidence: `search-drawer/header.tsx:51` and `recent-searches.tsx:39` hard-code `router.push(/${countryCode}/store?…)`, and `/store` is scoped to `product_type = "wheel"` (`discovery/data/get-products.ts:60`). Verified live: **Falken is a TYRE brand — 65 products, 0 wheels**; unscoped search returns 65, wheel-scoped returns 0. Tyre discovery ALREADY reads `?q` (`get-tire-products.ts:178`), so the capability exists and the UI simply never routes to it.
 - problem: one line, two symptoms — searching from `/tires` bounces you to wheels, and any tyre-only brand is unfindable. The client is right that the product exists and search cannot find it.
